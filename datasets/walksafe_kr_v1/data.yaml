@@ -1,0 +1,10 @@
+path: datasets/walksafe_kr_v1
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: damaged_tactile_block
+  1: parked_kickboard_bicycle
+  2: construction_obstacle
+  3: pothole

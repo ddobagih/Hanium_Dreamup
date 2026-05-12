@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Optional
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+os.environ.setdefault("UPLOAD_DIR", str(ROOT / "backend" / "uploads" / "test"))
+
+from backend.app.config import get_settings  # noqa: E402
+from backend.app.main import app  # noqa: E402
+
+
+@pytest.fixture(scope="session", autouse=True)
+def migrated_database() -> None:
+    settings = get_settings()
+    engine = create_engine(settings.database_url)
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError as exc:
+        pytest.skip(f"PostGIS test database is not reachable: {exc}")
+
+    config = Config(str(ROOT / "backend" / "alembic.ini"))
+    command.upgrade(config, "head")
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(app)
+
+
+def sample_metadata(**overrides: object) -> dict[str, object]:
+    metadata = {
+        "class_id": 0,
+        "class_name": "damaged_tactile_block",
+        "confidence": 0.91,
+        "bbox": {"x": 0.2, "y": 0.35, "width": 0.4, "height": 0.22},
+        "captured_at": "2026-05-12T12:00:00.000Z",
+        "source": "fake",
+        "gps": {"latitude": 37.5665, "longitude": 126.978, "accuracy_m": 9.5},
+        "heading": 181.0,
+    }
+    metadata.update(overrides)
+    return metadata
+
+
+def create_report(client: TestClient, metadata: Optional[dict[str, object]] = None) -> dict[str, object]:
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(metadata or sample_metadata())},
+        files={"image": ("sample.jpg", b"fake image bytes", "image/jpeg")},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def ids(response: object) -> set[str]:
+    assert isinstance(response, list)
+    return {str(report["id"]) for report in response}
+
+
+def test_health(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_create_get_list_and_update_report(client: TestClient) -> None:
+    created = create_report(client)
+    report_id = created["id"]
+
+    detail = client.get(f"/reports/{report_id}")
+    assert detail.status_code == 200
+    assert detail.json()["class_name"] == "damaged_tactile_block"
+    assert detail.json()["location_quality"] == "high"
+    assert "fake_source" in detail.json()["review_flags"]
+
+    nearby = client.get("/reports", params={"lat": 37.5665, "lng": 126.978, "radius_m": 100})
+    assert nearby.status_code == 200
+    assert report_id in ids(nearby.json())
+
+    patched = client.patch(f"/reports/{report_id}/status", json={"status": "reviewed"})
+    assert patched.status_code == 200
+    assert patched.json()["status"] == "reviewed"
+
+
+def test_list_reports_filters(client: TestClient) -> None:
+    tactile = create_report(client)
+    obstacle = create_report(
+        client,
+        sample_metadata(
+            class_id=2,
+            class_name="construction_obstacle",
+            confidence=0.83,
+            captured_at="2026-05-12T13:00:00.000Z",
+            source="server",
+            gps={"latitude": 37.57, "longitude": 126.98, "accuracy_m": 8.0},
+        ),
+    )
+    client.patch(f"/reports/{obstacle['id']}/status", json={"status": "resolved"})
+
+    by_status = client.get("/reports", params={"status": "resolved", "limit": 100})
+    assert by_status.status_code == 200
+    assert obstacle["id"] in ids(by_status.json())
+    assert tactile["id"] not in ids(by_status.json())
+
+    by_class = client.get("/reports", params={"class_name": "construction_obstacle", "limit": 100})
+    assert by_class.status_code == 200
+    assert obstacle["id"] in ids(by_class.json())
+    assert tactile["id"] not in ids(by_class.json())
+
+    by_source = client.get("/reports", params={"source": "server", "limit": 100})
+    assert by_source.status_code == 200
+    assert obstacle["id"] in ids(by_source.json())
+    assert tactile["id"] not in ids(by_source.json())
+
+    by_date = client.get("/reports", params={"created_from": "2026-01-01T00:00:00Z", "limit": 100})
+    assert by_date.status_code == 200
+    assert obstacle["id"] in ids(by_date.json())
+
+
+def test_report_quality_flags(client: TestClient) -> None:
+    created = create_report(
+        client,
+        sample_metadata(
+            confidence=0.62,
+            gps=None,
+            heading=None,
+        ),
+    )
+
+    assert created["location_quality"] == "missing"
+    assert set(created["review_flags"]) >= {"fake_source", "low_confidence", "missing_location", "missing_heading"}
+
+
+def test_duplicate_candidate_support(client: TestClient) -> None:
+    first = create_report(
+        client,
+        sample_metadata(
+            class_id=3,
+            class_name="pothole",
+            captured_at="2026-05-12T15:00:00.000Z",
+            gps={"latitude": 37.5, "longitude": 127.0, "accuracy_m": 10.0},
+        ),
+    )
+    second = create_report(
+        client,
+        sample_metadata(
+            class_id=3,
+            class_name="pothole",
+            captured_at="2026-05-12T15:04:00.000Z",
+            gps={"latitude": 37.50003, "longitude": 127.00003, "accuracy_m": 10.0},
+        ),
+    )
+
+    assert first["id"] in second["duplicate_report_ids"]
+
+    duplicate_check = client.get(
+        "/reports/duplicate-check",
+        params={
+            "class_name": "pothole",
+            "captured_at": "2026-05-12T15:03:00Z",
+            "lat": 37.50002,
+            "lng": 127.00002,
+            "radius_m": 25,
+            "minutes": 10,
+        },
+    )
+    assert duplicate_check.status_code == 200
+    assert first["id"] in duplicate_check.json()["duplicate_report_ids"]
+    assert second["id"] in duplicate_check.json()["duplicate_report_ids"]
+
+
+def test_requires_complete_radius_query(client: TestClient) -> None:
+    response = client.get("/reports", params={"lat": 37.5665, "lng": 126.978})
+    assert response.status_code == 400
+
+
+def test_rejects_mismatched_class(client: TestClient) -> None:
+    metadata = sample_metadata()
+    metadata["class_name"] = "pothole"
+
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(metadata)},
+        files={"image": ("sample.jpg", b"fake image bytes", "image/jpeg")},
+    )
+    assert response.status_code == 422

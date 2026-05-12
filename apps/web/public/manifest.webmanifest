@@ -1,0 +1,18 @@
+{
+  "name": "WalkSafe Assist",
+  "short_name": "WalkSafe",
+  "description": "시각장애인 보행 지원 PWA 프로토타입",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5EE",
+  "theme_color": "#10201C",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+node_modules/
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# Model training outputs
+runs/
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.mlpackage/
+
+# Local datasets can contain personal or location-sensitive imagery.
+data_sources/raw/
+datasets/**/images/**
+datasets/**/labels/**
+!datasets/**/images/**/
+!datasets/**/images/**/.gitkeep
+!datasets/**/labels/**/
+!datasets/**/labels/**/.gitkeep
+datasets/**/labels/*.cache
+datasets/**/labels/**/*.cache
+
+# Local app artifacts
+apps/web/.next/
+apps/web/node_modules/
+backend/uploads/*
+!backend/uploads/.gitkeep
