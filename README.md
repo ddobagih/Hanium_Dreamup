@@ -41,6 +41,7 @@ python model/train_yolo.py --data datasets/walksafe_v1/data.yaml --epochs 1 --ba
 docker compose up -d db
 source .venv/bin/activate
 python -m pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env
 python -m alembic -c backend/alembic.ini upgrade head
 python -m uvicorn backend.app.main:app --reload --port 8000
 ```

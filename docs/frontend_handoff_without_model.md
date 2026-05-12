@@ -65,6 +65,8 @@ metadata=<DetectionEvent JSON string>
 image=<captured image file>
 ```
 
+이미지는 `image/jpeg`, `image/png`, `image/webp`만 허용된다. 기본 최대 크기는 8MB이며, 초과 시 `413`과 `upload_too_large`가 반환된다.
+
 응답에서 프론트가 우선 표시할 필드:
 
 | 필드 | 표시 방법 |

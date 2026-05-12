@@ -71,6 +71,14 @@ PWA는 신고 시 `multipart/form-data`로 보낸다.
 
 백엔드는 `metadata`를 검증한 뒤 이미지 파일을 로컬 업로드 폴더에 저장하고, PostGIS 좌표 컬럼에는 `gps`가 있는 경우에만 위치를 저장한다.
 
+업로드 이미지 정책:
+
+| 항목 | 기본값 |
+| --- | --- |
+| 허용 MIME | `image/jpeg`, `image/png`, `image/webp` |
+| 최대 크기 | `8388608` bytes |
+| 설정 변수 | `ALLOWED_IMAGE_CONTENT_TYPES`, `MAX_UPLOAD_BYTES` |
+
 ## 신고 응답 추가 필드
 
 백엔드는 저장된 신고를 반환할 때 프론트에서 바로 표시할 수 있는 계산 필드를 추가한다. 이 값들은 DB에 별도 저장하지 않고 신고 데이터에서 계산한다.
@@ -155,6 +163,8 @@ Content-Type: multipart/form-data
 context={"captured_at":"2026-05-12T12:00:00Z","gps":{"latitude":37.5665,"longitude":126.978,"accuracy_m":9.5},"heading":180}
 image=<camera frame image>
 ```
+
+`image`는 신고 업로드와 같은 MIME/크기 제한을 적용한다.
 
 모델 연결 전 응답:
 

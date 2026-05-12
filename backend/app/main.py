@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import List, Optional, Sequence
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
@@ -31,6 +30,7 @@ from backend.app.schemas import (
     ReportStatus,
     ReportStatusUpdate,
 )
+from backend.app.uploads import image_suffix, read_image_upload, write_image_file
 
 
 settings = get_settings()
@@ -174,15 +174,6 @@ def find_duplicate_candidates(
     return list(db.scalars(statement).all())
 
 
-def image_suffix(upload: UploadFile) -> str:
-    content_type = upload.content_type or ""
-    if content_type == "image/png":
-        return ".png"
-    if content_type == "image/webp":
-        return ".webp"
-    return ".jpg"
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -203,12 +194,10 @@ async def detect_objects(
     except (ValidationError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    content_type = image.content_type or "application/octet-stream"
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="image must be an image upload")
+    image_bytes, content_type = await read_image_upload(image, settings)
 
     try:
-        return await run_detection(image=image, context=parsed_context)
+        return await run_detection(image_bytes=image_bytes, content_type=content_type, context=parsed_context)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=503,
@@ -231,15 +220,12 @@ async def create_report(
     except (ValidationError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    content_type = image.content_type or "application/octet-stream"
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="image must be an image upload")
+    content, content_type = await read_image_upload(image, settings)
 
     report_id = uuid.uuid4()
-    filename = f"{report_id}{image_suffix(image)}"
+    filename = f"{report_id}{image_suffix(content_type)}"
     destination = settings.upload_dir / filename
-    content = await image.read()
-    destination.write_bytes(content)
+    write_image_file(destination, content)
 
     gps = parsed.gps
     latitude = gps.latitude if gps else None

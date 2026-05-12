@@ -187,6 +187,35 @@ def test_requires_complete_radius_query(client: TestClient) -> None:
     assert response.status_code == 400
 
 
+def test_rejects_unsupported_report_image_type(client: TestClient) -> None:
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(sample_metadata())},
+        files={"image": ("sample.txt", b"not an image", "text/plain")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "unsupported_image_type"
+
+
+def test_rejects_report_image_over_size_limit(client: TestClient) -> None:
+    settings = get_settings()
+    previous_limit = settings.max_upload_bytes
+    settings.max_upload_bytes = 8
+
+    try:
+        response = client.post(
+            "/reports",
+            data={"metadata": json.dumps(sample_metadata())},
+            files={"image": ("sample.jpg", b"x" * 9, "image/jpeg")},
+        )
+    finally:
+        settings.max_upload_bytes = previous_limit
+
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "upload_too_large"
+
+
 def test_rejects_mismatched_class(client: TestClient) -> None:
     metadata = sample_metadata()
     metadata["class_name"] = "pothole"

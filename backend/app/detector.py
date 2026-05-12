@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from fastapi import UploadFile
-
 from backend.app.config import get_settings
 from backend.app.schemas import DetectContext, DetectHealthResponse, DetectResponse
 
@@ -23,6 +21,6 @@ def detect_health() -> DetectHealthResponse:
     )
 
 
-async def run_detection(image: UploadFile, context: DetectContext) -> DetectResponse:
+async def run_detection(image_bytes: bytes, content_type: str, context: DetectContext) -> DetectResponse:
     health = detect_health()
     raise RuntimeError(health.reason or MODEL_UNAVAILABLE_REASON)
