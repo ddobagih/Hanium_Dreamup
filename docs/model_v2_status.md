@@ -33,6 +33,29 @@ runs/detect/walksafe_kr_tactile_v2_full/weights/last.pt
 | mAP50 | `0.66394` |
 | mAP50-95 | `0.49194` |
 
+test split 별도 검증 결과:
+
+```text
+runs/detect/runs/detect/walksafe_kr_tactile_v2_test_20260514
+```
+
+| 항목 | 값 |
+| --- | ---: |
+| images | `2,347` |
+| instances | `3,979` |
+| precision | `0.728` |
+| recall | `0.581` |
+| mAP50 | `0.657` |
+| mAP50-95 | `0.481` |
+
+해석:
+
+- validation mAP50-95 `0.49194` 대비 test mAP50-95는 약 `-0.011` 하락했다.
+- test 기준 성능 하락 폭은 작아서 v2를 기준선으로 동결할 수 있다.
+- 다만 recall이 `0.581` 수준이라 실제 보행자 시점에서 미탐 가능성이 크다.
+- 따라서 v2를 최종 서비스 모델로 보지 말고, AI Hub 513 외부 validation과 실패 프레임 분석을 계속 진행한다.
+- 검증 중 Ultralytics가 일부 test JPEG를 로컬에서 `corrupt JPEG restored and saved`로 복구 저장했다. `datasets/`는 Git ignore 대상이며 GitHub에는 올라가지 않는다.
+
 해석:
 
 - v2는 기준선 모델로 보관할 만한 상태다.

@@ -10,13 +10,18 @@
 - `docs/model_training_status.md`: YOLO 데이터셋과 v1/v2 학습 결과
 - `docs/voice_stt_tts_status.md`: 로컬 STT/TTS 프로토타입과 실제 음성 테스트 결과
 - `docs/pwa_backend_status.md`: PWA, 백엔드, fake detector, 모델 미연결 상태
+- `docs/project_3day_execution_plan.md`: 2026-05-14~2026-05-16 통합 실행 계획
+- `docs/frontend_3day_execution_plan.md`: 프론트엔드 3일 실행 체크리스트
+- `docs/backend_3day_execution_plan.md`: 백엔드 3일 실행 체크리스트
+- `docs/model_training_3day_execution_plan.md`: 모델 학습/검증 3일 실행 체크리스트
+- `docs/voice_stt_tts_3day_execution_plan.md`: STT/TTS 3일 실행 체크리스트
 
 핵심 상태:
 
 - 탐지 대상: 파손/단절 점자블록, 방치 킥보드/자전거, 공사 구조물/적치물, 포트홀
 - 목표: 객체 인식 정확도 90% 이상, 경보 지연 1초 이내
 - 완료: AI Hub 513 `TL8/TL9/TS8/TS9` 기반 점자블록 v1/v2 로컬 학습
-- 진행: test split/외부 검증, ONNX 또는 서버 추론 연결 검토, PWA 음성 명령 연동
+- 진행: v2 test split 검증 완료, AI Hub 513 외부 검증, ONNX 또는 서버 추론 연결 검토, PWA 음성 명령 연동
 - 기준 환경: 한국 보행 환경. 해외 공개 데이터는 smoke test 또는 pretrain 후보로만 사용합니다.
 
 데이터셋 이미지/라벨, AI Hub zip, `runs/`, `.pt`, 음성 샘플/출력/로그는 GitHub에 올리지 않고 로컬에서만 처리합니다.
