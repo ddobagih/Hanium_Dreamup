@@ -18,6 +18,9 @@ export type ReportResponse = {
   image_path: string;
   image_content_type: string;
   metadata: Record<string, unknown>;
+  location_quality: "missing" | "low" | "medium" | "high";
+  review_flags: string[];
+  duplicate_report_ids: string[];
   created_at: string;
   updated_at: string;
 };
@@ -34,6 +37,11 @@ export type ReportListParams = {
   radius_m?: string;
 };
 
+export type DuplicateCheckResponse = {
+  duplicate_report_ids: string[];
+  reports: ReportResponse[];
+};
+
 export function reportImageUrl(report: ReportResponse): string {
   if (report.image_path.startsWith("http")) {
     return report.image_path;
@@ -47,6 +55,20 @@ function appendParam(params: URLSearchParams, key: string, value: string | numbe
   }
 }
 
+async function parseApiJson<T>(response: Response, fallbackMessage: string): Promise<T> {
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `${fallbackMessage} (${response.status})`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`${fallbackMessage}: 백엔드 API 응답을 확인해 주세요.`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export async function submitReport(detection: DetectionEvent, image: Blob): Promise<ReportResponse> {
   const body = new FormData();
   body.append("metadata", JSON.stringify(detection));
@@ -57,12 +79,28 @@ export async function submitReport(detection: DetectionEvent, image: Blob): Prom
     body
   });
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Report upload failed with ${response.status}`);
+  return parseApiJson<ReportResponse>(response, "신고 업로드 실패");
+}
+
+export async function checkDuplicateReports(detection: DetectionEvent): Promise<DuplicateCheckResponse | null> {
+  if (!detection.gps) {
+    return null;
   }
 
-  return response.json() as Promise<ReportResponse>;
+  const params = new URLSearchParams({
+    class_name: detection.class_name,
+    captured_at: detection.captured_at,
+    lat: String(detection.gps.latitude),
+    lng: String(detection.gps.longitude),
+    radius_m: "25",
+    minutes: "10"
+  });
+
+  const response = await fetch(`${API_BASE_URL}/reports/duplicate-check?${params.toString()}`, {
+    cache: "no-store"
+  });
+
+  return parseApiJson<DuplicateCheckResponse>(response, "중복 신고 확인 실패");
 }
 
 export async function listReports(filters: ReportListParams = {}): Promise<ReportResponse[]> {
@@ -81,12 +119,7 @@ export async function listReports(filters: ReportListParams = {}): Promise<Repor
     cache: "no-store"
   });
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Report list failed with ${response.status}`);
-  }
-
-  return response.json() as Promise<ReportResponse[]>;
+  return parseApiJson<ReportResponse[]>(response, "신고 목록 불러오기 실패");
 }
 
 export async function updateReportStatus(reportId: string, status: ReportStatus): Promise<ReportResponse> {
@@ -98,10 +131,5 @@ export async function updateReportStatus(reportId: string, status: ReportStatus)
     body: JSON.stringify({ status })
   });
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Report status update failed with ${response.status}`);
-  }
-
-  return response.json() as Promise<ReportResponse>;
+  return parseApiJson<ReportResponse>(response, "신고 상태 변경 실패");
 }

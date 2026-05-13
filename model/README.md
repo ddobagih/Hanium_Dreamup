@@ -1,6 +1,6 @@
 # 모델 개발
 
-이 폴더는 YOLO 기반 모델 v1 개발을 위한 스크립트를 담습니다.
+이 폴더는 YOLO 기반 모델 개발을 위한 스크립트를 담습니다.
 
 ## 데이터셋 검증
 
@@ -28,6 +28,29 @@ python model/train_yolo.py \
   --batch 8
 ```
 
+AI Hub 513 전체 `TL8/TL9/TS8/TS9`로 만든 v2 데이터셋은 명시적으로 경로를 지정한다.
+
+```bash
+python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
+python model/train_yolo.py \
+  --data datasets/walksafe_kr_v2/data.yaml \
+  --model yolo11n.pt \
+  --epochs 50 \
+  --imgsz 640 \
+  --batch 8 \
+  --name walksafe_kr_tactile_v2_full
+```
+
+학습 완료 후 test split 별도 검증은 새 run 이름으로 분리한다.
+
+```bash
+yolo detect val \
+  model=runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
+  data=datasets/walksafe_kr_v2/data.yaml \
+  split=test \
+  name=walksafe_kr_tactile_v2_test
+```
+
 `ultralytics`가 설치되어 있지 않으면 `requirements-model.txt`를 먼저 설치합니다.
 
 ```bash
@@ -36,7 +59,9 @@ python -m pip install -r requirements-model.txt
 
 ## 주의
 
-데이터가 없는 상태에서는 학습을 실행하지 않습니다. 먼저 `datasets/walksafe_kr_v1/images`와 `datasets/walksafe_kr_v1/labels`에 한국 기준 YOLO 형식 데이터를 채웁니다.
+데이터가 없는 상태에서는 학습을 실행하지 않습니다. 먼저 `datasets/walksafe_kr_v1` 또는 `datasets/walksafe_kr_v2`의 `images`와 `labels`에 한국 기준 YOLO 형식 데이터를 채웁니다.
+
+`runs/`, `weights/`, `*.pt`, `*.onnx`, `*.engine`, `*.tflite`는 GitHub에 올리지 않습니다.
 
 해외 공개 baseline 데이터셋은 다음처럼 명시적으로 지정할 때만 사용합니다.
 

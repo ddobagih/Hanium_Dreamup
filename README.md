@@ -48,6 +48,12 @@ AI Hub 513 점자블록 데이터로 만든 로컬 데이터셋과 학습 결과
 모델 개발과 별개로 `apps/web`의 Next.js PWA는 fake detector로 동작합니다. 탐지 이벤트 형식은 `docs/inference_contract.md`를 기준으로 맞춥니다.
 모델 미구현 때문에 임시로 넣은 대체 시스템은 `docs/model_placeholder_systems.md`에서 따로 관리합니다.
 외부 프론트엔드 작업자는 `docs/frontend_handoff_without_model.md`를 먼저 보면 됩니다.
+Figma AI로 만든 UI를 구현 기준으로 정리할 때는 `docs/figma_ui_handoff.md`를 사용합니다.
+Figma Make 화면을 시각장애인 실제 사용 기준으로 검수할 때는 `docs/figma_make_accessibility_review.md`를 사용합니다.
+백엔드 API와 실행 환경은 `docs/api_reference.md`, `docs/backend_environment.md`, `docs/backend_db_reset.md`를 기준으로 확인합니다.
+실제 모델 연결 단계는 `docs/model_integration_plan.md`에 따로 정리합니다.
+모델 학습이 끝난 뒤 넘겨받을 항목은 `docs/model_training_handoff.md`에 정리합니다.
+외부 프론트엔드 연동 시에는 `docs/frontend_api_examples.md`, `docs/backend_error_contract.md`, `docs/report_operations.md`, `docs/pre_model_backend_todo.md`를 함께 확인합니다.
 
 ```bash
 docker compose up -d db

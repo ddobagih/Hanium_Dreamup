@@ -21,6 +21,9 @@ from backend.app.config import get_settings  # noqa: E402
 from backend.app.main import app  # noqa: E402
 
 
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + (b"0" * 16)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def migrated_database() -> None:
     settings = get_settings()
@@ -59,7 +62,7 @@ def create_report(client: TestClient, metadata: Optional[dict[str, object]] = No
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(metadata or sample_metadata())},
-        files={"image": ("sample.jpg", b"fake image bytes", "image/jpeg")},
+        files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -198,6 +201,28 @@ def test_rejects_unsupported_report_image_type(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "unsupported_image_type"
 
 
+def test_rejects_report_image_extension_mismatch(client: TestClient) -> None:
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(sample_metadata())},
+        files={"image": ("sample.png", JPEG_BYTES, "image/jpeg")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "image_extension_mismatch"
+
+
+def test_rejects_report_image_content_mismatch(client: TestClient) -> None:
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(sample_metadata())},
+        files={"image": ("sample.jpg", b"not an actual jpeg", "image/jpeg")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "image_content_mismatch"
+
+
 def test_rejects_report_image_over_size_limit(client: TestClient) -> None:
     settings = get_settings()
     previous_limit = settings.max_upload_bytes
@@ -223,6 +248,6 @@ def test_rejects_mismatched_class(client: TestClient) -> None:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(metadata)},
-        files={"image": ("sample.jpg", b"fake image bytes", "image/jpeg")},
+        files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
     )
     assert response.status_code == 422

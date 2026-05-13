@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Clock3, Filter, Image as ImageIcon, MapPin, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock3, Filter, Image as ImageIcon, MapPin, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   listReports,
@@ -23,6 +23,29 @@ const SOURCE_LABELS: Record<DetectorSource, string> = {
   onnx: "ONNX",
   server: "Server"
 };
+
+const LOCATION_QUALITY_LABELS: Record<ReportResponse["location_quality"], string> = {
+  missing: "위치 없음",
+  low: "위치 정확도 낮음",
+  medium: "위치 정확도 보통",
+  high: "위치 정확도 높음"
+};
+
+const REVIEW_FLAG_LABELS: Record<string, string> = {
+  fake_source: "데모 탐지",
+  low_confidence: "신뢰도 낮음",
+  missing_location: "위치 없음",
+  low_location_accuracy: "위치 정확도 낮음",
+  missing_heading: "방향 정보 없음"
+};
+
+const STATUS_SORT_ORDER: Record<ReportStatus, number> = {
+  new: 0,
+  reviewed: 1,
+  resolved: 2
+};
+
+type SortMode = "latest" | "confidence" | "status";
 
 type FilterState = {
   status: ReportStatus | "";
@@ -74,14 +97,23 @@ export default function AdminReportsPage() {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [reports, setReports] = useState<ReportResponse[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const selectedReport = useMemo(
-    () => reports.find((report) => report.id === selectedId) ?? reports[0] ?? null,
-    [reports, selectedId]
-  );
+  const sortedReports = useMemo(() => {
+    const nextReports = [...reports];
+    if (sortMode === "confidence") {
+      return nextReports.sort((first, second) => second.confidence - first.confidence);
+    }
+    if (sortMode === "status") {
+      return nextReports.sort((first, second) => STATUS_SORT_ORDER[first.status] - STATUS_SORT_ORDER[second.status]);
+    }
+    return nextReports.sort((first, second) => Date.parse(second.created_at) - Date.parse(first.created_at));
+  }, [reports, sortMode]);
+
+  const selectedReport = useMemo(() => reports.find((report) => report.id === selectedId) ?? null, [reports, selectedId]);
 
   const buildParams = useCallback((): ReportListParams => {
     const hasRadius = filters.lat !== "" && filters.lng !== "" && filters.radius_m !== "";
@@ -109,7 +141,7 @@ export default function AdminReportsPage() {
         if (current && nextReports.some((report) => report.id === current)) {
           return current;
         }
-        return nextReports[0]?.id ?? null;
+        return null;
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "신고 목록을 불러오지 못했습니다.");
@@ -147,10 +179,20 @@ export default function AdminReportsPage() {
           <p className="admin-kicker">WalkSafe 운영</p>
           <h1>신고 관리</h1>
         </div>
-        <button className="admin-action" type="button" onClick={refreshReports} disabled={isLoading}>
-          <RefreshCw className={isLoading ? "spin" : undefined} aria-hidden="true" size={20} />
-          새로고침
-        </button>
+        <div className="admin-header-actions">
+          <label>
+            <span>정렬</span>
+            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+              <option value="latest">최신순</option>
+              <option value="confidence">신뢰도순</option>
+              <option value="status">상태순</option>
+            </select>
+          </label>
+          <button className="admin-action" type="button" onClick={refreshReports} disabled={isLoading}>
+            <RefreshCw className={isLoading ? "spin" : undefined} aria-hidden="true" size={20} />
+            새로고침
+          </button>
+        </div>
       </header>
 
       <section className="admin-filters" aria-label="신고 목록 필터">
@@ -243,27 +285,41 @@ export default function AdminReportsPage() {
         </button>
       </section>
 
-      {error ? <div className="admin-error">{error}</div> : null}
+      {error ? (
+        <div className="admin-error" role="alert">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>
+            <X aria-hidden="true" size={18} />
+            닫기
+          </button>
+        </div>
+      ) : null}
 
       <section className="admin-content">
         <div className="report-list" aria-label="신고 목록">
           <div className="report-list-header">
-            <strong>신고 {reports.length}건</strong>
-            <span>{isLoading ? "불러오는 중" : "최신순"}</span>
+            <strong>신고 {sortedReports.length}건</strong>
+            <span>{isLoading ? "불러오는 중" : "목록에서 신고를 선택하세요"}</span>
           </div>
           {reports.length === 0 && !isLoading ? <div className="empty-list">조건에 맞는 신고가 없습니다.</div> : null}
-          {reports.map((report) => (
+          {sortedReports.map((report) => (
             <button
               key={report.id}
               className={`report-row ${selectedReport?.id === report.id ? "selected" : ""}`}
               type="button"
-              onClick={() => setSelectedId(report.id)}
+              aria-label={`${CLASS_LABELS[report.class_name]}, ${STATUS_LABELS[report.status]}, 신뢰도 ${Math.round(
+                report.confidence * 100
+              )}%, ${formatGps(report)}`}
+              onClick={() => setSelectedId((current) => (current === report.id ? null : report.id))}
             >
               <span className={`status-dot ${report.status}`} aria-hidden="true" />
               <span>
                 <strong>{CLASS_LABELS[report.class_name]}</strong>
                 <small>
                   {STATUS_LABELS[report.status]} · {SOURCE_LABELS[report.source]} · {formatDate(report.created_at)}
+                </small>
+                <small className={report.location_quality === "missing" ? "missing-location" : undefined}>
+                  {formatGps(report)} · {LOCATION_QUALITY_LABELS[report.location_quality]}
                 </small>
               </span>
               <b>{Math.round(report.confidence * 100)}%</b>
@@ -274,6 +330,16 @@ export default function AdminReportsPage() {
         <div className="report-detail" aria-label="신고 상세">
           {selectedReport ? (
             <>
+              <div className="detail-top">
+                <div>
+                  <span className="status-label">신고 상세</span>
+                  <strong>#{selectedReport.id.slice(0, 8)}</strong>
+                </div>
+                <button className="detail-close" type="button" onClick={() => setSelectedId(null)}>
+                  <X aria-hidden="true" size={20} />
+                  <span className="sr-only">상세 패널 닫기</span>
+                </button>
+              </div>
               <div className="detail-image-frame">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={reportImageUrl(selectedReport)} alt={`${CLASS_LABELS[selectedReport.class_name]} 신고 이미지`} />
@@ -303,6 +369,17 @@ export default function AdminReportsPage() {
                   <span>{SOURCE_LABELS[selectedReport.source]}</span>
                 </div>
               </div>
+              <div className="review-flags" aria-label="검토 플래그">
+                <strong>검토 표시</strong>
+                <div>
+                  <span>{LOCATION_QUALITY_LABELS[selectedReport.location_quality]}</span>
+                  {selectedReport.review_flags.length === 0 ? <span>추가 검토 표시 없음</span> : null}
+                  {selectedReport.review_flags.map((flag) => (
+                    <span key={flag}>{REVIEW_FLAG_LABELS[flag] ?? flag}</span>
+                  ))}
+                </div>
+              </div>
+              <h3 className="status-action-title">상태 변경</h3>
               <div className="status-actions" aria-label="신고 상태 변경">
                 {(["new", "reviewed", "resolved"] as const).map((status) => (
                   <button

@@ -36,10 +36,22 @@ python model/validate_yolo_dataset.py --data datasets/walksafe_v1/data.yaml
 
 생성 데이터는 크고 개인정보/위치정보가 포함될 수 있으므로 Git 추적에서 제외한다.
 
-AI Hub 513 점자블럭 데이터는 `datasets/walksafe_kr_v1`로 변환한다.
+AI Hub 513 점자블럭 데이터는 기본적으로 균형 샘플링 v1을 `datasets/walksafe_kr_v1`로 변환한다.
 
 ```bash
 python data_sources/scripts/build_walksafe_kr_tactile.py --dry-run
 python data_sources/scripts/build_walksafe_kr_tactile.py
 python model/validate_yolo_dataset.py
 ```
+
+`TL8/TL9/TS8/TS9` 전체를 쓰는 v2는 target과 샘플 제한을 명시한다.
+
+```bash
+python data_sources/scripts/build_walksafe_kr_tactile.py \
+  --target datasets/walksafe_kr_v2 \
+  --max-positive 0 \
+  --max-negative 0
+python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
+```
+
+`datasets/walksafe_kr_v2`의 실제 이미지/라벨과 `BUILD_SUMMARY.md`는 로컬 산출물이며 GitHub에 올리지 않는다. 현재 진행 요약은 `docs/model_v2_status.md`와 `docs/model_training_status.md`에 기록한다.

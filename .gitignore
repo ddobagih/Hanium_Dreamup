@@ -13,12 +13,19 @@ build/
 
 # Model training outputs
 runs/
+weights/
 *.zip
 *.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.gguf
 *.onnx
 *.engine
 *.tflite
 *.mlpackage/
+*.log
 
 # Local datasets can contain personal or location-sensitive imagery.
 data_sources/raw/
@@ -41,6 +48,8 @@ backend/uploads/*
 logs/
 
 # Local voice prototype artifacts
+outputs/*
+!outputs/voice/
 outputs/voice/*
 !outputs/voice/.gitkeep
 !outputs/voice/cache/

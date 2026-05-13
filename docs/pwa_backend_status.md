@@ -17,9 +17,14 @@ PWA와 백엔드는 실제 YOLO 모델 없이도 fake detector로 통합 흐름�
 - GPS 위치 표시
 - DeviceOrientation `alpha` 기반 방향 표시
 - Web Speech API TTS 경고
+- 위험 유형별 진동 패턴
+- 음성 꺼짐 상태에서 더 강한 진동 fallback
 - 6초 음성 경고 쿨다운
 - 현재 위험 신고 버튼
+- 신고 전 위치가 있으면 중복 후보 조회
+- 중복 후보가 있어도 보행 중 확인 모달로 사용자를 멈추지 않고 advisory로만 표시
 - 신고 시 카메라 프레임 JPEG 캡처
+- 신고 성공/실패 haptic feedback
 - PWA manifest와 service worker 기본 캐시
 
 현재 모델 상태 표시는 `Fake 탐지` 또는 `모델 연결 대기`로 분기한다.
@@ -29,9 +34,12 @@ PWA와 백엔드는 실제 YOLO 모델 없이도 fake detector로 통합 흐름�
 `/admin`에서 신고 운영 흐름을 확인할 수 있다.
 
 - 최신 신고 목록 조회
+- 최신순, 신뢰도순, 상태순 정렬
 - 상태, 위험 유형, 소스, 날짜, 반경 필터
 - 신고 상세 조회
 - 신고 이미지 미리보기
+- 위치 품질 표시: `missing`, `low`, `medium`, `high`
+- 검토 플래그 표시: fake source, low confidence, missing location, low location accuracy, missing heading
 - 신고 상태 변경: `new`, `reviewed`, `resolved`
 - 로딩, 빈 목록, 오류 상태 처리
 
@@ -57,6 +65,9 @@ FastAPI/PostGIS 기준 기능:
 - 기본 최대 크기: 8 MB
 - 초과 시 `413 upload_too_large`
 - 미지원 MIME이면 `400 unsupported_image_type`
+- 파일명 확장자와 MIME이 충돌하면 `400 image_extension_mismatch`
+- 빈 파일이면 `400 empty_image`
+- 파일 헤더가 MIME과 맞지 않으면 `400 image_content_mismatch`
 
 ## 탐지 이벤트 계약
 
