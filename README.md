@@ -15,6 +15,7 @@
 - `docs/backend_3day_execution_plan.md`: 백엔드 3일 실행 체크리스트
 - `docs/model_training_3day_execution_plan.md`: 모델 학습/검증 3일 실행 체크리스트
 - `docs/voice_stt_tts_3day_execution_plan.md`: STT/TTS 3일 실행 체크리스트
+- `docs/execution/2026-05-14_summary.md`: 2026-05-14 실행 결과 요약
 
 핵심 상태:
 

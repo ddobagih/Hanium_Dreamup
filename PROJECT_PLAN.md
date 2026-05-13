@@ -21,6 +21,10 @@
 - `docs/model_training_3day_execution_plan.md`: v2 검증, 외부 validation, ONNX, v3/v4 보강 계획
 - `docs/voice_stt_tts_3day_execution_plan.md`: 로컬 STT/TTS, PWA 음성 명령, 실폰 종단 테스트
 
+실행 기록:
+
+- `docs/execution/2026-05-14_summary.md`: 1일차 실행 결과 요약
+
 ## 0. 2026-05-13 현재 진행 요약
 
 - PWA/백엔드는 fake detector 기준으로 카메라, 위치, 방향, TTS 경고, 신고 생성, 관리자 신고 처리 흐름을 확인할 수 있다.
