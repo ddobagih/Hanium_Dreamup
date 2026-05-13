@@ -1,0 +1,11 @@
+# Local voice prototype dependencies. No paid/cloud API clients.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+numpy>=1.26
+soundfile>=0.12
+faster-whisper>=1.1
+qwen-tts>=0.1.1
+torch>=2.11
+torchaudio>=2.11

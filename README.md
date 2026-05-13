@@ -4,12 +4,22 @@
 
 ## 현재 진행 단계
 
-1차 구현은 모델 v1부터 시작합니다.
+현재 진행 상태는 아래 문서로 나누어 관리합니다.
+
+- `docs/current_status.md`: 전체 현재 상태 요약
+- `docs/model_training_status.md`: YOLO 데이터셋과 v1/v2 학습 결과
+- `docs/voice_stt_tts_status.md`: 로컬 STT/TTS 프로토타입과 실제 음성 테스트 결과
+- `docs/pwa_backend_status.md`: PWA, 백엔드, fake detector, 모델 미연결 상태
+
+핵심 상태:
 
 - 탐지 대상: 파손/단절 점자블록, 방치 킥보드/자전거, 공사 구조물/적치물, 포트홀
 - 목표: 객체 인식 정확도 90% 이상, 경보 지연 1초 이내
-- 우선 작업: 데이터셋 구성, 라벨링, YOLO baseline 학습, 브라우저 추론 검토
+- 완료: AI Hub 513 `TL8/TL9/TS8/TS9` 기반 점자블록 v1/v2 로컬 학습
+- 진행: test split/외부 검증, ONNX 또는 서버 추론 연결 검토, PWA 음성 명령 연동
 - 기준 환경: 한국 보행 환경. 해외 공개 데이터는 smoke test 또는 pretrain 후보로만 사용합니다.
+
+데이터셋 이미지/라벨, AI Hub zip, `runs/`, `.pt`, 음성 샘플/출력/로그는 GitHub에 올리지 않고 로컬에서만 처리합니다.
 
 ## 모델 작업 빠른 시작
 
@@ -30,6 +40,8 @@ python data_sources/scripts/build_walksafe_v1.py
 python model/validate_yolo_dataset.py --data datasets/walksafe_v1/data.yaml
 python model/train_yolo.py --data datasets/walksafe_v1/data.yaml --epochs 1 --batch 4 --name walksafe_public_smoke
 ```
+
+AI Hub 513 점자블록 데이터로 만든 로컬 데이터셋과 학습 결과 요약은 `docs/model_training_status.md`를 봅니다. 실제 산출물은 로컬 `datasets/`, `runs/`, `logs/` 아래에만 보관합니다.
 
 ## PWA/백엔드 병렬 개발 빠른 시작
 
@@ -63,3 +75,16 @@ npx @google/design.md@0.1.1 lint DESIGN.md
 cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
 cd ../.. && python -m pytest backend/tests
 ```
+
+## 로컬 음성 프로토타입
+
+음성 서버는 YOLO용 `.venv`와 분리된 `.venv-voice`에서 실행합니다.
+
+```bash
+python3 -m venv .venv-voice
+source .venv-voice/bin/activate
+python -m pip install -r requirements-voice.txt
+PYTHONPATH=. python -m uvicorn voice.server:app --host 127.0.0.1 --port 9001
+```
+
+상세 실행 방법과 테스트 결과는 `docs/local_voice_server_plan.md`, 현재 판단 요약은 `docs/voice_stt_tts_status.md`를 봅니다.

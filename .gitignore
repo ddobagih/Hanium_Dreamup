@@ -13,6 +13,7 @@ build/
 
 # Model training outputs
 runs/
+*.zip
 *.pt
 *.onnx
 *.engine
@@ -21,6 +22,8 @@ runs/
 
 # Local datasets can contain personal or location-sensitive imagery.
 data_sources/raw/
+datasets/walksafe_kr_v1/BUILD_SUMMARY.md
+datasets/walksafe_kr_v2/
 datasets/**/images/**
 datasets/**/labels/**
 !datasets/**/images/**/
@@ -35,3 +38,26 @@ apps/web/.next/
 apps/web/node_modules/
 backend/uploads/*
 !backend/uploads/.gitkeep
+logs/
+
+# Local voice prototype artifacts
+outputs/voice/*
+!outputs/voice/.gitkeep
+!outputs/voice/cache/
+outputs/voice/cache/*
+!outputs/voice/cache/.gitkeep
+!outputs/voice/tts/
+outputs/voice/tts/*
+!outputs/voice/tts/.gitkeep
+!samples/voice/
+samples/voice/stt/*
+!samples/voice/stt/.gitkeep
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.webm
+
+# Local voice virtualenv
+.venv-voice/
