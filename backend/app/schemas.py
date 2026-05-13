@@ -12,6 +12,7 @@ CLASS_NAMES = {
     2: "construction_obstacle",
     3: "pothole",
 }
+CLASS_ORDER = tuple(CLASS_NAMES[class_id] for class_id in sorted(CLASS_NAMES))
 
 ClassId = Literal[0, 1, 2, 3]
 ClassName = Literal["damaged_tactile_block", "parked_kickboard_bicycle", "construction_obstacle", "pothole"]
@@ -91,6 +92,11 @@ class DetectHealthResponse(BaseModel):
     model_status: ModelStatus
     model_version: Optional[str] = None
     reason: Optional[str] = None
+    model_artifact_path: Optional[str] = None
+    model_class_order: List[ClassName]
+    model_confidence_threshold: float = Field(ge=0, le=1)
+    model_iou_threshold: float = Field(ge=0, le=1)
+    model_image_size: int = Field(gt=0)
 
 
 class DetectResponse(BaseModel):

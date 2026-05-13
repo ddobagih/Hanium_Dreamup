@@ -51,6 +51,23 @@ def classify_intent(transcript: str) -> IntentResult:
     if any(key in compact for key in ["신고해", "싱고해", "위험신고", "위험싱고", "현재위험신고", "현재위험싱고", "신고저장", "신고", "싱고"]):
         return IntentResult("create_report", 0.9, {}, text)
 
+    location_keys = [
+        "지금어디",
+        "현재어디",
+        "여기어디",
+        "나어디",
+        "내가어디",
+        "어디야",
+        "현재위치",
+        "내위치",
+        "나의위치",
+        "제위치",
+        "현위치",
+    ]
+    location_pattern = r"(?:내|제|나의|현재|지금|여기)?위치[를은이가]?(?:알려|말해|확인|보여|어디)"
+    if any(key in compact for key in location_keys) or re.search(location_pattern, compact):
+        return IntentResult("get_current_location", 0.88, {}, text)
+
     if any(key in compact for key in ["음성꺼", "음성꼭", "음성끅", "소리꺼", "말하지마", "음성끄", "음소거"]):
         return IntentResult("voice_off", 0.93, {}, text)
 
