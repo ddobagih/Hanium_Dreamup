@@ -6,14 +6,25 @@
 
 실제 YOLO/ONNX 모델은 아직 PWA에 연결하지 않는다. 프론트엔드는 `docs/inference_contract.md`의 `DetectionEvent` 형식으로 신고 API를 호출하면 된다.
 
+사용자는 휴대폰을 목걸이 형태로 목에 걸고 보행한다고 가정한다. 따라서 화면은 장시간 주시하는 UI가 아니라, 목걸이형 카메라 입력과 TTS/진동 알림을 보조하는 상태 화면으로 설계한다.
+
 ## 신고 전 권장 흐름
 
 1. 카메라 프레임에서 탐지 이벤트를 만든다.
 2. `gps`, `heading`, `accuracy_m`이 있으면 `metadata`에 포함한다.
 3. 위치가 있으면 `GET /reports/duplicate-check`로 중복 후보를 확인한다.
-4. 중복 후보가 있으면 사용자에게 재신고 여부를 확인한다.
+4. 중복 후보가 있어도 보행 중 확인 조작을 요구하지 않고, TTS/상태 문구로 “비슷한 신고가 있음”만 안내한 뒤 저장한다.
 5. `POST /reports`로 `metadata` JSON 문자열과 이미지 파일을 `multipart/form-data`로 보낸다.
 6. 응답의 `location_quality`, `review_flags`, `duplicate_report_ids`를 화면 또는 로그에 표시한다.
+
+## 목걸이 착용 UI 기준
+
+- 위험 안내 문구는 한 문장 안에서 끝낸다.
+- “확인하세요”처럼 화면을 보게 만드는 문구보다 “발밑 주의”, “우회하세요”, “천천히 이동”처럼 행동을 직접 알려준다.
+- 위험 유형별 진동 패턴을 다르게 둔다.
+- 음성 꺼짐 상태에서는 진동을 더 길고 강하게 한다.
+- 중복 신고 확인은 보행 중 사용자를 멈추게 하지 않는다.
+- 자세한 실기기 확인은 `docs/neck_worn_phone_test_checklist.md`를 따른다.
 
 ## API 사용
 

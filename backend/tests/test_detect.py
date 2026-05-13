@@ -15,6 +15,9 @@ from backend.app.config import get_settings  # noqa: E402
 from backend.app.main import app  # noqa: E402
 
 
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + (b"0" * 16)
+
+
 def test_detect_health_is_explicitly_unavailable() -> None:
     client = TestClient(app)
 
@@ -39,7 +42,7 @@ def test_detect_returns_model_unavailable_until_adapter_exists() -> None:
     response = client.post(
         "/detect",
         data={"context": json.dumps(context)},
-        files={"image": ("frame.jpg", b"fake image bytes", "image/jpeg")},
+        files={"image": ("frame.jpg", JPEG_BYTES, "image/jpeg")},
     )
 
     assert response.status_code == 503
@@ -85,7 +88,7 @@ def test_detect_rejects_invalid_context() -> None:
     response = client.post(
         "/detect",
         data={"context": "{not-json"},
-        files={"image": ("frame.jpg", b"fake image bytes", "image/jpeg")},
+        files={"image": ("frame.jpg", JPEG_BYTES, "image/jpeg")},
     )
 
     assert response.status_code == 422

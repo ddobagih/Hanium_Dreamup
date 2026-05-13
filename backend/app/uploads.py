@@ -13,22 +13,60 @@ IMAGE_SUFFIXES = {
     "image/webp": ".webp",
 }
 
+IMAGE_EXTENSIONS = {
+    "image/jpeg": {".jpg", ".jpeg"},
+    "image/png": {".png"},
+    "image/webp": {".webp"},
+}
+
+IMAGE_SIGNATURES = {
+    "image/jpeg": (b"\xff\xd8\xff",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+}
+
 
 def image_suffix(content_type: str) -> str:
     return IMAGE_SUFFIXES.get(content_type, ".jpg")
 
 
+def validate_image_extension(filename: str | None, content_type: str) -> None:
+    suffix = Path(filename or "").suffix.lower()
+    if not suffix:
+        return
+
+    expected = IMAGE_EXTENSIONS.get(content_type, set())
+    if suffix not in expected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "image_extension_mismatch",
+                "content_type": content_type,
+                "received_extension": suffix,
+                "expected_extensions": sorted(expected),
+            },
+        )
+
+
+def matches_image_signature(content: bytes, content_type: str) -> bool:
+    if content_type == "image/webp":
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    return any(content.startswith(signature) for signature in IMAGE_SIGNATURES.get(content_type, ()))
+
+
 async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[bytes, str]:
     content_type = upload.content_type or "application/octet-stream"
-    if content_type not in settings.allowed_image_content_types:
+    supported_content_types = set(IMAGE_SUFFIXES)
+    allowed_content_types = settings.allowed_image_content_types & supported_content_types
+    if content_type not in allowed_content_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "unsupported_image_type",
-                "allowed": sorted(settings.allowed_image_content_types),
+                "allowed": sorted(allowed_content_types),
             },
         )
 
+    validate_image_extension(upload.filename, content_type)
     content = await upload.read(settings.max_upload_bytes + 1)
     if not content:
         raise HTTPException(
@@ -41,6 +79,14 @@ async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[byt
             detail={
                 "code": "upload_too_large",
                 "max_bytes": settings.max_upload_bytes,
+            },
+        )
+    if not matches_image_signature(content, content_type):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "image_content_mismatch",
+                "content_type": content_type,
             },
         )
 
