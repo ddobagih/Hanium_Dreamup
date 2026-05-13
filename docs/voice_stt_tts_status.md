@@ -1,6 +1,6 @@
 # 로컬 STT/TTS 진행 상태
 
-작성 기준일: 2026-05-13 KST
+작성 기준일: 2026-05-14 KST
 
 ## 범위
 
@@ -31,12 +31,14 @@
 | `repeat_last` | 마지막 안내 반복 |
 | `set_destination` | 목적지 설정 |
 | `start_navigation` | 길 안내 시작 |
+| `get_current_location` | 현재 위치 안내 |
 | `unknown` | 미지원 또는 불확실 |
 
 실제 사람 음성 테스트 후 다음 alias를 intent rule에 추가했다.
 
 - `음성꼭`, `음성끅` -> `voice_off`
 - `길었네시작`, `길시작` -> `start_navigation`
+- `지금 어디야`, `현재 위치`, `내 위치`, `위치 알려줘` 계열 -> `get_current_location`
 
 ## 합성 음성 기반 STT 테스트
 
@@ -87,7 +89,7 @@ samples/voice/stt/myvoice
 | average latency | 0.457 sec |
 | p95 latency | 0.572 sec |
 
-지원 intent 기준 최종 실패는 없다. `지금어디야.m4a`는 현재 intent schema에 위치 질의 intent가 없어 `needs_manual_review`로 처리했다.
+지원 intent 기준 최종 실패는 없다. 아래 수치는 `get_current_location` 추가 전 CSV 기준이라 `지금어디야.m4a`는 `needs_manual_review`로 남아 있다. 현재 intent schema는 위치 질의 intent를 지원하므로 실제 음성 샘플 CSV는 별도 재실행이 필요하다.
 
 초기 실패 2개는 모델 파인튜닝 문제가 아니라 후처리 부족이었다.
 
@@ -123,8 +125,9 @@ CustomVoice 결과:
 
 ## 다음 작업
 
-1. PWA에서 짧은 명령 녹음 후 `POST /speech/stt`로 전송한다.
-2. `지금 어디야?`를 지원할지 결정하고 필요하면 `get_current_location` intent를 추가한다.
-3. 보행 중 잡음, 바람, 휴대폰 마이크, 복수 화자 샘플을 더 모아 재평가한다.
-4. TTS 안내문은 데모 전 사람이 직접 청취해 속도, 억양, 명료도를 평가한다.
-5. 자주 쓰는 위험 경고는 `outputs/voice/cache`에 미리 생성해 지연을 줄인다.
+1. PWA에서 짧은 명령 녹음 후 `POST /speech/stt`로 전송한 흐름을 로컬 브라우저에서 확인한다.
+2. `scripts/check_voice_contract.py`로 `/health`, `/speech/intent`, `/speech/stt` 오류 계약을 실폰 없이 확인한다.
+3. `get_current_location` 추가 후 실제 사람 음성 샘플 CSV를 다시 생성한다.
+4. 보행 중 잡음, 바람, 휴대폰 마이크, 복수 화자 샘플을 더 모아 재평가한다.
+5. TTS 안내문은 데모 전 사람이 직접 청취해 속도, 억양, 명료도를 평가한다.
+6. 자주 쓰는 위험 경고는 `outputs/voice/cache`에 미리 생성해 지연을 줄인다.
