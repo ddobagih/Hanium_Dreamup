@@ -2,15 +2,19 @@
 
 import { AlertTriangle, Camera, Loader2, MapPin, Mic, Navigation, RefreshCw, Send, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { detectFrame, DETECT_API_BASE, fetchDetectHealth } from "@/lib/detect-api";
 import { createFakeDetection } from "@/lib/detector";
 import { checkDuplicateReports, submitReport } from "@/lib/report-api";
 import { speechConfidence, uploadSpeechStt, VOICE_API_BASE, type VoiceIntent, type VoiceSttResponse } from "@/lib/voice-api";
 import { CLASS_LABELS, type DetectionClassName, type DetectionEvent, type GpsFix } from "@/types/inference";
 
 const DETECTOR_MODE = process.env.NEXT_PUBLIC_DETECTOR_MODE ?? "fake";
+const SERVER_DETECT_INTERVAL_MS = 2800;
 const SPEECH_COOLDOWN_MS = 6000;
 const VOICE_RECORDING_MAX_MS = 5000;
 const VOICE_INTENT_CONFIDENCE_THRESHOLD = 0.7;
+const INITIAL_DETECTOR_MESSAGE =
+  DETECTOR_MODE === "server" ? `서버 ${DETECT_API_BASE}` : DETECTOR_MODE === "fake" ? "데모 탐지 대기" : `탐지 모드 확인 필요: ${DETECTOR_MODE}`;
 
 type VoiceRecordState = "idle" | "recording" | "uploading" | "error";
 
@@ -129,6 +133,8 @@ export default function Home() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [heading, setHeading] = useState<number | null>(null);
   const [detection, setDetection] = useState<DetectionEvent | null>(null);
+  const [detectorMessage, setDetectorMessage] = useState(INITIAL_DETECTOR_MESSAGE);
+  const [detectorBusy, setDetectorBusy] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [reportState, setReportState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [reportMessage, setReportMessage] = useState("신고 대기 중");
@@ -145,7 +151,8 @@ export default function Home() {
   const detectionLabel = detection ? CLASS_LABELS[detection.class_name] : "탐지 대기";
   const riskText = detection ? `${detectionLabel} ${formatPercent(detection.confidence)}` : "위험 요소 없음";
   const directionLabel = headingLabel(heading);
-  const modeText = DETECTOR_MODE === "fake" ? "데모 탐지 모드" : "모델 연결 대기";
+  const modeText = DETECTOR_MODE === "fake" ? "데모 탐지 모드" : DETECTOR_MODE === "server" ? "서버 탐지 모드" : "모델 연결 대기";
+  const detectorStatusText = DETECTOR_MODE === "server" && detectorBusy && !detection ? "서버 탐지 중" : detectorMessage;
   const canReport = Boolean(detection) && cameraReady && reportState !== "sending";
   const voiceResultText = voiceTranscript
     ? `${voiceTranscript} · ${voiceIntent ?? "unknown"}${voiceConfidence === null ? "" : ` ${formatPercent(voiceConfidence)}`}`
@@ -287,6 +294,7 @@ export default function Home() {
       detectionIndexRef.current += 1;
       const nextDetection = createFakeDetection(detectionIndexRef.current, gps, heading);
       setDetection(nextDetection);
+      setDetectorMessage(`${CLASS_LABELS[nextDetection.class_name]} 데모 감지`);
       if (reportStateRef.current !== "sending") {
         setReportState("idle");
         setLastDuplicateCount(0);
@@ -316,6 +324,12 @@ export default function Home() {
       speak(alert.speech);
     }
   }, [detection, speechEnabled]);
+
+  useEffect(() => {
+    if (!detection) {
+      lastStatusMessageRef.current = `탐지 상태. ${detectorMessage}.`;
+    }
+  }, [detection, detectorMessage]);
 
   useEffect(() => {
     reportStateRef.current = reportState;
@@ -358,6 +372,94 @@ export default function Home() {
       );
     });
   }, []);
+
+  useEffect(() => {
+    if (DETECTOR_MODE !== "server" || !cameraReady) {
+      return;
+    }
+
+    let stopped = false;
+    let inFlight = false;
+    let intervalId: number | null = null;
+
+    const setIdleReportMessage = (message: string) => {
+      if (reportStateRef.current !== "sending") {
+        setReportState("idle");
+        setLastDuplicateCount(0);
+        setReportMessage(message);
+      }
+    };
+
+    const clearServerDetection = (message: string) => {
+      setDetection(null);
+      setDetectorMessage(message);
+      setIdleReportMessage(message);
+    };
+
+    const runServerDetection = async () => {
+      if (inFlight) {
+        return;
+      }
+
+      inFlight = true;
+      setDetectorBusy(true);
+      try {
+        const health = await fetchDetectHealth();
+        if (stopped) {
+          return;
+        }
+        if (health.model_status !== "ready") {
+          clearServerDetection(health.reason ? `서버 모델 미준비: ${health.reason}` : "서버 모델 미준비");
+          return;
+        }
+
+        const capturedAt = new Date().toISOString();
+        const image = await captureFrame();
+        const result = await detectFrame(image, { captured_at: capturedAt, gps, heading });
+        if (stopped) {
+          return;
+        }
+
+        const nextDetection = result.detections.reduce<DetectionEvent | null>(
+          (bestDetection, currentDetection) => (!bestDetection || currentDetection.confidence > bestDetection.confidence ? currentDetection : bestDetection),
+          null
+        );
+        setDetection(nextDetection);
+
+        if (nextDetection) {
+          const message = `${CLASS_LABELS[nextDetection.class_name]} 서버 감지`;
+          setDetectorMessage(message);
+          setIdleReportMessage(`${CLASS_LABELS[nextDetection.class_name]} 신고 가능`);
+        } else {
+          const message = `서버 연결됨 · 위험 없음 (${result.model_version})`;
+          setDetectorMessage(message);
+          setIdleReportMessage("서버 탐지 결과 없음");
+        }
+      } catch (error) {
+        if (stopped) {
+          return;
+        }
+        clearServerDetection(error instanceof Error ? error.message : "서버 탐지 실패");
+      } finally {
+        inFlight = false;
+        if (!stopped) {
+          setDetectorBusy(false);
+        }
+      }
+    };
+
+    void runServerDetection();
+    intervalId = window.setInterval(() => {
+      void runServerDetection();
+    }, SERVER_DETECT_INTERVAL_MS);
+
+    return () => {
+      stopped = true;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [cameraReady, captureFrame, gps, heading]);
 
   const handleReport = useCallback(async () => {
     if (!detection || !cameraReady) {
@@ -744,7 +846,7 @@ export default function Home() {
             <AlertTriangle aria-hidden="true" size={18} />
             <span>{riskText}</span>
           </div>
-          <span>{detection ? "전방 확인" : "탐지 대기"}</span>
+          <span>{detection ? "전방 확인" : detectorStatusText}</span>
         </div>
       </section>
 
@@ -753,7 +855,7 @@ export default function Home() {
           <div className={`status-item current-risk ${detection ? "warning" : "safe"}`} aria-live="polite">
             <span className="status-label">현재 위험</span>
             <strong>{detectionLabel}</strong>
-            <small>{detection ? `신뢰도 ${formatPercent(detection.confidence)}` : "탐지 대기 중"}</small>
+            <small>{detection ? `신뢰도 ${formatPercent(detection.confidence)}` : detectorStatusText}</small>
           </div>
           <div className="status-item">
             <span className="status-label">위치</span>
