@@ -578,7 +578,7 @@ export default function Home() {
         if (message === "반복할 상태가 없습니다.") {
           vibrate([120, 80, 120]);
         }
-        if (speechEnabled || message !== "반복할 상태가 없습니다.") {
+        if (speechEnabled) {
           speak(message);
         }
         return;

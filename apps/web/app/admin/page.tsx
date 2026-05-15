@@ -310,6 +310,7 @@ export default function AdminReportsPage() {
               aria-label={`${CLASS_LABELS[report.class_name]}, ${STATUS_LABELS[report.status]}, 신뢰도 ${Math.round(
                 report.confidence * 100
               )}%, ${formatGps(report)}`}
+              aria-pressed={selectedReport?.id === report.id}
               onClick={() => setSelectedId((current) => (current === report.id ? null : report.id))}
             >
               <span className={`status-dot ${report.status}`} aria-hidden="true" />
@@ -386,6 +387,7 @@ export default function AdminReportsPage() {
                     key={status}
                     type="button"
                     className={selectedReport.status === status ? "active" : ""}
+                    aria-pressed={selectedReport.status === status}
                     disabled={updatingId === selectedReport.id}
                     onClick={() => void handleStatusChange(selectedReport.id, status)}
                   >

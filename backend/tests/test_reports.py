@@ -22,6 +22,8 @@ from backend.app.main import app  # noqa: E402
 
 
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + (b"0" * 16)
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + (b"0" * 16)
+WEBP_BYTES = b"RIFF" + (b"0" * 4) + b"WEBP" + (b"0" * 16)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -58,11 +60,17 @@ def sample_metadata(**overrides: object) -> dict[str, object]:
     return metadata
 
 
-def create_report(client: TestClient, metadata: Optional[dict[str, object]] = None) -> dict[str, object]:
+def create_report(
+    client: TestClient,
+    metadata: Optional[dict[str, object]] = None,
+    filename: str = "sample.jpg",
+    image_bytes: bytes = JPEG_BYTES,
+    content_type: str = "image/jpeg",
+) -> dict[str, object]:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(metadata or sample_metadata())},
-        files={"image": ("sample.jpg", JPEG_BYTES, "image/jpeg")},
+        files={"image": (filename, image_bytes, content_type)},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -131,6 +139,66 @@ def test_list_reports_filters(client: TestClient) -> None:
     by_date = client.get("/reports", params={"created_from": "2026-01-01T00:00:00Z", "limit": 100})
     assert by_date.status_code == 200
     assert obstacle["id"] in ids(by_date.json())
+
+
+def test_list_reports_limit_and_created_to_filter(client: TestClient) -> None:
+    created = create_report(client)
+
+    limited = client.get("/reports", params={"limit": 1})
+    assert limited.status_code == 200
+    assert len(limited.json()) == 1
+
+    by_created_to = client.get("/reports", params={"created_to": "2100-01-01T00:00:00Z", "limit": 100})
+    assert by_created_to.status_code == 200
+    assert created["id"] in ids(by_created_to.json())
+
+    before_reports_existed = client.get("/reports", params={"created_to": "2000-01-01T00:00:00Z", "limit": 100})
+    assert before_reports_existed.status_code == 200
+    assert created["id"] not in ids(before_reports_existed.json())
+
+
+@pytest.mark.parametrize(
+    ("filename", "image_bytes", "content_type", "expected_suffix"),
+    [
+        ("sample.jpg", JPEG_BYTES, "image/jpeg", ".jpg"),
+        ("sample.png", PNG_BYTES, "image/png", ".png"),
+        ("sample.webp", WEBP_BYTES, "image/webp", ".webp"),
+    ],
+)
+def test_create_report_accepts_supported_image_types(
+    client: TestClient,
+    filename: str,
+    image_bytes: bytes,
+    content_type: str,
+    expected_suffix: str,
+) -> None:
+    created = create_report(
+        client,
+        filename=filename,
+        image_bytes=image_bytes,
+        content_type=content_type,
+    )
+
+    assert created["image_content_type"] == content_type
+    assert created["image_path"].endswith(expected_suffix)
+
+
+def test_report_status_sequential_transition(client: TestClient) -> None:
+    created = create_report(client)
+    report_id = created["id"]
+    assert created["status"] == "new"
+
+    reviewed = client.patch(f"/reports/{report_id}/status", json={"status": "reviewed"})
+    assert reviewed.status_code == 200
+    assert reviewed.json()["status"] == "reviewed"
+
+    resolved = client.patch(f"/reports/{report_id}/status", json={"status": "resolved"})
+    assert resolved.status_code == 200
+    assert resolved.json()["status"] == "resolved"
+
+    detail = client.get(f"/reports/{report_id}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "resolved"
 
 
 def test_report_quality_flags(client: TestClient) -> None:
@@ -221,6 +289,17 @@ def test_rejects_report_image_content_mismatch(client: TestClient) -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"]["code"] == "image_content_mismatch"
+
+
+def test_rejects_empty_report_image(client: TestClient) -> None:
+    response = client.post(
+        "/reports",
+        data={"metadata": json.dumps(sample_metadata())},
+        files={"image": ("sample.jpg", b"", "image/jpeg")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "empty_image"
 
 
 def test_rejects_report_image_over_size_limit(client: TestClient) -> None:

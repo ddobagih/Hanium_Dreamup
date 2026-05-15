@@ -17,6 +17,7 @@ TEST_COMMANDS = [
     "다시 말해줘",
     "목적지 서울역으로 설정해",
     "길 안내 시작해",
+    "지금 어디야",
 ]
 
 AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"}
