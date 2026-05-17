@@ -9,7 +9,6 @@ from typing import Optional
 import pytest
 from alembic import command
 from alembic.config import Config
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -19,6 +18,7 @@ os.environ.setdefault("UPLOAD_DIR", str(ROOT / "backend" / "uploads" / "test"))
 
 from backend.app.config import get_settings  # noqa: E402
 from backend.app.main import app  # noqa: E402
+from asgi_client import ASGITestClient  # noqa: E402
 
 
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + (b"0" * 16)
@@ -41,8 +41,8 @@ def migrated_database() -> None:
 
 
 @pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+def client() -> ASGITestClient:
+    return ASGITestClient(app)
 
 
 def sample_metadata(**overrides: object) -> dict[str, object]:
@@ -61,7 +61,7 @@ def sample_metadata(**overrides: object) -> dict[str, object]:
 
 
 def create_report(
-    client: TestClient,
+    client: ASGITestClient,
     metadata: Optional[dict[str, object]] = None,
     filename: str = "sample.jpg",
     image_bytes: bytes = JPEG_BYTES,
@@ -81,13 +81,13 @@ def ids(response: object) -> set[str]:
     return {str(report["id"]) for report in response}
 
 
-def test_health(client: TestClient) -> None:
+def test_health(client: ASGITestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_create_get_list_and_update_report(client: TestClient) -> None:
+def test_create_get_list_and_update_report(client: ASGITestClient) -> None:
     created = create_report(client)
     report_id = created["id"]
 
@@ -106,7 +106,7 @@ def test_create_get_list_and_update_report(client: TestClient) -> None:
     assert patched.json()["status"] == "reviewed"
 
 
-def test_list_reports_filters(client: TestClient) -> None:
+def test_list_reports_filters(client: ASGITestClient) -> None:
     tactile = create_report(client)
     obstacle = create_report(
         client,
@@ -141,7 +141,7 @@ def test_list_reports_filters(client: TestClient) -> None:
     assert obstacle["id"] in ids(by_date.json())
 
 
-def test_list_reports_limit_and_created_to_filter(client: TestClient) -> None:
+def test_list_reports_limit_and_created_to_filter(client: ASGITestClient) -> None:
     created = create_report(client)
 
     limited = client.get("/reports", params={"limit": 1})
@@ -166,7 +166,7 @@ def test_list_reports_limit_and_created_to_filter(client: TestClient) -> None:
     ],
 )
 def test_create_report_accepts_supported_image_types(
-    client: TestClient,
+    client: ASGITestClient,
     filename: str,
     image_bytes: bytes,
     content_type: str,
@@ -183,7 +183,7 @@ def test_create_report_accepts_supported_image_types(
     assert created["image_path"].endswith(expected_suffix)
 
 
-def test_report_status_sequential_transition(client: TestClient) -> None:
+def test_report_status_sequential_transition(client: ASGITestClient) -> None:
     created = create_report(client)
     report_id = created["id"]
     assert created["status"] == "new"
@@ -201,7 +201,7 @@ def test_report_status_sequential_transition(client: TestClient) -> None:
     assert detail.json()["status"] == "resolved"
 
 
-def test_report_quality_flags(client: TestClient) -> None:
+def test_report_quality_flags(client: ASGITestClient) -> None:
     created = create_report(
         client,
         sample_metadata(
@@ -215,7 +215,7 @@ def test_report_quality_flags(client: TestClient) -> None:
     assert set(created["review_flags"]) >= {"fake_source", "low_confidence", "missing_location", "missing_heading"}
 
 
-def test_duplicate_candidate_support(client: TestClient) -> None:
+def test_duplicate_candidate_support(client: ASGITestClient) -> None:
     first = create_report(
         client,
         sample_metadata(
@@ -253,12 +253,12 @@ def test_duplicate_candidate_support(client: TestClient) -> None:
     assert second["id"] in duplicate_check.json()["duplicate_report_ids"]
 
 
-def test_requires_complete_radius_query(client: TestClient) -> None:
+def test_requires_complete_radius_query(client: ASGITestClient) -> None:
     response = client.get("/reports", params={"lat": 37.5665, "lng": 126.978})
     assert response.status_code == 400
 
 
-def test_rejects_unsupported_report_image_type(client: TestClient) -> None:
+def test_rejects_unsupported_report_image_type(client: ASGITestClient) -> None:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(sample_metadata())},
@@ -269,7 +269,7 @@ def test_rejects_unsupported_report_image_type(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "unsupported_image_type"
 
 
-def test_rejects_report_image_extension_mismatch(client: TestClient) -> None:
+def test_rejects_report_image_extension_mismatch(client: ASGITestClient) -> None:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(sample_metadata())},
@@ -280,7 +280,7 @@ def test_rejects_report_image_extension_mismatch(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "image_extension_mismatch"
 
 
-def test_rejects_report_image_content_mismatch(client: TestClient) -> None:
+def test_rejects_report_image_content_mismatch(client: ASGITestClient) -> None:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(sample_metadata())},
@@ -291,7 +291,7 @@ def test_rejects_report_image_content_mismatch(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "image_content_mismatch"
 
 
-def test_rejects_empty_report_image(client: TestClient) -> None:
+def test_rejects_empty_report_image(client: ASGITestClient) -> None:
     response = client.post(
         "/reports",
         data={"metadata": json.dumps(sample_metadata())},
@@ -302,7 +302,7 @@ def test_rejects_empty_report_image(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "empty_image"
 
 
-def test_rejects_report_image_over_size_limit(client: TestClient) -> None:
+def test_rejects_report_image_over_size_limit(client: ASGITestClient) -> None:
     settings = get_settings()
     previous_limit = settings.max_upload_bytes
     settings.max_upload_bytes = 8
@@ -320,7 +320,7 @@ def test_rejects_report_image_over_size_limit(client: TestClient) -> None:
     assert response.json()["detail"]["code"] == "upload_too_large"
 
 
-def test_rejects_mismatched_class(client: TestClient) -> None:
+def test_rejects_mismatched_class(client: ASGITestClient) -> None:
     metadata = sample_metadata()
     metadata["class_name"] = "pothole"
 

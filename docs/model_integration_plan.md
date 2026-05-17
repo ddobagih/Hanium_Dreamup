@@ -2,9 +2,16 @@
 
 작성 기준일: 2026-05-12
 
+## 2026-05-17~2026-05-18 구현 반영
+
+- backend `/detect` `.pt` adapter와 PWA server detector mode는 구현되어 headless fixture smoke에서 `source: "server"` 신고 저장까지 확인됐다.
+- 현재 backend ready 기준 산출물은 `runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt`다. `best.onnx`는 test split 2,347장 기준 full metric equivalence를 통과했지만, PT 대비 CPU p95 latency가 느렸고 browser/ONNX Runtime Web latency 근거는 아직 없다.
+- v2 모델은 class `0: damaged_tactile_block` baseline이다. 4-class 서비스 성능 근거로 쓰지 않는다.
+- 이 문서는 남은 통합/운영 확인 항목을 추적하는 문서로 유지한다.
+
 ## 목적
 
-현재 PWA와 백엔드는 fake detector와 서버 추론 placeholder로 병렬 개발 중이다. 실제 모델이 준비되면 이 문서 순서대로 기존 계약을 유지하면서 연결한다.
+현재 PWA와 백엔드는 fake detector와 서버 추론 adapter로 병렬 개발 중이다. 실제 운영/field 검증으로 확장할 때 이 문서 순서대로 기존 계약을 유지하면서 확인한다.
 
 ## 전제
 
@@ -29,10 +36,11 @@
 학습 완료 후 모델 파일 경로를 `.env`에 지정한다.
 
 ```env
-MODEL_ARTIFACT_PATH=/absolute/path/to/model.onnx
+MODEL_ARTIFACT_PATH=/absolute/path/to/best.pt
+MODEL_VERSION=walksafe-kr-tactile-v2-full-20260514-best-02a6be87
 ```
 
-현재 `backend/app/detector.py`는 파일 존재 여부만 확인한다. 모델 파일이 있더라도 실제 어댑터가 없으면 `model_adapter_not_implemented`를 반환한다.
+현재 `backend/app/detector.py`는 Ultralytics `.pt` 산출물을 로드해 `/detect` 결과를 반환할 수 있다. 모델 env가 없거나 파일이 없으면 `/detect/health`는 unavailable, `POST /detect`는 `503 model_unavailable`을 반환한다.
 
 ## 2단계: Detector Adapter 구현
 
@@ -87,9 +95,9 @@ MODEL_ARTIFACT_PATH=/absolute/path/to/model.onnx
 
 ## 보류 항목
 
-다음은 모델 산출물이 생긴 뒤 결정한다.
+다음은 추가 field/runtime 근거가 생긴 뒤 결정한다.
 
-- ONNX Runtime을 백엔드에 둘지, 브라우저 PWA에 둘지
+- ONNX Runtime을 백엔드에 둘지, 브라우저 PWA에 둘지. 현재 ONNX metric equivalence는 통과했지만 로컬 CPU latency는 PT보다 느렸고 browser/ONNX Runtime Web latency는 미실행이다.
 - confidence threshold 기본값
 - 클래스별 TTS 우선순위
 - 중복 신고 기준을 클래스별로 다르게 둘지 여부

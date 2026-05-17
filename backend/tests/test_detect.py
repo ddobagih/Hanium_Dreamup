@@ -7,7 +7,6 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from fastapi.testclient import TestClient
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +17,7 @@ from backend.app.config import get_settings  # noqa: E402
 import backend.app.detector as detector  # noqa: E402
 from backend.app.main import app  # noqa: E402
 from backend.app.schemas import CLASS_ORDER  # noqa: E402
+from asgi_client import ASGITestClient  # noqa: E402
 
 
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + (b"0" * 16)
@@ -100,7 +100,7 @@ def configure_model_settings(model_path: Path, version: str = "walksafe-test") -
 
 
 def test_detect_health_is_explicitly_unavailable() -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
 
     response = client.get("/detect/health")
 
@@ -117,7 +117,7 @@ def test_detect_health_reports_dependency_missing_for_existing_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -146,7 +146,7 @@ def test_detect_health_is_ready_after_fake_model_loads(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -182,7 +182,7 @@ def test_detect_health_rejects_class_order_mismatch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -197,7 +197,7 @@ def test_detect_health_rejects_class_order_mismatch(
 
 
 def test_detect_returns_model_unavailable_without_configured_model() -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     context = {
         "captured_at": "2026-05-12T12:00:00.000Z",
         "gps": {"latitude": 37.5665, "longitude": 126.978, "accuracy_m": 9.5},
@@ -219,7 +219,7 @@ def test_detect_returns_model_unavailable_when_model_load_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -245,7 +245,7 @@ def test_detect_returns_server_detections_with_normalized_bbox(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -304,7 +304,7 @@ def test_detect_single_class_model_only_maps_damaged_tactile_block(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     model_path = tmp_path / "best.pt"
     model_path.write_bytes(b"placeholder")
     configure_model_settings(model_path)
@@ -331,7 +331,7 @@ def test_detect_single_class_model_only_maps_damaged_tactile_block(
 
 
 def test_detect_rejects_non_image_upload() -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
 
     response = client.post(
         "/detect",
@@ -344,7 +344,7 @@ def test_detect_rejects_non_image_upload() -> None:
 
 
 def test_detect_rejects_image_over_size_limit() -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
     settings = get_settings()
     previous_limit = settings.max_upload_bytes
     settings.max_upload_bytes = 8
@@ -363,7 +363,7 @@ def test_detect_rejects_image_over_size_limit() -> None:
 
 
 def test_detect_rejects_invalid_context() -> None:
-    client = TestClient(app)
+    client = ASGITestClient(app)
 
     response = client.post(
         "/detect",

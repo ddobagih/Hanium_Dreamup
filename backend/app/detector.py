@@ -7,8 +7,6 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Optional
 
-from starlette.concurrency import run_in_threadpool
-
 from backend.app.config import get_settings
 from backend.app.schemas import CLASS_NAMES, DetectContext, DetectHealthResponse, DetectResponse, ReportMetadata
 
@@ -91,7 +89,7 @@ async def run_detection(image_bytes: bytes, content_type: str, context: DetectCo
     if load_result.adapter is None:
         raise RuntimeError(load_result.reason or MODEL_NOT_CONFIGURED_REASON)
 
-    return await run_in_threadpool(load_result.adapter.predict, image_bytes, settings, context)
+    return load_result.adapter.predict(image_bytes, settings, context)
 
 
 def _adapter_load_result(settings: Any) -> AdapterLoadResult:

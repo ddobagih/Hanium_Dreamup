@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from geoalchemy2.elements import WKTElement
 from pydantic import ValidationError
 from sqlalchemy import select, text
@@ -30,7 +31,7 @@ from backend.app.schemas import (
     ReportStatus,
     ReportStatusUpdate,
 )
-from backend.app.uploads import image_suffix, read_image_upload, write_image_file
+from backend.app.uploads import IMAGE_EXTENSIONS, image_suffix, read_image_upload, write_image_file
 
 
 settings = get_settings()
@@ -44,7 +45,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 
 DUPLICATE_RADIUS_M = 25.0
@@ -52,6 +52,11 @@ DUPLICATE_WINDOW_MINUTES = 10
 LOW_CONFIDENCE_THRESHOLD = 0.7
 HIGH_LOCATION_ACCURACY_M = 15.0
 MEDIUM_LOCATION_ACCURACY_M = 50.0
+UPLOAD_MEDIA_TYPES = {
+    extension: content_type
+    for content_type, extensions in IMAGE_EXTENSIONS.items()
+    for extension in extensions
+}
 
 
 def location_quality(report: Report) -> LocationQuality:
@@ -175,13 +180,26 @@ def find_duplicate_candidates(
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @app.get("/detect/health", response_model=DetectHealthResponse)
-def get_detect_health() -> DetectHealthResponse:
+async def get_detect_health() -> DetectHealthResponse:
     return detect_health()
+
+
+@app.get("/uploads/{filename}")
+async def get_upload(filename: str) -> Response:
+    if Path(filename).name != filename:
+        raise HTTPException(status_code=404, detail="upload not found")
+
+    path = settings.upload_dir / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="upload not found")
+
+    media_type = UPLOAD_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return Response(content=path.read_bytes(), media_type=media_type)
 
 
 @app.post("/detect", response_model=DetectResponse)
@@ -261,7 +279,7 @@ async def create_report(
 
 
 @app.get("/reports", response_model=List[ReportResponse])
-def list_reports(
+async def list_reports(
     db: Session = Depends(get_db),
     limit: int = Query(default=25, ge=1, le=100),
     status: Optional[ReportStatus] = Query(default=None),
@@ -302,7 +320,7 @@ def list_reports(
 
 
 @app.get("/reports/duplicate-check", response_model=DuplicateCheckResponse)
-def check_report_duplicates(
+async def check_report_duplicates(
     db: Session = Depends(get_db),
     class_name: ClassName = Query(...),
     captured_at: datetime = Query(...),
@@ -328,7 +346,7 @@ def check_report_duplicates(
 
 
 @app.get("/reports/{report_id}", response_model=ReportResponse)
-def get_report(report_id: uuid.UUID, db: Session = Depends(get_db)) -> ReportResponse:
+async def get_report(report_id: uuid.UUID, db: Session = Depends(get_db)) -> ReportResponse:
     report = db.get(Report, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="report not found")
@@ -336,7 +354,7 @@ def get_report(report_id: uuid.UUID, db: Session = Depends(get_db)) -> ReportRes
 
 
 @app.patch("/reports/{report_id}/status", response_model=ReportResponse)
-def update_report_status(
+async def update_report_status(
     report_id: uuid.UUID,
     payload: ReportStatusUpdate,
     db: Session = Depends(get_db),

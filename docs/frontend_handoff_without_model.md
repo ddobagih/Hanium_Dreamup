@@ -1,10 +1,16 @@
-# 프론트엔드 인계 메모: 모델 미연결 상태
+# 프론트엔드 인계 메모: 모델 연결 상태와 fallback
 
 작성 기준일: 2026-05-12
 
+## 2026-05-18 상태 보정
+
+서버 `.pt` 추론 adapter와 PWA server detector mode는 구현되어 있다. `NEXT_PUBLIC_DETECTOR_MODE=server`와 backend `MODEL_ARTIFACT_PATH`를 함께 설정하면 `/detect` 결과를 신고 흐름에 연결할 수 있다.
+
+다만 Android 실폰 field 성능, browser/ONNX Runtime Web, 운영 기본값 전환은 아직 완료되지 않았다. fake detector는 UI/API flow 검증용 fallback으로만 사용한다.
+
 ## 현재 전제
 
-실제 YOLO/ONNX 모델은 아직 PWA에 연결하지 않는다. 프론트엔드는 `docs/inference_contract.md`의 `DetectionEvent` 형식으로 신고 API를 호출하면 된다.
+프론트엔드는 detector mode와 무관하게 `docs/inference_contract.md`의 `DetectionEvent` 형식으로 신고 API를 호출하면 된다. fake 결과는 성능 근거로 쓰지 않고, server 결과는 `source: "server"`로 분리한다.
 
 사용자는 휴대폰을 목걸이 형태로 목에 걸고 보행한다고 가정한다. 따라서 화면은 장시간 주시하는 UI가 아니라, 목걸이형 카메라 입력과 TTS/진동 알림을 보조하는 상태 화면으로 설계한다.
 
@@ -34,7 +40,7 @@
 GET /detect/health
 ```
 
-현재 모델 어댑터가 없으면 아래처럼 응답한다.
+모델 env가 없거나 로드에 실패하면 아래처럼 응답한다.
 
 ```json
 {
@@ -56,7 +62,7 @@ context={"captured_at":"2026-05-12T12:00:00Z","gps":{"latitude":37.5665,"longitu
 image=<camera frame image>
 ```
 
-현재는 실제 모델이 없으므로 `503`과 `model_unavailable`을 반환한다. 이 응답은 정상적인 placeholder 상태이며, 프론트는 실패 토스트보다 "모델 연결 대기" 상태로 처리하는 것이 좋다.
+모델 env가 없거나 로드에 실패하면 `503`과 `model_unavailable`을 반환한다. 프론트는 실패 토스트보다 "모델 연결 대기" 상태 또는 fake/local fallback으로 처리하는 것이 좋다.
 
 ### 중복 확인
 

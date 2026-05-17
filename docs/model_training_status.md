@@ -2,6 +2,14 @@
 
 작성 기준일: 2026-05-13 KST
 
+## 2026-05-18 보정 요약
+
+- v2 `best.pt` test split 별도 검증은 완료됐다. test split 2,347장 기준 precision `0.728`, recall `0.581`, mAP50 `0.657`, mAP50-95 `0.481`이다.
+- `best.onnx` full metric equivalence도 완료됐다. test split 기준 PT mAP50-95 `0.481`, ONNX mAP50-95 `0.482`로 계획 기준을 만족했다.
+- PT/ONNX latency는 test split 120장으로 측정됐다. PT p95 `12.6493ms`, ONNX Runtime CPU p95 `58.1289ms`라 backend ready artifact는 계속 `.pt`로 둔다.
+- VL1+VS1 hard-negative 200장 평가와 상위 FP visual review가 완료됐다. conf `0.35` 기준 FP image `21/200`, FP detections `30`이다.
+- v3 후보 manifest는 `data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv`에 정리했다.
+
 ## 범위
 
 이 문서는 로컬에 생성된 데이터셋과 학습 결과를 요약한다. AI Hub 원본 zip, 데이터셋 이미지/라벨, `runs/`, `.pt` 파일은 GitHub에 올리지 않고 로컬에서만 보관한다.
@@ -95,12 +103,12 @@ v2는 v1 대비 validation 기준 mAP50-95가 약 `+0.05315`, mAP50이 약 `+0.0
 | `best.pt` | `runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt` |
 | `last.pt` | `runs/detect/walksafe_kr_tactile_v2_full/weights/last.pt` |
 
-## 아직 하지 않은 검증
+## 남은 검증
 
-- `best.pt`로 `walksafe_kr_v2` test split 별도 검증
-- AI Hub 513 validation zip `VL1/VL2/VS1/VS2` 외부 검증
+- AI Hub 513 `VL2+VS2` tactile subset 외부 검증과 class `1..3` 한국 GT validation
 - 실제 보행자 시점 영상 또는 직접 촬영 이미지에서 실패 프레임 추출
-- ONNX/TensorFlow.js 변환 및 모바일 추론 지연 측정
+- browser/ONNX Runtime Web 또는 모바일 추론 지연 측정
+- full test split failure sampling 재시도. 기존 대형 실행은 exit code `137` 기록이 있어 streaming/저장량 제한 방식이 필요하다.
 
 ## 판단
 
@@ -108,8 +116,8 @@ v2는 v1보다 지표가 개선됐지만, 아직 목표인 mAP 0.9와는 거리�
 
 추가 epoch만 반복하는 것보다 다음 작업이 우선이다.
 
-1. test split 별도 검증
-2. AI Hub validation set 외부 검증
-3. 실패 프레임 수집과 라벨 품질 점검
-4. 한국 보행자 시점 직접 촬영 데이터 보강
-5. 4개 클래스 통합 학습 데이터 확보
+1. AI Hub validation set 외부 검증 확장
+2. 실패 프레임 수집과 라벨 품질 점검
+3. 한국 보행자 시점 직접 촬영 데이터 보강
+4. 4개 클래스 통합 학습 데이터 확보
+5. browser/mobile latency 검증

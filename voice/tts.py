@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,38 @@ DEFAULT_TTS_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 OPTIONAL_TTS_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
 DEFAULT_VOICE_INSTRUCT = "차분하고 명확한 한국어 보행 안전 안내 음성. 너무 빠르지 않게 말하세요."
 TTSMode = Literal["custom", "design", "clone"]
+
+
+def _huggingface_hub_cache_dir() -> Path:
+    explicit_cache = os.getenv("HUGGINGFACE_HUB_CACHE") or os.getenv("HF_HUB_CACHE")
+    if explicit_cache:
+        return Path(explicit_cache)
+    hf_home = os.getenv("HF_HOME")
+    if hf_home:
+        return Path(hf_home) / "hub"
+    return Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def _cached_snapshot_path(model_id: str) -> Path | None:
+    if "/" not in model_id or Path(model_id).exists():
+        return None
+
+    model_cache = _huggingface_hub_cache_dir() / f"models--{model_id.replace('/', '--')}"
+    snapshots_dir = model_cache / "snapshots"
+    ref_path = model_cache / "refs" / "main"
+    if ref_path.exists():
+        snapshot_path = snapshots_dir / ref_path.read_text(encoding="utf-8").strip()
+        if snapshot_path.is_dir():
+            return snapshot_path
+
+    if not snapshots_dir.is_dir():
+        return None
+    snapshots = sorted(
+        (path for path in snapshots_dir.iterdir() if path.is_dir()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return snapshots[0] if snapshots else None
 
 
 @dataclass(frozen=True)
@@ -59,6 +92,10 @@ class LocalTTSEngine:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._model = None
 
+    def _model_load_path(self) -> str:
+        cached_snapshot = _cached_snapshot_path(self.model_id)
+        return str(cached_snapshot) if cached_snapshot else self.model_id
+
     def load(self) -> None:
         if self._model is not None:
             return
@@ -75,7 +112,7 @@ class LocalTTSEngine:
         }
         if self.attn_implementation:
             kwargs["attn_implementation"] = self.attn_implementation
-        self._model = Qwen3TTSModel.from_pretrained(self.model_id, **kwargs)
+        self._model = Qwen3TTSModel.from_pretrained(self._model_load_path(), **kwargs)
 
     def _cache_path(self, text: str, mode: TTSMode, suffix: str = ".wav") -> Path:
         key = hashlib.sha256(

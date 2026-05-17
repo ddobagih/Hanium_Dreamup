@@ -9,7 +9,7 @@
 - `docs/current_status.md`: 전체 현재 상태 요약
 - `docs/model_training_status.md`: YOLO 데이터셋과 v1/v2 학습 결과
 - `docs/voice_stt_tts_status.md`: 로컬 STT/TTS 프로토타입과 실제 음성 테스트 결과
-- `docs/pwa_backend_status.md`: PWA, 백엔드, fake detector, 모델 미연결 상태
+- `docs/pwa_backend_status.md`: PWA, 백엔드, fake detector, `.pt` server adapter 상태
 - `docs/project_3day_execution_plan.md`: 2026-05-14~2026-05-16 통합 실행 계획
 - `docs/frontend_3day_execution_plan.md`: 프론트엔드 3일 실행 체크리스트
 - `docs/backend_3day_execution_plan.md`: 백엔드 3일 실행 체크리스트
@@ -22,7 +22,8 @@
 - 탐지 대상: 파손/단절 점자블록, 방치 킥보드/자전거, 공사 구조물/적치물, 포트홀
 - 목표: 객체 인식 정확도 90% 이상, 경보 지연 1초 이내
 - 완료: AI Hub 513 `TL8/TL9/TS8/TS9` 기반 점자블록 v1/v2 로컬 학습
-- 진행: v2 test split 검증 완료, AI Hub 513 외부 검증, ONNX 또는 서버 추론 연결 검토, PWA 음성 명령 연동
+- 진행: v2 test split 검증 완료, AI Hub 513 외부 검증, `.pt` 서버 추론 adapter와 PWA server detector mode headless smoke, PWA 음성 명령 연동
+- 미완료: Android 실폰/목걸이 착용 field test, 브라우저/실폰 마이크 E2E, TTS HTTP cache/fallback/청취 평가, PostGIS runtime 재검증
 - 기준 환경: 한국 보행 환경. 해외 공개 데이터는 smoke test 또는 pretrain 후보로만 사용합니다.
 
 데이터셋 이미지/라벨, AI Hub zip, `runs/`, `.pt`, 음성 샘플/출력/로그는 GitHub에 올리지 않고 로컬에서만 처리합니다.
@@ -51,8 +52,8 @@ AI Hub 513 점자블록 데이터로 만든 로컬 데이터셋과 학습 결과
 
 ## PWA/백엔드 병렬 개발 빠른 시작
 
-모델 개발과 별개로 `apps/web`의 Next.js PWA는 fake detector로 동작합니다. 탐지 이벤트 형식은 `docs/inference_contract.md`를 기준으로 맞춥니다.
-모델 미구현 때문에 임시로 넣은 대체 시스템은 `docs/model_placeholder_systems.md`에서 따로 관리합니다.
+모델 개발과 별개로 `apps/web`의 Next.js PWA는 기본 데모 경로에서 fake detector로 동작합니다. `NEXT_PUBLIC_DETECTOR_MODE=server`와 backend `MODEL_ARTIFACT_PATH`를 설정하면 서버 `/detect` 결과를 PWA 신고 흐름에 연결할 수 있습니다. 탐지 이벤트 형식은 `docs/inference_contract.md`를 기준으로 맞춥니다.
+서버 `.pt` adapter 구현 이후에도 남은 fake detector 등 데모/fallback 시스템은 `docs/model_placeholder_systems.md`에서 따로 관리합니다.
 외부 프론트엔드 작업자는 `docs/frontend_handoff_without_model.md`를 먼저 보면 됩니다.
 Figma AI로 만든 UI를 구현 기준으로 정리할 때는 `docs/figma_ui_handoff.md`를 사용합니다.
 Figma Make 화면을 시각장애인 실제 사용 기준으로 검수할 때는 `docs/figma_make_accessibility_review.md`를 사용합니다.

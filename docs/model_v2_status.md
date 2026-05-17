@@ -128,6 +128,13 @@ best.pt 경로
 
 AI Hub 513 validation은 v2 공식 검증을 보강하는 용도다.
 
+2026-05-17~2026-05-18 현재:
+
+- `VL1+VS1` 200장 hard-negative subset은 평가와 상위 FP visual review가 완료됐다.
+- conf `0.35` 기준 FP image `21/200`, FP detections `30`이다.
+- positive box가 없는 subset이므로 recall/mAP가 아니라 정상 점자블록 false positive 평가로만 사용한다.
+- `VL2+VS2` tactile positive subset과 전체 class `1..3` 한국 GT validation은 아직 남아 있다.
+
 우선순위:
 
 ```text
@@ -187,12 +194,14 @@ Training 전체
 ## 7. v3/v4로 넘어가는 흐름
 
 1. v2 `best.pt`를 보관한다.
-2. 159번 실외 BBOX validation 일부를 다운로드한다.
-3. v2 `best.pt`로 다운로드한 이미지에 추론을 돌린다.
-4. 놓친 장면과 오탐 장면을 실패 프레임으로 분리한다.
-5. 필요한 프레임만 라벨링한다.
-6. 라벨링된 실패 프레임을 `datasets/walksafe_kr_v3_candidates`로 모은다.
-7. v3 데이터셋을 새로 만들고 새 run 이름으로 학습한다.
+2. `data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv`의 failure 후보 40행과 `data_sources/manifests/walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv`의 VL1+VS1 FP 후보 21행을 v3 후보로 둔다.
+3. full test split failure sampling은 한 번에 이미지 저장까지 수행하지 않는다. CSV streaming, 최대 후보 수 제한, 이미지 저장 opt-in 방식으로 재시도한다.
+4. 159번 실외 BBOX validation 일부를 다운로드한다.
+5. v2 `best.pt`로 다운로드한 이미지에 추론을 돌린다.
+6. 놓친 장면과 오탐 장면을 실패 프레임으로 분리한다.
+7. 필요한 프레임만 라벨링한다.
+8. 라벨링된 실패 프레임을 `datasets/walksafe_kr_v3_candidates`로 모은다.
+9. v3 데이터셋을 새로 만들고 새 run 이름으로 학습한다.
 
 권장 경로:
 

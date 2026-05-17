@@ -2,6 +2,13 @@
 
 작성 기준일: 2026-05-14 KST
 
+## 2026-05-18 최신 보정
+
+- 2026-05-17 기준 실제 사람 음성 샘플 8개는 모두 지원 intent로 판정됐다. `지금어디야.m4a`는 `get_current_location`으로 처리된다.
+- 2026-05-17 재실행 CSV 기준 STT 지연은 평균 `1.807 sec`, p95 `2.048 sec`, max `2.048 sec`다. 이전 2026-05-14 수치는 같은 intent set의 최신 근거가 아니다.
+- Qwen3-TTS는 로컬 Hugging Face cache snapshot을 우선 사용하도록 보정됐고, PWA 기준 7개 문구는 direct-call 기준 두 번째 요청 cache hit가 확인됐다.
+- 아직 HTTP `/speech/tts` cache header, PWA 브라우저/실폰 마이크 E2E, CORS, voice-off/repeat/server-down fallback, 휴대폰 스피커 청취 평가는 완료 근거가 없다.
+
 ## 범위
 
 이 문서는 WalkSafe Assist 음성 명령과 안내음 프로토타입의 현재 상태를 요약한다. 원본 음성 샘플, 생성 WAV, CSV, 로그는 로컬 산출물로만 보관하고 GitHub에는 요약 수치와 코드/문서만 올린다.
@@ -81,15 +88,15 @@ samples/voice/stt/myvoice
 | metric | value |
 | --- | ---: |
 | total files | 8 |
-| known intent files | 7 |
-| success | 7 |
+| known intent files | 8 |
+| success | 8 |
 | failure | 0 |
-| needs manual review | 1 |
+| needs manual review | 0 |
 | known-intent accuracy | 100.00% |
-| average latency | 0.457 sec |
-| p95 latency | 0.572 sec |
+| average latency | 1.807 sec |
+| p95 latency | 2.048 sec |
 
-지원 intent 기준 최종 실패는 없다. 아래 수치는 `get_current_location` 추가 전 CSV 기준이라 `지금어디야.m4a`는 `needs_manual_review`로 남아 있다. 현재 intent schema는 위치 질의 intent를 지원하므로 실제 음성 샘플 CSV는 별도 재실행이 필요하다.
+지원 intent 기준 최종 실패는 없다. 2026-05-17 재실행 CSV에서는 `지금어디야.m4a`가 `get_current_location`으로 처리됐다.
 
 초기 실패 2개는 모델 파인튜닝 문제가 아니라 후처리 부족이었다.
 
@@ -120,14 +127,13 @@ CustomVoice 결과:
 - 현재 faster-whisper medium은 지원 명령 기준 PWA 프로토타입에 충분하다.
 - 실제 사람 음성 known-intent 정확도가 90% 기준을 넘었으므로 파인튜닝은 지금 하지 않는다.
 - 특정 표현 오류는 intent rule 보강으로 해결됐다.
-- 평균 0.457초, p95 0.572초라 STT 자체 지연은 프로토타입 기준을 만족한다.
-- 브라우저 녹음, 업로드, 서버 왕복 지연은 아직 별도 측정이 필요하다.
+- 최신 2026-05-17 재실행 기준 평균 1.807초, p95 2.048초다. 브라우저 녹음, 업로드, 서버 왕복 지연은 아직 별도 측정이 필요하다.
 
 ## 다음 작업
 
 1. PWA에서 짧은 명령 녹음 후 `POST /speech/stt`로 전송한 흐름을 로컬 브라우저에서 확인한다.
 2. `scripts/check_voice_contract.py`로 `/health`, `/speech/intent`, `/speech/stt` 오류 계약을 실폰 없이 확인한다.
-3. `get_current_location` 추가 후 실제 사람 음성 샘플 CSV를 다시 생성한다.
-4. 보행 중 잡음, 바람, 휴대폰 마이크, 복수 화자 샘플을 더 모아 재평가한다.
-5. TTS 안내문은 데모 전 사람이 직접 청취해 속도, 억양, 명료도를 평가한다.
-6. 자주 쓰는 위험 경고는 `outputs/voice/cache`에 미리 생성해 지연을 줄인다.
+3. 브라우저/실폰 마이크로 `신고해`, `음성 켜/꺼`, `다시 말해줘`, `지금 어디야`의 transcript, intent, confidence, UI action을 확인한다.
+4. TTS 7문구를 HTTP 경로로 2회 요청해 두 번째 `X-Voice-Cached: true`와 WAV 존재를 확인한다.
+5. 보행 중 잡음, 바람, 휴대폰 마이크, 복수 화자 샘플을 더 모아 재평가한다.
+6. TTS 안내문은 데모 전 사람이 직접 청취해 속도, 억양, 명료도를 평가한다.

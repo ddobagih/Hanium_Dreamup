@@ -2,9 +2,15 @@
 
 작성 기준일: 2026-05-13 KST
 
+## 2026-05-17 최신 보정
+
+PWA의 기본 데모 경로는 여전히 fake detector이지만, `NEXT_PUBLIC_DETECTOR_MODE=server`와 backend `MODEL_ARTIFACT_PATH`를 설정한 server detector mode가 추가됐다. 2026-05-15 headless fixture E2E에서는 `/detect` 결과로 `source: "server"`와 `metadata.source: "server"` 신고 저장이 확인됐다.
+
+아직 Android 실폰/목걸이 착용 카메라 field test, PWA 설치/offline/TalkBack, 브라우저/실폰 마이크 E2E는 통과 근거가 없다.
+
 ## 현재 결론
 
-PWA와 백엔드는 실제 YOLO 모델 없이도 fake detector로 통합 흐름을 확인할 수 있는 상태다. 실제 안전 판단은 아직 금지이며, 모델 연결 전까지 `source: "fake"` 데이터는 데모/API 검증용으로만 사용한다.
+PWA와 백엔드는 fake detector로 데모/API 흐름을 확인할 수 있고, v2 `best.pt`가 준비된 개발 환경에서는 server detector mode로 `/detect` 기반 신고 흐름을 smoke test할 수 있다. 실제 안전 판단은 아직 금지이며, `source: "fake"` 데이터는 데모/API 검증용으로만 사용한다.
 
 ## PWA
 
@@ -13,6 +19,7 @@ PWA와 백엔드는 실제 YOLO 모델 없이도 fake detector로 통합 흐름�
 - 모바일 후면 카메라 권한 요청
 - 카메라 영상 중심 보행 화면
 - fake detector 기반 4개 위험 클래스 순환 생성
+- server detector mode에서 backend `/detect` 결과를 `DetectionEvent`로 변환
 - 카메라 프레임 위 bbox 오버레이
 - GPS 위치 표시
 - DeviceOrientation `alpha` 기반 방향 표시
@@ -27,7 +34,7 @@ PWA와 백엔드는 실제 YOLO 모델 없이도 fake detector로 통합 흐름�
 - 신고 성공/실패 haptic feedback
 - PWA manifest와 service worker 기본 캐시
 
-현재 모델 상태 표시는 `Fake 탐지` 또는 `모델 연결 대기`로 분기한다.
+현재 모델 상태 표시는 `데모 탐지 모드`, `서버 탐지 모드`, `모델 연결 대기`로 분기한다.
 
 ## 관리자 화면
 
@@ -56,8 +63,8 @@ FastAPI/PostGIS 기준 기능:
 | `PATCH` | `/reports/{report_id}/status` | 구현 |
 | `GET` | `/reports/duplicate-check` | 구현 |
 | `GET` | `/uploads/{filename}` | 구현 |
-| `GET` | `/detect/health` | placeholder |
-| `POST` | `/detect` | placeholder |
+| `GET` | `/detect/health` | 구현, 모델 env 미설정 시 unavailable |
+| `POST` | `/detect` | 구현, v2 `.pt` adapter 준비 시 server detection |
 
 업로드 정책:
 
@@ -86,9 +93,9 @@ FastAPI/PostGIS 기준 기능:
 }
 ```
 
-## 실제 모델 미연결 상태
+## 모델 미설정 상태와 server mode
 
-`/detect/health`는 모델 어댑터가 없으면 아래 상태를 반환한다.
+`/detect/health`는 모델 env가 없거나 산출물을 찾을 수 없으면 아래 상태를 반환한다.
 
 ```json
 {
@@ -98,13 +105,14 @@ FastAPI/PostGIS 기준 기능:
 }
 ```
 
-`POST /detect`는 모델 연결 전 `503 model_unavailable`을 반환한다. fake detector 결과를 서버 모델 결과처럼 반환하지 않는 것이 현재 정책이다.
+`POST /detect`는 모델 미설정 상태에서 `503 model_unavailable`을 반환한다. fake detector 결과를 서버 모델 결과처럼 반환하지 않는 것이 현재 정책이다.
+
+v2 `best.pt`를 `MODEL_ARTIFACT_PATH`로 설정한 개발 환경에서는 `/detect/health`가 `ready`가 되고, PWA server detector mode가 `source: "server"` 신고를 만들 수 있다. 이 근거는 headless fixture/known-positive smoke이며 실폰 field 성능 근거는 아니다.
 
 ## 다음 작업
 
-1. YOLO `best.pt`를 ONNX 또는 서버 추론 어댑터로 연결한다.
-2. `source` 기본값을 `fake`에서 `onnx` 또는 `server`로 바꿀 조건을 정한다.
-3. 모델 연결 후 `Fake 탐지` 문구가 운영 화면에 남지 않는지 확인한다.
-4. 로컬 음성 서버 `POST /speech/stt`를 PWA 녹음 UI와 연결한다.
-5. IMU/DeviceMotion 기반 이동 방향과 GPS 보정 상태를 별도 카드로 분리한다.
-6. 실환경 테스트 전 fake 신고 데이터를 성능 집계에서 제외하는 운영 규칙을 확정한다.
+1. Android 실폰/목걸이 착용 환경에서 fake/server mode를 분리해 카메라, GPS, 방향, TTS, 진동, 신고 흐름을 확인한다.
+2. PostGIS 접근 가능한 환경에서 reports 테스트와 HTTP smoke를 재검증한다.
+3. 브라우저/실폰 마이크 STT E2E와 TTS HTTP cache/fallback/청취 평가를 확인한다.
+4. IMU/DeviceMotion 기반 이동 방향과 GPS 보정 상태를 별도 카드로 분리한다.
+5. 실환경 테스트 전 fake 신고 데이터를 성능 집계에서 제외하는 운영 규칙을 확정한다.
