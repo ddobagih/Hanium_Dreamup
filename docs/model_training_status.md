@@ -10,6 +10,12 @@
 - VL1+VS1 hard-negative 200장 평가와 상위 FP visual review가 완료됐다. conf `0.35` 기준 FP image `21/200`, FP detections `30`이다.
 - v3 후보 manifest는 `data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv`에 정리했다.
 
+## 2026-05-19 보정 요약
+
+- v2 test split failure sampling은 streaming smoke로 재시도했다. 80장 기준 CSV 85행과 checkpoint를 생성했고 prediction 이미지는 저장하지 않았다.
+- v3 후보 index는 기존 failure 40행과 VL1+VS1 FP review 21행을 합쳐 61행으로 통합했다.
+- `hold_until_min_box_policy_review` 9행은 min-box 정책 확정 전 학습 포함을 보류한다.
+
 ## 범위
 
 이 문서는 로컬에 생성된 데이터셋과 학습 결과를 요약한다. AI Hub 원본 zip, 데이터셋 이미지/라벨, `runs/`, `.pt` 파일은 GitHub에 올리지 않고 로컬에서만 보관한다.
@@ -105,10 +111,10 @@ v2는 v1 대비 validation 기준 mAP50-95가 약 `+0.05315`, mAP50이 약 `+0.0
 
 ## 남은 검증
 
-- AI Hub 513 `VL2+VS2` tactile subset 외부 검증과 class `1..3` 한국 GT validation
+- AI Hub 513 `VL2+VS2` tactile subset 외부 검증은 class `0` 기준 완료됐고, 남은 항목은 VL1+VS1 전체 hard-negative 확장 판단과 class `1..3` 한국 GT validation이다.
 - 실제 보행자 시점 영상 또는 직접 촬영 이미지에서 실패 프레임 추출
 - browser/ONNX Runtime Web 또는 모바일 추론 지연 측정
-- full test split failure sampling 재시도. 기존 대형 실행은 exit code `137` 기록이 있어 streaming/저장량 제한 방식이 필요하다.
+- full test split failure sampling의 전체 실행 여부 판단. 80장 streaming smoke는 완료했지만 전체 2,347장 재실행은 디스크 gate 때문에 보류 중이다.
 
 ## 판단
 
@@ -116,7 +122,7 @@ v2는 v1보다 지표가 개선됐지만, 아직 목표인 mAP 0.9와는 거리�
 
 추가 epoch만 반복하는 것보다 다음 작업이 우선이다.
 
-1. AI Hub validation set 외부 검증 확장
+1. AI Hub hard-negative/직접 촬영 외부 검증 확장
 2. 실패 프레임 수집과 라벨 품질 점검
 3. 한국 보행자 시점 직접 촬영 데이터 보강
 4. 4개 클래스 통합 학습 데이터 확보

@@ -128,26 +128,27 @@ best.pt 경로
 
 AI Hub 513 validation은 v2 공식 검증을 보강하는 용도다.
 
-2026-05-17~2026-05-18 현재:
+2026-05-19 현재:
 
 - `VL1+VS1` 200장 hard-negative subset은 평가와 상위 FP visual review가 완료됐다.
 - conf `0.35` 기준 FP image `21/200`, FP detections `30`이다.
 - positive box가 없는 subset이므로 recall/mAP가 아니라 정상 점자블록 false positive 평가로만 사용한다.
-- `VL2+VS2` tactile positive subset과 전체 class `1..3` 한국 GT validation은 아직 남아 있다.
+- `VL2+VS2` tactile positive subset 외부 검증은 class `0` 기준 완료됐다. 전체 class `1..3` 한국 GT validation은 아직 남아 있다.
+- v3 후보 index는 failure 40행과 hard-negative FP 21행을 합쳐 61행이며, min-box 보류 9행은 정책 확정 전 학습에 넣지 않는다.
 
 우선순위:
 
 ```text
-1. VL1.zip, VL2.zip
-2. VS1.zip
-3. VS2.zip
+1. VL1+VS1 전체 hard-negative 확장 여부 판단
+2. AI Hub 159 소형 validation subset 확보
+3. 직접 촬영 실패 프레임 후보 수집
 ```
 
 주의:
 
 - `VL*.zip`은 라벨이고 `VS*.zip`은 이미지다.
 - 라벨만 받아서는 검증할 수 없다.
-- `VS1.zip`, `VS2.zip`은 대용량이므로 둘을 한 번에 받지 않는다.
+- validation zip과 추출 subset은 대용량이므로 추가 build/eval 전 디스크 gate를 먼저 확인한다.
 
 ## 6. AI Hub 159 다운로드 계획
 

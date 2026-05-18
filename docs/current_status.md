@@ -128,8 +128,8 @@ GitHub에는 문서, 설정, 경량 소스만 올린다. 아래 항목은 로컬
 ## 남은 우선순위
 
 1. 실폰을 다시 ADB에 연결하고 목걸이 착용 상태에서 카메라 각도, 흔들림, TTS/진동 인지성을 확인한다.
-2. v2 `best.pt`로 `walksafe_kr_v2` test split 검증을 따로 실행하고 결과를 문서화한다.
-3. AI Hub 513 `VL1/VL2/VS1/VS2`를 확보해 외부 검증을 한다.
+2. PostGIS/HTTP smoke와 PWA server mode `source: "server"` 신고 저장을 일반 개발 세션에서 재확인한다.
+3. 모델은 v3 후보 61행의 min-box/privacy 정책을 확정하고, AI Hub 159 또는 직접 촬영 실패 프레임 수집을 시작한다.
 4. Android 실폰/목걸이 착용 상태에서 server mode 카메라 입력과 `source: "server"` 신고 저장을 재확인한다.
 5. 브라우저/실폰 마이크 STT E2E와 TTS HTTP cache/fallback/청취 평가를 확인한다.
-6. AI Hub 159 1인칭 보행 영상 일부와 직접 촬영 데이터로 실패 프레임을 모아 v3/v4 데이터 보강을 시작한다.
+6. class `1..3` 한국 GT를 확보하기 전까지 4-class 서비스 성능으로 보고하지 않는다.

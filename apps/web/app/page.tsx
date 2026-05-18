@@ -17,6 +17,9 @@ const INITIAL_DETECTOR_MESSAGE =
   DETECTOR_MODE === "server" ? `서버 ${DETECT_API_BASE}` : DETECTOR_MODE === "fake" ? "데모 탐지 대기" : `탐지 모드 확인 필요: ${DETECTOR_MODE}`;
 
 type VoiceRecordState = "idle" | "recording" | "uploading" | "error";
+type DeviceOrientationEventWithPermission = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<PermissionState>;
+};
 
 const RISK_ALERTS: Record<DetectionClassName, { speech: string; vibration: VibratePattern; silentVibration: VibratePattern }> = {
   damaged_tactile_block: {
@@ -115,9 +118,18 @@ function destinationFromSlots(slots: Record<string, unknown>) {
   return "";
 }
 
+function deviceOrientationEventWithPermission() {
+  if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) {
+    return null;
+  }
+
+  return window.DeviceOrientationEvent as DeviceOrientationEventWithPermission;
+}
+
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const gpsWatchIdRef = useRef<number | null>(null);
   const detectionIndexRef = useRef(0);
   const lastAlertRef = useRef<{ key: string; time: number }>({ key: "", time: 0 });
   const reportStateRef = useRef<"idle" | "sending" | "sent" | "error">("idle");
@@ -132,6 +144,7 @@ export default function Home() {
   const [gps, setGps] = useState<GpsFix | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [heading, setHeading] = useState<number | null>(null);
+  const [headingMessage, setHeadingMessage] = useState("센서 대기");
   const [detection, setDetection] = useState<DetectionEvent | null>(null);
   const [detectorMessage, setDetectorMessage] = useState(INITIAL_DETECTOR_MESSAGE);
   const [detectorBusy, setDetectorBusy] = useState(false);
@@ -164,6 +177,7 @@ export default function Home() {
     : !detection
       ? "탐지된 위험이 없습니다. 위험이 감지되면 신고할 수 있습니다."
       : "";
+  const reportHelpText = reportDisabledReason || reportMessage;
 
   const getCurrentLocationMessage = useCallback(() => {
     if (gpsError) {
@@ -178,6 +192,63 @@ export default function Home() {
     const headingText = heading === null ? "" : ` 방향은 ${directionLabel}입니다.`;
     return `현재 위치는 위도 ${gps.latitude.toFixed(5)}, 경도 ${gps.longitude.toFixed(5)}입니다. ${accuracyText}${headingText}`;
   }, [directionLabel, gps, gpsError, heading]);
+
+  const startGpsWatch = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsError("GPS 미지원");
+      return;
+    }
+
+    if (gpsWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+      gpsWatchIdRef.current = null;
+    }
+
+    setGpsError(null);
+    gpsWatchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setGps({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy_m: position.coords.accuracy
+        });
+        setGpsError(null);
+      },
+      () => {
+        setGpsError("위치 권한 필요");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 3000,
+        timeout: 10000
+      }
+    );
+  }, []);
+
+  const requestHeadingPermission = useCallback(async () => {
+    const orientationEvent = deviceOrientationEventWithPermission();
+    if (!orientationEvent) {
+      setHeading(null);
+      setHeadingMessage("방향 센서 미지원");
+      return;
+    }
+
+    if (typeof orientationEvent.requestPermission !== "function") {
+      setHeadingMessage("방향 센서 대기");
+      return;
+    }
+
+    try {
+      const permission = await orientationEvent.requestPermission();
+      if (permission !== "granted") {
+        setHeading(null);
+      }
+      setHeadingMessage(permission === "granted" ? "방향 센서 대기" : "방향 센서 권한 필요");
+    } catch {
+      setHeading(null);
+      setHeadingMessage("방향 센서를 시작할 수 없습니다");
+    }
+  }, []);
 
   const clearVoiceStopTimer = useCallback(() => {
     if (voiceStopTimerRef.current !== null) {
@@ -202,6 +273,8 @@ export default function Home() {
     }
 
     try {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
@@ -227,6 +300,12 @@ export default function Home() {
     }
   }, []);
 
+  const reconnectCameraAndSensors = useCallback(() => {
+    void startCamera();
+    startGpsWatch();
+    void requestHeadingPermission();
+  }, [requestHeadingPermission, startCamera, startGpsWatch]);
+
   useEffect(() => {
     const cameraTimer = window.setTimeout(() => {
       void startCamera();
@@ -247,37 +326,26 @@ export default function Home() {
   }, [cleanupVoiceRecording]);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      const gpsTimer = window.setTimeout(() => setGpsError("GPS 미지원"), 0);
-      return () => window.clearTimeout(gpsTimer);
-    }
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        setGps({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy_m: position.coords.accuracy
-        });
-        setGpsError(null);
-      },
-      () => {
-        setGpsError("위치 권한 필요");
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 10000
+    const gpsTimer = window.setTimeout(() => startGpsWatch(), 0);
+    return () => {
+      window.clearTimeout(gpsTimer);
+      if (gpsWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
+        gpsWatchIdRef.current = null;
       }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+    };
+  }, [startGpsWatch]);
 
   useEffect(() => {
+    if (!deviceOrientationEventWithPermission()) {
+      const orientationTimer = window.setTimeout(() => setHeadingMessage("방향 센서 미지원"), 0);
+      return () => window.clearTimeout(orientationTimer);
+    }
+
     const onOrientation = (event: DeviceOrientationEvent) => {
       if (typeof event.alpha === "number") {
         setHeading(Math.round(event.alpha));
+        setHeadingMessage("방향 센서 수신 중");
       }
     };
 
@@ -815,9 +883,9 @@ export default function Home() {
             <Camera aria-hidden="true" size={40} />
             <strong>카메라 준비 중</strong>
             <span>{cameraError ?? "후면 카메라 권한을 확인하고 있습니다."}</span>
-            <button className="control-button secondary" type="button" onClick={startCamera}>
+            <button className="control-button secondary" type="button" onClick={reconnectCameraAndSensors}>
               <Camera aria-hidden="true" size={20} />
-              카메라 다시 연결
+              카메라/센서 다시 연결
             </button>
           </div>
         ) : null}
@@ -865,9 +933,9 @@ export default function Home() {
           <div className="status-item">
             <span className="status-label">방향</span>
             <strong>{directionLabel}</strong>
-            <small>{heading === null ? "센서 대기" : `${heading}도`}</small>
+            <small>{heading === null ? headingMessage : `${heading}도`}</small>
           </div>
-          <div className="status-item">
+          <div className="status-item" aria-live="polite">
             <span className="status-label">신고</span>
             <strong>{reportMessage}</strong>
             {lastDuplicateCount > 0 ? <small>중복 후보 {lastDuplicateCount}건</small> : null}
@@ -913,6 +981,7 @@ export default function Home() {
           type="button"
           onClick={handleReport}
           disabled={!canReport}
+          aria-describedby="report-button-help"
           aria-label={reportDisabledReason || "현재 탐지된 위험을 신고합니다."}
         >
           {reportState === "sending" ? (
@@ -922,11 +991,11 @@ export default function Home() {
           )}
           <span className="button-stack">
             <span>{reportButtonLabel}</span>
-            <small>{reportDisabledReason || reportMessage}</small>
+            <small id="report-button-help">{reportHelpText}</small>
           </span>
         </button>
 
-        <button className="control-button secondary sensor-action" type="button" onClick={startCamera}>
+        <button className="control-button secondary sensor-action" type="button" onClick={reconnectCameraAndSensors}>
           <RefreshCw aria-hidden="true" size={20} />
           카메라/센서 재연결
         </button>

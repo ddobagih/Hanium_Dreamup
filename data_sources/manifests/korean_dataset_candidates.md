@@ -36,6 +36,12 @@ v2/v3 점자블록 성능은 class `0` baseline으로만 사용한다. class `1.
 
 분할 기준은 장소/촬영 시퀀스 단위로 고정한다. 동일 장소의 연속 프레임은 train/val/test에 섞지 않는다.
 
+## 2026-05-19 보유 파일 확인
+
+현재 repo와 `/home/ddobagi/Downloads` 검색 기준으로 AI Hub 159 `1인칭 시점 보행영상`의 `Average_stature/out` zip과 직접 촬영 후보 파일은 확인되지 않았다.
+
+디스크가 `/` 기준 99% 사용 중이므로 AI Hub 159는 전체 다운로드를 하지 않는다. 승인/공간 확보 후 1차로 `School` label+image 소형 subset을 받고, 그 다음 `Building_area`, `Bridge` 순서로 확장한다. 직접 촬영 데이터는 Android 목걸이 field smoke 이후 파일명, 장소 단위 split key, 비식별 상태를 별도 manifest에 기록한 뒤 v3/v4 후보로 편입한다.
+
 ## AI Hub 513 점자블럭 파일 매핑
 
 로컬 다운로드한 `TL*.zip` 전체를 JSON 라벨 기준으로 스캔한 결과, 점자블럭은 다음 파일에 들어 있다.

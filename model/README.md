@@ -51,6 +51,23 @@ yolo detect val \
   name=walksafe_kr_tactile_v2_test
 ```
 
+## 실패 후보 샘플링
+
+full test split 실패 후보를 다시 볼 때는 prediction 이미지를 대량 저장하지 않고 CSV와 checkpoint만 남긴다.
+
+```bash
+.venv/bin/python model/sample_yolo_failures.py \
+  --model runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
+  --data datasets/walksafe_kr_v2/data.yaml \
+  --split test \
+  --output-dir runs/failure_sampling/walksafe_kr_v2_test_stream_smoke_20260519 \
+  --max-images 80 \
+  --device cpu \
+  --overwrite
+```
+
+새 학습에 쓰기 전에는 생성 CSV의 `privacy_review_required=yes` 항목과 `small_or_far`/min-box 후보를 수동 검수한다.
+
 `ultralytics`가 설치되어 있지 않으면 `requirements-model.txt`를 먼저 설치합니다.
 
 ```bash
