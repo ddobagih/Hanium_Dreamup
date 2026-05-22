@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `walksafe_v3_relabel_20260521/` | WalkSafe v3 `damaged_tactile_block` 수동 bbox relabel | `walksafe_v3_relabel_20260521/README.md` |
 | `walksafe_tactile_damage_area_review_20260522/` | `tactile_damage_area` 오류 후보 120건 C-mode 전체 외부 검수 | `walksafe_tactile_damage_area_review_20260522/GUIDE.md` |
+| `walksafe_two_model_runtime_20260522/` | WalkSafe v2 two-model runtime/inference 후속 작업 핸드오프 | `walksafe_two_model_runtime_20260522/README.md` |
 
 ## 운영 원칙
 

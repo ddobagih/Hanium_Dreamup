@@ -972,3 +972,38 @@ button:focus-visible {
     display: none;
   }
 }
+
+.detection-box.tactile {
+  border-color: #f2c94c;
+}
+
+.detection-box.tactile span {
+  background: #f2c94c;
+  color: #1f1600;
+}
+
+.detection-box.general {
+  border-color: #56ccf2;
+}
+
+.detection-box.general span {
+  background: #117da0;
+  color: var(--color-surface);
+}
+
+.detection-box.secondary {
+  border-style: dashed;
+  opacity: 0.78;
+}
+
+.detection-box.primary {
+  box-shadow: 0 0 0 9999px rgba(16, 32, 28, 0.06), 0 0 0 4px rgba(255, 255, 255, 0.18);
+}
+
+.channel-card.tactile {
+  border-color: rgba(242, 201, 76, 0.5);
+}
+
+.channel-card.general {
+  border-color: rgba(86, 204, 242, 0.5);
+}

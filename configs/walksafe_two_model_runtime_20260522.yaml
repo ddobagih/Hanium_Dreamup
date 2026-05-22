@@ -1,0 +1,36 @@
+version: 1
+models:
+  custom_tactile:
+    source_model: "YOLO26s custom"
+    category: "tactile"
+    classes:
+      - normal_tactile_block
+      - damaged_tactile_block
+      - tactile_damage_area
+    thresholds:
+      default: 0.25
+      normal_tactile_block: 0.25
+      damaged_tactile_block: 0.25
+      tactile_damage_area: 0.25
+  coco_general:
+    source_model: "YOLO26n COCO pretrained"
+    category: "general_obstacle"
+    allowlist:
+      - person
+      - car
+      - bus
+      - truck
+      - bicycle
+      - motorcycle
+      - traffic light
+      - bench
+    thresholds:
+      default: 0.25
+      person: 0.25
+      car: 0.25
+      bus: 0.25
+      truck: 0.25
+      bicycle: 0.25
+      motorcycle: 0.25
+      traffic light: 0.25
+      bench: 0.25

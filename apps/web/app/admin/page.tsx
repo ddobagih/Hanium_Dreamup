@@ -45,6 +45,46 @@ const STATUS_SORT_ORDER: Record<ReportStatus, number> = {
   resolved: 2
 };
 
+const ADMIN_CLASS_LABELS: Record<string, string> = {
+  ...CLASS_LABELS,
+  tactile_damage_area: "점자블록 파손 영역",
+  damaged_tactile_block: "점자블록 파손"
+};
+
+const V2_METADATA_KEYS = ["schema_version", "model_key", "source_model", "trigger", "auto_reported"] as const;
+
+function reportClassLabel(className: string) {
+  return ADMIN_CLASS_LABELS[className] ?? className;
+}
+
+function formatMetadataValue(value: unknown) {
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (value === null) {
+    return "null";
+  }
+  return JSON.stringify(value);
+}
+
+function getV2MetadataEntries(metadata: ReportResponse["metadata"] | null | undefined) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  return V2_METADATA_KEYS.flatMap((key) => {
+    if (!(key in metadata)) {
+      return [];
+    }
+
+    const value = formatMetadataValue(metadata[key]);
+    return value === undefined ? [] : [{ key, value }];
+  });
+}
+
 type SortMode = "latest" | "confidence" | "status";
 
 type FilterState = {
@@ -114,6 +154,10 @@ export default function AdminReportsPage() {
   }, [reports, sortMode]);
 
   const selectedReport = useMemo(() => reports.find((report) => report.id === selectedId) ?? null, [reports, selectedId]);
+  const selectedV2MetadataEntries = useMemo(
+    () => (selectedReport ? getV2MetadataEntries(selectedReport.metadata) : []),
+    [selectedReport]
+  );
 
   const buildParams = useCallback((): ReportListParams => {
     const hasRadius = filters.lat !== "" && filters.lng !== "" && filters.radius_m !== "";
@@ -219,7 +263,7 @@ export default function AdminReportsPage() {
             <option value="">전체</option>
             {DETECTION_CLASS_NAMES.map((className) => (
               <option key={className} value={className}>
-                {CLASS_LABELS[className]}
+                {reportClassLabel(className)}
               </option>
             ))}
           </select>
@@ -307,7 +351,7 @@ export default function AdminReportsPage() {
               key={report.id}
               className={`report-row ${selectedReport?.id === report.id ? "selected" : ""}`}
               type="button"
-              aria-label={`${CLASS_LABELS[report.class_name]}, ${STATUS_LABELS[report.status]}, 신뢰도 ${Math.round(
+              aria-label={`${reportClassLabel(report.class_name)}, ${STATUS_LABELS[report.status]}, 신뢰도 ${Math.round(
                 report.confidence * 100
               )}%, ${formatGps(report)}`}
               aria-pressed={selectedReport?.id === report.id}
@@ -315,7 +359,7 @@ export default function AdminReportsPage() {
             >
               <span className={`status-dot ${report.status}`} aria-hidden="true" />
               <span>
-                <strong>{CLASS_LABELS[report.class_name]}</strong>
+                <strong>{reportClassLabel(report.class_name)}</strong>
                 <small>
                   {STATUS_LABELS[report.status]} · {SOURCE_LABELS[report.source]} · {formatDate(report.created_at)}
                 </small>
@@ -343,12 +387,12 @@ export default function AdminReportsPage() {
               </div>
               <div className="detail-image-frame">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={reportImageUrl(selectedReport)} alt={`${CLASS_LABELS[selectedReport.class_name]} 신고 이미지`} />
+                <img src={reportImageUrl(selectedReport)} alt={`${reportClassLabel(selectedReport.class_name)} 신고 이미지`} />
               </div>
               <div className="detail-summary">
                 <div>
                   <span className="status-label">위험 유형</span>
-                  <h2>{CLASS_LABELS[selectedReport.class_name]}</h2>
+                  <h2>{reportClassLabel(selectedReport.class_name)}</h2>
                 </div>
                 <span className={`detail-status ${selectedReport.status}`}>{STATUS_LABELS[selectedReport.status]}</span>
               </div>
@@ -380,6 +424,18 @@ export default function AdminReportsPage() {
                   ))}
                 </div>
               </div>
+              {selectedV2MetadataEntries.length > 0 ? (
+                <div className="review-flags" aria-label="v2 메타데이터">
+                  <strong>v2 메타데이터</strong>
+                  <div>
+                    {selectedV2MetadataEntries.map(({ key, value }) => (
+                      <span key={key}>
+                        {key}: {value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <h3 className="status-action-title">상태 변경</h3>
               <div className="status-actions" aria-label="신고 상태 변경">
                 {(["new", "reviewed", "resolved"] as const).map((status) => (

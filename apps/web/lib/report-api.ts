@@ -1,4 +1,4 @@
-import type { DetectionClassName, DetectionEvent, DetectorSource, GpsFix, NormalizedBBox } from "@/types/inference";
+import type { DetectionEvent, DetectorSource, GpsFix, NormalizedBBox } from "@/types/inference";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -8,7 +8,7 @@ export type ReportResponse = {
   id: string;
   status: ReportStatus;
   class_id: number;
-  class_name: DetectionClassName;
+  class_name: string;
   confidence: number;
   bbox: NormalizedBBox;
   captured_at: string;
@@ -28,7 +28,7 @@ export type ReportResponse = {
 export type ReportListParams = {
   limit?: number;
   status?: ReportStatus | "";
-  class_name?: DetectionClassName | "";
+  class_name?: string | "";
   source?: DetectorSource | "";
   created_from?: string;
   created_to?: string;

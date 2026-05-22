@@ -20,6 +20,8 @@ ReportStatus = Literal["new", "reviewed", "resolved"]
 DetectorSource = Literal["fake", "onnx", "server"]
 LocationQuality = Literal["missing", "low", "medium", "high"]
 ModelStatus = Literal["unavailable", "ready"]
+DetectV2ModelKey = Literal["custom_tactile", "coco_general"]
+ReportV2Trigger = Literal["auto", "voice"]
 
 
 class BBox(BaseModel):
@@ -103,3 +105,28 @@ class DetectResponse(BaseModel):
     model_status: Literal["ready"]
     model_version: str
     detections: List[ReportMetadata]
+
+
+class DetectV2Detection(BaseModel):
+    schema_version: Literal["detect.v2"]
+    model_key: DetectV2ModelKey
+    source_model: str
+    model_class_id: int = Field(ge=0)
+    class_name: str
+    category: str
+    confidence: float = Field(ge=0, le=1)
+    bbox: BBox
+    threshold_used: float = Field(ge=0, le=1)
+    captured_at: datetime
+    gps: Optional[GpsFix] = None
+    heading: Optional[float] = Field(default=None, ge=0, lt=360)
+
+
+class DetectV2Response(BaseModel):
+    schema_version: Literal["detect.v2"]
+    detections: List[DetectV2Detection]
+
+
+class ReportV2Metadata(DetectV2Detection):
+    trigger: ReportV2Trigger
+    auto_reported: bool
