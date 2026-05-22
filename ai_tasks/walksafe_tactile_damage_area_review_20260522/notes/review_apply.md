@@ -4,13 +4,13 @@ Date: 2026-05-22 KST
 
 ## Status
 
-`pending_decisions`
+`pending_decisions` — no reviewed dataset has been materialized yet.
 
 ## Inputs
 
 - Source dataset: `datasets/walksafe_kr_tactile_3class_20260521`
 - Decision CSV: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`
-- Target dataset: `datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522`
+- Planned target dataset: `datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522` (not created yet)
 
 ## Summary
 
@@ -19,7 +19,7 @@ Date: 2026-05-22 KST
   "date": "2026-05-22",
   "status": "pending_decisions",
   "source_dataset": "datasets/walksafe_kr_tactile_3class_20260521",
-  "target_dataset": "datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522",
+  "planned_target_dataset": "datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522",
   "decision_csv": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
   "rows": 120,
   "validation_status_counts": {
@@ -63,3 +63,6 @@ Date: 2026-05-22 KST
 - `fix_tactile_damage_area_bbox` and `add_missing_tactile_damage_area` require `manual_damage_area_boxes_xywhn`.
 - `remove_false_damage_area_label` requires `confirm_remove_all_damage_area=yes`.
 - This script does not train a model.
+
+- The planned target dataset path is documented for the future apply step only; it does not indicate that the dataset exists.
+- External/AI review decisions still need human confirmation and exact normalized bbox coordinates where required before any reviewed dataset build.

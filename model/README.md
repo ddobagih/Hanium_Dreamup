@@ -1,11 +1,36 @@
 # 모델 개발
 
-이 폴더는 YOLO 기반 모델 개발을 위한 스크립트를 담습니다.
+이 폴더는 WalkSafe 모델 검증, 학습, v2 two-model runtime helper를 담습니다.
+
+## 현재 모델 방향
+
+- custom tactile 후보: YOLO26s 3-class
+  - `normal_tactile_block`
+  - `damaged_tactile_block`
+  - `tactile_damage_area`
+- COCO helper 후보: YOLO26n COCO pretrained, inference-only
+- v2 앱은 두 모델 결과를 한 class-id 공간으로 합치지 않고 `model_key`, `source_model`, `class_name`을 유지한다.
+- 2026-05-22 기준 Stage1 `best.pt`가 현재 MVP 후보로 기록되어 있으나, 실제 weight/run 산출물은 GitHub에 올리지 않는다.
+
+## v2 runtime helper
+
+`model/two_model_runtime.py`는 CPU-only helper입니다. Ultralytics/PIL/GPU runtime을 import하지 않고, 이미 생성된 detection payload를 필터링/병합합니다.
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" python3 -m pytest model/test_two_model_runtime.py -q
+```
+
+관련 설정:
+
+- `configs/walksafe_two_model_runtime_20260522.yaml`
+- custom tactile thresholds: 기본 0.25
+- COCO allowlist: `person`, `car`, `bus`, `truck`, `bicycle`, `motorcycle`, `traffic light`, `bench`
+- cross-model NMS는 적용하지 않는다.
 
 ## 데이터셋 검증
 
 ```bash
-python model/validate_yolo_dataset.py
+python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
 ```
 
 검증 항목:
@@ -17,71 +42,36 @@ python model/validate_yolo_dataset.py
 - 클래스 ID 범위
 - bbox 좌표가 0~1 사이인지 여부
 
-## 학습 실행
+## 학습 실행 예시
 
 ```bash
 python model/train_yolo.py \
-  --data datasets/walksafe_kr_v1/data.yaml \
+  --data datasets/walksafe_kr_v2/data.yaml \
   --model yolo11n.pt \
   --epochs 50 \
   --imgsz 640 \
   --batch 8
 ```
 
-AI Hub 513 전체 `TL8/TL9/TS8/TS9`로 만든 v2 데이터셋은 명시적으로 경로를 지정한다.
-
-```bash
-python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
-python model/train_yolo.py \
-  --data datasets/walksafe_kr_v2/data.yaml \
-  --model yolo11n.pt \
-  --epochs 50 \
-  --imgsz 640 \
-  --batch 8 \
-  --name walksafe_kr_tactile_v2_full
-```
-
-학습 완료 후 test split 별도 검증은 새 run 이름으로 분리한다.
-
-```bash
-yolo detect val \
-  model=runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
-  data=datasets/walksafe_kr_v2/data.yaml \
-  split=test \
-  name=walksafe_kr_tactile_v2_test
-```
-
-## 실패 후보 샘플링
-
-full test split 실패 후보를 다시 볼 때는 prediction 이미지를 대량 저장하지 않고 CSV와 checkpoint만 남긴다.
-
-```bash
-.venv/bin/python model/sample_yolo_failures.py \
-  --model runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
-  --data datasets/walksafe_kr_v2/data.yaml \
-  --split test \
-  --output-dir runs/failure_sampling/walksafe_kr_v2_test_stream_smoke_20260519 \
-  --max-images 80 \
-  --device cpu \
-  --overwrite
-```
-
-새 학습에 쓰기 전에는 생성 CSV의 `privacy_review_required=yes` 항목과 `small_or_far`/min-box 후보를 수동 검수한다.
-
-`ultralytics`가 설치되어 있지 않으면 `requirements-model.txt`를 먼저 설치합니다.
+`ultralytics`가 설치되어 있지 않으면 먼저 설치합니다.
 
 ```bash
 python -m pip install -r requirements-model.txt
 ```
 
-## 주의
+## tactile_damage_area 검수 상태
 
-데이터가 없는 상태에서는 학습을 실행하지 않습니다. 먼저 `datasets/walksafe_kr_v1` 또는 `datasets/walksafe_kr_v2`의 `images`와 `labels`에 한국 기준 YOLO 형식 데이터를 채웁니다.
+`tactile_damage_area` 검수 패키지는 `ai_tasks/walksafe_tactile_damage_area_review_20260522/`에 있습니다.
 
-`runs/`, `weights/`, `*.pt`, `*.onnx`, `*.engine`, `*.tflite`는 GitHub에 올리지 않습니다.
+- AI suggestion은 최종 label decision이 아니다.
+- 외부 검수 결과 CSV가 있어도 최종 decision 적용과 reviewed dataset build는 별도 단계다.
+- bbox 수정/추가 결정은 normalized bbox 좌표 검수 후 적용해야 한다.
 
-해외 공개 baseline 데이터셋은 다음처럼 명시적으로 지정할 때만 사용합니다.
+## GitHub 업로드 금지
 
-```bash
-python model/train_yolo.py --data datasets/walksafe_v1/data.yaml --epochs 1 --batch 4 --name walksafe_public_smoke
-```
+다음은 로컬 전용입니다.
+
+- `datasets/**/images/**`, `datasets/**/labels/**`
+- `runs/`, `weights/`
+- `*.pt`, `*.onnx`, `*.engine`, `*.tflite`
+- 원본 AI Hub zip과 대량 review 중간 산출물

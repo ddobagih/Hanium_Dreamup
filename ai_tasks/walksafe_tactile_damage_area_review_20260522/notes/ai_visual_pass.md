@@ -19,7 +19,7 @@ AI-assisted suggestions have been generated as a **non-final** review aid.
   "date": "2026-05-22",
   "status": "ai_suggestions_written_non_final",
   "source_queue": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv",
-  "suggestions_input": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestion_input_2026-05-22.csv",
+  "suggestions_input": "local-only data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestion_input_2026-05-22.csv",
   "suggestions_out": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv",
   "rows": 120,
   "decision_counts": {
@@ -80,6 +80,10 @@ AI-assisted suggestions have been generated as a **non-final** review aid.
   "hard_negative_false_positive_damage_area|exclude_unclear": 1
 }
 ```
+
+## Packaging note
+
+The intermediate `suggestions_input` CSV is a local-only generation input and is not part of the GitHub review package. The package intentionally keeps the final suggestions CSV, summary JSON, review queue, and decision templates under `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/`.
 
 ## Guardrails
 
