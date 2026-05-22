@@ -9,7 +9,7 @@ Date: 2026-05-22 KST
 ## Inputs
 
 - Source dataset: `datasets/walksafe_kr_tactile_3class_20260521`
-- Decision CSV: `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`
+- Decision CSV: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`
 - Target dataset: `datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522`
 
 ## Summary
@@ -20,7 +20,7 @@ Date: 2026-05-22 KST
   "status": "pending_decisions",
   "source_dataset": "datasets/walksafe_kr_tactile_3class_20260521",
   "target_dataset": "datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522",
-  "decision_csv": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
+  "decision_csv": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
   "rows": 120,
   "validation_status_counts": {
     "pending": 120
@@ -28,8 +28,8 @@ Date: 2026-05-22 KST
   "decision_counts": {
     "blank": 120
   },
-  "applied_rows": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_applied_2026-05-22.csv",
-  "blocked_rows": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_blocked_2026-05-22.csv",
+  "applied_rows": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_applied_2026-05-22.csv",
+  "blocked_rows": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_blocked_2026-05-22.csv",
   "materialized_manifest": "",
   "built_dataset": false,
   "errors_preview": [

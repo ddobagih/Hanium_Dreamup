@@ -8,10 +8,10 @@ The error review pack is generated, but label decisions are still pending. This 
 
 ## Inputs
 
-- Review queue: `data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
-- Decision template: `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`
-- Summary JSON: `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_summary_2026-05-22.json`
-- Review images/contact sheets: `docs/review/walksafe_tactile3_damage_area_20260522/`
+- Review queue: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
+- Decision template: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`
+- Summary JSON: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_summary_2026-05-22.json`
+- Review images/contact sheets: `ai_tasks/walksafe_tactile_damage_area_review_20260522/`
 
 ## Rows
 

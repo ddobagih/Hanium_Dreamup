@@ -20,12 +20,12 @@ DATE = "2026-05-22"
 ROOT = Path(".")
 DEFAULT_SOURCE_DATASET = ROOT / "datasets/walksafe_kr_tactile_3class_20260521"
 DEFAULT_TARGET_DATASET = ROOT / "datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522"
-DEFAULT_DECISIONS = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv"
-DEFAULT_APPLIED = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_applied_2026-05-22.csv"
-DEFAULT_BLOCKED = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_blocked_2026-05-22.csv"
-DEFAULT_MATERIALIZED = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_reviewed_materialized_manifest_2026-05-22.csv"
-DEFAULT_SUMMARY = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_apply_summary_2026-05-22.json"
-DEFAULT_DOC = ROOT / "docs/execution/2026-05-22_tactile_damage_area_review_apply.md"
+DEFAULT_DECISIONS = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv"
+DEFAULT_APPLIED = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_applied_2026-05-22.csv"
+DEFAULT_BLOCKED = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_blocked_2026-05-22.csv"
+DEFAULT_MATERIALIZED = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_reviewed_materialized_manifest_2026-05-22.csv"
+DEFAULT_SUMMARY = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_apply_summary_2026-05-22.json"
+DEFAULT_DOC = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/notes/review_apply.md"
 
 ALLOWED_DECISIONS = {
     "accept_existing_labels",
@@ -66,7 +66,7 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 def write_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(file, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fieldnames})

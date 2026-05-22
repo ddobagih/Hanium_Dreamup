@@ -11,10 +11,10 @@ from pathlib import Path
 
 DATE = "2026-05-22"
 ROOT = Path(".")
-DEFAULT_QUEUE = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv"
-DEFAULT_TEMPLATE = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv"
-DEFAULT_SUMMARY = ROOT / "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_summary_2026-05-22.json"
-DEFAULT_DOC = ROOT / "docs/execution/2026-05-22_tactile_damage_area_review_decision_workflow.md"
+DEFAULT_QUEUE = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv"
+DEFAULT_TEMPLATE = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv"
+DEFAULT_SUMMARY = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_summary_2026-05-22.json"
+DEFAULT_DOC = ROOT / "ai_tasks/walksafe_tactile_damage_area_review_20260522/notes/review_decision_workflow.md"
 
 ALLOWED_DECISIONS = (
     "accept_existing_labels",
@@ -71,7 +71,7 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 def write_csv(path: Path, rows: list[dict[str, object]], fieldnames: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer = csv.DictWriter(file, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in rows:
             writer.writerow({field: row.get(field, "") for field in fieldnames})
@@ -177,7 +177,7 @@ The error review pack is generated, but label decisions are still pending. This 
 - Review queue: `{queue_path}`
 - Decision template: `{args.out}`
 - Summary JSON: `{args.summary_out}`
-- Review images/contact sheets: `docs/review/walksafe_tactile3_damage_area_20260522/`
+- Review images/contact sheets: `ai_tasks/walksafe_tactile_damage_area_review_20260522/`
 
 ## Rows
 

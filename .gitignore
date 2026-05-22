@@ -70,3 +70,18 @@ samples/voice/stt/*
 
 # Local voice virtualenv
 .venv-voice/
+
+# Local review/data artifacts that should not be pushed accidentally
+# Curated external-AI review packages belong under ai_tasks/ instead.
+docs/review/**/chunks/**
+docs/review/**/final_crops/**
+docs/review/**/final_overlays/**
+data_sources/labels/**
+data_sources/manifests/*_error_chunks_*/
+data_sources/manifests/*_materialized_manifest_*.csv
+data_sources/manifests/*_master_manifest*.csv
+data_sources/manifests/*_image_manifest*.csv
+data_sources/manifests/*_filename_sanitize_map*.csv
+data_sources/manifests/*_privacy_location_audit_results*.csv
+data_sources/manifests/*_val_image_error_summary_*.csv
+datasets/*/materialized_manifest.csv

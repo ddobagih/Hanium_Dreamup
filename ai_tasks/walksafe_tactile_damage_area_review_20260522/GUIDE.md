@@ -20,13 +20,13 @@ Date: 2026-05-22 KST
 
 1. 이 문서
 2. 리뷰 이미지 README
-   - `docs/review/walksafe_tactile3_damage_area_20260522/README.md`
+   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/README.md`
 3. 전체 이미지 contact sheet
-   - `docs/review/walksafe_tactile3_damage_area_20260522/final_contact_sheets/`
+   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/contact_sheets/full/`
 4. crop contact sheet
-   - `docs/review/walksafe_tactile3_damage_area_20260522/final_crop_contact_sheets/`
+   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/contact_sheets/crops/`
 5. 외부 검수용 CSV
-   - `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
+   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
 
 ## 이미지 보는 법
 
@@ -51,13 +51,13 @@ Date: 2026-05-22 KST
 ## 참고용 CSV
 
 - 오류 후보 원본 큐
-  - `data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
+  - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
 - 로컬 AI 제안
-  - `data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv`
+  - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv`
 - 로컬 AI 제안 요약
-  - `data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json`
+  - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json`
 - 제안 컬럼이 합쳐진 검수 템플릿
-  - `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
+  - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
 
 로컬 AI 제안은 `ai_suggested_decision`, `ai_confidence`, `ai_reason_short` 컬럼에 들어 있다. 이 값은 최종 결정이 아니므로 반드시 이미지 기준으로 다시 판단한다.
 
@@ -102,8 +102,8 @@ bbox 좌표를 정확히 낼 수 없으면 `manual_damage_area_boxes_xywhn`을 �
 
 ## 권장 검수 절차
 
-1. `final_contact_sheets`에서 review_order 순서대로 전체 장면을 본다.
-2. 같은 번호의 `final_crop_contact_sheets`에서 후보 영역을 확대 확인한다.
+1. `contact_sheets/full`에서 review_order 순서대로 전체 장면을 본다.
+2. 같은 번호의 `contact_sheets/crops`에서 후보 영역을 확대 확인한다.
 3. CSV의 기존 GT/예측 개수와 로컬 AI 제안을 비교한다.
 4. 로컬 AI 제안을 그대로 복사하지 말고 이미지 기준으로 최종 decision을 정한다.
 5. 120건 전체를 채운 외부 AI 결과 CSV를 만든다.

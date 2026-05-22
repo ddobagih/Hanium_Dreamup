@@ -8,9 +8,9 @@ AI-assisted suggestions have been generated as a **non-final** review aid.
 
 ## Outputs
 
-- Suggestions CSV: `data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv`
-- Summary JSON: `data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json`
-- Source review queue: `data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
+- Suggestions CSV: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv`
+- Summary JSON: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json`
+- Source review queue: `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv`
 
 ## Counts
 
@@ -18,9 +18,9 @@ AI-assisted suggestions have been generated as a **non-final** review aid.
 {
   "date": "2026-05-22",
   "status": "ai_suggestions_written_non_final",
-  "source_queue": "data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv",
-  "suggestions_input": "data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestion_input_2026-05-22.csv",
-  "suggestions_out": "data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv",
+  "source_queue": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv",
+  "suggestions_input": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestion_input_2026-05-22.csv",
+  "suggestions_out": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv",
   "rows": 120,
   "decision_counts": {
     "fix_tactile_damage_area_bbox": 11,
@@ -86,12 +86,12 @@ AI-assisted suggestions have been generated as a **non-final** review aid.
 - `ai_suggested_decision` is not copied into `review_decision` automatically.
 - All rows keep `ai_is_final_decision=no` and `needs_human_confirmation=yes`.
 - Before building a reviewed dataset, confirm or edit the official decision template:
-  `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`.
+  `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv`.
 
 ## Decision-template helper
 
 A convenience copy of the official decision template with AI suggestion columns was also written:
 
-- `data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
+- `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
 
 This file still keeps `review_decision` blank. Use the AI columns only as a review aid before copying confirmed choices into the official decision field.
