@@ -39,6 +39,15 @@ ai_tasks/walksafe_tactile_damage_area_review_20260522/
 - Green: matched `tactile_damage_area`
 - Cyan: GT `damaged_tactile_block` context
 
+
+## Existing external-review output
+
+The branch also contains an external-review decision CSV:
+
+- `manifests/walksafe_tactile3_damage_area_external_ai_review_decisions_2026-05-22.csv`
+
+This file has 120 rows in the requested output format. It is still a review artifact, not an applied dataset build. Rows with `manual_bbox_required` in the reason need exact normalized bbox coordinates before running the apply/build step.
+
 ## Important notes
 
 - Local AI suggestions are non-final. Verify from the images.

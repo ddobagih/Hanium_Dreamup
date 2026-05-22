@@ -58,6 +58,8 @@ Date: 2026-05-22 KST
   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json`
 - 제안 컬럼이 합쳐진 검수 템플릿
   - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_with_ai_suggestions_2026-05-22.csv`
+- 외부 AI 검수 결과 CSV(이미 생성된 경우 재검증 대상)
+  - `ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_external_ai_review_decisions_2026-05-22.csv`
 
 로컬 AI 제안은 `ai_suggested_decision`, `ai_confidence`, `ai_reason_short` 컬럼에 들어 있다. 이 값은 최종 결정이 아니므로 반드시 이미지 기준으로 다시 판단한다.
 
@@ -140,6 +142,7 @@ bbox 좌표를 정확히 낼 수 없으면 `manual_damage_area_boxes_xywhn`을 �
 - 120건 오류 후보 생성 완료
 - contact sheet/crop contact sheet 생성 완료
 - 로컬 AI-assisted visual pass 완료
-- 최종 `review_decision`은 아직 비어 있음
+- 공식 적용용 `review_decision`은 아직 비어 있음
+- 외부 AI 결과 CSV는 추가되었지만, bbox 좌표가 필요한 row는 아직 사람이 확정해야 함
 - reviewed dataset은 아직 빌드하지 않음
 - 추가 학습은 아직 진행하지 않음
