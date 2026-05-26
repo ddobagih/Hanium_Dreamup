@@ -23,7 +23,7 @@
 | 모델 v2 baseline | test split metric, ONNX equivalence, latency, hard-negative FP 결과가 기록됨 | model eval scripts, CSV/JSON summary | `docs/model_training_status.md`, `docs/execution/2026-05-17_model_data_mlops.md` | class 0 baseline PASS |
 | 모델 v3/v4 데이터 보강 | v3 후보 manifest, privacy_status, split_policy, class `1..3` 한국 GT 계획이 기록됨 | manifest row count, contact sheet/CSV 검수 | `docs/execution/2026-05-18_model_data_mlops.md` | v3 계획/manifest PASS, 새 학습 미완료 |
 | STT 음성 명령 | 브라우저/실폰 마이크에서 transcript, intent, confidence, UI action이 확인됨 | voice HTTP health/CORS + desktop/phone mic E2E | `docs/voice_stt_tts_status.md`, 향후 voice execution | local audio PASS, E2E 미완료 |
-| 대화형 음성 내비게이션 | 목적지 설정, 경로 조회, 단계별 안내, 재탐색/주변 정보 질의가 화면 조작 없이 동작 | mock route contract, 향후 Kakao Map API adapter, mic E2E, TTS 안내 | 향후 navigation execution | P2 후순위 |
+| 대화형 음성 내비게이션 | 목적지 설정, 경로 조회, 단계별 안내, 재탐색/주변 정보 질의가 화면 조작 없이 동작 | TMAP route contract/proxy, mock route, 향후 destination search/geocoding, mic E2E, TTS 안내 | 향후 navigation execution | 일부 구현, 실폰/목적지 검색 미완료 |
 | TTS HTTP/fallback/청취 | HTTP 2회 요청 cache header, server-down/voice-off/repeat fallback, 휴대폰 스피커 청취가 기록됨 | HTTP/CORS/E2E/수동 청취 | 향후 voice execution | direct-call cache만 PASS |
 | PWA 설치/offline/TalkBack | Android Chrome standalone, offline shell fallback, TalkBack 읽기 순서와 aria-live가 확인됨 | 실폰/수동 접근성 점검 | `docs/figma_make_accessibility_review.md`, 향후 field report | 미완료 |
 | MLOps 자동 고도화 | 사용자 동의, IndexedDB/local queue, upload adapter, 재학습 실행, 성능 비교, model rollback/dynamic load가 기록됨 | local skeleton 또는 cloud 승인 후 CI/CD smoke | 향후 MLOps execution | C/B 보류 |
@@ -53,6 +53,14 @@
 | Model Eval | 모델/데이터 검증 | test split mAP, accuracy 정의, latency, hard-negative FP, curation manifest |
 | GIS/Ops | 공간 데이터 운영 검증 | PostGIS radius/cluster, GeoJSON export, heatmap, status 처리율 |
 | Release | 배포/제출/운영 | domain, auth, storage, rollback, monitoring, release artifact |
+
+## evidence badge 규칙
+
+- badge는 `[등급 상태]` 형식으로 쓰고, `PASS`에는 실행 명령/환경/날짜/증거 경로를 함께 남긴다.
+- fake/mock/local fixture는 해당 Static/Unit/Headless 근거로만 쓰며, 실제 보행 안전·Device·Model·Release PASS로 확대하지 않는다.
+- Headless/ASGI/browser fixture PASS는 Android 실폰 카메라·GPS·TTS/진동·mic·TalkBack PASS가 아니다.
+- Device PASS는 실기기와 수동/로그 evidence가 있을 때만 쓴다.
+- Model PASS는 dataset split, metric 정의, class 범위, checkpoint/hash를 함께 제한해 표기하고 fake/demo는 제외한다.
 
 ## 일일 보고 비율
 
@@ -84,7 +92,7 @@
 - service worker 기본 캐시를 PWA 설치/offline/TalkBack 수동 검증 완료로 표현
 - VL1+VS1 hard-negative 200장 FP 평가를 recall/mAP 또는 positive detection 성능 근거로 표현
 - contact sheet 빠른 triage를 정식 개인정보/위치정보 비식별 검수로 표현
-- AWS/S3, Kakao Map API, 지자체 API, Cloud STT/TTS, 공공 데이터셋 공개, Blue-Green 배포를 구현/검증 없이 실제 운영 완료로 표현
+- AWS/S3, 외부 지도 API 고도화, 지자체 API, Cloud STT/TTS, 공공 데이터셋 공개, Blue-Green 배포를 구현/검증 없이 실제 운영 완료로 표현
 - 월 1회 자동 재학습 또는 15% 성능 향상을 pipeline/metric 없이 완료로 표현
 
 ## 기능별 증거 우선순위
@@ -97,7 +105,7 @@
 | IMU/ROI | 실기기 센서 로그와 ROI 계산 리포트 | fixture 계산 | 센서 수집만으로 충돌 필터링 완료 아님 |
 | Model | 한국 test/validation metric, latency, failure review | dry-run/smoke | class 0과 4-class, accuracy와 mAP 구분 |
 | Voice | 브라우저/실폰 mic + UI action | local audio script | local sample은 E2E가 아님 |
-| Navigation | route contract + Kakao Map API 또는 mock route 기반 경로 안내 E2E | mock route | 목적지 intent만으로 내비게이션 완료 아님. MVP 범위 아님 |
+| Navigation | TMAP route contract/proxy + mock route + 실폰 길안내 E2E | mock route | 목적지 intent만으로 내비게이션 완료 아님. 목적지 검색/geocoding과 Kakao fallback은 후순위 |
 | GIS/Ops | GeoJSON/heatmap/radius/cluster 조회 | DB row 확인 | 실제 지자체 연계와 구분 |
 | Accessibility | TalkBack/aria-live/터치 타깃 수동 기록 | 디자인 문서/DevTools | 문서 기준만으로 완료 아님 |
 | MLOps/Release | 승인된 env/secret/storage/domain + rollback 또는 명시적 demo/mock release evidence | local runbook | 실제 외부 연동은 별도 승인 전 실행 금지 |
