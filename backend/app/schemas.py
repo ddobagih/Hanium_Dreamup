@@ -18,10 +18,15 @@ ClassId = Literal[0, 1, 2, 3]
 ClassName = Literal["damaged_tactile_block", "parked_kickboard_bicycle", "construction_obstacle", "pothole"]
 ReportStatus = Literal["new", "reviewed", "resolved"]
 DetectorSource = Literal["fake", "onnx", "server"]
+ReportDemoFilter = Literal["all", "only_fake", "exclude_fake"]
 LocationQuality = Literal["missing", "low", "medium", "high"]
 ModelStatus = Literal["unavailable", "ready"]
 DetectV2ModelKey = Literal["custom_tactile", "coco_general"]
+DetectV2DistanceSource = Literal["sensor_depth", "manual_fixture", "model_estimate", "unknown"]
 ReportV2Trigger = Literal["auto", "voice"]
+WalkingRouteProvider = Literal["tmap_pedestrian", "kakao_mobility"]
+DestinationSearchProvider = Literal["tmap_poi"]
+WalkingRoutePriority = Literal["RECOMMEND", "MAIN_STREET", "DISTANCE", "STAIR_AVOID"]
 
 
 class BBox(BaseModel):
@@ -35,6 +40,79 @@ class GpsFix(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     accuracy_m: Optional[float] = Field(default=None, ge=0)
+
+
+class RoutePoint(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    name: Optional[str] = None
+
+
+class WalkingRouteRequest(BaseModel):
+    origin: RoutePoint
+    destination: RoutePoint
+    waypoints: List[RoutePoint] = Field(default_factory=list, max_length=5)
+    priority: WalkingRoutePriority = "STAIR_AVOID"
+    radius_m: int = Field(default=5000, gt=0, le=12000)
+    default_speed: Optional[float] = Field(default=None, ge=0)
+
+
+class DestinationSearchResult(BaseModel):
+    id: str
+    name: str
+    point: RoutePoint
+    address: Optional[str] = None
+    road_address: Optional[str] = None
+    category: Optional[str] = None
+    result_type: Literal["poi", "address", "alias"] = "poi"
+    distance_m: Optional[int] = Field(default=None, ge=0)
+
+
+class DestinationSearchResponse(BaseModel):
+    schema_version: Literal["walksafe.destination_search.v1"]
+    provider: DestinationSearchProvider
+    query: str
+    results: List[DestinationSearchResult]
+
+
+class WalkingRouteSummary(BaseModel):
+    distance_m: int = Field(ge=0)
+    duration_s: int = Field(ge=0)
+
+
+class WalkingRouteStep(BaseModel):
+    index: int = Field(ge=0)
+    distance_m: int = Field(ge=0)
+    duration_s: int = Field(ge=0)
+    points: List[RoutePoint]
+    instruction: Optional[str] = None
+    road_name: Optional[str] = None
+    turn_type: Optional[int] = None
+    facility_type: Optional[int] = None
+
+
+class WalkingRouteGuidePoint(BaseModel):
+    index: int = Field(ge=0)
+    point: RoutePoint
+    instruction: Optional[str] = None
+    turn_type: Optional[int] = None
+    point_type: Optional[str] = None
+    facility_type: Optional[int] = None
+    distance_from_start_m: Optional[int] = Field(default=None, ge=0)
+    remaining_distance_m: Optional[int] = Field(default=None, ge=0)
+
+
+class WalkingRouteResponse(BaseModel):
+    schema_version: Literal["walksafe.walking_route.v1"]
+    provider: WalkingRouteProvider
+    provider_route_id: Optional[str] = None
+    priority: WalkingRoutePriority
+    summary: WalkingRouteSummary
+    polyline: List[RoutePoint]
+    steps: List[WalkingRouteStep]
+    guide_points: List[WalkingRouteGuidePoint] = Field(default_factory=list)
+    provider_result_code: int
+    provider_result_message: str
 
 
 class ReportMetadata(BaseModel):
@@ -56,6 +134,9 @@ class ReportMetadata(BaseModel):
 
 class ReportStatusUpdate(BaseModel):
     status: ReportStatus
+    note: Optional[str] = Field(default=None, max_length=500)
+    resolution_reason: Optional[str] = Field(default=None, max_length=500)
+    expected_updated_at: Optional[datetime] = None
 
 
 class ReportResponse(BaseModel):
@@ -116,6 +197,9 @@ class DetectV2Detection(BaseModel):
     category: str
     confidence: float = Field(ge=0, le=1)
     bbox: BBox
+    distance_m: Optional[float] = Field(default=None, ge=0, le=50)
+    distance_source: Optional[DetectV2DistanceSource] = None
+    distance_confidence: Optional[float] = Field(default=None, ge=0, le=1)
     threshold_used: float = Field(ge=0, le=1)
     captured_at: datetime
     gps: Optional[GpsFix] = None

@@ -29,6 +29,6 @@ def create_router(settings: Settings) -> APIRouter:
             raise HTTPException(status_code=404, detail="upload not found")
 
         media_type = UPLOAD_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
-        return Response(content=path.read_bytes(), media_type=media_type)
+        return Response(content=path.read_bytes(), media_type=media_type, headers={"Cache-Control": "no-store"})
 
     return router

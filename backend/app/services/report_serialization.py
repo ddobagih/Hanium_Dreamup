@@ -24,8 +24,23 @@ def location_quality(report: Report) -> LocationQuality:
 def review_flags(report: Report) -> list[str]:
     flags: list[str] = []
     quality = location_quality(report)
+    metadata = report.payload if isinstance(report.payload, dict) else {}
+    metadata_flags = metadata.get("review_flags") if isinstance(metadata.get("review_flags"), list) else []
+    fake_by_metadata = (
+        metadata.get("fake_source") is True
+        or metadata.get("performance_excluded") is True
+        or metadata.get("data_origin") == "demo"
+        or metadata.get("demo") is True
+        or metadata.get("is_demo") is True
+        or metadata.get("is_fake") is True
+        or "fake_source" in metadata_flags
+        or (
+            isinstance(metadata.get("source_model"), str)
+            and ("fake" in metadata["source_model"].lower() or "demo" in metadata["source_model"].lower())
+        )
+    )
 
-    if report.source == "fake":
+    if report.source == "fake" or fake_by_metadata:
         flags.append("fake_source")
     if report.confidence < LOW_CONFIDENCE_THRESHOLD:
         flags.append("low_confidence")

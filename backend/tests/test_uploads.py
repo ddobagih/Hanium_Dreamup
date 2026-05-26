@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 from pathlib import Path
 import sys
@@ -10,6 +11,7 @@ os.environ.setdefault("UPLOAD_DIR", str(ROOT / "backend" / "uploads" / "test"))
 
 from backend.app.config import get_settings  # noqa: E402
 from backend.app.main import app  # noqa: E402
+from backend.app.uploads import strip_image_metadata  # noqa: E402
 from asgi_client import ASGITestClient  # noqa: E402
 
 
@@ -40,3 +42,16 @@ def test_upload_route_rejects_path_traversal(tmp_path: Path) -> None:
         settings.upload_dir = previous_upload_dir
 
     assert response.status_code == 404
+
+
+def test_strip_image_metadata_removes_jpeg_exif_when_decodable() -> None:
+    from PIL import Image
+
+    source = io.BytesIO()
+    image = Image.new("RGB", (2, 2), color=(255, 0, 0))
+    image.save(source, format="JPEG", exif=b"Exif\x00\x00TEST-EXIF")
+
+    sanitized = strip_image_metadata(source.getvalue(), "image/jpeg")
+
+    assert sanitized.startswith(b"\xff\xd8\xff")
+    assert b"TEST-EXIF" not in sanitized

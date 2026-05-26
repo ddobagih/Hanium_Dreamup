@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from backend.app.config import Settings
 from backend.app.detector import detect_health, run_detection
 from backend.app.schemas import DetectContext, DetectHealthResponse, DetectResponse, DetectV2Response
-from backend.app.services.detect_v2 import fake_detect_v2_detections
+from backend.app.services.detect_v2 import detect_v2_health, run_detect_v2
 from backend.app.uploads import read_image_upload
 
 
@@ -43,6 +43,10 @@ def create_router(settings: Settings) -> APIRouter:
                 },
             ) from exc
 
+    @router.get("/detect/v2/health")
+    async def get_detect_v2_health() -> dict[str, object]:
+        return detect_v2_health(settings)
+
     @router.post("/detect/v2", response_model=DetectV2Response)
     async def detect_objects_v2(
         context: str = Form(default="{}"),
@@ -53,7 +57,22 @@ def create_router(settings: Settings) -> APIRouter:
         except (ValidationError, json.JSONDecodeError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-        await read_image_upload(image, settings)
-        return fake_detect_v2_detections(parsed_context)
+        image_bytes, content_type = await read_image_upload(image, settings)
+        try:
+            return run_detect_v2(
+                image_bytes=image_bytes,
+                content_type=content_type,
+                context=parsed_context,
+                settings=settings,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "detect_v2_unavailable",
+                    "reason": str(exc),
+                    "message": "Detect v2 real provider is not available. Use fake mode or configure the trained models.",
+                },
+            ) from exc
 
     return router
