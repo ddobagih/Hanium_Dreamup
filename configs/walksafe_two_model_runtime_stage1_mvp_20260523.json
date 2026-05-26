@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "models": {
+    "custom_tactile": {
+      "source_model": "walksafe_tactile3_reviewed_yolo26s_stage1_best_20260523",
+      "category": "tactile",
+      "classes": [
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "tactile_damage_area"
+      ],
+      "thresholds": {
+        "default": 0.55,
+        "normal_tactile_block": 0.55,
+        "damaged_tactile_block": 0.50,
+        "tactile_damage_area": 0.80
+      }
+    },
+    "coco_general": {
+      "source_model": "YOLO26n COCO pretrained",
+      "category": "general_obstacle",
+      "allowlist": [
+        "person",
+        "car",
+        "bus",
+        "truck",
+        "bicycle",
+        "motorcycle",
+        "traffic light",
+        "bench"
+      ],
+      "thresholds": {
+        "default": 0.40,
+        "person": 0.40,
+        "car": 0.45,
+        "bus": 0.45,
+        "truck": 0.45,
+        "bicycle": 0.40,
+        "motorcycle": 0.40,
+        "traffic light": 0.50,
+        "bench": 0.50
+      }
+    }
+  }
+}

@@ -82,6 +82,9 @@ class Detection:
     bbox: BBox
     source_model: str
     category: str
+    distance_m: float | None = None
+    distance_source: str | None = None
+    distance_confidence: float | None = None
 
     def __post_init__(self) -> None:
         if self.model_key not in MODEL_KEYS:
@@ -106,6 +109,17 @@ class Detection:
         if bbox[2] <= 0 or bbox[3] <= 0:
             raise ValueError("bbox width and height must be greater than 0")
         object.__setattr__(self, "bbox", bbox)
+
+        if self.distance_m is not None:
+            distance_m = _as_float(self.distance_m, "distance_m")
+            if distance_m < 0 or distance_m > 50:
+                raise ValueError("distance_m must be between 0 and 50")
+            object.__setattr__(self, "distance_m", distance_m)
+        if self.distance_confidence is not None:
+            distance_confidence = _as_float(self.distance_confidence, "distance_confidence")
+            if distance_confidence < 0 or distance_confidence > 1:
+                raise ValueError("distance_confidence must be between 0 and 1")
+            object.__setattr__(self, "distance_confidence", distance_confidence)
 
 
 def load_threshold_config(path: str | Path | None = None) -> dict[str, Any]:
@@ -286,6 +300,9 @@ def _to_detection(raw_detection: Detection | Mapping[str, Any]) -> Detection:
             bbox=bbox_values,
             source_model=raw_detection["source_model"],
             category=raw_detection["category"],
+            distance_m=raw_detection.get("distance_m"),
+            distance_source=raw_detection.get("distance_source"),
+            distance_confidence=raw_detection.get("distance_confidence"),
         )
     except KeyError as exc:
         raise ValueError(f"missing detection field: {exc.args[0]}") from exc
@@ -295,7 +312,7 @@ def _to_detection(raw_detection: Detection | Mapping[str, Any]) -> Detection:
 
 def _detection_to_dict(detection: Detection) -> dict[str, Any]:
     x, y, width, height = detection.bbox
-    return {
+    payload = {
         "model_key": detection.model_key,
         "class_name": detection.class_name,
         "confidence": detection.confidence,
@@ -308,6 +325,13 @@ def _detection_to_dict(detection: Detection) -> dict[str, Any]:
         "source_model": detection.source_model,
         "category": detection.category,
     }
+    if detection.distance_m is not None:
+        payload["distance_m"] = detection.distance_m
+    if detection.distance_source is not None:
+        payload["distance_source"] = detection.distance_source
+    if detection.distance_confidence is not None:
+        payload["distance_confidence"] = detection.distance_confidence
+    return payload
 
 
 def _validate_thresholds(raw_thresholds: Any, model_key: str) -> dict[str, float]:

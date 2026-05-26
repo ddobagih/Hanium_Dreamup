@@ -12,7 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from voice.intents import classify_intent
+from voice.intents import classify_intent, intent_response_payload, intent_schema_payload
+from voice.phrases import phrase_catalog_payload, phrase_text_by_id
+from voice.telemetry import intent_telemetry_schema
 from voice.stt import LocalSTTEngine
 from voice.tts import DEFAULT_TTS_MODEL_ID, LocalTTSEngine
 
@@ -61,8 +63,10 @@ class TranscriptRequest(BaseModel):
 
 
 class TTSRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str | None = Field(default=None, min_length=1, max_length=180)
+    phrase_id: str | None = None
     use_cache: bool = True
+    allow_fallback: bool = True
 
 
 def env_csv(name: str, default: str) -> list[str]:
@@ -157,11 +161,23 @@ def speech_intent(request: TranscriptRequest) -> dict[str, Any]:
     result = classify_intent(request.transcript)
     return {
         "transcript": request.transcript,
-        "normalized": result.normalized,
-        "intent": result.intent,
-        "score": result.score,
-        "slots": result.slots,
+        **intent_response_payload(result),
     }
+
+
+@app.get("/speech/intents")
+def speech_intents() -> dict[str, Any]:
+    return intent_schema_payload()
+
+
+@app.get("/speech/intent-telemetry/schema")
+def speech_intent_telemetry_schema() -> dict[str, Any]:
+    return intent_telemetry_schema()
+
+
+@app.get("/speech/phrases")
+def speech_phrases() -> dict[str, object]:
+    return phrase_catalog_payload()
 
 
 @app.post("/speech/stt")
@@ -191,12 +207,10 @@ async def speech_stt(audio: UploadFile = File(...)) -> dict[str, Any]:
         if bytes_written == 0:
             raise stt_error(status.HTTP_400_BAD_REQUEST, "empty_audio", "Uploaded audio file is empty.")
         result = get_stt_engine().transcribe_file(tmp_path)
+        intent_result = classify_intent(result.transcript)
         return {
             "transcript": result.transcript,
-            "intent": result.intent,
-            "confidence": result.score,
-            "score": result.score,
-            "slots": result.slots,
+            **intent_response_payload(intent_result),
             "language": result.language,
             "duration_sec": result.duration_sec,
             "model": result.model,
@@ -216,16 +230,65 @@ async def speech_stt(audio: UploadFile = File(...)) -> dict[str, Any]:
             pass
 
 
+def tts_fallback_path() -> Path | None:
+    configured = os.getenv("VOICE_TTS_FALLBACK_WAV")
+    if not configured:
+        return None
+    path = Path(configured)
+    if path.is_file() and path.stat().st_size > 0:
+        return path
+    return None
+
+
 @app.post("/speech/tts")
 def speech_tts(request: TTSRequest) -> FileResponse:
+    text = resolve_tts_request_text(request)
     try:
-        result = get_tts_engine().synthesize(request.text, use_cache=request.use_cache)
+        result = get_tts_engine().synthesize(text, use_cache=request.use_cache)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        fallback_path = tts_fallback_path() if request.allow_fallback else None
+        if fallback_path is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        headers = {
+            "X-Voice-Model": "fallback",
+            "X-Voice-Cached": "false",
+            "X-Voice-Fallback": "true",
+            "X-Voice-Mode": "fallback",
+            "X-Voice-Generation-Seconds": "0.000",
+        }
+        return FileResponse(fallback_path, media_type="audio/wav", filename=fallback_path.name, headers=headers)
     headers = {
         "X-Voice-Model": result.model,
         "X-Voice-Cached": str(result.cached).lower(),
+        "X-Voice-Fallback": "false",
         "X-Voice-Mode": result.mode,
         "X-Voice-Generation-Seconds": f"{result.duration_sec:.3f}",
     }
     return FileResponse(result.output_path, media_type="audio/wav", filename=result.output_path.name, headers=headers)
+
+
+@app.post("/speech/tts/cache-status")
+def speech_tts_cache_status(request: TTSRequest) -> dict[str, Any]:
+    text = resolve_tts_request_text(request)
+    engine = get_tts_engine()
+    cache_path = engine._cache_path(text, engine.mode)  # dry-run; does not load model
+    return {
+        "schema_version": "walksafe.tts_cache_status.v1",
+        "cached": cache_path.exists() and cache_path.stat().st_size > 0,
+        "cache_key": cache_path.stem,
+        "path_suffix": cache_path.suffix,
+        "phrase_id": request.phrase_id,
+        "model": engine.model_id,
+        "mode": engine.mode,
+    }
+
+
+def resolve_tts_request_text(request: TTSRequest) -> str:
+    if request.phrase_id:
+        text = phrase_text_by_id(request.phrase_id)
+        if text:
+            return text
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="unknown phrase_id")
+    if request.text:
+        return request.text
+    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="text or phrase_id is required")

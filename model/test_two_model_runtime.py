@@ -81,6 +81,9 @@ def test_mapping_input_and_response_dict_are_json_serializable() -> None:
         "bbox": {"x": 0.2, "y": 0.3, "width": 0.4, "height": 0.5},
         "source_model": "YOLO26n COCO pretrained",
         "category": "general_obstacle",
+        "distance_m": 1.2,
+        "distance_source": "manual_fixture",
+        "distance_confidence": 0.9,
     }
 
     response = to_response_dict([raw_detection], image_id="sample-001")
@@ -96,6 +99,9 @@ def test_mapping_input_and_response_dict_are_json_serializable() -> None:
                 "bbox": {"x": 0.2, "y": 0.3, "width": 0.4, "height": 0.5},
                 "source_model": "YOLO26n COCO pretrained",
                 "category": "general_obstacle",
+                "distance_m": 1.2,
+                "distance_source": "manual_fixture",
+                "distance_confidence": 0.9,
             }
         ],
     }
@@ -150,3 +156,19 @@ def test_validate_threshold_config_rejects_bad_threshold() -> None:
 def test_detection_rejects_invalid_bbox() -> None:
     with pytest.raises(ValueError, match="width and height"):
         Detection("custom_tactile", "normal_tactile_block", 0.9, (0.1, 0.2, 0.0, 0.4), "YOLO26s custom", "tactile")
+
+
+def test_detection_rejects_unrealistic_distance_metadata() -> None:
+    with pytest.raises(ValueError, match="distance_m"):
+        Detection("coco_general", "person", 0.9, BBOX, "YOLO26n COCO pretrained", "general_obstacle", distance_m=51)
+    with pytest.raises(ValueError, match="distance_confidence"):
+        Detection(
+            "coco_general",
+            "person",
+            0.9,
+            BBOX,
+            "YOLO26n COCO pretrained",
+            "general_obstacle",
+            distance_m=1.0,
+            distance_confidence=1.2,
+        )
