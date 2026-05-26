@@ -1,13 +1,16 @@
-import { Loader2, MapPin, Mic, Navigation, RefreshCw, Send, Volume2, VolumeX } from "lucide-react";
+import { Loader2, MapPin, Mic, Navigation, RefreshCw, Save, Send, UserRound, Volume2, VolumeX } from "lucide-react";
 import { labelForTwoModelDetection } from "@/lib/detector-v2";
 import type { DetectionEvent, GpsFix } from "@/types/inference";
 import type { TwoModelDetection } from "@/types/inference-v2";
+import type { EmergencyContact } from "../hooks/useWalkSafeSettings";
+import type { NavigationDestinationCandidate } from "../navigation-destination";
 import { formatGps, formatPercent } from "../utils";
 
 type VoiceRecordState = "idle" | "recording" | "uploading" | "error";
 type ReportState = "idle" | "sending" | "sent" | "error";
 
 type AssistPanelProps = {
+  panelId?: string;
   detection: DetectionEvent | null;
   v2Detections: TwoModelDetection[];
   v2Primary: TwoModelDetection | null;
@@ -25,6 +28,19 @@ type AssistPanelProps = {
   lastDuplicateCount: number;
   voiceMessage: string;
   voiceResultText: string;
+  navigationActive: boolean;
+  navigationStatusText: string;
+  navigationInstructionText: string;
+  navigationDetailText: string;
+  navigationDestinationCandidates: NavigationDestinationCandidate[];
+  navigationHiddenDestinationCandidateCount: number;
+  navigationCanShowMoreDestinations: boolean;
+  navigationSearchActive: boolean;
+  onSelectNavigationCandidate: (candidateId: string) => void;
+  onShowMoreNavigationCandidates: () => void;
+  onCancelNavigationSearch: () => void;
+  onRetryNavigationSearch: () => void;
+  onStopNavigation: () => void;
   speechEnabled: boolean;
   handleSpeechToggle: () => void;
   voiceState: VoiceRecordState;
@@ -40,9 +56,40 @@ type AssistPanelProps = {
   reportHelpText: string;
   reconnectCameraAndSensors: () => void;
   modeText: string;
+  guardianSummary: string;
+  settingsMessage: string;
+  settingsExpanded: boolean;
+  setupChecklist: { id: string; label: string; done: boolean }[];
+  settingsForm: {
+    emergencyContacts: EmergencyContact[];
+  };
+  stepLengthSummary: string;
+  stepLengthDetail: string;
+  motionPermissionLabel: string;
+  motionSampleCount: number;
+  stepLengthConfidence: number;
+  storedStepCalibrationActive: boolean;
+  isOnline: boolean;
+  pwaInstallMessage: string;
+  pwaUpdateMessage: string;
+  swVersion: string | null;
+  canInstallPwa: boolean;
+  canApplyPwaUpdate: boolean;
+  onEmergencyContactNameChange: (contactId: string, value: string) => void;
+  onEmergencyContactPhoneChange: (contactId: string, value: string) => void;
+  onAddEmergencyContact: () => void;
+  onRemoveEmergencyContact: (contactId: string) => void;
+  onRequestMotionPermission: () => void;
+  onResetStepLengthCalibration: () => void;
+  onInstallPwa: () => void;
+  onApplyPwaUpdate: () => void;
+  onSaveSettings: () => void;
+  onClearSettings: () => void;
+  onToggleSettingsExpanded: () => void;
 };
 
 export function AssistPanel({
+  panelId,
   detection,
   v2Detections,
   v2Primary,
@@ -60,6 +107,19 @@ export function AssistPanel({
   lastDuplicateCount,
   voiceMessage,
   voiceResultText,
+  navigationActive,
+  navigationStatusText,
+  navigationInstructionText,
+  navigationDetailText,
+  navigationDestinationCandidates,
+  navigationHiddenDestinationCandidateCount,
+  navigationCanShowMoreDestinations,
+  navigationSearchActive,
+  onSelectNavigationCandidate,
+  onShowMoreNavigationCandidates,
+  onCancelNavigationSearch,
+  onRetryNavigationSearch,
+  onStopNavigation,
   speechEnabled,
   handleSpeechToggle,
   voiceState,
@@ -74,10 +134,38 @@ export function AssistPanel({
   reportButtonLabel,
   reportHelpText,
   reconnectCameraAndSensors,
-  modeText
+  modeText,
+  guardianSummary,
+  settingsMessage,
+  settingsExpanded,
+  setupChecklist,
+  settingsForm,
+  stepLengthSummary,
+  stepLengthDetail,
+  motionPermissionLabel,
+  motionSampleCount,
+  stepLengthConfidence,
+  storedStepCalibrationActive,
+  isOnline,
+  pwaInstallMessage,
+  pwaUpdateMessage,
+  swVersion,
+  canInstallPwa,
+  canApplyPwaUpdate,
+  onEmergencyContactNameChange,
+  onEmergencyContactPhoneChange,
+  onAddEmergencyContact,
+  onRemoveEmergencyContact,
+  onRequestMotionPermission,
+  onResetStepLengthCalibration,
+  onInstallPwa,
+  onApplyPwaUpdate,
+  onSaveSettings,
+  onClearSettings,
+  onToggleSettingsExpanded
 }: AssistPanelProps) {
   return (
-    <section className="assist-panel" aria-label="보행 보조 상태와 신고">
+    <section id={panelId} className="assist-panel" aria-label="보행 보조 상태와 신고">
       <div className="status-grid">
         <div className={`status-item current-risk ${riskActive ? "warning" : "safe"}`} aria-live="polite">
           <span className="status-label">현재 위험</span>
@@ -125,7 +213,61 @@ export function AssistPanel({
           <strong>{voiceMessage}</strong>
           <small>{voiceResultText}</small>
         </div>
+        <div className={`status-item navigation-card ${navigationActive ? "active" : ""}`} aria-live="polite">
+          <span className="status-label">길안내</span>
+          <strong>{navigationInstructionText}</strong>
+          <small>{navigationStatusText}</small>
+          <small>{navigationDetailText}</small>
+          {navigationActive ? (
+            <button className="inline-action" type="button" onClick={onStopNavigation}>
+              길안내 중지
+            </button>
+          ) : null}
+          {navigationSearchActive ? (
+            <button className="inline-action" type="button" onClick={onCancelNavigationSearch}>
+              검색 취소
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      {navigationDestinationCandidates.length > 0 ? (
+        <section className="navigation-candidate-card" aria-label="목적지 후보 선택">
+          <strong>목적지 후보 선택</strong>
+          <div className="navigation-candidate-list" role="list" aria-live="polite">
+            {navigationDestinationCandidates.map((candidate, index) => (
+              <button
+                key={candidate.id}
+                className="navigation-candidate-button"
+                type="button"
+                onClick={() => onSelectNavigationCandidate(candidate.id)}
+                aria-label={`${index + 1}번 목적지 ${candidate.label} 선택`}
+                role="listitem"
+              >
+                <span>{index + 1}</span>
+                <b>{candidate.name}</b>
+                {candidate.addressLabel || candidate.distanceLabel ? (
+                  <small>{[candidate.addressLabel, candidate.distanceLabel].filter(Boolean).join(" · ")}</small>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          <div className="navigation-candidate-actions">
+            {navigationCanShowMoreDestinations ? (
+              <button className="inline-action" type="button" onClick={onShowMoreNavigationCandidates}>
+                더 보기 {navigationHiddenDestinationCandidateCount}개
+              </button>
+            ) : null}
+            <button className="inline-action" type="button" onClick={onRetryNavigationSearch}>
+              다시 검색
+            </button>
+            <button className="inline-action" type="button" onClick={onCancelNavigationSearch}>
+              취소
+            </button>
+          </div>
+          <p>여러 장소가 검색되면 자동 길안내를 시작하지 않습니다.</p>
+        </section>
+      ) : null}
 
       <button
         className="voice-button"
@@ -155,6 +297,116 @@ export function AssistPanel({
         </span>
         <small>{voiceButtonHelp}</small>
       </button>
+
+
+
+      <section className="settings-card" aria-label="보호자와 보폭 자동 측정 설정">
+        <div className="settings-card-header">
+          <span>
+            <UserRound aria-hidden="true" size={18} />
+            초기 설정
+          </span>
+          <small>{guardianSummary}</small>
+          <button
+            className="inline-action"
+            type="button"
+            aria-expanded={settingsExpanded}
+            onClick={onToggleSettingsExpanded}
+          >
+            {settingsExpanded ? "접기" : "펼치기"}
+          </button>
+        </div>
+        <div className="setup-checklist" aria-label="첫 실행 확인 목록">
+          {setupChecklist.map((item) => (
+            <span key={item.id} className={item.done ? "done" : undefined}>
+              {item.done ? "완료" : "확인"} · {item.label}
+            </span>
+          ))}
+        </div>
+        <div className="settings-fields" hidden={!settingsExpanded}>
+          <div className="emergency-contact-list" aria-label="긴급 연락처 목록">
+            {settingsForm.emergencyContacts.map((contact, index) => (
+              <fieldset key={contact.id} className="emergency-contact-row">
+                <legend>{index === 0 ? "주 긴급 연락처" : `추가 연락처 ${index + 1}`}</legend>
+                <label>
+                  이름
+                  <input
+                    type="text"
+                    value={contact.name}
+                    onChange={(event) => onEmergencyContactNameChange(contact.id, event.target.value)}
+                    placeholder="예: 홍길동"
+                    autoComplete="off"
+                  />
+                </label>
+                <label>
+                  전화번호
+                  <input
+                    type="tel"
+                    value={contact.phone}
+                    onChange={(event) => onEmergencyContactPhoneChange(contact.id, event.target.value)}
+                    placeholder="예: 010-0000-0000"
+                    autoComplete="tel"
+                  />
+                </label>
+                {settingsForm.emergencyContacts.length > 1 ? (
+                  <button className="inline-action" type="button" onClick={() => onRemoveEmergencyContact(contact.id)}>
+                    이 연락처 삭제
+                  </button>
+                ) : null}
+              </fieldset>
+            ))}
+            {settingsForm.emergencyContacts.length < 3 ? (
+              <button className="inline-action" type="button" onClick={onAddEmergencyContact}>
+                연락처 추가
+              </button>
+            ) : null}
+          </div>
+          <div className="step-length-readout" aria-live="polite">
+            <span>보폭 자동 측정</span>
+            <strong>{stepLengthSummary}</strong>
+            <small>{stepLengthDetail}</small>
+            <small>
+              움직임 권한 {motionPermissionLabel} · 샘플 {motionSampleCount}개 · 신뢰도 {Math.round(stepLengthConfidence * 100)}%
+              {storedStepCalibrationActive ? " · 저장값 사용 중" : ""}
+            </small>
+            <div className="settings-actions compact">
+              <button className="inline-action" type="button" onClick={onRequestMotionPermission}>
+                움직임 권한/측정 시작
+              </button>
+              <button className="inline-action" type="button" onClick={onResetStepLengthCalibration}>
+                보폭 재보정
+              </button>
+            </div>
+            <small>실기기 측정 완료가 아니라 local dry-run 보정 로그입니다.</small>
+          </div>
+          <div className="pwa-status-card" aria-live="polite">
+            <span>앱 설치/오프라인</span>
+            <strong>{isOnline ? "온라인" : "오프라인 셸 사용 중"}</strong>
+            <small>{pwaInstallMessage}</small>
+            <small>{pwaUpdateMessage}</small>
+            {swVersion ? <small>서비스워커 버전 {swVersion}</small> : null}
+            <div className="settings-actions compact">
+              <button className="inline-action" type="button" onClick={onInstallPwa} disabled={!canInstallPwa}>
+                앱 설치
+              </button>
+              <button className="inline-action" type="button" onClick={onApplyPwaUpdate} disabled={!canApplyPwaUpdate}>
+                오프라인 셸 업데이트 적용
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="settings-actions">
+          <button className="control-button secondary" type="button" onClick={onSaveSettings}>
+            <Save aria-hidden="true" size={18} />
+            설정 저장
+          </button>
+          <button className="control-button secondary" type="button" onClick={onClearSettings}>
+            연락처 지우기
+          </button>
+        </div>
+        <p>{settingsMessage}</p>
+        <p className="assist-note">보호자 연락처는 report/STT payload로 전송하지 않으며 실제 전화/SMS도 발신하지 않습니다.</p>
+      </section>
 
       <button
         className="report-button"

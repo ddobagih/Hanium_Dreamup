@@ -44,11 +44,18 @@ async function parseApiJson<T>(response: Response, fallbackMessage: string): Pro
   return response.json() as Promise<T>;
 }
 
+function assertOnline() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new Error("오프라인 상태입니다. 신고 API 요청을 보내지 않습니다.");
+  }
+}
+
 export async function submitReportV2(
   detection: TwoModelDetection,
   image: Blob,
   trigger: ReportV2Trigger
 ): Promise<ReportV2Response> {
+  assertOnline();
   const metadata: AutoReportV2Metadata = {
     ...detection,
     trigger,

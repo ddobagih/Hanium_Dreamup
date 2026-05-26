@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { speechConfidence, uploadSpeechStt, VOICE_API_BASE, type VoiceIntent, type VoiceSttResponse } from "@/lib/voice-api";
 import { VOICE_INTENT_CONFIDENCE_THRESHOLD, VOICE_RECORDING_MAX_MS } from "../config";
-import { speak, vibrate } from "../feedback";
+import { speak, stopSpeaking, vibrate } from "../feedback";
 import { destinationFromSlots, formatPercent, preferredAudioMimeType } from "../utils";
 
 export type VoiceRecordState = "idle" | "recording" | "uploading" | "error";
+
+type VoiceActionResult = { ok: boolean; message: string };
 
 type UseVoiceCommandsOptions = {
   speechEnabled: boolean;
@@ -12,11 +14,27 @@ type UseVoiceCommandsOptions = {
   setVoiceMessage: (message: string) => void;
   isReportSending: () => boolean;
   onCreateReport: () => Promise<void>;
+  onSetDestination?: (destination: string) => void | VoiceActionResult | Promise<void | VoiceActionResult>;
+  onSelectDestinationCandidateByIndex?: (candidateIndex: number) => VoiceActionResult | Promise<VoiceActionResult>;
+  onStartNavigation?: () => Promise<VoiceActionResult>;
+  onStopNavigation?: () => void;
   getLastStatusMessage: () => string | null;
   setLastStatusMessage: (message: string) => void;
   getCurrentLocationMessage: () => string;
   hasGps: boolean;
+  hasNavigationDestination?: boolean;
 };
+
+function candidateIndexFromSlots(slots: Record<string, unknown>): number | null {
+  const value = slots.candidate_index ?? slots.candidateIndex ?? slots.index;
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
+    return value;
+  }
+  if (typeof value === "string" && /^[1-9]\d*$/.test(value.trim())) {
+    return Number(value);
+  }
+  return null;
+}
 
 export function useVoiceCommands({
   speechEnabled,
@@ -24,10 +42,15 @@ export function useVoiceCommands({
   setVoiceMessage,
   isReportSending,
   onCreateReport,
+  onSetDestination,
+  onSelectDestinationCandidateByIndex,
+  onStartNavigation,
+  onStopNavigation,
   getLastStatusMessage,
   setLastStatusMessage,
   getCurrentLocationMessage,
-  hasGps
+  hasGps,
+  hasNavigationDestination = false
 }: UseVoiceCommandsOptions) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
@@ -57,7 +80,10 @@ export function useVoiceCommands({
   }, [clearVoiceStopTimer]);
 
   useEffect(() => {
-    return () => cleanupVoiceRecording();
+    return () => {
+      stopSpeaking();
+      cleanupVoiceRecording();
+    };
   }, [cleanupVoiceRecording]);
 
   const handleSpeechToggle = useCallback(() => {
@@ -74,12 +100,12 @@ export function useVoiceCommands({
       const confidence = speechConfidence(result);
       const intent = result.intent;
 
-      if (confidence < VOICE_INTENT_CONFIDENCE_THRESHOLD || intent === "unknown") {
-        const message = intent === "unknown" ? "명령을 이해하지 못했습니다." : "명령 신뢰도가 낮습니다.";
-        setVoiceMessage(`${message} 다시 말씀해 주세요.`);
+      if (result.should_execute === false || confidence < VOICE_INTENT_CONFIDENCE_THRESHOLD || intent === "unknown") {
+        const message = result.prompt ?? (intent === "unknown" ? "명령을 이해하지 못했습니다. 다시 말씀해 주세요." : "명령 신뢰도가 낮습니다. 다시 말씀해 주세요.");
+        setVoiceMessage(message);
         vibrate([120, 80, 120]);
         if (speechEnabled) {
-          speak("다시 말씀해 주세요.");
+          speak(message);
         }
         return;
       }
@@ -138,6 +164,15 @@ export function useVoiceCommands({
         if (nextDestination) {
           setDestination(nextDestination);
           setNavigationActive(false);
+          const destinationResult = await onSetDestination?.(nextDestination);
+          if (destinationResult) {
+            setVoiceMessage(destinationResult.message);
+            vibrate(destinationResult.ok ? 70 : [120, 80, 120]);
+            if (speechEnabled) {
+              speak(destinationResult.message);
+            }
+            return;
+          }
         }
         const message = nextDestination ? `${nextDestination} 목적지 저장` : "목적지를 다시 말씀해 주세요.";
         setVoiceMessage(message);
@@ -148,8 +183,52 @@ export function useVoiceCommands({
         return;
       }
 
-      if (intent === "start_navigation") {
-        if (!destination) {
+      if (intent === "select_destination_candidate") {
+        const candidateIndex = candidateIndexFromSlots(result.slots);
+        if (candidateIndex === null) {
+          const message = "몇 번째 목적지를 선택할지 다시 말씀해 주세요.";
+          setVoiceMessage(message);
+          vibrate([120, 80, 120]);
+          if (speechEnabled) {
+            speak(message);
+          }
+          return;
+        }
+
+        if (!onSelectDestinationCandidateByIndex) {
+          const message = "선택할 목적지 후보가 없습니다. 목적지를 먼저 말씀해 주세요.";
+          setVoiceMessage(message);
+          vibrate([120, 80, 120]);
+          if (speechEnabled) {
+            speak(message);
+          }
+          return;
+        }
+
+        const selectionResult = await onSelectDestinationCandidateByIndex(candidateIndex);
+        setNavigationActive(false);
+        setVoiceMessage(selectionResult.message);
+        vibrate(selectionResult.ok ? 70 : [120, 80, 120]);
+        if (speechEnabled) {
+          speak(selectionResult.message);
+        }
+        return;
+      }
+
+      if (intent === "stop_navigation") {
+        onStopNavigation?.();
+        setNavigationActive(false);
+        const message = "길안내를 중지했습니다.";
+        setVoiceMessage(message);
+        vibrate([80, 50, 80]);
+        if (speechEnabled) {
+          speak(message);
+        }
+        return;
+      }
+
+      if (intent === "start_navigation" || intent === "reroute_navigation") {
+        if (!destination && !hasNavigationDestination) {
           setVoiceMessage("목적지를 먼저 말씀해 주세요.");
           vibrate([120, 80, 120]);
           if (speechEnabled) {
@@ -158,11 +237,22 @@ export function useVoiceCommands({
           return;
         }
 
+        if (onStartNavigation) {
+          const result = await onStartNavigation();
+          setNavigationActive(result.ok);
+          setVoiceMessage(result.message);
+          vibrate(result.ok ? [70, 50, 120] : [120, 80, 120]);
+          if (speechEnabled && !result.ok) {
+            speak(result.message);
+          }
+          return;
+        }
+
         setNavigationActive(true);
-        setVoiceMessage(`${destination} 안내 시작 준비`);
+        setVoiceMessage(intent === "reroute_navigation" ? "재탐색 준비" : `${destination} 안내 시작 준비`);
         vibrate([70, 50, 120]);
         if (speechEnabled) {
-          speak("길 안내를 시작합니다.");
+          speak(intent === "reroute_navigation" ? "경로를 다시 확인합니다." : "길 안내를 시작합니다.");
         }
       }
     },
@@ -170,9 +260,14 @@ export function useVoiceCommands({
       destination,
       getCurrentLocationMessage,
       getLastStatusMessage,
+      hasNavigationDestination,
       hasGps,
       isReportSending,
       onCreateReport,
+      onSelectDestinationCandidateByIndex,
+      onSetDestination,
+      onStartNavigation,
+      onStopNavigation,
       setLastStatusMessage,
       setSpeechEnabled,
       setVoiceMessage,
@@ -243,6 +338,7 @@ export function useVoiceCommands({
       return;
     }
 
+    stopSpeaking();
     setVoiceState("recording");
     setVoiceMessage("말씀하세요");
     setVoiceTranscript(null);

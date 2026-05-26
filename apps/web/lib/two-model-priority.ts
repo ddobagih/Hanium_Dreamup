@@ -20,8 +20,8 @@ type RankedDetection = {
 };
 
 const CLASS_PRIORITY: Record<KnownTwoModelClassName, { rank: number; group: PriorityGroup }> = {
-  tactile_damage_area: { rank: 0, group: "tactile_damage" },
-  damaged_tactile_block: { rank: 1, group: "tactile_damage" },
+  damaged_tactile_block: { rank: 0, group: "tactile_damage" },
+  tactile_damage_area: { rank: 1, group: "tactile_damage" },
   car: { rank: 2, group: "vehicle" },
   bus: { rank: 2, group: "vehicle" },
   truck: { rank: 2, group: "vehicle" },

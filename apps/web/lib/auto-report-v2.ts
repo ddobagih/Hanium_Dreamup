@@ -1,6 +1,6 @@
 import type { GpsFixV2, TwoModelDetection } from "@/types/inference-v2";
 
-const AUTO_REPORT_CLASSES = new Set(["tactile_damage_area", "damaged_tactile_block"]);
+const AUTO_REPORT_CLASSES = new Set(["damaged_tactile_block"]);
 export const AUTO_REPORT_COOLDOWN_MS = 10 * 60 * 1000;
 export const AUTO_REPORT_LOCATION_PRECISION = 4;
 

@@ -39,6 +39,8 @@ export type GpsFixV2 = {
   accuracy_m?: number | null;
 };
 
+export type DetectionDistanceSource = "sensor_depth" | "manual_fixture" | "model_estimate" | "unknown";
+
 export type TwoModelDetection = {
   schema_version: "detect.v2";
   model_key: TwoModelKey;
@@ -48,6 +50,9 @@ export type TwoModelDetection = {
   category: TwoModelCategory;
   confidence: number;
   bbox: NormalizedBBoxV2;
+  distance_m?: number | null;
+  distance_source?: DetectionDistanceSource | null;
+  distance_confidence?: number | null;
   threshold_used: number;
   captured_at: string;
   gps?: GpsFixV2 | null;

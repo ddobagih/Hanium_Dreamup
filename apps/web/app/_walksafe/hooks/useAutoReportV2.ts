@@ -76,13 +76,23 @@ export function useAutoReportV2({
         return false;
       }
 
-      if (trigger === "auto" && !gps) {
-        setAutoReportV2State("waiting_location");
+      if (!gps) {
+        setAutoReportV2State(
+          "waiting_location",
+          trigger === "auto" ? "자동 신고 대기 · 위치 확인 필요" : "음성 요청 신고 대기 · 위치 확인 필요"
+        );
+        if (trigger === "voice") {
+          setVoiceMessage("위치 확인 후 다시 신고해 주세요.");
+          vibrate([120, 80, 120]);
+          if (speechEnabled) {
+            speak("위치 확인 후 다시 신고해 주세요.");
+          }
+        }
         return false;
       }
 
-      const cooldownKey = gps ? autoReportV2CooldownKey(target, gps) : null;
-      if (!options.bypassCooldown && gps && !canAutoReportV2(autoReportCooldownsRef.current, target, gps)) {
+      const cooldownKey = autoReportV2CooldownKey(target, gps);
+      if (!options.bypassCooldown && !canAutoReportV2(autoReportCooldownsRef.current, target, gps)) {
         setAutoReportV2State("cooldown");
         return false;
       }
@@ -105,9 +115,7 @@ export function useAutoReportV2({
           return false;
         }
 
-        if (cooldownKey) {
-          autoReportCooldownsRef.current.set(cooldownKey, Date.now());
-        }
+        autoReportCooldownsRef.current.set(cooldownKey, Date.now());
 
         const duplicateCount = response.duplicate_report_ids.length;
         setLastDuplicateCount(duplicateCount);
@@ -139,7 +147,7 @@ export function useAutoReportV2({
         autoReportInFlightRef.current = false;
       }
     },
-    [captureFrame, gps, heading, setAutoReportV2State, setLastDuplicateCount, speechEnabled]
+    [captureFrame, gps, heading, setAutoReportV2State, setLastDuplicateCount, setVoiceMessage, speechEnabled]
   );
 
   const handleVoiceReportV2 = useCallback(async () => {

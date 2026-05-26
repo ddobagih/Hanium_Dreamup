@@ -14,6 +14,7 @@ type CameraSurfaceProps = {
   v2Primary: TwoModelDetection | null;
   riskActive: boolean;
   modeText: string;
+  isFakeV2Mode: boolean;
   riskText: string;
   detectorStatusText: string;
 };
@@ -28,6 +29,7 @@ export function CameraSurface({
   v2Primary,
   riskActive,
   modeText,
+  isFakeV2Mode,
   riskText,
   detectorStatusText
 }: CameraSurfaceProps) {
@@ -83,7 +85,7 @@ export function CameraSurface({
           }}
           aria-hidden="true"
         >
-          <span>{labelForTwoModelDetection(item)}</span>
+          <span>{isFakeV2Mode ? `데모 · ${labelForTwoModelDetection(item)}` : labelForTwoModelDetection(item)}</span>
         </div>
       ))}
 

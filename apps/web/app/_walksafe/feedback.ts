@@ -3,6 +3,12 @@ import type { DetectionEvent } from "@/types/inference";
 import type { TwoModelDetection } from "@/types/inference-v2";
 import { RISK_ALERTS } from "./config";
 
+export function stopSpeaking() {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
 export function speak(message: string) {
   if (!("speechSynthesis" in window)) {
     return;
@@ -11,7 +17,7 @@ export function speak(message: string) {
   const utterance = new SpeechSynthesisUtterance(message);
   utterance.lang = "ko-KR";
   utterance.rate = 0.95;
-  window.speechSynthesis.cancel();
+  stopSpeaking();
   window.speechSynthesis.speak(utterance);
 }
 

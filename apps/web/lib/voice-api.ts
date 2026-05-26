@@ -9,9 +9,14 @@ export type VoiceIntent =
   | "voice_off"
   | "repeat_last"
   | "set_destination"
+  | "select_destination_candidate"
   | "start_navigation"
+  | "reroute_navigation"
+  | "stop_navigation"
   | "get_current_location"
   | "unknown";
+
+export type VoiceIntentAction = "execute" | "reprompt";
 
 export type VoiceSttResponse = {
   transcript: string;
@@ -20,6 +25,10 @@ export type VoiceSttResponse = {
   confidence?: number;
   score?: number;
   slots: Record<string, unknown>;
+  action?: VoiceIntentAction;
+  should_execute?: boolean;
+  reason?: string | null;
+  prompt?: string | null;
   language?: string | null;
   duration_sec?: number;
   model?: string;
@@ -32,7 +41,10 @@ const VOICE_INTENTS = new Set<VoiceIntent>([
   "voice_off",
   "repeat_last",
   "set_destination",
+  "select_destination_candidate",
   "start_navigation",
+  "reroute_navigation",
+  "stop_navigation",
   "get_current_location",
   "unknown"
 ]);
@@ -115,6 +127,9 @@ async function parseVoiceJson(response: Response): Promise<unknown> {
 }
 
 export async function uploadSpeechStt(audio: Blob): Promise<VoiceSttResponse> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new Error("오프라인 상태입니다. 음성 명령 서버로 전송하지 않습니다.");
+  }
   const body = new FormData();
   const contentType = audio.type || "audio/webm";
   body.append("audio", audio, audioFileName(contentType));
@@ -155,6 +170,10 @@ export async function uploadSpeechStt(audio: Blob): Promise<VoiceSttResponse> {
     confidence: typeof payload.confidence === "number" ? payload.confidence : undefined,
     score: typeof payload.score === "number" ? payload.score : undefined,
     slots: isRecord(payload.slots) ? payload.slots : {},
+    action: payload.action === "execute" || payload.action === "reprompt" ? payload.action : undefined,
+    should_execute: typeof payload.should_execute === "boolean" ? payload.should_execute : undefined,
+    reason: typeof payload.reason === "string" || payload.reason === null ? payload.reason : undefined,
+    prompt: typeof payload.prompt === "string" || payload.prompt === null ? payload.prompt : undefined,
     language: typeof payload.language === "string" || payload.language === null ? payload.language : undefined,
     duration_sec: typeof payload.duration_sec === "number" ? payload.duration_sec : undefined,
     model: typeof payload.model === "string" ? payload.model : undefined,

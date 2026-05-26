@@ -1,8 +1,11 @@
-import { DETECT_API_BASE } from "@/lib/detect-api";
-import type { GpsFixV2, NormalizedBBoxV2, TwoModelDetection, TwoModelKey } from "@/types/inference-v2";
+import type { DetectionDistanceSource, GpsFixV2, NormalizedBBoxV2, TwoModelDetection, TwoModelKey } from "@/types/inference-v2";
 
+const DEFAULT_DETECT_API_BASE = "http://localhost:8000";
 const DETECT_TIMEOUT_MS = 8000;
+const DETECT_API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_DETECT_API_BASE).replace(/\/+$/, "");
 const MODEL_KEYS = new Set<string>(["custom_tactile", "coco_general"]);
+const DISTANCE_SOURCES = new Set<string>(["sensor_depth", "manual_fixture", "model_estimate", "unknown"]);
+const MAX_REASONABLE_DISTANCE_M = 50;
 
 export type DetectFrameV2Result = { schema_version: "detect.v2"; detections: TwoModelDetection[] };
 
@@ -50,12 +53,18 @@ function toBbox(value: unknown): NormalizedBBoxV2 | null {
   if (x === null || y === null || width === null || height === null) {
     return null;
   }
+  if (x < 0 || y < 0 || width <= 0 || height <= 0 || x > 1 || y > 1 || width > 1 || height > 1) {
+    return null;
+  }
+  if (x + width > 1 || y + height > 1) {
+    return null;
+  }
 
   return {
-    x: clamp(x, 0, 1),
-    y: clamp(y, 0, 1),
-    width: clamp(width, 0, 1),
-    height: clamp(height, 0, 1)
+    x,
+    y,
+    width,
+    height
   };
 }
 
@@ -76,6 +85,24 @@ function toGps(value: unknown): GpsFixV2 | null {
     longitude,
     accuracy_m: accuracy === null || accuracy === undefined ? null : finiteNumber(accuracy)
   };
+}
+
+function toDistanceM(value: unknown): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const distance = finiteNumber(value);
+  return distance !== null && distance >= 0 && distance <= MAX_REASONABLE_DISTANCE_M ? distance : null;
+}
+
+function toDistanceSource(value: unknown): DetectionDistanceSource | null {
+  return typeof value === "string" && DISTANCE_SOURCES.has(value) ? (value as DetectionDistanceSource) : null;
+}
+
+function toUnitConfidence(value: unknown): number | null {
+  const confidence = finiteNumber(value);
+  return confidence !== null ? clamp(confidence, 0, 1) : null;
 }
 
 function errorParts(payload: unknown): { code: string | null; reason: string | null; message: string | null } {
@@ -110,6 +137,9 @@ async function parseJson(response: Response): Promise<unknown> {
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, fallbackMessage: string): Promise<unknown> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    throw new DetectV2ApiError("오프라인 상태입니다. 탐지 API 요청을 보내지 않습니다.", 0, "offline");
+  }
   const abortController = new AbortController();
   const timeoutId = window.setTimeout(() => abortController.abort(), DETECT_TIMEOUT_MS);
   let response: Response;
@@ -177,10 +207,26 @@ function detectionFromPayload(payload: unknown, fallbackContext: DetectV2Context
     category,
     confidence: clamp(confidence, 0, 1),
     bbox,
+    distance_m: toDistanceM(payload.distance_m),
+    distance_source: toDistanceSource(payload.distance_source),
+    distance_confidence: toUnitConfidence(payload.distance_confidence),
     threshold_used: clamp(threshold, 0, 1),
     captured_at: capturedAt,
     gps: toGps(payload.gps) ?? fallbackContext.gps,
     heading
+  };
+}
+
+export function parseDetectFrameV2Payload(payload: unknown, fallbackContext: DetectV2Context): DetectFrameV2Result | null {
+  if (!isRecord(payload) || payload.schema_version !== "detect.v2" || !Array.isArray(payload.detections)) {
+    return null;
+  }
+
+  return {
+    schema_version: "detect.v2",
+    detections: payload.detections
+      .map((detection) => detectionFromPayload(detection, fallbackContext))
+      .filter((detection): detection is TwoModelDetection => detection !== null)
   };
 }
 
@@ -203,14 +249,10 @@ export async function detectFrameV2(image: Blob, context: DetectV2Context): Prom
     "서버 탐지 실패"
   );
 
-  if (!isRecord(payload) || payload.schema_version !== "detect.v2" || !Array.isArray(payload.detections)) {
+  const parsed = parseDetectFrameV2Payload(payload, requestContext);
+  if (!parsed) {
     throw new DetectV2ApiError("탐지 서버 응답을 확인해 주세요.", 0, "invalid_response");
   }
 
-  return {
-    schema_version: "detect.v2",
-    detections: payload.detections
-      .map((detection) => detectionFromPayload(detection, requestContext))
-      .filter((detection): detection is TwoModelDetection => detection !== null)
-  };
+  return parsed;
 }

@@ -34,13 +34,13 @@ export function labelForTwoModelDetection(detection: TwoModelDetection) {
 export function createFakeTwoModelDetections(index: number, gps: GpsFixV2 | null, heading: number | null) {
   const capturedAt = new Date().toISOString();
   const tactileDamage = index % 3 !== 1;
-  const primaryTactileClass = tactileDamage ? "tactile_damage_area" : "normal_tactile_block";
+  const primaryTactileClass = tactileDamage ? "damaged_tactile_block" : "normal_tactile_block";
   const tactileDetections: TwoModelDetection[] = [
     {
       schema_version: "detect.v2",
       model_key: "custom_tactile",
       source_model: "fake-custom-tactile-v2",
-      model_class_id: tactileDamage ? 2 : 0,
+      model_class_id: tactileDamage ? 1 : 0,
       class_name: primaryTactileClass,
       category: tactileDamage ? "tactile_damage" : "tactile_normal",
       confidence: tactileDamage ? 0.86 + (index % 2) * 0.05 : 0.82,
