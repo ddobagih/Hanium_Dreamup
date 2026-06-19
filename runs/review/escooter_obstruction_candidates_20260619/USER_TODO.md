@@ -4,9 +4,13 @@
 
 - 전체 보기: `contact_sheet_01.jpg` ~ `contact_sheet_07.jpg`
 - 후보 CSV: `escooter_obstruction_review_template.csv`
-- 더 자세히 볼 때:
+- 빠른 확인용 축소 이미지:
   - `overlays/`
   - `crops/`
+- 원본 해상도 확인용:
+  - `originals_fullres/`: 원천 이미지 원본, 리사이즈 없음
+  - `overlays_fullres/`: 원본 해상도에 bbox 표시
+  - `crops_fullres/`: 원본 해상도에서 후보 주변 crop, 썸네일 축소 없음
 
 ## 다른 AI에게 넘길 것
 
@@ -18,8 +22,10 @@
 
 정확도를 더 높이는 방법:
 
-- contact sheet로 1차 판정
-- 애매한 candidate_id는 `overlays/후보번호_candidate_id.jpg`와 `crops/후보번호_candidate_id.jpg`를 추가 업로드
+- contact sheet는 후보 위치를 빠르게 찾는 용도로만 사용
+- 실제 판정은 가능하면 `overlays_fullres/후보번호_candidate_id.jpg`를 기준으로 진행
+- 애매한 candidate_id는 `originals_fullres/후보번호_candidate_id.jpg`와 `crops_fullres/후보번호_candidate_id.jpg`를 추가 업로드
+- 저해상도 때문에 헷갈리면 축소본 `overlays/`, `crops/` 대신 원본 해상도 폴더를 사용
 
 ## 다른 AI가 돌려줘야 하는 것
 

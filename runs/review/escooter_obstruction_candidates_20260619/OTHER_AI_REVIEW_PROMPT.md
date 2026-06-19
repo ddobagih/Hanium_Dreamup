@@ -114,3 +114,10 @@ CSV 수정이 어렵다면 아래 표 형식으로만 답해라.
 
 최종적으로 승인된 후보만 `e_scooter_obstruction` 학습 라벨로 사용할 것이다.
 그러므로 `approve`는 정말 확실한 것만 골라라.
+
+## 이미지 해상도 사용 지침
+
+- `contact_sheet_*.jpg`, `overlays/`, `crops/`는 빠른 확인용 축소 이미지다.
+- 최종 판정은 가능하면 `overlays_fullres/`의 원본 해상도 bbox 이미지를 기준으로 한다.
+- 후보가 작거나 애매하면 `originals_fullres/`와 `crops_fullres/`를 함께 확인한다.
+- 원본 해상도 이미지에서도 확신이 없으면 `approve`하지 말고 `hold`로 둔다.

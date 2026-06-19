@@ -1,0 +1,15 @@
+{
+  "candidate_count": 150,
+  "written_count": 150,
+  "missing_count": 0,
+  "resolution_counts": {
+    "1920x1080": 139,
+    "3328x1872": 11
+  },
+  "folders": {
+    "originals_fullres": "원천 ZIP에서 꺼낸 원본 JPEG 바이트. 리사이즈 없음.",
+    "overlays_fullres": "원본 해상도 위에 빨간 bbox와 candidate_id를 표시한 이미지. 리사이즈 없음.",
+    "crops_fullres": "원본 해상도에서 후보 주변을 자른 이미지. 썸네일 축소 없음."
+  },
+  "missing": []
+}
