@@ -1,0 +1,14 @@
+{
+  "candidate_count": 150,
+  "output": "runs/review/escooter_obstruction_candidates_20260619",
+  "csv": "runs/review/escooter_obstruction_candidates_20260619/escooter_obstruction_review_template.csv",
+  "decision_policy": {
+    "approve": "보도 위 정지/방치/보행 경로 차단 전동킥보드만 e_scooter_obstruction positive",
+    "reject": "주행 중, 탑승자 있음, 차도/자전거도로, 멀리 있음, 장애물 아님",
+    "hold": "판단 애매하거나 bbox 수정 필요"
+  },
+  "source_counts": {
+    "aihub189_bbox_scooter_candidate": 84,
+    "aihub189_polygon_scooter_candidate": 66
+  }
+}
