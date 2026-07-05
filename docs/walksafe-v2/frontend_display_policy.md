@@ -1,7 +1,13 @@
 # Frontend v2 display, warning, and voice policy
 
-- 기준일: 2026-05-23 KST
+- 기준일: 2026-06-02 KST
 - 구현 위치: `apps/web/app/_walksafe/`, `apps/web/lib/*-v2.ts`, `apps/web/types/inference-v2.ts`
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 연결은 bbox/depth 좌표 정합 gate 이후 진행한다.
 
 ## 1. 지원 모드
 
@@ -9,7 +15,7 @@
 |---|---|
 | `fake` | 기존 v1 브라우저 fake detector |
 | `server` | 기존 v1 backend `/detect` 호출 |
-| `fake-v2` | 브라우저에서 two-model fake detections 생성. 실제 신고 저장 없음 |
+| `fake-v2` | 브라우저에서 unified-v2 fake detections 생성. 실제 신고 저장 없음 |
 | `server-v2` | backend `/detect/v2` 호출, tactile damage는 `/reports/v2` 저장 |
 
 ## 2. 화면 구조
@@ -26,6 +32,10 @@
 | `damaged_tactile_block` | 파손 점자블록 표시 | 기본 TTS 없음 | 자동 신고 대상 |
 | `tactile_damage_area` | 파손 영역 보조 표시 | 기본 TTS 없음 | 신고 안 함 |
 | `normal_tactile_block` | 정상 점자블록 표시 가능 | 경고 없음 | 신고 안 함 |
+| `crosswalk` | 횡단보도 안내 후보 | 경고가 아니라 경로/주의 안내 후보 | 신고 안 함 |
+| `curb_step` | 보도 턱/단차 표시 | 표면 위험 경고 | 신고 안 함 |
+| `uneven_sidewalk` | 고르지 않은 보도 표시 | 표면 위험 경고 | 신고 안 함 |
+| `e_scooter_obstruction` | 방치 킥보드/PM 장애물 표시 | 경로 장애물 경고 | 신고 안 함 |
 | COCO/general 객체 | 보조 표시 가능 | risk evaluator가 위험으로 판단할 때만 경고 | 신고 안 함 |
 
 타일/점자블록 손상은 “시설물 신고” 성격이므로 사용자가 매번 들을 경고로 처리하지 않는다. 손상 점자블록은 자동 신고만 수행하고 사용자 TTS는 기본으로 내보내지 않는다. `낙상 위험` 표현은 현재 MVP에서 별도 경고 카테고리로 쓰지 않는다.

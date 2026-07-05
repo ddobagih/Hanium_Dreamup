@@ -10,6 +10,10 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+export function isWalkSafePwaEnabled(rawValue = process.env.NEXT_PUBLIC_WALKSAFE_PWA_ENABLED): boolean {
+  return rawValue === "true";
+}
+
 export function isStandaloneDisplayMode(matchMediaResult: boolean, navigatorStandalone: unknown): boolean {
   return matchMediaResult || navigatorStandalone === true;
 }
@@ -47,7 +51,10 @@ export function describePwaUpdateState(state: PwaUpdateState, version: string | 
   }
 }
 
-function initialPwaUpdateState(): PwaUpdateState {
+function initialPwaUpdateState(pwaEnabled: boolean): PwaUpdateState {
+  if (!pwaEnabled) {
+    return "unsupported";
+  }
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return "unsupported";
   }
@@ -55,9 +62,10 @@ function initialPwaUpdateState(): PwaUpdateState {
 }
 
 export function usePwaStatus() {
+  const pwaEnabled = isWalkSafePwaEnabled();
   const [isOnline, setIsOnline] = useState(true);
   const [installState, setInstallState] = useState<PwaInstallState>("unsupported");
-  const [updateState, setUpdateState] = useState<PwaUpdateState>(() => initialPwaUpdateState());
+  const [updateState, setUpdateState] = useState<PwaUpdateState>(() => initialPwaUpdateState(pwaEnabled));
   const [swVersion, setSwVersion] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
@@ -77,6 +85,9 @@ export function usePwaStatus() {
   }, []);
 
   useEffect(() => {
+    if (!pwaEnabled) {
+      return;
+    }
     if (typeof window === "undefined" || typeof navigator === "undefined") {
       return;
     }
@@ -104,9 +115,12 @@ export function usePwaStatus() {
       window.removeEventListener("appinstalled", onAppInstalled);
       media?.removeEventListener?.("change", updateInstallState);
     };
-  }, [deferredPrompt]);
+  }, [deferredPrompt, pwaEnabled]);
 
   useEffect(() => {
+    if (!pwaEnabled) {
+      return;
+    }
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
@@ -160,7 +174,7 @@ export function usePwaStatus() {
       cancelled = true;
       navigator.serviceWorker.removeEventListener("message", onMessage);
     };
-  }, []);
+  }, [pwaEnabled]);
 
   const installApp = useCallback(async () => {
     if (!deferredPrompt) {

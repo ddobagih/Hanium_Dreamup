@@ -230,22 +230,25 @@ def test_duplicate_candidate_support(client: ASGITestClient) -> None:
         sample_metadata(
             class_id=3,
             class_name="pothole",
-            captured_at="2026-05-12T15:04:00.000Z",
+            captured_at="2026-05-12T15:00:30.000Z",
             gps={"latitude": 37.50003, "longitude": 127.00003, "accuracy_m": 10.0},
         ),
     )
 
     assert first["id"] in second["duplicate_report_ids"]
+    assert first["id"] in second["metadata"]["duplicate_report_ids"]
+    assert "duplicate_candidate" in second["review_flags"]
+    assert "duplicate_candidate" in second["metadata"]["review_flags"]
 
     duplicate_check = client.get(
         "/reports/duplicate-check",
         params={
             "class_name": "pothole",
-            "captured_at": "2026-05-12T15:03:00Z",
+            "captured_at": "2026-05-12T15:00:20Z",
             "lat": 37.50002,
             "lng": 127.00002,
-            "radius_m": 25,
-            "minutes": 10,
+            "radius_m": 10,
+            "minutes": 1,
         },
     )
     assert duplicate_check.status_code == 200

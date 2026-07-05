@@ -1,5 +1,6 @@
 import type { DetectionEvent } from "@/types/inference";
 import type { DetectionDistanceSource, TwoModelDetection } from "@/types/inference-v2";
+import { estimatePseudoDepthFromHistory, type ApproachState } from "./depth-estimator";
 
 export type RiskType =
   | "no_risk"
@@ -18,6 +19,7 @@ export type RiskObjectTracking = {
   object_id?: string;
   stable_frames?: number;
   stable_ms?: number;
+  approach_state?: ApproachState;
   approaching?: boolean;
   area_growth_ratio?: number | null;
   area_growth_per_second?: number | null;
@@ -25,6 +27,8 @@ export type RiskObjectTracking = {
   projected_path_intersection?: boolean;
   time_to_collision_ms?: number | null;
   distance_m?: number | null;
+  distance_source?: DetectionDistanceSource | null;
+  distance_confidence?: number | null;
 };
 
 export type RiskDepthContext = {
@@ -84,6 +88,7 @@ type BBoxHistoryRiskOptions = {
   min_iou?: number;
   max_center_shift?: number;
   min_stable_frames?: number;
+  motion_stability?: number | null;
 };
 
 const V1_POLICY: Record<DetectionEvent["class_name"], V1RiskPolicy> = {
@@ -114,14 +119,19 @@ const V1_POLICY: Record<DetectionEvent["class_name"], V1RiskPolicy> = {
 };
 
 const REPORTABLE_TACTILE_DAMAGE_CLASSES = new Set(["damaged_tactile_block"]);
+const SURFACE_HAZARD_CLASSES = new Set(["curb_step", "uneven_sidewalk"]);
+const PATH_OBSTACLE_CLASSES = new Set(["e_scooter_obstruction"]);
+const PATH_GUIDANCE_CLASSES = new Set(["crosswalk"]);
 
 const DEFAULT_BBOX_HISTORY_OPTIONS: Required<BBoxHistoryRiskOptions> = {
   max_history_ms: 2500,
   max_sample_gap_ms: 1300,
   min_iou: 0.1,
   max_center_shift: 0.3,
-  min_stable_frames: 3
+  min_stable_frames: 3,
+  motion_stability: null
 };
+const CLOSE_RISK_DISTANCE_SOURCES = new Set<DetectionDistanceSource>(["sensor_depth", "manual_fixture"]);
 
 export function trackingKeyForDetection(detection: TwoModelDetection): string {
   return `${detection.source_model}:${detection.model_key}:${detection.model_class_id}:${detection.class_name}`;
@@ -271,6 +281,10 @@ export function buildBBoxHistoryRiskContext(
       ? Math.round((latestRelativeDistance / relativeClosingSpeed) * 1000)
       : null;
   const growthSteps = areaGrowthStepCounts(track);
+  const pseudoDepth = estimatePseudoDepthFromHistory(current, track, {
+    minStableFrames: resolvedOptions.min_stable_frames,
+    motionStability: resolvedOptions.motion_stability
+  });
   const approaching =
     stableFrames >= resolvedOptions.min_stable_frames &&
     areaGrowthRatio !== null &&
@@ -287,7 +301,11 @@ export function buildBBoxHistoryRiskContext(
       approaching,
       area_growth_ratio: areaGrowthRatio,
       area_growth_per_second: areaGrowthPerSecond,
-      time_to_collision_ms: timeToCollisionMs
+      time_to_collision_ms: timeToCollisionMs,
+      distance_m: pseudoDepth?.distance_m ?? null,
+      distance_source: pseudoDepth?.source ?? null,
+      distance_confidence: pseudoDepth?.confidence ?? null,
+      approach_state: pseudoDepth?.approach_state ?? (approaching ? "approaching" : "unknown")
     }
   };
 }
@@ -301,33 +319,77 @@ function highConfidenceLevel(confidence: number, fallback: RiskLevel): RiskLevel
 }
 
 function isReportableTactileDamage(detection: TwoModelDetection): boolean {
-  return detection.model_key === "custom_tactile" && REPORTABLE_TACTILE_DAMAGE_CLASSES.has(detection.class_name);
+  return (
+    (detection.model_key === "custom_tactile" || detection.model_key === "unified_walksafe") &&
+    REPORTABLE_TACTILE_DAMAGE_CLASSES.has(detection.class_name)
+  );
 }
 
 function isTactileDamageAreaDetail(detection: TwoModelDetection): boolean {
-  return detection.model_key === "custom_tactile" && detection.class_name === "tactile_damage_area";
+  return (
+    (detection.model_key === "custom_tactile" || detection.model_key === "unified_walksafe") &&
+    detection.class_name === "tactile_damage_area"
+  );
 }
 
 function isNormalTactile(detection: TwoModelDetection): boolean {
   return detection.category === "tactile_normal" || detection.class_name === "normal_tactile_block";
 }
 
+function isSurfaceHazard(detection: TwoModelDetection): boolean {
+  return detection.category === "surface_hazard" || SURFACE_HAZARD_CLASSES.has(detection.class_name);
+}
+
+function isPathObstacle(detection: TwoModelDetection): boolean {
+  return detection.category === "obstruction" || PATH_OBSTACLE_CLASSES.has(detection.class_name);
+}
+
+function isPathGuidance(detection: TwoModelDetection): boolean {
+  return detection.category === "path_guidance" || PATH_GUIDANCE_CLASSES.has(detection.class_name);
+}
+
 function isStableTracking(tracking: RiskObjectTracking): boolean {
   return (tracking.stable_frames ?? 0) >= 3 || (tracking.stable_ms ?? 0) >= 700;
 }
 
+function closeRiskDistanceM(context: RiskEvaluationContext): number | null {
+  if (context.depth?.source && CLOSE_RISK_DISTANCE_SOURCES.has(context.depth.source)) {
+    return context.depth.distance_m ?? null;
+  }
+
+  if (context.tracking?.distance_source && CLOSE_RISK_DISTANCE_SOURCES.has(context.tracking.distance_source)) {
+    return context.tracking.distance_m ?? null;
+  }
+
+  return null;
+}
+
 function isCloseContext(context: RiskEvaluationContext): boolean {
-  const distance = context.depth?.distance_m ?? context.tracking?.distance_m ?? null;
+  const distance = closeRiskDistanceM(context);
   return typeof distance === "number" && distance > 0 && distance <= 2.2;
 }
 
 function generalRiskSignal(context: RiskEvaluationContext): GeneralRiskSignal | null {
   const tracking = context.tracking;
+  const pathRelation = context.segmentation?.path_relation;
+  const sensorDepthClose =
+    context.depth?.source === "sensor_depth" &&
+    (context.depth.confidence ?? 0) >= 0.5 &&
+    isCloseContext(context) &&
+    pathRelation !== "off_path";
+
+  if (sensorDepthClose) {
+    return {
+      risk_type: "blocking_object",
+      risk_level: (context.depth?.distance_m ?? 99) <= 1.2 ? "high" : "medium",
+      reason: "실제 depth 센서가 가까운 전방 객체를 표시했습니다."
+    };
+  }
+
   if (!tracking || !isStableTracking(tracking)) {
     return null;
   }
 
-  const pathRelation = context.segmentation?.path_relation;
   const isBlocking =
     tracking.blocking_path === true ||
     tracking.projected_path_intersection === true ||
@@ -440,6 +502,42 @@ export function evaluateTwoModelDetectionRisk(
       risk_level: "none",
       reason: "정상 점자블록은 경고 대상이 아닙니다.",
       recommended_message: null
+    };
+  }
+
+  if (isPathGuidance(detection)) {
+    return {
+      alertable: false,
+      reportable: false,
+      risk_type: "no_risk",
+      risk_level: "none",
+      reason: "횡단보도/경로 안내 클래스는 위험 경고가 아닌 안내 후보로 처리합니다.",
+      recommended_message: null
+    };
+  }
+
+  if (isSurfaceHazard(detection)) {
+    return {
+      alertable: true,
+      reportable: false,
+      risk_type: "surface_hazard",
+      risk_level: highConfidenceLevel(detection.confidence, "medium"),
+      reason: "보행 표면 위험 클래스입니다.",
+      recommended_message:
+        detection.class_name === "curb_step"
+          ? "전방 보도 턱입니다. 발밑을 확인하세요."
+          : "전방 보도가 고르지 않습니다. 발밑을 주의하세요."
+    };
+  }
+
+  if (isPathObstacle(detection)) {
+    return {
+      alertable: true,
+      reportable: false,
+      risk_type: "path_obstacle",
+      risk_level: highConfidenceLevel(detection.confidence, "medium"),
+      reason: "보행 경로 장애물 클래스입니다.",
+      recommended_message: "전방 방치 킥보드 장애물입니다. 천천히 피하세요."
     };
   }
 

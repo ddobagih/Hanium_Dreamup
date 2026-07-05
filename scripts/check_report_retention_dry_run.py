@@ -11,7 +11,7 @@ from typing import Any
 RETENTION_DAYS = {
     "fake_demo": 30,
     "active": 180,
-    "resolved": 365,
+    "resolved": 180,
 }
 
 

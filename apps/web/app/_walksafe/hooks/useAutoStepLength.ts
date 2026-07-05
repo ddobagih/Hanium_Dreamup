@@ -19,6 +19,8 @@ export type MotionPermissionStatus = "unsupported" | "prompt" | "granted" | "den
 export type AutoStepLengthState = StepLengthEstimate & {
   motionPermissionStatus: MotionPermissionStatus;
   motionSampleCount: number;
+  motionStability: number;
+  shakeScore: number;
   storedCalibrationActive: boolean;
   calibrationLog: StepLengthCalibrationLog;
   requestMotionPermission: () => Promise<MotionPermissionStatus>;
@@ -42,6 +44,8 @@ const MAX_MOTION_SAMPLES = 240;
 const STEP_PEAK_THRESHOLD = 1.15;
 const STEP_RESET_THRESHOLD = 0.75;
 const MIN_STEP_INTERVAL_MS = 320;
+const MOTION_STABILITY_WINDOW_MS = 1500;
+const SHAKE_SCORE_FULL_DELTA = 3.2;
 
 function safeReadStoredCalibration(): StoredStepLengthCalibration | null {
   if (typeof window === "undefined") {
@@ -100,6 +104,20 @@ function getDeviceMotionPermissionEvent(): DeviceMotionPermissionEvent | null {
   return window.DeviceMotionEvent as DeviceMotionPermissionEvent;
 }
 
+function summarizeMotionStability(samples: readonly MotionSample[], nowMs: number): { motionStability: number; shakeScore: number } {
+  const recentSamples = samples.filter((sample) => nowMs - sample.observedAtMs <= MOTION_STABILITY_WINDOW_MS);
+  if (recentSamples.length < 3) {
+    return { motionStability: 1, shakeScore: 0 };
+  }
+
+  const averageDelta = recentSamples.reduce((sum, sample) => sum + sample.deltaFromGravity, 0) / recentSamples.length;
+  const shakeScore = Math.min(1, averageDelta / SHAKE_SCORE_FULL_DELTA);
+  return {
+    motionStability: Math.round((1 - shakeScore) * 100) / 100,
+    shakeScore: Math.round(shakeScore * 100) / 100
+  };
+}
+
 function initialMotionPermissionStatus(): MotionPermissionStatus {
   const motionEvent = getDeviceMotionPermissionEvent();
   if (!motionEvent) {
@@ -119,6 +137,8 @@ export function useAutoStepLength(gps: GpsFix | null): AutoStepLengthState {
   const [estimate, setEstimate] = useState<StepLengthEstimate>(() => initialEstimate(initialStoredCalibration));
   const [motionPermissionStatus, setMotionPermissionStatus] = useState<MotionPermissionStatus>(() => initialMotionPermissionStatus());
   const [motionSampleCount, setMotionSampleCount] = useState(0);
+  const [motionStability, setMotionStability] = useState(1);
+  const [shakeScore, setShakeScore] = useState(0);
   const [calibrationLog, setCalibrationLog] = useState<StepLengthCalibrationLog>(() =>
     buildStepLengthCalibrationLog(initialEstimate(initialStoredCalibration), 0)
   );
@@ -173,6 +193,8 @@ export function useAutoStepLength(gps: GpsFix | null): AutoStepLengthState {
     lastStepAtMsRef.current = 0;
     setStoredCalibration(null);
     setMotionSampleCount(0);
+    setMotionStability(1);
+    setShakeScore(0);
     const nextEstimate = initialEstimate(null);
     setEstimate(nextEstimate);
     setCalibrationLog(buildStepLengthCalibrationLog(nextEstimate, 0));
@@ -189,6 +211,7 @@ export function useAutoStepLength(gps: GpsFix | null): AutoStepLengthState {
         latitude: gps.latitude,
         longitude: gps.longitude,
         accuracy_m: gps.accuracy_m,
+        speed_mps: gps.speed_mps ?? null,
         observedAtMs: Date.now()
       }
     ].slice(-MAX_GPS_SAMPLES);
@@ -215,7 +238,10 @@ export function useAutoStepLength(gps: GpsFix | null): AutoStepLengthState {
         ...motionSamplesRef.current,
         { observedAtMs: nowMs, magnitude, deltaFromGravity: motionDelta }
       ].slice(-MAX_MOTION_SAMPLES);
+      const motionSummary = summarizeMotionStability(motionSamplesRef.current, nowMs);
       setMotionSampleCount(motionSamplesRef.current.length);
+      setMotionStability(motionSummary.motionStability);
+      setShakeScore(motionSummary.shakeScore);
       setMotionPermissionStatus("listening");
 
       const wasBelowReset = previousMotionDeltaRef.current < STEP_RESET_THRESHOLD;
@@ -239,6 +265,8 @@ export function useAutoStepLength(gps: GpsFix | null): AutoStepLengthState {
     ...estimate,
     motionPermissionStatus,
     motionSampleCount,
+    motionStability,
+    shakeScore,
     storedCalibrationActive: estimate.source === "stored_calibration",
     calibrationLog,
     requestMotionPermission,

@@ -13,6 +13,8 @@ from model.two_model_runtime import (
     COCO_GENERAL_ALLOWLIST,
     CUSTOM_TACTILE_CLASSES,
     Detection,
+    UNIFIED_WALKSAFE_CLASSES,
+    filter_detections,
     filter_and_merge_detections,
     load_threshold_config,
     validate_threshold_config,
@@ -24,6 +26,12 @@ DETECT_V2_READY_STATUS = "ready"
 DETECT_V2_UNAVAILABLE_STATUS = "unavailable"
 DETECT_V2_UNSUPPORTED_MODE_REASON = "detect_v2_mode_unsupported"
 DETECT_V2_MODEL_NOT_CONFIGURED_REASON = "detect_v2_model_not_configured"
+CUSTOM_TACTILE_INFERENCE_CONF = 0.15
+CUSTOM_TACTILE_INFERENCE_IMGSZ = 960
+COCO_GENERAL_INFERENCE_CONF = 0.10
+COCO_GENERAL_INFERENCE_IMGSZ = 640
+UNIFIED_WALKSAFE_INFERENCE_CONF = 0.10
+UNIFIED_WALKSAFE_INFERENCE_IMGSZ = 640
 
 
 class DetectV2Provider(Protocol):
@@ -53,7 +61,7 @@ class FakeDetectV2Provider:
 
 
 class LazyYoloDetectV2Runtime:
-    """Lazy two-model YOLO runtime.
+    """Lazy YOLO runtime for legacy two-model or unified single-model detection.
 
     Ultralytics and model weights are loaded only when ``detect`` is called.
     Tests can avoid that path by injecting a fake runtime into
@@ -63,15 +71,18 @@ class LazyYoloDetectV2Runtime:
     def __init__(
         self,
         *,
-        custom_tactile_model_path: Path,
-        coco_model_path: Path,
+        custom_tactile_model_path: Path | None = None,
+        coco_model_path: Path | None = None,
+        unified_model_path: Path | None = None,
         runtime_config_path: Path | None = None,
     ) -> None:
         self.custom_tactile_model_path = custom_tactile_model_path
         self.coco_model_path = coco_model_path
+        self.unified_model_path = unified_model_path
         self.runtime_config_path = runtime_config_path
         self._custom_model: Any | None = None
         self._coco_model: Any | None = None
+        self._unified_model: Any | None = None
         self._runtime_config: dict[str, Any] | None = None
 
     @property
@@ -82,46 +93,102 @@ class LazyYoloDetectV2Runtime:
 
     def detect(self, image_bytes: bytes, content_type: str) -> list[Detection]:
         image = _open_image(image_bytes)
-        custom_results = self._custom_model_lazy()(image)
-        coco_results = self._coco_model_lazy()(image)
+        if self.unified_model_path is not None:
+            return self._detect_unified(image)
+
+        if self.custom_tactile_model_path is None or self.coco_model_path is None:
+            raise RuntimeError(DETECT_V2_MODEL_NOT_CONFIGURED_REASON)
+        custom_results = self._custom_model_lazy()(
+            image,
+            conf=CUSTOM_TACTILE_INFERENCE_CONF,
+            imgsz=CUSTOM_TACTILE_INFERENCE_IMGSZ,
+            verbose=False,
+        )
+        coco_results = self._coco_model_lazy()(
+            image,
+            conf=COCO_GENERAL_INFERENCE_CONF,
+            imgsz=COCO_GENERAL_INFERENCE_IMGSZ,
+            verbose=False,
+        )
         config = self.runtime_config
+        custom_config = config.get("models", {}).get(
+            "custom_tactile",
+            DEFAULT_RUNTIME_CONFIG["models"]["custom_tactile"],
+        )
+        coco_config = config.get("models", {}).get(
+            "coco_general",
+            DEFAULT_RUNTIME_CONFIG["models"]["coco_general"],
+        )
 
         custom_raw = _results_to_raw_detections(
             custom_results,
             model_key="custom_tactile",
-            source_model=config["models"]["custom_tactile"]["source_model"],
+            source_model=custom_config["source_model"],
         )
         coco_raw = _results_to_raw_detections(
             coco_results,
             model_key="coco_general",
-            source_model=config["models"]["coco_general"]["source_model"],
-            allowlist=config["models"]["coco_general"].get("allowlist", COCO_GENERAL_ALLOWLIST),
+            source_model=coco_config["source_model"],
+            allowlist=coco_config.get("allowlist", COCO_GENERAL_ALLOWLIST),
         )
         return filter_and_merge_detections(custom_raw, coco_raw, config)
 
+    def _detect_unified(self, image: Any) -> list[Detection]:
+        config = self.runtime_config
+        unified_config = config.get("models", {}).get(
+            "unified_walksafe",
+            DEFAULT_RUNTIME_CONFIG["models"]["unified_walksafe"],
+        )
+        unified_results = self._unified_model_lazy()(
+            image,
+            conf=UNIFIED_WALKSAFE_INFERENCE_CONF,
+            imgsz=UNIFIED_WALKSAFE_INFERENCE_IMGSZ,
+            verbose=False,
+        )
+        unified_raw = _results_to_raw_detections(
+            unified_results,
+            model_key="unified_walksafe",
+            source_model=unified_config["source_model"],
+            allowlist=unified_config.get("classes", UNIFIED_WALKSAFE_CLASSES),
+        )
+        return filter_detections(unified_raw, config)
+
     def _custom_model_lazy(self) -> Any:
         if self._custom_model is None:
+            if self.custom_tactile_model_path is None:
+                raise RuntimeError(DETECT_V2_MODEL_NOT_CONFIGURED_REASON)
             self._custom_model = load_yolo_model(str(self.custom_tactile_model_path))
         return self._custom_model
 
     def _coco_model_lazy(self) -> Any:
         if self._coco_model is None:
+            if self.coco_model_path is None:
+                raise RuntimeError(DETECT_V2_MODEL_NOT_CONFIGURED_REASON)
             self._coco_model = load_yolo_model(str(self.coco_model_path))
         return self._coco_model
+
+    def _unified_model_lazy(self) -> Any:
+        if self._unified_model is None:
+            if self.unified_model_path is None:
+                raise RuntimeError(DETECT_V2_MODEL_NOT_CONFIGURED_REASON)
+            self._unified_model = load_yolo_model(str(self.unified_model_path))
+        return self._unified_model
 
 
 class YoloDetectV2Provider:
     def __init__(
         self,
         *,
-        custom_tactile_model_path: Path,
-        coco_model_path: Path,
+        custom_tactile_model_path: Path | None = None,
+        coco_model_path: Path | None = None,
+        unified_model_path: Path | None = None,
         runtime_config_path: Path | None = None,
         runtime: DetectV2Runtime | None = None,
     ) -> None:
         self.runtime = runtime or LazyYoloDetectV2Runtime(
             custom_tactile_model_path=custom_tactile_model_path,
             coco_model_path=coco_model_path,
+            unified_model_path=unified_model_path,
             runtime_config_path=runtime_config_path,
         )
 
@@ -139,10 +206,16 @@ def _path_exists(path: Path | None) -> bool:
 
 
 def _missing_model_reason(settings: Any) -> str | None:
+    unified_model_path = getattr(settings, "detect_v2_unified_model_path", None)
+    if _path_exists(unified_model_path):
+        return None
+    if unified_model_path is not None:
+        return f"{DETECT_V2_MODEL_NOT_CONFIGURED_REASON}:unified_walksafe"
+
     missing = []
-    if not _path_exists(settings.detect_v2_custom_tactile_model_path):
+    if not _path_exists(getattr(settings, "detect_v2_custom_tactile_model_path", None)):
         missing.append("custom_tactile")
-    if not _path_exists(settings.detect_v2_coco_model_path):
+    if not _path_exists(getattr(settings, "detect_v2_coco_model_path", None)):
         missing.append("coco_general")
     if not missing:
         return None
@@ -166,6 +239,7 @@ def get_detect_v2_provider_state(settings: Any) -> DetectV2ProviderState:
             provider=YoloDetectV2Provider(
                 custom_tactile_model_path=settings.detect_v2_custom_tactile_model_path,
                 coco_model_path=settings.detect_v2_coco_model_path,
+                unified_model_path=getattr(settings, "detect_v2_unified_model_path", None),
                 runtime_config_path=getattr(settings, "detect_v2_runtime_config_path", None),
             ),
             status=DETECT_V2_READY_STATUS,
@@ -180,23 +254,43 @@ def get_detect_v2_provider_state(settings: Any) -> DetectV2ProviderState:
 
 def detect_v2_health(settings: Any) -> dict[str, Any]:
     provider_state = get_detect_v2_provider_state(settings)
+    runtime_config = load_detect_v2_runtime_config(getattr(settings, "detect_v2_runtime_config_path", None))
+    configured_runtime = _configured_runtime(settings)
     return {
         "schema_version": "detect.v2",
         "mode": getattr(settings, "detect_v2_mode", DETECT_V2_MODE_FAKE),
         "status": provider_state.status,
         "reason": provider_state.reason,
+        "runtime_primary_model": runtime_config.get("primary_model"),
+        "runtime_fallback_model": runtime_config.get("fallback_model"),
+        "configured_runtime": configured_runtime,
         "custom_tactile_model_path": (
             str(settings.detect_v2_custom_tactile_model_path)
             if settings.detect_v2_custom_tactile_model_path
             else None
         ),
         "coco_model_path": str(settings.detect_v2_coco_model_path) if settings.detect_v2_coco_model_path else None,
+        "unified_model_path": (
+            str(settings.detect_v2_unified_model_path)
+            if getattr(settings, "detect_v2_unified_model_path", None)
+            else None
+        ),
         "runtime_config_path": (
             str(settings.detect_v2_runtime_config_path)
             if settings.detect_v2_runtime_config_path
             else None
         ),
     }
+
+
+def _configured_runtime(settings: Any) -> str | None:
+    if _path_exists(getattr(settings, "detect_v2_unified_model_path", None)):
+        return "unified_walksafe"
+    if _path_exists(getattr(settings, "detect_v2_custom_tactile_model_path", None)) and _path_exists(
+        getattr(settings, "detect_v2_coco_model_path", None)
+    ):
+        return "legacy_two_model"
+    return None
 
 
 def run_detect_v2(image_bytes: bytes, content_type: str, context: DetectContext, settings: Any) -> DetectV2Response:
@@ -234,6 +328,8 @@ def _model_class_id(raw_detection: Mapping[str, Any]) -> int:
         return int(raw_detection["model_class_id"])
     if raw_detection["model_key"] == "custom_tactile":
         return CUSTOM_TACTILE_CLASSES.index(raw_detection["class_name"])
+    if raw_detection["model_key"] == "unified_walksafe":
+        return UNIFIED_WALKSAFE_CLASSES.index(raw_detection["class_name"])
     return COCO_GENERAL_ALLOWLIST.index(raw_detection["class_name"])
 
 
@@ -256,6 +352,7 @@ def _detect_v2_detection(
         distance_m=raw_detection.get("distance_m"),
         distance_source=raw_detection.get("distance_source"),
         distance_confidence=raw_detection.get("distance_confidence"),
+        approach_state=raw_detection.get("approach_state"),
         threshold_used=_threshold_for_detection(raw_detection, runtime_config),
         captured_at=captured_at,
         gps=context.gps,
@@ -265,49 +362,44 @@ def _detect_v2_detection(
 
 def fake_detect_v2_detections(context: DetectContext) -> DetectV2Response:
     captured_at = context.captured_at or datetime.now(timezone.utc)
-    overlapping_bbox = (0.12, 0.18, 0.42, 0.36)
-    raw_custom_detections = [
+    unified_config = DEFAULT_RUNTIME_CONFIG["models"]["unified_walksafe"]
+    class_categories = unified_config["class_categories"]
+    raw_unified_detections = [
         {
-            "model_key": "custom_tactile",
-            "source_model": "fake/custom-tactile-contract",
+            "model_key": "unified_walksafe",
+            "source_model": "fake/unified-walksafe-contract",
             "class_name": "damaged_tactile_block",
-            "category": DEFAULT_RUNTIME_CONFIG["models"]["custom_tactile"]["category"],
+            "category": class_categories["damaged_tactile_block"],
             "confidence": 0.93,
             "bbox": (0.1, 0.16, 0.46, 0.4),
         },
         {
-            "model_key": "custom_tactile",
-            "source_model": "fake/custom-tactile-contract",
-            "class_name": "tactile_damage_area",
-            "category": DEFAULT_RUNTIME_CONFIG["models"]["custom_tactile"]["category"],
-            "confidence": 0.91,
-            "bbox": overlapping_bbox,
-        },
-    ]
-    raw_coco_detections = [
-        {
-            "model_key": "coco_general",
-            "source_model": "fake/coco-general-contract",
+            "model_key": "unified_walksafe",
+            "source_model": "fake/unified-walksafe-contract",
             "class_name": "person",
-            "category": DEFAULT_RUNTIME_CONFIG["models"]["coco_general"]["category"],
+            "category": class_categories["person"],
             "confidence": 0.84,
-            "bbox": overlapping_bbox,
+            "bbox": (0.12, 0.18, 0.42, 0.36),
         },
         {
-            "model_key": "coco_general",
-            "source_model": "fake/coco-general-contract",
+            "model_key": "unified_walksafe",
+            "source_model": "fake/unified-walksafe-contract",
+            "class_name": "crosswalk",
+            "category": class_categories["crosswalk"],
+            "confidence": 0.78,
+            "bbox": (0.08, 0.64, 0.72, 0.18),
+        },
+        {
+            "model_key": "unified_walksafe",
+            "source_model": "fake/unified-walksafe-contract",
             "class_name": "dog",
-            "category": DEFAULT_RUNTIME_CONFIG["models"]["coco_general"]["category"],
+            "category": "unknown",
             "confidence": 0.99,
             "bbox": (0.55, 0.1, 0.22, 0.58),
         },
     ]
 
-    filtered = filter_and_merge_detections(
-        raw_custom_detections,
-        raw_coco_detections,
-        DEFAULT_RUNTIME_CONFIG,
-    )
+    filtered = filter_detections(raw_unified_detections, DEFAULT_RUNTIME_CONFIG)
     detections = [
         _detect_v2_detection(
             {
@@ -324,7 +416,6 @@ def fake_detect_v2_detections(context: DetectContext) -> DetectV2Response:
         for detection in filtered
     ]
     return DetectV2Response(schema_version="detect.v2", detections=detections)
-
 
 def _open_image(image_bytes: bytes) -> Any:
     try:
@@ -379,5 +470,8 @@ def _detection_mapping(detection: Detection | Mapping[str, Any]) -> Mapping[str,
         distance_confidence = getattr(detection, "distance_confidence", None)
         if distance_confidence is not None:
             mapped["distance_confidence"] = distance_confidence
+        approach_state = getattr(detection, "approach_state", None)
+        if approach_state is not None:
+            mapped["approach_state"] = approach_state
         return mapped
     return detection

@@ -1,7 +1,13 @@
 # V2 automatic report and safety alert policy
 
-- 기준일: 2026-05-22 KST
+- 기준일: 2026-07-02 KST
 - 구현 위치: `apps/web/lib/auto-report-v2.ts`, `apps/web/app/_walksafe/hooks/useAutoReportV2.ts`, `backend/app/services/report_policy.py`
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 연결은 bbox/depth 좌표 정합 gate 이후 진행한다.
 
 ## 1. 핵심 원칙
 
@@ -14,13 +20,17 @@
 
 | model_key | class_name | 처리 |
 |---|---|---|
-| `custom_tactile` | `tactile_damage_area` | 자동 신고 대상 |
+| `unified_walksafe` | `damaged_tactile_block` | 자동 신고 대상 |
 | `custom_tactile` | `damaged_tactile_block` | 자동 신고 대상 |
+
+Backend/report 운영 threshold는 `damaged_tactile_block=0.50`으로 시작한다. 이 값은 test split image-level presence sweep에서 F1/recall 균형이 가장 좋았기 때문이다. 어드민 검수에서 오탐 부담이 크면 `0.60`, 필요 시 `0.75`로 올린다. Android TFLite debug threshold는 `apps/android/app/src/main/assets/model-config/two_model_runtime.json`을 따르며, backend 운영 threshold와 같다고 가정하지 않는다.
 
 아래는 현재 신고 대상이 아니다.
 
+- `tactile_damage_area` — 손상 부위 bbox 보조 정보이며 신고 기준은 아님
 - `normal_tactile_block`
 - 모든 `coco_general` 객체
+- `unified_walksafe`의 일반 객체/경로·장애물 class
 - unknown class
 
 Backend `/reports/v2`도 같은 정책을 강제한다.
@@ -57,19 +67,23 @@ Frontend v2 상태:
 
 ## 5. 음성 요청 신고
 
-- `create_report` intent는 현재 v2 detections 중 신고 가능한 tactile damage를 찾는다.
+- `create_report` intent는 현재 v2 detections 중 신고 가능한 `damaged_tactile_block`을 찾는다.
 - 음성 요청 신고는 자동 신고보다 우선한다.
-- `server-v2`에서 `/reports/v2`로 저장한다.
-- `fake-v2`에서는 실제 저장하지 않고 데모 안내만 한다.
+- PWA `server-v2` 경로에서는 `/reports/v2`로 저장한다.
+- PWA `fake-v2` UI에서는 실제 저장하지 않고 데모 안내만 한다. backend fake-mode는 API contract/test 용도로 저장 동작을 검증할 수 있으므로 PWA demo 저장 정책과 구분한다.
 - 음성 요청 신고는 자동 cooldown을 우회한다.
 - 완료/실패는 짧게 TTS로 안내한다.
 - 신고 대상이 없으면 “현재 신고할 타일 손상이 없습니다”로 안내한다.
+- 위치가 확인되지 않으면 “위치 확인 후 다시 신고해 주세요”로 안내하고 저장하지 않는다.
 
 ## 6. 위치와 중복
 
 - 자동 신고(`trigger: auto`)는 GPS가 없으면 보내지 않는다.
-- 음성 요청 신고(`trigger: voice`)는 사용자가 명시 요청한 흐름이므로 GPS가 없어도 저장을 시도할 수 있다.
-- Frontend 자동 신고 cooldown은 class + 위도/경도 소수점 4자리 기준, 기본 10분이다.
+- 음성 요청 신고(`trigger: voice`)도 GPS가 없으면 보내지 않는다.
+- 제품 컨셉상 GPS는 거의 항상 잡히는 것으로 가정한다. 다만 GPS drift는 가능하므로 `accuracy_m`, 중복 후보, 어드민 지도 검수를 함께 본다.
+- 자동/음성 신고 중복 후보는 같은 `class_name`, 위치 반경 `10m`, `captured_at` 전후 `1분` 기준으로 본다.
+- 중복 후보여도 저장은 유지하고 `duplicate_candidate` tag와 후보 ID를 남긴다.
+- 사용자가 명시적으로 신고를 요청했는데 중복 후보이면 "이미 신고가 된 상태입니다"라고 TTS로 안내한다.
 - Backend 중복 후보는 class/location/time 기준이며, GPS가 없으면 중복 후보를 만들지 않는다.
 
 ## 7. Backend 저장
@@ -78,12 +92,14 @@ Frontend v2 상태:
 - DB: 기존 `reports` 테이블 재사용
 - `source`: `source_model`이 `fake`로 시작하면 `fake`, 아니면 `server`
 - 원본 v2 metadata는 JSON payload로 보존한다.
+- 운영 조회는 `GET /reports`에서 `class_name`, `model_key`, `trigger`, `auto_reported`로 필터링한다.
 - 신규 migration은 추가하지 않았다.
 
 ## 8. 남은 결정
 
-- 자동 신고 cooldown 현장값 조정
+- Android 자동 신고 위치 기반 duplicate key와 10m/1분 반영
+- Android voice/manual 중복 TTS 안내
+- 로그인 필수와 reporter user id 저장
 - 음성 “신고 취소” 정책
-- v2 report query/filter 확장
-- 실제 YOLO adapter 연결 후 threshold 조정
-- 지면 위험 class를 tactile damage와 별도로 분리할지 여부
+- `tactile_damage_area`를 계속 보조 표시로 둘지, inference 응답에서 숨길지 여부
+- 지면 위험 class를 손상 점자블록 신고와 별도로 분리할지 여부

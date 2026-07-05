@@ -28,7 +28,6 @@ def review_flags(report: Report) -> list[str]:
     metadata_flags = metadata.get("review_flags") if isinstance(metadata.get("review_flags"), list) else []
     fake_by_metadata = (
         metadata.get("fake_source") is True
-        or metadata.get("performance_excluded") is True
         or metadata.get("data_origin") == "demo"
         or metadata.get("demo") is True
         or metadata.get("is_demo") is True
@@ -40,18 +39,33 @@ def review_flags(report: Report) -> list[str]:
         )
     )
 
+    def append_flag(flag: str) -> None:
+        if flag not in flags:
+            flags.append(flag)
+
     if report.source == "fake" or fake_by_metadata:
-        flags.append("fake_source")
+        append_flag("fake_source")
     if report.confidence < LOW_CONFIDENCE_THRESHOLD:
-        flags.append("low_confidence")
+        append_flag("low_confidence")
     if quality == "missing":
-        flags.append("missing_location")
+        append_flag("missing_location")
     elif quality == "low":
-        flags.append("low_location_accuracy")
+        append_flag("low_location_accuracy")
     if report.heading is None:
-        flags.append("missing_heading")
+        append_flag("missing_heading")
+    for flag in metadata_flags:
+        if isinstance(flag, str):
+            append_flag(flag)
 
     return flags
+
+
+def metadata_duplicate_report_ids(report: Report) -> list[str]:
+    metadata = report.payload if isinstance(report.payload, dict) else {}
+    raw_ids = metadata.get("duplicate_report_ids")
+    if not isinstance(raw_ids, list):
+        return []
+    return [str(value) for value in raw_ids if isinstance(value, str) and value]
 
 
 def report_to_response(report: Report, duplicate_report_ids: Optional[Sequence[str]] = None) -> ReportResponse:
@@ -62,6 +76,12 @@ def report_to_response(report: Report, duplicate_report_ids: Optional[Sequence[s
             "longitude": report.longitude,
             "accuracy_m": report.accuracy_m,
         }
+
+    resolved_duplicate_report_ids = (
+        [str(value) for value in duplicate_report_ids]
+        if duplicate_report_ids is not None
+        else metadata_duplicate_report_ids(report)
+    )
 
     return ReportResponse(
         id=str(report.id),
@@ -84,7 +104,7 @@ def report_to_response(report: Report, duplicate_report_ids: Optional[Sequence[s
         metadata=report.payload,
         location_quality=location_quality(report),
         review_flags=review_flags(report),
-        duplicate_report_ids=list(duplicate_report_ids or []),
+        duplicate_report_ids=resolved_duplicate_report_ids,
         created_at=report.created_at,
         updated_at=report.updated_at,
     )

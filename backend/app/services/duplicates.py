@@ -11,8 +11,8 @@ from backend.app.models import Report
 from backend.app.schemas import ReportMetadata, ReportV2Metadata
 
 
-DUPLICATE_RADIUS_M = 25.0
-DUPLICATE_WINDOW_MINUTES = 10
+DUPLICATE_RADIUS_M = 10.0
+DUPLICATE_WINDOW_MINUTES = 1
 
 
 def duplicate_candidate_statement(

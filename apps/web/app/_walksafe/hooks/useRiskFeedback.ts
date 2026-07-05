@@ -7,7 +7,7 @@ import type { TwoModelDetection } from "@/types/inference-v2";
 import { SPEECH_COOLDOWN_MS, WALKSAFE_GUIDE_COOLDOWN_MS } from "../config";
 import { resolveVoiceFeedbackState, shouldApplyNavigationStatusMessage } from "../voice-priority";
 import { alertForDetection, alertForTwoModelDetection, speak, vibrate } from "../feedback";
-import { buildRiskGuidanceMessage, selectRiskGuidanceCandidate } from "../risk-guidance";
+import { buildRiskGuidanceMessage, isMetricDistanceGuidanceSource, selectRiskGuidanceCandidate } from "../risk-guidance";
 import { evaluateDetectionRisk, evaluateTwoModelDetectionRisk } from "../risk-evaluator";
 import type { RiskDecision, RiskEvaluationContext } from "../risk-evaluator";
 import { formatPercent } from "../utils";
@@ -23,6 +23,9 @@ type UseRiskFeedbackOptions = {
   reportMessage: string;
   gps: GpsFix | null;
   gpsError: string | null;
+  heading?: number | null;
+  walkingSpeedMps?: number | null;
+  motionStability?: number | null;
   speechEnabled: boolean;
   getCurrentLocationMessage: () => string;
   stepLengthM?: number | null;
@@ -32,9 +35,12 @@ type UseRiskFeedbackOptions = {
 };
 
 function distanceForRiskContext(context: RiskEvaluationContext): number | null {
-  // 실제 depth/외부 센서 값은 아직 연결되지 않았다.
-  // bbox 크기 등으로 가짜 거리를 만들지 않고, 명시적으로 전달된 거리만 안내에 사용한다.
-  return context.depth?.distance_m ?? null;
+  if (isMetricDistanceGuidanceSource(context.depth?.source) && typeof context.depth?.distance_m === "number") {
+    return context.depth.distance_m;
+  }
+
+  // model_estimate/polygon trend는 내부 접근 판단에만 사용하고 사용자 보폭 거리 안내에는 쓰지 않는다.
+  return null;
 }
 
 function messageForV2Risk(
@@ -49,6 +55,7 @@ function messageForV2Risk(
     riskLevel: risk.risk_level,
     bbox: detectionValue.bbox,
     distanceM: distanceForRiskContext(context),
+    distanceSource: context.depth?.source ?? null,
     stepLengthM,
     label: fallbackLabel,
     fallback: risk.recommended_message
@@ -64,6 +71,9 @@ export function useRiskFeedback({
   reportMessage,
   gps,
   gpsError,
+  heading = null,
+  walkingSpeedMps = null,
+  motionStability = null,
   speechEnabled,
   getCurrentLocationMessage,
   stepLengthM = null,
@@ -74,8 +84,8 @@ export function useRiskFeedback({
   const lastAlertRef = useRef<{ key: string; time: number }>({ key: "", time: 0 });
   const lastNavigationAlertRef = useRef<{ key: string; time: number }>({ key: "", time: 0 });
   const lastStatusMessageRef = useRef<string | null>(null);
-  const v2PrimaryRiskContext = useTwoModelRiskHistory(v2Primary);
-  const v2SecondaryRiskContext = useTwoModelRiskHistory(v2Secondary);
+  const v2PrimaryRiskContext = useTwoModelRiskHistory(v2Primary, { heading, walkingSpeedMps, motionStability });
+  const v2SecondaryRiskContext = useTwoModelRiskHistory(v2Secondary, { heading, walkingSpeedMps, motionStability });
 
   const detectionRisk = useMemo(() => (detection ? evaluateDetectionRisk(detection) : null), [detection]);
   const v2PrimaryRisk = useMemo(
@@ -181,7 +191,7 @@ export function useRiskFeedback({
     const activeLabel = labelForTwoModelDetection(activeRiskDetection);
     const activeRiskContext = alertableV2Candidate?.context ?? {};
     const activeRiskMessage = messageForV2Risk(activeRiskDetection, activeRisk, activeRiskContext, activeLabel, stepLengthM);
-    lastStatusMessageRef.current = `현재 위험. ${activeLabel}. 신뢰도 ${formatPercent(activeRiskDetection.confidence)}.${secondaryText}`;
+    lastStatusMessageRef.current = `현재 위험. ${activeRiskMessage ?? activeLabel}. 신뢰도 ${formatPercent(activeRiskDetection.confidence)}.${secondaryText}`;
     const now = Date.now();
     const key = `${activeRiskDetection.model_key}:${activeRiskDetection.class_name}`;
     if (lastAlertRef.current.key === key && now - lastAlertRef.current.time < SPEECH_COOLDOWN_MS) {
@@ -249,6 +259,8 @@ export function useRiskFeedback({
     detectionRisk,
     v2PrimaryRisk,
     v2SecondaryRisk,
+    v2PrimaryRiskContext,
+    v2SecondaryRiskContext,
     riskActive,
     detectionLabel,
     riskText,

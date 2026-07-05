@@ -1,8 +1,14 @@
 # Backend v2 API 계약
 
-- 기준일: 2026-05-23 KST
+- 기준일: 2026-07-01 KST
 - 구현 위치: `backend/app/api/`, `backend/app/services/`, `backend/app/schemas.py`
-- 상태: v2 API contract 구현 완료, YOLO provider는 lazy-load 구조까지 연결됨. 실제 운영 모델 경로/threshold 선택은 학습 완료 후 확정 필요
+- 상태: v2 API contract 구현 완료, YOLO provider는 lazy-load 구조까지 연결됨. backend 운영 threshold와 Android TFLite threshold는 분리해 관리
+
+## 2026-07-01 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 코드 경로는 일부 연결되어 있다. 이 문서는 backend 계약을 설명하며, Android Device evidence를 대체하지 않는다.
 
 ## 1. v1과 v2 분리 원칙
 
@@ -39,7 +45,7 @@ image=<image file>
 | `gps` | object or null | `latitude`, `longitude`, optional `accuracy_m` |
 | `heading` | number or null | `0 <= heading < 360` |
 
-기본값은 `fake` mode이며 이미지 업로드 검증 후 fake v2 detection을 반환한다. `DETECT_V2_MODE=yolo` 또는 `real`에서 custom tactile/COCO model path가 모두 존재하면 lazy YOLO runtime을 사용한다. Ultralytics model load는 `/detect/v2/health`가 아니라 실제 `/detect/v2` 요청 시점까지 지연한다.
+기본값은 `fake` mode이며 이미지 업로드 검증 후 `unified_walksafe` fake v2 detection을 반환한다. `DETECT_V2_MODE=yolo` 또는 `real`에서 `DETECT_V2_UNIFIED_MODEL_PATH`가 존재하면 unified 단일 YOLO runtime을 우선 사용한다. unified path가 없으면 custom tactile/COCO model path가 모두 존재할 때 legacy fallback runtime을 사용한다. Ultralytics model load는 `/detect/v2/health`가 아니라 실제 `/detect/v2` 요청 시점까지 지연한다.
 
 ### 응답
 
@@ -49,11 +55,11 @@ image=<image file>
   "detections": [
     {
       "schema_version": "detect.v2",
-      "model_key": "custom_tactile",
-      "source_model": "fake/custom-tactile-contract",
-      "model_class_id": 1,
+      "model_key": "unified_walksafe",
+      "source_model": "fake/unified-walksafe-contract",
+      "model_class_id": 8,
       "class_name": "damaged_tactile_block",
-      "category": "tactile",
+      "category": "tactile_damage",
       "confidence": 0.93,
       "bbox": { "x": 0.10, "y": 0.16, "width": 0.46, "height": 0.40 },
       "distance_m": null,
@@ -74,8 +80,9 @@ image=<image file>
 |---|---|---|
 | `custom_tactile` | YOLO26s custom 또는 fake contract | `normal_tactile_block`, `damaged_tactile_block`, `tactile_damage_area` |
 | `coco_general` | YOLO26n COCO pretrained 또는 fake contract | allowlist 일반 객체 |
+| `unified_walksafe` | YOLO26n COCO+WalkSafe 13-class 후보 | `person`, `bicycle`, `car`, `motorcycle`, `bus`, `truck`, `traffic light`, `normal_tactile_block`, `damaged_tactile_block`, `crosswalk`, `curb_step`, `uneven_sidewalk`, `e_scooter_obstruction` |
 
-`/detect/v2` fake contract는 COCO allowlist 밖 class를 필터링한다. 모델 간 cross-model NMS는 하지 않는다.
+`/detect/v2` fake contract는 기본적으로 `unified_walksafe` 13-class payload를 반환한다. unified에서는 `bench`를 쓰지 않는다. legacy fallback에서만 COCO allowlist와 cross-model NMS 미적용 정책이 의미 있다.
 
 `distance_m`은 명시적 거리값이 있을 때만 전달한다. 허용 범위는 `0 <= distance_m <= 50`이며, `distance_source`는 `sensor_depth`, `manual_fixture`, `model_estimate`, `unknown`, `distance_confidence`는 `0..1`이다. 프론트는 source/confidence가 없으면 보폭 TTS 문구를 만들지 않는다.
 
@@ -89,8 +96,12 @@ image=<image file>
   "mode": "fake",
   "status": "ready",
   "reason": null,
+  "runtime_primary_model": "unified_walksafe",
+  "runtime_fallback_model": "legacy_two_model",
+  "configured_runtime": null,
   "custom_tactile_model_path": null,
   "coco_model_path": null,
+  "unified_model_path": null,
   "runtime_config_path": null
 }
 ```
@@ -100,13 +111,14 @@ image=<image file>
 | env | 기본값 | 의미 |
 |---|---|---|
 | `DETECT_V2_MODE` | `fake` | `fake`, `yolo`, `real` |
-| `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH` | unset | custom tactile YOLO checkpoint |
-| `DETECT_V2_COCO_MODEL_PATH` | unset | COCO helper model |
+| `DETECT_V2_UNIFIED_MODEL_PATH` | unset | unified 13-class YOLO checkpoint. 있으면 이 경로를 우선 사용 |
+| `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH` | unset | legacy fallback custom tactile YOLO checkpoint |
+| `DETECT_V2_COCO_MODEL_PATH` | unset | legacy fallback COCO helper model |
 | `DETECT_V2_RUNTIME_CONFIG_PATH` | unset | threshold/runtime config |
 
-`fake` mode는 모델 path 없이 ready다. `yolo`/`real` mode에서 model path가 없으면 `/detect/v2`는 503을 반환한다. model path가 있으면 health는 ready가 될 수 있지만, 실제 추론은 첫 `/detect/v2` 요청에서 모델 로딩과 런타임 의존성을 확인한다.
+`fake` mode는 모델 path 없이 ready다. `yolo`/`real` mode에서는 unified path도 없고 legacy custom tactile+COCO path pair도 완성되지 않으면 `/detect/v2`는 503을 반환한다. model path가 있으면 health는 ready가 될 수 있지만, 실제 추론은 첫 `/detect/v2` 요청에서 모델 로딩과 런타임 의존성을 확인한다.
 
-2026-05-23 KST 기준 local Stage1 후보 env와 health-only smoke는 `docs/execution/2026-05-23_reviewed_yolo26s_final_selection.md`와 `scripts/check_detect_v2_stage1_candidate_health_20260523.sh`를 따른다.
+2026-05-23 KST 기준 local Stage1 env와 health-only smoke는 legacy fallback 참고 기록이다. 필요하면 `docs/execution/2026-05-23_reviewed_yolo26s_final_selection.md`와 `scripts/check_detect_v2_stage1_candidate_health_20260523.sh`를 참고하되, 현재 primary는 unified path를 우선한다.
 
 ## 4. `POST /reports/v2`
 
@@ -126,11 +138,15 @@ image=<image file>
 |---|---|---|
 | `trigger` | `auto` 또는 `voice` | 자동 신고인지 음성 요청 신고인지 |
 | `auto_reported` | boolean | `trigger == "auto"`일 때 true |
+| `source` | optional `android` | Android native on-device upload일 때만 사용. 없으면 `source_model` 기준으로 `fake`/`server` 저장 |
+| `coordinate_gate_status` | string or null | Android bbox/depth gate 상태. non-pass 값은 성능 집계 제외 근거가 될 수 있음 |
 
 ### 허용 대상
 
 | model_key | class_name | 저장 |
 |---|---|---|
+| `unified_walksafe` | `damaged_tactile_block` | 허용 |
+| `unified_walksafe` | 일반 객체/경로·장애물 class | 거부, 위험 경고 입력만 가능 |
 | `custom_tactile` | `damaged_tactile_block` | 허용 |
 | `custom_tactile` | `tactile_damage_area` | 거부, 보조 bbox 정보 |
 | `custom_tactile` | `normal_tactile_block` | 거부 |
@@ -143,8 +159,8 @@ image=<image file>
 - 기존 `reports` 테이블을 재사용한다.
 - `class_id`에는 v2 `model_class_id`를 저장한다.
 - `class_name`에는 v2 `class_name`을 저장한다.
-- `source`는 `source_model`이 `fake`로 시작하면 `fake`, 아니면 `server`로 저장한다.
-- v2 payload는 허용된 detection/report/review flag 필드만 report JSON metadata에 저장한다. 보호자 연락처 등 unknown extra field는 저장하지 않는다.
+- `source`가 `android`이면 `reports.source=android`로 저장한다. 그 외에는 `source_model`이 `fake`로 시작하면 `fake`, 아니면 `server`로 저장한다.
+- v2 payload는 허용된 detection/report/review flag 필드만 report JSON metadata에 저장한다. Android `apk_sha256`, `model_config_sha256`, `android_model_version`, `bbox_coordinate_space`, `depth_coordinate_space`, `depth_sample_count`, `depth_valid_sample_ratio`, `detection_age_ms`, `coordinate_gate_status`, `fallback_used`, `loaded_model_key`, `model_load_reason`은 현재 allowlist에 포함되어 있다. 보호자 연락처 등 unknown extra field는 저장하지 않는다.
 - v2 손상 점자블록 신고는 GPS가 있어야 저장한다. GPS가 없으면 422로 거부한다.
 - 중복 후보는 class/location/time 기준으로 기존 정책을 재사용한다.
 
@@ -156,7 +172,7 @@ image=<image file>
 |---|---|---|
 | `status` | `new`, `reviewed`, `resolved` | 기존 상태 필터 |
 | `class_name` | string | v1 enum 외 v2 class name도 허용 |
-| `source` | `fake`, `onnx`, `server` | 기존 detector source |
+| `source` | `fake`, `onnx`, `server`, `android` | detector/upload source. Android native upload는 `android`로 분리한다 |
 | `model_key` | string | v2 metadata `model_key`와 매칭 |
 | `trigger` | string | v2 metadata `trigger`와 매칭. 현재 `auto`, `voice` |
 | `auto_reported` | boolean | v2 metadata `auto_reported`와 매칭 |
@@ -166,7 +182,7 @@ image=<image file>
 예:
 
 ```http
-GET /reports?class_name=damaged_tactile_block&model_key=custom_tactile
+GET /reports?class_name=damaged_tactile_block&model_key=unified_walksafe
 GET /reports?trigger=voice&auto_reported=false
 ```
 
@@ -175,7 +191,7 @@ GET /reports?trigger=voice&auto_reported=false
 관리자/운영자가 현재 필터 조건의 신고 목록을 외부 검수나 기관 제출 준비용으로 내보내는 endpoint다.
 
 ```http
-GET /reports/export?model_key=custom_tactile
+GET /reports/export?model_key=unified_walksafe
 GET /reports/export?trigger=voice&auto_reported=false
 GET /reports/export?format=json&class_name=damaged_tactile_block
 GET /reports/export?format=geojson&status=reviewed
@@ -301,7 +317,8 @@ TMAP priority mapping:
       "turn_type": 13,
       "point_type": "GP",
       "distance_from_start_m": 20,
-      "remaining_distance_m": 1261
+      "remaining_distance_m": 1261,
+      "bearing_deg": 12.4
     }
   ],
   "provider_result_code": 0,
@@ -309,7 +326,7 @@ TMAP priority mapping:
 }
 ```
 
-`guide_points`는 TMAP Point feature의 안내 지점을 정규화한 배열이다. `description`이 `", 73m"`처럼 안내 의미가 없는 거리 문구뿐이면 `instruction`은 `null`이 될 수 있다. Kakao fallback은 guide point를 제공하지 않아 빈 배열을 반환한다.
+`guide_points`는 TMAP Point feature의 안내 지점을 정규화한 배열이다. `description`이 `", 73m"`처럼 안내 의미가 없는 거리 문구뿐이면 `instruction`은 `null`이 될 수 있다. `bearing_deg`는 route polyline의 다음 segment 방향에서 계산한 0 이상 360 미만의 보조 heading이다. Kakao fallback은 guide point를 제공하지 않아 빈 배열을 반환한다.
 
 `GET /navigation/walking/health`는 실제 provider를 호출하지 않고 key 설정 여부만 보여준다.
 
@@ -330,7 +347,7 @@ TMAP priority mapping:
 
 오류 코드 `tmap_invalid_api_key`는 appKey가 잘못됐거나 해당 앱에 보행자 경로안내 상품 권한이 없을 때 반환될 수 있다.
 
-현재 이 API는 경로 geometry/요약을 받아오는 proxy다. 목적지 이름을 좌표로 변환하는 검색/geocoding API는 아직 포함하지 않는다.
+현재 이 API는 경로 geometry/요약을 받아오는 proxy다. 목적지 이름 검색은 위 `GET /navigation/destinations/search`에서 별도 제공한다.
 
 ## 8. 안전 주의
 

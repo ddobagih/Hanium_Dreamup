@@ -40,7 +40,7 @@ export type RoiRiskResult = {
   };
 };
 
-const DEFAULT_NON_BLOCKING_GENERAL_CLASSES = ["traffic light"] as const;
+const DEFAULT_NON_BLOCKING_GENERAL_CLASSES = ["traffic light", "crosswalk"] as const;
 
 const DEFAULT_ROI_OPTIONS: Required<RoiRiskOptions> = {
   centerBandMinX: 0.35,
@@ -72,7 +72,10 @@ function bboxArea(bbox: NormalizedBBoxV2): number {
 }
 
 function isGeneralObstacle(detection: TwoModelDetection): boolean {
-  return detection.model_key === "coco_general";
+  return (
+    detection.model_key === "coco_general" ||
+    (detection.model_key === "unified_walksafe" && !detection.class_name.includes("tactile_block") && detection.class_name !== "tactile_damage_area")
+  );
 }
 
 function normalizeClassName(className: string): string {

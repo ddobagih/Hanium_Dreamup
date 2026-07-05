@@ -13,7 +13,7 @@
   - `scripts/check_detect_report_export_trace_20260524.py`에 `--require-server-source`, artifact JSON/Markdown 출력, dry-run Pydantic/policy 검증 추가.
 - #13 export/Admin
   - demo-aware filename/header, JSON manifest, redacted/public export, GeoJSON grid aggregate 추가.
-  - Admin에 공개용 GeoJSON, export manifest, 기관 제출 후보(redacted) 링크 추가.
+  - Admin에 공개용 GeoJSON, export manifest, 운영자 내부 검토(redacted) 링크 추가.
 - #14 summary/cluster
   - `/reports/summary`에 grid/top limit, bounds, status/source breakdown 추가.
   - Admin은 list limit와 무관한 backend summary를 사용하고 cluster 반경 필터 버튼을 제공.

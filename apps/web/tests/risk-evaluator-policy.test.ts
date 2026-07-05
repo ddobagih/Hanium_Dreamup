@@ -11,11 +11,18 @@ import {
   mockDepthEstimate,
   resolveBrowserDepthCapability
 } from "../app/_walksafe/risk-depth";
+import {
+  estimatePseudoDepthFromHistory,
+  estimateSensorDepthForBBox,
+  polygonFromBBox,
+  roiSamplePointsFromBBox
+} from "../app/_walksafe/depth-estimator";
 import { buildRoiRiskContext, evaluateRoiRisk } from "../app/_walksafe/risk-roi";
 import {
   actionForRiskType,
   buildRiskGuidanceMessage,
   directionFromBBox,
+  isMetricDistanceGuidanceSource,
   phraseForApproxSteps,
   phraseForBBoxVerticalPosition,
   selectRiskGuidanceCandidate
@@ -81,6 +88,63 @@ function testDamagedTactileBlockIsReportOnly() {
   assert(result.reportable, "damaged_tactile_block should be reportable");
   assert(!result.alertable, "damaged_tactile_block should not be user-alertable by default");
   assert(result.risk_type === "report_only_damage", "damaged_tactile_block should stay report_only_damage");
+}
+
+function testUnifiedDamagedTactileBlockIsReportOnly() {
+  const result = evaluateTwoModelDetectionRisk(
+    detection({
+      model_key: "unified_walksafe",
+      model_class_id: 8,
+      class_name: "damaged_tactile_block",
+      category: "tactile_damage",
+      confidence: 0.91
+    })
+  );
+
+  assert(result.reportable, "unified damaged_tactile_block should be reportable");
+  assert(!result.alertable, "unified damaged_tactile_block should not be user-alertable by default");
+  assert(result.risk_type === "report_only_damage", "unified damaged_tactile_block should stay report_only_damage");
+}
+
+function testUnifiedSurfaceHazardsAreAlertable() {
+  const curb = evaluateTwoModelDetectionRisk(
+    detection({
+      model_key: "unified_walksafe",
+      model_class_id: 10,
+      class_name: "curb_step",
+      category: "surface_hazard",
+      confidence: 0.88
+    })
+  );
+  const uneven = evaluateTwoModelDetectionRisk(
+    detection({
+      model_key: "unified_walksafe",
+      model_class_id: 11,
+      class_name: "uneven_sidewalk",
+      category: "surface_hazard",
+      confidence: 0.88
+    })
+  );
+
+  assert(curb.alertable, "curb_step should be alertable");
+  assert(curb.risk_type === "surface_hazard", "curb_step should be surface_hazard");
+  assert(uneven.alertable, "uneven_sidewalk should be alertable");
+  assert(uneven.risk_type === "surface_hazard", "uneven_sidewalk should be surface_hazard");
+}
+
+function testUnifiedEScooterObstructionIsPathObstacle() {
+  const result = evaluateTwoModelDetectionRisk(
+    detection({
+      model_key: "unified_walksafe",
+      model_class_id: 12,
+      class_name: "e_scooter_obstruction",
+      category: "obstruction",
+      confidence: 0.89
+    })
+  );
+
+  assert(result.alertable, "e_scooter_obstruction should be alertable");
+  assert(result.risk_type === "path_obstacle", "e_scooter_obstruction should be path_obstacle");
 }
 
 function testTactileDamageAreaIsAuxiliaryOnly() {
@@ -250,6 +314,7 @@ function testRiskGuidanceMessageIncludesDirectionDistanceAndAction() {
     riskType: "blocking_object",
     bbox: { x: 0.42, y: 0.2, width: 0.2, height: 0.2 },
     distanceM: 1.4,
+    distanceSource: "sensor_depth",
     stepLengthM: 0.5,
     label: "사람"
   });
@@ -266,6 +331,41 @@ function testRiskGuidanceMessageOmitsStepsWithoutDistance() {
   });
 
   assert(message === "전방 사람. 멈추세요.", "guidance message should keep direction/action and omit steps without distance");
+}
+
+function testRiskGuidanceMessageRejectsNonMetricDistanceSources() {
+  const webxr = buildRiskGuidanceMessage({
+    riskType: "blocking_object",
+    bbox: { x: 0.42, y: 0.2, width: 0.2, height: 0.2 },
+    distanceM: 1.4,
+    distanceSource: "webxr",
+    stepLengthM: 0.5,
+    label: "사람"
+  });
+  const modelEstimate = buildRiskGuidanceMessage({
+    riskType: "blocking_object",
+    bbox: { x: 0.42, y: 0.2, width: 0.2, height: 0.2 },
+    distanceM: 1.4,
+    distanceSource: "model_estimate",
+    stepLengthM: 0.5,
+    label: "사람"
+  });
+  const polygonTrend = buildRiskGuidanceMessage({
+    riskType: "blocking_object",
+    bbox: { x: 0.42, y: 0.2, width: 0.2, height: 0.2 },
+    distanceM: 1.4,
+    distanceSource: "polygon_trend",
+    stepLengthM: 0.5,
+    label: "사람"
+  });
+
+  assert(isMetricDistanceGuidanceSource("sensor_depth"), "sensor_depth should be allowed for metric/step guidance");
+  assert(isMetricDistanceGuidanceSource("webxr"), "explicit webxr metric source should be allowed for metric/step guidance");
+  assert(!isMetricDistanceGuidanceSource("model_estimate"), "model_estimate should not be allowed for metric/step guidance");
+  assert(!isMetricDistanceGuidanceSource("polygon_trend"), "polygon_trend should not be allowed for metric/step guidance");
+  assert(webxr === "전방 약 3보 앞 사람. 멈추세요.", "webxr metric source should enable approximate step guidance");
+  assert(modelEstimate === "전방 사람. 멈추세요.", "model_estimate should omit approximate step guidance");
+  assert(polygonTrend === "전방 사람. 멈추세요.", "polygon_trend should omit approximate step guidance");
 }
 
 function testDetectV2ParserPreservesExplicitDistanceOnly() {
@@ -289,6 +389,28 @@ function testDetectV2ParserPreservesExplicitDistanceOnly() {
   assert(parsed.detections[2].distance_m === null, "parser should not preserve negative distance_m");
   assert(parsed.detections[3].distance_m === null, "parser should not preserve unrealistic distance_m");
   assert(!parsed.detections.some((item) => item.class_name === "truck"), "parser should drop invalid overflow bbox");
+}
+
+function testDetectV2ParserAcceptsUnifiedWalksafeModelKey() {
+  const parsed = parseDetectFrameV2Payload(
+    {
+      schema_version: "detect.v2",
+      detections: [
+        detection({
+          model_key: "unified_walksafe",
+          source_model: "unified-policy-test",
+          model_class_id: 8,
+          class_name: "damaged_tactile_block",
+          category: "tactile_damage"
+        })
+      ]
+    },
+    { captured_at: "2026-05-23T06:00:00.000Z", gps: null, heading: null }
+  );
+
+  assert(parsed !== null, "valid detect v2 payload should parse");
+  assert(parsed.detections.length === 1, "unified_walksafe detection should not be dropped");
+  assert(parsed.detections[0].model_key === "unified_walksafe", "parser should preserve unified model key");
 }
 
 function testDetectV2ParserPreservesTrustedDistanceMetadata() {
@@ -322,6 +444,7 @@ function testExplicitDetectionDistanceFeedsDepthGuidance() {
     riskType: "blocking_object",
     bbox: target.bbox,
     distanceM: context.depth?.distance_m,
+    distanceSource: context.depth?.source,
     stepLengthM: 0.5,
     label: "사람"
   });
@@ -347,6 +470,188 @@ function testBrowserDepthGateAndPolicy() {
   assert(ready.status === "ready", "browser depth bridge should be ready when WebXR probe exists");
   assert(context.depth?.source === "manual_fixture", "mock depth should produce manual_fixture context");
   assert(untrustedContext.depth === undefined, "model_estimate should not enable step guidance as trusted depth");
+}
+
+function testDepthEstimatorSamplesFreshSensorRoiMedian() {
+  const bbox = { x: 0.4, y: 0.4, width: 0.2, height: 0.2 };
+  const points = roiSamplePointsFromBBox(bbox, { gridSize: 3 });
+  const polygon = polygonFromBBox(bbox, 0.2);
+  const result = estimateSensorDepthForBBox(
+    bbox,
+    {
+      observedAtMs: 1000,
+      getDepthInMeters: (x, y) => (x > 0.55 && y > 0.55 ? 8 : 1.24)
+    },
+    { nowMs: 1200, gridSize: 3, detectionConfidence: 1, motionStability: 1 }
+  );
+
+  assert(points.length === 9, "3x3 depth ROI should create 9 sample points");
+  assert(polygon.length === 4, "bbox polygon fallback should create a 4-point polygon");
+  assert(result?.source === "sensor_depth", "fresh sensor depth should produce sensor_depth source");
+  assert(result.distance_m === 1.24, "sensor depth should use trimmed median distance");
+  assert(result.confidence >= 0.5, "fresh stable sensor depth should be trusted enough");
+}
+
+function testDepthEstimatorRejectsStaleSensorFrame() {
+  const result = estimateSensorDepthForBBox(
+    { x: 0.4, y: 0.4, width: 0.2, height: 0.2 },
+    { observedAtMs: 1000, getDepthInMeters: () => 1.2 },
+    { nowMs: 2001, maxFrameAgeMs: 900 }
+  );
+
+  assert(result === null, "stale sensor depth frame should not produce distance");
+}
+
+function testDepthEstimatorRejectsSparseSensorSamples() {
+  const bbox = { x: 0.4, y: 0.4, width: 0.2, height: 0.2 };
+  const points = roiSamplePointsFromBBox(bbox, { gridSize: 3 });
+  let fewSampleCalls = 0;
+  const fewSamples = estimateSensorDepthForBBox(
+    bbox,
+    {
+      observedAtMs: 1000,
+      getDepthInMeters: () => {
+        fewSampleCalls += 1;
+        return fewSampleCalls <= 3 ? 1.2 : null;
+      }
+    },
+    { nowMs: 1100, gridSize: 3, minValidSamples: 4, minValidRatio: 0.2 }
+  );
+  let lowRatioCalls = 0;
+  const lowRatio = estimateSensorDepthForBBox(
+    bbox,
+    {
+      observedAtMs: 1000,
+      getDepthInMeters: () => {
+        lowRatioCalls += 1;
+        return lowRatioCalls <= 4 ? 1.2 : null;
+      }
+    },
+    { nowMs: 1100, gridSize: 3, minValidSamples: 2, minValidRatio: 0.5 }
+  );
+
+  assert(points.length === 9, "sparse depth sample test should use 3x3 ROI");
+  assert(fewSamples === null, "sensor depth should reject frames below minValidSamples");
+  assert(lowRatio === null, "sensor depth should reject frames below minValidRatio");
+}
+
+function testPseudoDepthMarksModelEstimateApproaching() {
+  const first = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.3, y: 0.3, width: 0.14, height: 0.14 }
+  });
+  const second = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.28, y: 0.28, width: 0.2, height: 0.2 }
+  });
+  const third = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.25, y: 0.25, width: 0.3, height: 0.3 }
+  });
+  const result = estimatePseudoDepthFromHistory(third, [sample(first, 1000), sample(second, 2000), sample(third, 3000)]);
+  const message = buildRiskGuidanceMessage({
+    riskType: "approaching_object",
+    bbox: third.bbox,
+    distanceM: result?.distance_m,
+    distanceSource: result?.source,
+    stepLengthM: 0.5,
+    label: "차량"
+  });
+
+  assert(result?.source === "model_estimate", "pseudo depth should be marked model_estimate");
+  assert(result.approach_state === "approaching", "growing bbox history should mark approaching");
+  assert(result.distance_m > 0, "pseudo depth should compute an internal meter estimate");
+  assert(message === "전방 차량. 피하세요.", "model_estimate distance should stay internal and not create step guidance");
+}
+
+function testPseudoDepthLowMotionStabilityIsConservative() {
+  const first = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.3, y: 0.3, width: 0.14, height: 0.14 }
+  });
+  const second = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.28, y: 0.28, width: 0.2, height: 0.2 }
+  });
+  const third = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle",
+    bbox: { x: 0.25, y: 0.25, width: 0.3, height: 0.3 }
+  });
+  const result = estimatePseudoDepthFromHistory(third, [sample(first, 1000), sample(second, 2000), sample(third, 3000)], {
+    motionStability: 0.2
+  });
+
+  assert(result?.source === "model_estimate", "low-motion pseudo depth should still expose internal model_estimate source");
+  assert(result.approach_state === "unknown", "low motion stability should make pseudo-depth approach unknown");
+  assert(result.confidence <= 0.35, "low motion stability should cap pseudo-depth confidence");
+}
+
+function testRiskDepthTrustsOnlySensorDepthAtConfidenceBoundary() {
+  const trusted = depthContextFromDetection(detection({ distance_m: 1.4, distance_source: "sensor_depth", distance_confidence: 0.5 }));
+  const lowConfidence = depthContextFromDetection(detection({ distance_m: 1.4, distance_source: "sensor_depth", distance_confidence: 0.49 }));
+  const modelEstimate = depthContextFromDetection(detection({ distance_m: 1.4, distance_source: "model_estimate", distance_confidence: 0.99 }));
+
+  assert(trusted.depth?.source === "sensor_depth", "sensor_depth at 0.5 confidence should be trusted");
+  assert(lowConfidence.depth === undefined, "sensor_depth below 0.5 confidence should be ignored");
+  assert(modelEstimate.depth === undefined, "model_estimate should not become trusted depth context");
+}
+
+function testSensorDepthCloseObjectCanAlertWithStepGuidance() {
+  const target = detection({
+    distance_m: 1.2,
+    distance_source: "sensor_depth",
+    distance_confidence: 0.8,
+    bbox: { x: 0.4, y: 0.2, width: 0.2, height: 0.2 }
+  });
+  const context = depthContextFromDetection(target);
+  const risk = evaluateTwoModelDetectionRisk(target, context);
+  const message = buildRiskGuidanceMessage({
+    riskType: risk.risk_type,
+    riskLevel: risk.risk_level,
+    bbox: target.bbox,
+    distanceM: context.depth?.distance_m,
+    distanceSource: context.depth?.source,
+    stepLengthM: 0.5,
+    label: "보행자",
+    fallback: risk.recommended_message
+  });
+
+  assert(risk.alertable, "close sensor_depth object should be alertable without bbox history");
+  assert(risk.risk_type === "blocking_object", "close sensor_depth should become blocking_object");
+  assert(message === "전방 약 2보 앞 보행자. 멈추세요.", "sensor_depth should enable step guidance");
+}
+
+function testModelEstimateCloseDistanceDoesNotRaiseBlockingSeverity() {
+  const target = detection({
+    class_name: "car",
+    model_class_id: 1,
+    category: "vehicle"
+  });
+  const risk = evaluateTwoModelDetectionRisk(target, {
+    tracking: {
+      stable_frames: 3,
+      projected_path_intersection: true,
+      distance_m: 0.8,
+      distance_source: "model_estimate",
+      distance_confidence: 0.95
+    }
+  });
+
+  assert(risk.alertable, "path-intersecting model_estimate object should still alert");
+  assert(risk.risk_type === "blocking_object", "path-intersecting model_estimate object should stay blocking");
+  assert(risk.risk_level === "medium", "model_estimate pseudo distance should not promote close blocking severity to high");
 }
 
 function testRoiCenterLowerObjectRaisesBlockingAlert() {
@@ -470,6 +775,9 @@ function testRiskGuidancePriorityAndHighRiskPhrase() {
 
 function main() {
   testDamagedTactileBlockIsReportOnly();
+  testUnifiedDamagedTactileBlockIsReportOnly();
+  testUnifiedSurfaceHazardsAreAlertable();
+  testUnifiedEScooterObstructionIsPathObstacle();
   testTactileDamageAreaIsAuxiliaryOnly();
   testNormalTactileIsNoRisk();
   testGeneralObjectWithoutHistoryIsDisplayOnly();
@@ -483,10 +791,20 @@ function main() {
   testRiskGuidanceHelpers();
   testRiskGuidanceMessageIncludesDirectionDistanceAndAction();
   testRiskGuidanceMessageOmitsStepsWithoutDistance();
+  testRiskGuidanceMessageRejectsNonMetricDistanceSources();
   testDetectV2ParserPreservesExplicitDistanceOnly();
+  testDetectV2ParserAcceptsUnifiedWalksafeModelKey();
   testDetectV2ParserPreservesTrustedDistanceMetadata();
   testExplicitDetectionDistanceFeedsDepthGuidance();
   testBrowserDepthGateAndPolicy();
+  testDepthEstimatorSamplesFreshSensorRoiMedian();
+  testDepthEstimatorRejectsStaleSensorFrame();
+  testDepthEstimatorRejectsSparseSensorSamples();
+  testPseudoDepthMarksModelEstimateApproaching();
+  testPseudoDepthLowMotionStabilityIsConservative();
+  testRiskDepthTrustsOnlySensorDepthAtConfidenceBoundary();
+  testSensorDepthCloseObjectCanAlertWithStepGuidance();
+  testModelEstimateCloseDistanceDoesNotRaiseBlockingSeverity();
   testRoiCenterLowerObjectRaisesBlockingAlert();
   testRoiEdgeObjectIsNearPathNotAlertableByItself();
   testRoiSmallUpperObjectIsOffPath();

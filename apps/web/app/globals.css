@@ -35,9 +35,13 @@ button:focus-visible {
 
 .assist-shell {
   display: grid;
-  grid-template-rows: auto auto minmax(420px, 1fr);
+  grid-template-rows: minmax(420px, 1fr) auto;
   min-height: 100dvh;
   background: var(--color-neutral);
+}
+
+.assist-shell.offline {
+  grid-template-rows: auto minmax(420px, 1fr) auto;
 }
 
 .skip-link {
@@ -507,6 +511,10 @@ button:focus-visible {
 @media (min-width: 860px) {
   .assist-shell {
     grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: 1fr;
+  }
+
+  .assist-shell.offline {
     grid-template-rows: auto 1fr;
   }
 
@@ -516,11 +524,16 @@ button:focus-visible {
 
   .camera-surface {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 1;
   }
 
   .assist-panel {
     grid-column: 2;
+    grid-row: 1;
+  }
+
+  .assist-shell.offline .camera-surface,
+  .assist-shell.offline .assist-panel {
     grid-row: 2;
   }
 
@@ -978,6 +991,20 @@ button:focus-visible {
   color: rgba(255, 255, 255, 0.62);
 }
 
+.permission-request-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff4cf;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
 .status-item strong {
   color: var(--color-surface);
   font-size: 17px;
@@ -1337,6 +1364,10 @@ button:focus-visible {
     grid-template-rows: minmax(42dvh, 1fr) auto;
   }
 
+  .assist-shell.offline {
+    grid-template-rows: auto minmax(42dvh, 1fr) auto;
+  }
+
   .camera-surface,
   .camera-video {
     min-height: 42dvh;
@@ -1463,4 +1494,63 @@ button:focus-visible {
 
 .channel-card.general {
   border-color: rgba(86, 204, 242, 0.5);
+}
+
+.test-capture-panel {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--color-border);
+  background: #fff7ed;
+  padding: 14px 16px max(18px, env(safe-area-inset-bottom));
+}
+
+.test-capture-panel strong,
+.test-capture-panel small,
+.test-capture-panel label {
+  line-height: 1.35;
+}
+
+.test-capture-panel label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.test-capture-panel select,
+.test-capture-panel input,
+.test-capture-panel textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.test-capture-panel textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.test-capture-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.test-capture-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-weight: 900;
+}
+
+.test-capture-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }

@@ -1,5 +1,8 @@
 # STT/TTS 3-Day Execution Plan
 
+> **문서 상태(2026-06-02): superseded.** 음성 prototype 3일 계획 기록이다. 현재 기준은 `docs/voice_stt_tts_status.md`와 `docs/walksafe-v2/voice_command_strategy.md`다.
+
+
 작성일: 2026-05-13 KST
 실행 기간: 2026-05-14 ~ 2026-05-16 KST
 담당 범위: STT/TTS 로컬 음성 서버, PWA 음성 명령 연동 계약, TTS 안내 캐시, 실폰 종단 테스트 기준

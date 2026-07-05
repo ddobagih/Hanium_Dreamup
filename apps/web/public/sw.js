@@ -1,7 +1,7 @@
-const SW_VERSION = "2026-05-26-device-motion-pwa";
+const SW_VERSION = "2026-05-31-camera-click-permission";
 const CACHE_NAME = `walksafe-assist-${SW_VERSION}`;
 const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/icon.svg"];
-const API_PATH_PREFIXES = ["/detect", "/reports", "/uploads", "/navigation", "/speech"];
+const API_PATH_PREFIXES = ["/api", "/detect", "/reports", "/uploads", "/navigation", "/speech"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)));
@@ -57,18 +57,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-
-      return fetch(event.request).then((response) => {
+    fetch(event.request)
+      .then((response) => {
         if (response.ok) {
           const responseClone = response.clone();
           event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone)));
         }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });

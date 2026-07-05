@@ -1,6 +1,7 @@
 import {
   describePwaInstallState,
   describePwaUpdateState,
+  isWalkSafePwaEnabled,
   isStandaloneDisplayMode
 } from "../app/_walksafe/hooks/usePwaStatus";
 
@@ -22,9 +23,16 @@ function testPwaMessages() {
   assert(describePwaUpdateState("unsupported", null).includes("지원하지"), "unsupported SW should be explicit");
 }
 
+function testPwaRegistrationIsOptIn() {
+  assert(!isWalkSafePwaEnabled(undefined), "PWA service worker should default to disabled");
+  assert(!isWalkSafePwaEnabled("false"), "PWA service worker should stay disabled for false");
+  assert(isWalkSafePwaEnabled("true"), "PWA service worker should register only on explicit opt-in");
+}
+
 function main() {
   testStandaloneDetection();
   testPwaMessages();
+  testPwaRegistrationIsOptIn();
   console.log("pwa status policy checks passed");
 }
 

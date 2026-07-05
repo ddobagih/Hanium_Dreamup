@@ -34,6 +34,7 @@ cat > "${OUT_DIR}/tsconfig.risk-policy.json" <<JSON
   "include": [
     "${PWD}/app/_walksafe/risk-evaluator.ts",
     "${PWD}/app/_walksafe/risk-depth.ts",
+    "${PWD}/app/_walksafe/depth-estimator.ts",
     "${PWD}/app/_walksafe/risk-guidance.ts",
     "${PWD}/app/_walksafe/risk-roi.ts",
     "${PWD}/app/_walksafe/hooks/useRiskFeedback.ts",

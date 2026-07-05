@@ -104,6 +104,49 @@ def test_coco_result_uses_result_names_and_runtime_allowlist() -> None:
     assert detections[1]["bbox_xyxy"] == (0.0, 0.0, 1.0, 0.5)
 
 
+def test_unified_result_keeps_general_and_tactile_classes() -> None:
+    result = FakeResult(
+        names={
+            0: "person",
+            2: "car",
+            7: "normal_tactile_block",
+            8: "damaged_tactile_block",
+            12: "e_scooter_obstruction",
+            13: "dog",
+        },
+        boxes=[
+            FakeBox(cls=[0], conf=[0.81], xyxyn=[[0.1, 0.2, 0.3, 0.4]]),
+            FakeBox(cls=[2], conf=[0.7], xyxyn=[[0.2, 0.2, 0.4, 0.4]]),
+            FakeBox(cls=[7], conf=[0.65], xyxyn=[[0.3, 0.3, 0.5, 0.5]]),
+            FakeBox(cls=[8], conf=[0.9], xyxyn=[[0.4, 0.4, 0.7, 0.7]]),
+            FakeBox(cls=[12], conf=[0.88], xyxyn=[[0.1, 0.1, 0.2, 0.2]]),
+            FakeBox(cls=[13], conf=[0.99], xyxyn=[[0.0, 0.0, 0.2, 0.2]]),
+        ],
+    )
+
+    detections = ultralytics_result_to_raw_detections(
+        result,
+        model_key="unified_walksafe",
+        source_model="unified.pt",
+    )
+
+    assert [detection["class_name"] for detection in detections] == [
+        "person",
+        "car",
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "e_scooter_obstruction",
+    ]
+    assert [detection["category"] for detection in detections] == [
+        "vulnerable_road_user",
+        "vehicle",
+        "tactile_normal",
+        "tactile_damage",
+        "obstruction",
+    ]
+    assert "dog" not in {detection["class_name"] for detection in detections}
+
+
 def test_empty_or_missing_boxes_return_empty_list() -> None:
     assert ultralytics_result_to_raw_detections(FakeResult(boxes=None), model_key="custom_tactile") == []
     assert ultralytics_result_to_raw_detections(FakeResult(boxes=[]), model_key="coco_general") == []

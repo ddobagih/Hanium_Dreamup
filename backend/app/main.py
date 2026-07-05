@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import detect, health, navigation, reports, uploads
+from backend.app.api import android_debug, detect, health, navigation, reports, uploads
 from backend.app.config import get_settings
 
 
@@ -24,3 +24,4 @@ app.include_router(uploads.create_router(settings))
 app.include_router(detect.create_router(settings))
 app.include_router(navigation.create_router(settings))
 app.include_router(reports.create_router(settings))
+app.include_router(android_debug.create_router(settings))

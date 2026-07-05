@@ -3,7 +3,7 @@ import type { DetectionEvent, DetectorSource, GpsFix, NormalizedBBox } from "@/t
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export type ReportStatus = "new" | "reviewed" | "resolved";
-export type ReportModelKey = "custom_tactile" | "coco_general";
+export type ReportModelKey = "custom_tactile" | "coco_general" | "unified_walksafe";
 export type ReportTrigger = "auto" | "voice";
 export type ReportExportFormat = "csv" | "json" | "geojson";
 export type ReportGeoJsonAggregate = "grid";
@@ -80,6 +80,7 @@ export type AdminReportSummary = {
     sourceFake: number;
     sourceServer: number;
     sourceOnnx: number;
+    sourceAndroid: number;
   };
   location: {
     located: number;
@@ -151,7 +152,6 @@ function hasDemoMetadata(metadata: ReportResponse["metadata"] | null | undefined
 
   return (
     "fake_source" in metadata ||
-    metadata.performance_excluded === true ||
     metadata.data_origin === "demo" ||
     reviewFlags.includes("fake_source") ||
     metadata.demo === true ||
@@ -213,7 +213,7 @@ export function summarizeAdminReports(
       ? Math.floor(options.topClusterLimit)
       : DEFAULT_REPORT_TOP_CLUSTER_LIMIT;
 
-  const sourceCounts: Record<DetectorSource, number> = { fake: 0, onnx: 0, server: 0 };
+  const sourceCounts: Record<DetectorSource, number> = { fake: 0, onnx: 0, server: 0, android: 0 };
   const statusCounts: Record<ReportStatus, number> = { new: 0, reviewed: 0, resolved: 0 };
   const clusters = new Map<
     string,
@@ -281,7 +281,7 @@ export function summarizeAdminReports(
         longitudeSum: 0,
         bounds: clusterBounds,
         statusCounts: { new: 0, reviewed: 0, resolved: 0 },
-        sourceCounts: { fake: 0, onnx: 0, server: 0 }
+        sourceCounts: { fake: 0, onnx: 0, server: 0, android: 0 }
       };
 
     cluster.count += 1;
@@ -304,7 +304,8 @@ export function summarizeAdminReports(
       nonFake: reports.length - fake,
       sourceFake: sourceCounts.fake,
       sourceServer: sourceCounts.server,
-      sourceOnnx: sourceCounts.onnx
+      sourceOnnx: sourceCounts.onnx,
+      sourceAndroid: sourceCounts.android
     },
     location: {
       located,
@@ -381,7 +382,8 @@ function normalizeBackendSummary(summary: BackendReportSummaryResponse): AdminRe
   const sourceCounts = {
     fake: summary.source_counts.fake ?? 0,
     onnx: summary.source_counts.onnx ?? 0,
-    server: summary.source_counts.server ?? 0
+    server: summary.source_counts.server ?? 0,
+    android: summary.source_counts.android ?? 0
   };
   return {
     fake: {
@@ -390,7 +392,8 @@ function normalizeBackendSummary(summary: BackendReportSummaryResponse): AdminRe
       nonFake: summary.non_fake,
       sourceFake: sourceCounts.fake,
       sourceServer: sourceCounts.server,
-      sourceOnnx: sourceCounts.onnx
+      sourceOnnx: sourceCounts.onnx,
+      sourceAndroid: sourceCounts.android
     },
     location: {
       located: summary.located,
@@ -418,7 +421,8 @@ function normalizeBackendSummary(summary: BackendReportSummaryResponse): AdminRe
         sourceCounts: {
           fake: cluster.source_counts.fake ?? 0,
           onnx: cluster.source_counts.onnx ?? 0,
-          server: cluster.source_counts.server ?? 0
+          server: cluster.source_counts.server ?? 0,
+          android: cluster.source_counts.android ?? 0
         }
       }))
     },

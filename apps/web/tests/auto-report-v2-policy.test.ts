@@ -41,6 +41,13 @@ function testDamagedTactileBlockIsAutoReportTarget() {
   assert(isAutoReportV2Target(detection()), "damaged_tactile_block should be auto-reportable");
 }
 
+function testUnifiedDamagedTactileBlockIsAutoReportTarget() {
+  assert(
+    isAutoReportV2Target(detection({ model_key: "unified_walksafe", source_model: "unified-policy-test", model_class_id: 8 })),
+    "unified damaged_tactile_block should be auto-reportable"
+  );
+}
+
 function testDamageAreaIsNotAutoReportTarget() {
   assert(
     !isAutoReportV2Target(detection({ class_name: "tactile_damage_area", model_class_id: 2 })),
@@ -67,6 +74,7 @@ function testIgnoresGeneralObjects() {
 
 function main() {
   testDamagedTactileBlockIsAutoReportTarget();
+  testUnifiedDamagedTactileBlockIsAutoReportTarget();
   testDamageAreaIsNotAutoReportTarget();
   testSelectsDamagedBlockOverDamageArea();
   testIgnoresGeneralObjects();

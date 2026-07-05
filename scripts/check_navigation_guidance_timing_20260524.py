@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -84,7 +85,7 @@ def action_from_guide(guide: WalkingRouteGuidePoint) -> GuideAction | None:
 
 
 def steps(distance_m: float, step_length_m: float) -> int:
-    return max(1, round(distance_m / step_length_m))
+    return max(1, math.ceil(distance_m / step_length_m))
 
 
 def prompt(action: GuideAction, stage: str, distance_m: float, step_length_m: float) -> str:

@@ -13,7 +13,8 @@ function optionalNumber(value: string | undefined, min: number, max: number): nu
 }
 
 export const DETECTOR_MODE = process.env.NEXT_PUBLIC_DETECTOR_MODE ?? "fake";
-export const SERVER_DETECT_INTERVAL_MS = 2800;
+export const SERVER_DETECT_INTERVAL_MS =
+  optionalNumber(process.env.NEXT_PUBLIC_SERVER_DETECT_INTERVAL_MS, 250, 5000) ?? 450;
 export const SPEECH_COOLDOWN_MS = 6000;
 export const WALKSAFE_DEFAULT_STEP_LENGTH_M = optionalNumber(process.env.NEXT_PUBLIC_WALKSAFE_STEP_LENGTH_M, 0.3, 1.2) ?? 0.65;
 export const WALKSAFE_MIN_WALKING_SPEED_MPS = 0.2;
@@ -42,17 +43,20 @@ export const VOICE_RECORDING_MAX_MS = 5000;
 export const VOICE_INTENT_CONFIDENCE_THRESHOLD = 0.7;
 export const IS_FAKE_V2_MODE = DETECTOR_MODE === "fake-v2";
 export const IS_SERVER_V2_MODE = DETECTOR_MODE === "server-v2";
+export const IS_CAMERA_ONLY_MODE = DETECTOR_MODE === "camera-only";
 export const IS_V2_MODE = IS_FAKE_V2_MODE || IS_SERVER_V2_MODE;
 export const INITIAL_DETECTOR_MESSAGE =
-  DETECTOR_MODE === "server"
-    ? `서버 ${DETECT_API_BASE}`
-    : DETECTOR_MODE === "fake"
-      ? "데모 탐지 대기"
-      : IS_FAKE_V2_MODE
-        ? "two-model 데모 탐지 대기"
-        : IS_SERVER_V2_MODE
-          ? `two-model 서버 ${DETECT_API_BASE}`
-          : `탐지 모드 확인 필요: ${DETECTOR_MODE}`;
+  IS_CAMERA_ONLY_MODE
+    ? "실기기 카메라 프리뷰 확인 중 · 데모 탐지 꺼짐"
+    : DETECTOR_MODE === "server"
+      ? `서버 ${DETECT_API_BASE}`
+      : DETECTOR_MODE === "fake"
+        ? "데모 탐지 대기"
+        : IS_FAKE_V2_MODE
+          ? "unified-v2 데모 탐지 대기"
+          : IS_SERVER_V2_MODE
+            ? `unified-v2 서버 ${DETECT_API_BASE}`
+            : `탐지 모드 확인 필요: ${DETECTOR_MODE}`;
 
 const defaultDestinationLatitude = optionalNumber(process.env.NEXT_PUBLIC_WALKSAFE_DESTINATION_LAT, -90, 90);
 const defaultDestinationLongitude = optionalNumber(process.env.NEXT_PUBLIC_WALKSAFE_DESTINATION_LNG, -180, 180);

@@ -35,17 +35,30 @@ export function useSensors() {
       gpsWatchIdRef.current = null;
     }
 
-    setGpsError(null);
+    setGpsError("위치 권한 요청 중");
     gpsWatchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         setGps({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-          accuracy_m: position.coords.accuracy
+          accuracy_m: position.coords.accuracy,
+          speed_mps: typeof position.coords.speed === "number" && Number.isFinite(position.coords.speed) ? position.coords.speed : null
         });
         setGpsError(null);
       },
-      () => {
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setGpsError("위치 권한이 차단됐습니다. 브라우저 사이트 설정에서 위치를 허용해 주세요.");
+          return;
+        }
+        if (error.code === error.POSITION_UNAVAILABLE) {
+          setGpsError("현재 위치를 가져올 수 없습니다. 기기 위치 서비스가 켜져 있는지 확인해 주세요.");
+          return;
+        }
+        if (error.code === error.TIMEOUT) {
+          setGpsError("위치 응답 시간이 초과됐습니다. 실외나 창가에서 다시 시도해 주세요.");
+          return;
+        }
         setGpsError("위치 권한 필요");
       },
       {
@@ -69,6 +82,7 @@ export function useSensors() {
       return;
     }
 
+    setHeadingMessage("방향 센서 권한 요청 중");
     try {
       const permission = await orientationEvent.requestPermission();
       if (permission !== "granted") {
@@ -77,20 +91,18 @@ export function useSensors() {
       setHeadingMessage(permission === "granted" ? "방향 센서 대기" : "방향 센서 권한 필요");
     } catch {
       setHeading(null);
-      setHeadingMessage("방향 센서를 시작할 수 없습니다");
+      setHeadingMessage("방향 센서 권한을 허용해야 방향 안내를 사용할 수 있습니다");
     }
   }, []);
 
   useEffect(() => {
-    const gpsTimer = window.setTimeout(() => startGpsWatch(), 0);
     return () => {
-      window.clearTimeout(gpsTimer);
       if (gpsWatchIdRef.current !== null) {
         navigator.geolocation.clearWatch(gpsWatchIdRef.current);
         gpsWatchIdRef.current = null;
       }
     };
-  }, [startGpsWatch]);
+  }, []);
 
   useEffect(() => {
     if (!deviceOrientationEventWithPermission()) {

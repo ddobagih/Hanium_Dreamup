@@ -49,13 +49,16 @@ const STATUS_WORKFLOW_GUIDANCE: Record<ReportStatus, { description: string; next
 const SOURCE_LABELS: Record<DetectorSource, string> = {
   fake: "Fake",
   onnx: "ONNX",
-  server: "Server"
+  server: "Server",
+  android: "Android"
 };
 
 const MODEL_KEY_LABELS: Record<ReportModelKey, string> = {
   custom_tactile: "보도블록 손상",
-  coco_general: "일반 객체"
+  coco_general: "일반 객체",
+  unified_walksafe: "통합 객체"
 };
+const REPORT_MODEL_FILTER_OPTIONS: ReportModelKey[] = ["unified_walksafe", "custom_tactile", "coco_general"];
 
 const TRIGGER_LABELS: Record<ReportTrigger, string> = {
   auto: "자동",
@@ -74,7 +77,9 @@ const REVIEW_FLAG_LABELS: Record<string, string> = {
   low_confidence: "신뢰도 낮음",
   missing_location: "위치 없음",
   low_location_accuracy: "위치 정확도 낮음",
-  missing_heading: "방향 정보 없음"
+  missing_heading: "방향 정보 없음",
+  coordinate_gate_pending: "좌표 정합 대기",
+  duplicate_candidate: "중복 후보"
 };
 
 const STATUS_SORT_ORDER: Record<ReportStatus, number> = {
@@ -86,7 +91,11 @@ const STATUS_SORT_ORDER: Record<ReportStatus, number> = {
 const ADMIN_CLASS_LABELS: Record<string, string> = {
   ...CLASS_LABELS,
   tactile_damage_area: "점자블록 파손 영역",
-  damaged_tactile_block: "점자블록 파손"
+  damaged_tactile_block: "점자블록 파손",
+  crosswalk: "횡단보도",
+  curb_step: "보도 턱",
+  uneven_sidewalk: "고르지 않은 보도",
+  e_scooter_obstruction: "방치 킥보드"
 };
 
 const V2_METADATA_KEYS = [
@@ -95,13 +104,18 @@ const V2_METADATA_KEYS = [
   "source_model",
   "trigger",
   "auto_reported",
+  "reporter_user_id",
+  "duplicate_report_ids",
   "distance_m",
+  "threshold_used",
+  "coordinate_gate_status",
   "trace_id",
   "payload_sha256",
   "image_sha256",
   "data_origin",
   "runtime_mode",
-  "performance_excluded"
+  "performance_excluded",
+  "performance_exclusion_reason"
 ] as const;
 const EXPORT_FORMAT_LABELS: Record<ReportExportFormat, string> = {
   csv: "CSV",
@@ -242,7 +256,11 @@ const EMPTY_FILTERS: FilterState = {
 const ADMIN_CLASS_FILTER_OPTIONS = Array.from(new Set([
   ...DETECTION_CLASS_NAMES,
   "tactile_damage_area",
-  "damaged_tactile_block"
+  "damaged_tactile_block",
+  "crosswalk",
+  "curb_step",
+  "uneven_sidewalk",
+  "e_scooter_obstruction"
 ]));
 
 function toDateTimeStart(value: string) {
@@ -363,13 +381,13 @@ export default function AdminReportsPage() {
   }, [buildParams]);
   const publicGeojsonHref = useMemo(() => reportExportUrl(buildParams(false), "geojson", { redacted: true }), [buildParams]);
   const manifestJsonHref = useMemo(() => reportExportUrl(buildParams(false), "json", { manifest: true }), [buildParams]);
-  const agencyExportHref = useMemo(
+  const reviewedDamageExportHref = useMemo(
     () =>
       reportExportUrl(
         {
           status: "reviewed",
           demo_filter: "exclude_fake",
-          model_key: "custom_tactile"
+          class_name: "damaged_tactile_block"
         },
         "geojson",
         { redacted: true }
@@ -551,6 +569,7 @@ export default function AdminReportsPage() {
             <option value="fake">Fake</option>
             <option value="onnx">ONNX</option>
             <option value="server">Server</option>
+            <option value="android">Android</option>
           </select>
         </label>
         <label>
@@ -562,7 +581,7 @@ export default function AdminReportsPage() {
             }
           >
             <option value="">전체</option>
-            {(["custom_tactile", "coco_general"] as const).map((modelKey) => (
+            {REPORT_MODEL_FILTER_OPTIONS.map((modelKey) => (
               <option key={modelKey} value={modelKey}>
                 {MODEL_KEY_LABELS[modelKey]}({modelKey})
               </option>
@@ -651,9 +670,9 @@ export default function AdminReportsPage() {
             {EXPORT_FORMAT_LABELS[format]} 내보내기
           </a>
         ))}
-        <a className="admin-filter-button" href={agencyExportHref}>
+        <a className="admin-filter-button" href={reviewedDamageExportHref}>
           <Download aria-hidden="true" size={18} />
-          기관 제출 후보(redacted)
+          검토 완료 손상 점자블록(redacted)
         </a>
         <a className="admin-filter-button" href={publicGeojsonHref}>
           <Download aria-hidden="true" size={18} />
@@ -664,7 +683,7 @@ export default function AdminReportsPage() {
           Export manifest
         </a>
         {demoFilterMode !== "exclude_fake" ? (
-          <span className="admin-export-warning">Export 주의: Fake/Demo 포함 가능 · 기관 제출 후보는 reviewed+비Demo만 사용하세요.</span>
+          <span className="admin-export-warning">Export 주의: Fake/Demo 포함 가능 · 외부 자동 제출 기능은 없습니다.</span>
         ) : null}
         {modelHealthLabel ? <span className="admin-model-health">모델 상태: {modelHealthLabel}</span> : null}
       </section>
@@ -678,7 +697,7 @@ export default function AdminReportsPage() {
           </span>
           <small>
             소스별: Fake {activeSummary.fake.sourceFake}건 · Server {activeSummary.fake.sourceServer}건 · ONNX{" "}
-            {activeSummary.fake.sourceOnnx}건
+            {activeSummary.fake.sourceOnnx}건 · Android {activeSummary.fake.sourceAndroid}건
           </small>
           <small>
             상태별: 신규 {activeSummary.status.new}건 · 검토 중 {activeSummary.status.reviewed}건 · 처리 완료{" "}
@@ -734,6 +753,16 @@ export default function AdminReportsPage() {
             >
               Server만 보기
             </button>
+            <button
+              type="button"
+              className={demoFilterMode === "all" && filters.source === "android" ? "active" : undefined}
+              onClick={() => {
+                setDemoFilterMode("all");
+                setFilters((current) => ({ ...current, source: "android" }));
+              }}
+            >
+              Android만 보기
+            </button>
           </div>
         </div>
         <div>
@@ -765,6 +794,10 @@ export default function AdminReportsPage() {
                   <small>
                     상태: 신규 {cluster.statusCounts.new} · 검토 {cluster.statusCounts.reviewed} · 완료{" "}
                     {cluster.statusCounts.resolved}
+                  </small>
+                  <small>
+                    소스: Fake {cluster.sourceCounts.fake} · Server {cluster.sourceCounts.server} · ONNX{" "}
+                    {cluster.sourceCounts.onnx} · Android {cluster.sourceCounts.android}
                   </small>
                   <button className="admin-cluster-filter" type="button" onClick={() => applyClusterFilter(cluster)}>
                     이 클러스터 반경 필터 적용
@@ -872,8 +905,14 @@ export default function AdminReportsPage() {
               <div className="review-flags" aria-label="검토 플래그">
                 <strong>검토 표시</strong>
                 <div>
-                  <span>{LOCATION_QUALITY_LABELS[selectedReport.location_quality]}</span>
-                  {isFakeOrDemoReport(selectedReport) ? <span>Fake/Demo · 제출/성능 제외</span> : null}
+	                  <span>{LOCATION_QUALITY_LABELS[selectedReport.location_quality]}</span>
+	                  {isFakeOrDemoReport(selectedReport) ? <span>Fake/Demo</span> : null}
+	                  {selectedReport.metadata?.performance_excluded === true ? <span>성능 집계 제외</span> : null}
+                  {selectedReport.duplicate_report_ids.length > 0 ? (
+                    <span>
+                      중복 후보 {selectedReport.duplicate_report_ids.map((id) => id.slice(0, 8)).join(", ")}
+                    </span>
+                  ) : null}
                   {selectedReport.review_flags.length === 0 ? <span>추가 검토 표시 없음</span> : null}
                   {selectedReport.review_flags.map((flag) => (
                     <span key={flag}>{REVIEW_FLAG_LABELS[flag] ?? flag}</span>

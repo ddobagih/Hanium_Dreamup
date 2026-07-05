@@ -7,6 +7,7 @@ export type BBoxVerticalPosition = "upper" | "middle" | "lower" | "foot" | "unkn
 const DEFAULT_STEP_LENGTH_M = 0.65;
 const MIN_STEP_LENGTH_M = 0.3;
 const MAX_STEP_LENGTH_M = 1.2;
+const METRIC_DISTANCE_GUIDANCE_SOURCES = new Set(["sensor_depth", "webxr"]);
 
 function safeStepLengthM(stepLengthM: number | null | undefined): number {
   if (typeof stepLengthM !== "number" || !Number.isFinite(stepLengthM)) {
@@ -154,11 +155,16 @@ export function phraseForApproxSteps(
   return `약 ${steps}보 앞`;
 }
 
+export function isMetricDistanceGuidanceSource(source: string | null | undefined): boolean {
+  return typeof source === "string" && METRIC_DISTANCE_GUIDANCE_SOURCES.has(source);
+}
+
 type RiskGuidanceMessageOptions = {
   riskType: RiskType;
   riskLevel?: RiskLevel;
   bbox?: NormalizedBBoxV2 | null;
   distanceM?: number | null;
+  distanceSource?: string | null;
   stepLengthM?: number | null;
   label?: string | null;
   fallback?: string | null;
@@ -169,6 +175,7 @@ export function buildRiskGuidanceMessage({
   riskLevel,
   bbox,
   distanceM,
+  distanceSource,
   stepLengthM,
   label,
   fallback
@@ -181,7 +188,7 @@ export function buildRiskGuidanceMessage({
   const prefix = [
     phraseForBBoxDirection(bbox),
     phraseForBBoxVerticalPosition(bbox),
-    phraseForApproxSteps(distanceM, stepLengthM),
+    phraseForApproxSteps(isMetricDistanceGuidanceSource(distanceSource) ? distanceM : null, stepLengthM),
     label
   ]
     .filter((part): part is string => Boolean(part))
@@ -216,7 +223,7 @@ const RISK_TYPE_PRIORITY: Record<RiskType, number> = {
 };
 
 function distancePriority(context: RiskEvaluationContext | undefined): number {
-  const distance = context?.depth?.distance_m ?? context?.tracking?.distance_m ?? null;
+  const distance = isMetricDistanceGuidanceSource(context?.depth?.source) ? context?.depth?.distance_m : null;
   if (typeof distance !== "number" || !Number.isFinite(distance) || distance <= 0) {
     return 0;
   }

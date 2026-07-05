@@ -1,6 +1,6 @@
 # Backend Environment and CORS
 
-작성 기준일: 2026-05-24
+작성 기준일: 2026-06-02
 
 ## 목적
 
@@ -32,8 +32,9 @@ python -m uvicorn backend.app.main:app --reload --port 8000
 | `MODEL_IOU_THRESHOLD` | `0.7` | v1 `/detect` NMS IoU threshold |
 | `MODEL_IMAGE_SIZE` | `640` | v1 `/detect` image size |
 | `DETECT_V2_MODE` | `fake` | v2 provider mode: `fake`, `yolo`, `real` |
-| `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH` | 빈 값 | v2 custom tactile YOLO checkpoint |
-| `DETECT_V2_COCO_MODEL_PATH` | 빈 값 | v2 COCO helper model |
+| `DETECT_V2_UNIFIED_MODEL_PATH` | 빈 값 | v2 unified 13-class YOLO checkpoint. 있으면 이 경로를 우선 사용 |
+| `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH` | 빈 값 | v2 legacy fallback custom tactile YOLO checkpoint |
+| `DETECT_V2_COCO_MODEL_PATH` | 빈 값 | v2 legacy fallback COCO helper model |
 | `DETECT_V2_RUNTIME_CONFIG_PATH` | 빈 값 | v2 threshold/runtime config |
 | `WALKING_ROUTE_PROVIDER` | `tmap_pedestrian` | 보행 route provider. `tmap_pedestrian` 또는 `kakao_mobility` |
 | `TMAP_APP_KEY` | 빈 값 | TMAP 보행자 경로안내 appKey. Git에 커밋하지 않는다 |
@@ -78,7 +79,19 @@ NEXT_PUBLIC_WALKSAFE_DESTINATION_LNG=
 NEXT_PUBLIC_WALKSAFE_DESTINATION_NAME=
 ```
 
-## v2 Stage1 후보 로컬 예시
+## v2 unified-primary 로컬 예시
+
+학습/export가 끝난 unified 13-class checkpoint가 있으면 backend는 path 하나만 지정하면 된다.
+
+```env
+DETECT_V2_MODE=yolo
+DETECT_V2_UNIFIED_MODEL_PATH=/home/ddobagi/Code/hanium-dreamup/runs/detect/walksafe_unified_yolo26n_640_13cls_20260602/weights/best.pt
+DETECT_V2_RUNTIME_CONFIG_PATH=/home/ddobagi/Code/hanium-dreamup/configs/walksafe_two_model_runtime_stage1_mvp_20260523.json
+```
+
+Unified path가 없을 때만 아래 legacy two-model fallback 예시를 사용한다.
+
+## v2 legacy Stage1 fallback 로컬 예시
 
 2026-05-23 KST 기준 reviewed YOLO26s MVP/backend integration 후보는 Stage1 `best.pt`다.
 

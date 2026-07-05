@@ -44,7 +44,11 @@ export function alertForDetection(detection: DetectionEvent, speechEnabled: bool
 
 export function alertForTwoModelDetection(detection: TwoModelDetection, speechEnabled: boolean) {
   const label = labelForTwoModelDetection(detection);
-  const isHighRisk = detection.category === "tactile_damage" || detection.category === "vehicle";
+  const isHighRisk =
+    detection.category === "tactile_damage" ||
+    detection.category === "vehicle" ||
+    detection.category === "surface_hazard" ||
+    detection.category === "obstruction";
   const speech = `${label}. 전방 주의.`;
 
   return {

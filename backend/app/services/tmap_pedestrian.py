@@ -140,6 +140,34 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
     return int(round(earth_radius_m * 2 * atan2(sqrt(a), sqrt(1 - a))))
 
 
+def _bearing_deg(start: RoutePoint, end: RoutePoint) -> float:
+    from math import atan2, cos, degrees, radians, sin
+
+    start_lat = radians(start.latitude)
+    end_lat = radians(end.latitude)
+    delta_lng = radians(end.longitude - start.longitude)
+    x = sin(delta_lng) * cos(end_lat)
+    y = cos(start_lat) * sin(end_lat) - sin(start_lat) * cos(end_lat) * cos(delta_lng)
+    return (degrees(atan2(x, y)) + 360.0) % 360.0
+
+
+def _route_bearing_for_point(point: RoutePoint, polyline: list[RoutePoint]) -> float | None:
+    if len(polyline) < 2:
+        return None
+    for index, route_point in enumerate(polyline[:-1]):
+        if abs(route_point.latitude - point.latitude) <= 0.000001 and abs(route_point.longitude - point.longitude) <= 0.000001:
+            return _bearing_deg(route_point, polyline[index + 1])
+
+    nearest_index = min(
+        range(len(polyline) - 1),
+        key=lambda index: _haversine_m(point.latitude, point.longitude, polyline[index].latitude, polyline[index].longitude),
+    )
+    nearest = polyline[nearest_index]
+    if _haversine_m(point.latitude, point.longitude, nearest.latitude, nearest.longitude) > 20:
+        return None
+    return _bearing_deg(nearest, polyline[nearest_index + 1])
+
+
 def _encoded_name(point: RoutePoint, fallback: str) -> str:
     return quote(point.name or fallback, safe="")
 
@@ -264,6 +292,12 @@ def _normalize_tmap_response(payload: Any, request: WalkingRouteRequest) -> Walk
         for guide_point in guide_points:
             if guide_point.distance_from_start_m is not None and guide_point.remaining_distance_m is None:
                 guide_point.remaining_distance_m = max(summary_distance_m - guide_point.distance_from_start_m, 0)
+    guide_points = [
+        guide_point if guide_point.bearing_deg is not None else guide_point.model_copy(
+            update={"bearing_deg": _route_bearing_for_point(guide_point.point, polyline)},
+        )
+        for guide_point in guide_points
+    ]
 
     return WalkingRouteResponse(
         schema_version="walksafe.walking_route.v1",

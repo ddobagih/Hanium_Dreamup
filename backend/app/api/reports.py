@@ -61,6 +61,7 @@ REPORT_EXPORT_FIELDS = [
     "threshold_used",
     "trigger",
     "auto_reported",
+    "reporter_user_id",
     "distance_m",
     "trace_id",
     "payload_sha256",
@@ -71,6 +72,7 @@ REPORT_EXPORT_FIELDS = [
     "performance_exclusion_reason",
     "location_quality",
     "review_flags",
+    "duplicate_report_ids",
     "status_history_count",
     "review_note",
     "resolution_reason",
@@ -79,6 +81,7 @@ REPORT_EXPORT_FIELDS = [
 
 REPORT_V2_METADATA_ALLOWLIST = {
     "schema_version",
+    "source",
     "model_key",
     "source_model",
     "model_class_id",
@@ -95,11 +98,24 @@ REPORT_V2_METADATA_ALLOWLIST = {
     "heading",
     "trigger",
     "auto_reported",
+    "reporter_user_id",
     "review_flags",
     "fake_source",
     "trace_id",
     "data_origin",
     "runtime_mode",
+    "apk_sha256",
+    "model_config_sha256",
+    "android_model_version",
+    "bbox_coordinate_space",
+    "depth_coordinate_space",
+    "depth_sample_count",
+    "depth_valid_sample_ratio",
+    "detection_age_ms",
+    "coordinate_gate_status",
+    "fallback_used",
+    "loaded_model_key",
+    "model_load_reason",
 }
 
 ALLOWED_STATUS_TRANSITIONS: dict[ReportStatus, set[ReportStatus]] = {
@@ -165,7 +181,6 @@ def _fake_demo_report_condition():
         Report.source == "fake",
         Report.payload.contains({"fake_source": True}),
         Report.payload.contains({"fake_source": "true"}),
-        Report.payload.contains({"performance_excluded": True}),
         Report.payload.contains({"data_origin": "demo"}),
         Report.payload.contains({"metadata": {"fake_source": True}}),
         Report.payload.contains({"metadata": {"fake_source": "true"}}),
@@ -205,6 +220,18 @@ def _sanitized_v2_payload(raw_payload: dict[str, Any], parsed: ReportV2Metadata)
     return payload
 
 
+def _coordinate_gate_exclusion_reason(payload: dict[str, Any]) -> str | None:
+    coordinate_gate_status = payload.get("coordinate_gate_status")
+    if coordinate_gate_status is None:
+        return "coordinate_gate_status=pending"
+    if not isinstance(coordinate_gate_status, str):
+        return f"coordinate_gate_status={coordinate_gate_status}"
+    normalized = coordinate_gate_status.strip().lower()
+    if normalized == "pass":
+        return None
+    return f"coordinate_gate_status={normalized or 'pending'}"
+
+
 def _is_fake_payload(payload: dict[str, Any], source: str) -> bool:
     flags = payload.get("review_flags") if isinstance(payload.get("review_flags"), list) else []
     source_model = payload.get("source_model")
@@ -224,15 +251,35 @@ def _is_fake_payload(payload: dict[str, Any], source: str) -> bool:
 def _enrich_v2_payload(payload: dict[str, Any], *, source: str, content: bytes) -> dict[str, Any]:
     enriched = dict(payload)
     fake_payload = _is_fake_payload(enriched, source)
+    coordinate_gate_exclusion_reason = _coordinate_gate_exclusion_reason(enriched)
+    exclusion_reasons: list[str] = []
+    if fake_payload:
+        exclusion_reasons.append("fake_demo_source")
+    if coordinate_gate_exclusion_reason:
+        exclusion_reasons.append(coordinate_gate_exclusion_reason)
     enriched["data_origin"] = "demo" if fake_payload else str(enriched.get("data_origin") or "field_candidate")
     enriched.setdefault("runtime_mode", source)
     enriched["payload_sha256"] = _json_sha256(payload)
     enriched["image_sha256"] = _bytes_sha256(content)
-    enriched["performance_excluded"] = fake_payload
-    if fake_payload:
-        enriched.setdefault("performance_exclusion_reason", "fake_demo_source")
+    enriched["performance_excluded"] = bool(exclusion_reasons)
+    if exclusion_reasons:
+        enriched["performance_exclusion_reason"] = ";".join(exclusion_reasons)
     else:
         enriched.setdefault("performance_exclusion_reason", "")
+    return enriched
+
+
+def _with_duplicate_candidate_payload(payload: dict[str, Any], candidates: list[Report]) -> dict[str, Any]:
+    if not candidates:
+        return payload
+
+    enriched = dict(payload)
+    flags = enriched.get("review_flags") if isinstance(enriched.get("review_flags"), list) else []
+    review_flags = [flag for flag in flags if isinstance(flag, str)]
+    if "duplicate_candidate" not in review_flags:
+        review_flags.append("duplicate_candidate")
+    enriched["review_flags"] = review_flags
+    enriched["duplicate_report_ids"] = [str(candidate.id) for candidate in candidates]
     return enriched
 
 
@@ -283,6 +330,7 @@ def _report_export_row(report: Report) -> dict[str, object]:
         "threshold_used": _csv_metadata_value(metadata.get("threshold_used")),
         "trigger": _csv_metadata_value(metadata.get("trigger")),
         "auto_reported": _csv_metadata_value(metadata.get("auto_reported")),
+        "reporter_user_id": _csv_safe(_csv_metadata_value(metadata.get("reporter_user_id"))),
         "distance_m": _csv_metadata_value(metadata.get("distance_m")),
         "trace_id": _csv_safe(_csv_metadata_value(metadata.get("trace_id"))),
         "payload_sha256": _csv_safe(_csv_metadata_value(metadata.get("payload_sha256"))),
@@ -293,6 +341,7 @@ def _report_export_row(report: Report) -> dict[str, object]:
         "performance_exclusion_reason": _csv_safe(_csv_metadata_value(metadata.get("performance_exclusion_reason"))),
         "location_quality": response.location_quality,
         "review_flags": ",".join(response.review_flags),
+        "duplicate_report_ids": ",".join(str(value) for value in metadata.get("duplicate_report_ids", []) if value),
         "status_history_count": len(status_history),
         "review_note": _csv_safe(_csv_metadata_value(metadata.get("review_note"))),
         "resolution_reason": _csv_safe(_csv_metadata_value(metadata.get("resolution_reason"))),
@@ -417,7 +466,7 @@ def _export_manifest(rows: list[dict[str, object]], *, filters: dict[str, object
 def _reports_summary(reports: list[Report], *, grid_size_degrees: float = 0.001, top_limit: int = 5) -> dict[str, object]:
     clusters: dict[str, dict[str, Any]] = {}
     status_counts: dict[str, int] = {"new": 0, "reviewed": 0, "resolved": 0}
-    source_counts: dict[str, int] = {"fake": 0, "onnx": 0, "server": 0}
+    source_counts: dict[str, int] = {"fake": 0, "onnx": 0, "server": 0, "android": 0}
     location_bounds: dict[str, float] | None = None
     located = 0
     fake = 0
@@ -463,7 +512,7 @@ def _reports_summary(reports: list[Report], *, grid_size_degrees: float = 0.001,
                     "max_longitude": (lng_cell + 1) * grid_size_degrees,
                 },
                 "status_counts": {"new": 0, "reviewed": 0, "resolved": 0},
-                "source_counts": {"fake": 0, "onnx": 0, "server": 0},
+                "source_counts": {"fake": 0, "onnx": 0, "server": 0, "android": 0},
             },
         )
         cluster["count"] += 1
@@ -531,6 +580,7 @@ def create_router(settings: Settings) -> APIRouter:
         longitude = gps.longitude if gps else None
         location = WKTElement(f"POINT({longitude} {latitude})", srid=4326) if gps else None
         duplicate_candidates = find_duplicate_candidates(db, parsed)
+        stored_payload = _with_duplicate_candidate_payload(parsed.model_dump(mode="json"), duplicate_candidates)
 
         report = Report(
             id=report_id,
@@ -550,7 +600,7 @@ def create_router(settings: Settings) -> APIRouter:
             location=location,
             image_path=f"/uploads/{filename}",
             image_content_type=content_type,
-            payload=parsed.model_dump(mode="json"),
+            payload=stored_payload,
         )
 
         db.add(report)
@@ -599,6 +649,7 @@ def create_router(settings: Settings) -> APIRouter:
         longitude = gps.longitude if gps else None
         location = WKTElement(f"POINT({longitude} {latitude})", srid=4326) if gps else None
         duplicate_candidates = find_duplicate_candidates_v2(db, parsed)
+        stored_payload = _with_duplicate_candidate_payload(stored_payload, duplicate_candidates)
 
         report = Report(
             id=report_id,

@@ -1,7 +1,13 @@
 # Backend model integration notes
 
-- 기준일: 2026-05-23 KST
-- 상태: `/detect/v2`는 fake 기본값을 유지하며, `DETECT_V2_MODE=yolo|real`에서 `LazyYoloDetectV2Runtime`/`YoloDetectV2Provider`로 실제 YOLO provider가 연결되어 있다. 2026-05-23 KST 기준 reviewed YOLO26s Stage1 `best.pt`를 MVP/backend integration 후보로 선택했고, 초기 runtime config를 준비했다.
+- 기준일: 2026-06-02 KST
+- 상태: `/detect/v2`는 fake 기본값을 유지하며, `DETECT_V2_MODE=yolo|real`에서 `LazyYoloDetectV2Runtime`/`YoloDetectV2Provider`로 실제 YOLO provider가 연결되어 있다. 현재 기본 경로는 `unified_walksafe` 13-class 단일 모델이고, custom tactile+COCO는 legacy fallback이다.
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 연결은 bbox/depth 좌표 정합 gate 이후 진행한다.
 
 ## 현재 구현된 연결
 
@@ -9,10 +15,10 @@
 - Adapter tests: `backend/tests/test_yolo_inference_adapter.py`
 - v2 provider/runtime: `backend/app/services/detect_v2.py`
 - Runtime filter/merge: `model/two_model_runtime.py`
-- Threshold config: `configs/walksafe_two_model_runtime_20260522.yaml`
-- Stage1 MVP candidate config: `configs/walksafe_two_model_runtime_stage1_mvp_20260523.json`
+- Current backend runtime config: `configs/walksafe_two_model_runtime_stage1_mvp_20260523.json` (unified primary + legacy fallback threshold/class contract)
+- Legacy/base helper config: `configs/walksafe_two_model_runtime_20260522.yaml`
 
-`/detect/v2` 기본값은 fake provider다. `DETECT_V2_MODE=yolo` 또는 `real`이고 custom tactile/COCO model path가 모두 설정되어 있으면 `YoloDetectV2Provider`가 만들어진다. `LazyYoloDetectV2Runtime`은 Ultralytics/Pillow/model weight 로드를 실제 `/detect/v2` 요청 시점까지 지연한다.
+`/detect/v2` 기본값은 fake provider다. `DETECT_V2_MODE=yolo` 또는 `real`이고 `DETECT_V2_UNIFIED_MODEL_PATH`가 있으면 unified 단일 모델 provider가 만들어진다. unified path가 없으면 custom tactile/COCO model path pair가 모두 설정된 경우 legacy fallback provider가 만들어진다. `LazyYoloDetectV2Runtime`은 Ultralytics/Pillow/model weight 로드를 실제 `/detect/v2` 요청 시점까지 지연한다.
 
 `/detect/v2/health`는 configured path 상태와 mode/status/reason만 확인한다. health 호출만으로 실제 모델을 로드하지 않는다.
 
@@ -22,11 +28,11 @@ Adapter output:
 
 | field | meaning |
 |---|---|
-| `model_key` | `custom_tactile` 또는 `coco_general` |
+| `model_key` | `unified_walksafe`, legacy `custom_tactile` 또는 legacy `coco_general` |
 | `source_model` | checkpoint 또는 pretrained 모델 식별자 |
 | `model_class_id` | 해당 모델 안에서의 class id |
 | `class_name` | v2 class name |
-| `category` | `tactile` 또는 `general_obstacle` |
+| `category` | `tactile_damage`, `tactile_normal`, `vehicle`, `vulnerable_road_user`, `traffic_signal`, `path_guidance`, `surface_hazard`, `obstruction` 등 |
 | `confidence` | `[0, 1]` confidence |
 | `bbox` | normalized `(x, y, width, height)`; runtime/filter와 `/detect/v2` 응답에 쓰는 값 |
 | `bbox_xyxy` | normalized `(x1, y1, x2, y2)`; 디버깅/검수용 보조 값 |
@@ -38,6 +44,24 @@ Adapter output:
 - `bbox_xyxy`는 저장/응답 필수 필드가 아니며, 연결 시 필요 없으면 버려도 된다.
 
 ## Class mapping
+
+Unified primary model:
+
+| model_class_id | class_name |
+|---:|---|
+| 0 | `person` |
+| 1 | `bicycle` |
+| 2 | `car` |
+| 3 | `motorcycle` |
+| 4 | `bus` |
+| 5 | `truck` |
+| 6 | `traffic light` |
+| 7 | `normal_tactile_block` |
+| 8 | `damaged_tactile_block` |
+| 9 | `crosswalk` |
+| 10 | `curb_step` |
+| 11 | `uneven_sidewalk` |
+| 12 | `e_scooter_obstruction` |
 
 Custom tactile model:
 
@@ -56,24 +80,25 @@ COCO helper:
 ## 현재 처리 흐름
 
 1. `/detect/v2`가 image validation 후 provider를 선택한다.
-2. fake mode는 fake v2 detection을 반환한다.
-3. `yolo`/`real` mode는 설정된 model path가 모두 있어야 ready가 된다.
-4. 실제 요청에서 lazy runtime이 image open 및 두 모델 inference를 실행한다.
-5. 각 result를 `ultralytics_result_to_raw_detections()`로 변환한다.
-6. `filter_and_merge_detections()`로 class allowlist/threshold를 적용한다.
-7. 기존 `DetectV2Detection` 응답 생성 경로로 변환한다.
-8. `/reports/v2` 저장 정책은 custom tactile의 `damaged_tactile_block`만 허용한다.
+2. fake mode는 `unified_walksafe` fake v2 detection을 반환한다.
+3. `yolo`/`real` mode는 `DETECT_V2_UNIFIED_MODEL_PATH`가 있으면 unified 단일 모델로 ready가 된다.
+4. unified path가 없을 때만 custom tactile/COCO model path pair를 legacy fallback으로 요구한다.
+5. 실제 요청에서 lazy runtime이 image open 및 unified 1회 inference 또는 legacy 2회 inference를 실행한다.
+6. 각 result를 `ultralytics_result_to_raw_detections()`로 변환한다.
+7. unified 결과는 `filter_detections()`, legacy pair 결과는 `filter_and_merge_detections()`로 class allowlist/threshold를 적용한다.
+8. 기존 `DetectV2Detection` 응답 생성 경로로 변환한다.
+9. `/reports/v2` 저장 정책은 `unified_walksafe` 또는 legacy `custom_tactile`의 `damaged_tactile_block`만 허용한다.
 
 ## Reports/export 연동 상태
 
 - `/reports`는 v2 metadata 필터 `model_key`, `trigger`, `auto_reported`를 지원한다.
 - `/reports`의 `class_name`은 v2 class name 문자열도 필터링할 수 있다.
-- `/reports/export`는 CSV 기본, `format=json` 지원이다.
-- `/reports/export`는 `/reports`와 같은 필터를 재사용하고 CSV 응답에 `Content-Disposition`을 제공한다.
+- `/reports/export`는 CSV 기본, `format=json`, `format=geojson`을 지원한다.
+- `/reports/export`는 `/reports`와 같은 필터를 재사용하고 CSV/JSON/GeoJSON 응답에 `Content-Disposition`과 no-store 정책을 제공한다.
 
-## 선택된 MVP 후보
+## legacy fallback 후보
 
-2026-05-23 KST 완료된 reviewed YOLO26s pipeline 기준 선택값:
+2026-05-23 KST 완료된 reviewed YOLO26s pipeline 기준 legacy fallback 선택값:
 
 | 항목 | 값 |
 |---|---|
@@ -82,7 +107,15 @@ COCO helper:
 | runtime config | `configs/walksafe_two_model_runtime_stage1_mvp_20260523.json` |
 | 선택 근거 | Stage1 best val/test mAP50-95가 Stage2보다 높음 |
 
-Local env 예시:
+Unified-primary local env 예시:
+
+```bash
+export DETECT_V2_MODE=yolo
+export DETECT_V2_UNIFIED_MODEL_PATH=/home/ddobagi/Code/hanium-dreamup/runs/detect/walksafe_unified_yolo26n_640_13cls_20260602/weights/best.pt
+export DETECT_V2_RUNTIME_CONFIG_PATH=/home/ddobagi/Code/hanium-dreamup/configs/walksafe_two_model_runtime_stage1_mvp_20260523.json
+```
+
+Legacy fallback local env 예시:
 
 ```bash
 export DETECT_V2_MODE=yolo
@@ -107,8 +140,8 @@ bash scripts/check_detect_v2_stage1_candidate_health_20260523.sh
 2. threshold sweep 또는 false-positive 샘플링 후 최종 class별 threshold.
 3. 배포 환경 변수:
    - `DETECT_V2_MODE=yolo` 또는 `real`
-   - `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH`
-   - `DETECT_V2_COCO_MODEL_PATH`
+   - primary: `DETECT_V2_UNIFIED_MODEL_PATH`
+   - fallback only: `DETECT_V2_CUSTOM_TACTILE_MODEL_PATH`, `DETECT_V2_COCO_MODEL_PATH`
    - `DETECT_V2_RUNTIME_CONFIG_PATH`
 4. 최종 모델 파일 배포 위치와 권한.
 
@@ -117,12 +150,13 @@ bash scripts/check_detect_v2_stage1_candidate_health_20260523.sh
 최종 checkpoint/env 확정 PR에서 확인할 테스트:
 
 - `fake` mode는 model path 없이 fake contract로 동작한다.
-- `yolo`/`real` mode에서 model path 미설정이면 `/detect/v2/health`가 unavailable reason을 반환하고 `/detect/v2`는 503을 반환한다.
+- `yolo`/`real` mode에서 unified path도 없고 legacy custom tactile+COCO path pair도 완성되지 않으면 `/detect/v2/health`가 unavailable reason을 반환하고 `/detect/v2`는 503을 반환한다.
 - `/detect/v2/health`는 실제 model load를 하지 않는다.
-- custom tactile result가 v2 response의 `model_key=custom_tactile`로 나온다.
-- COCO allowlist 밖 class는 response에 없다.
+- unified result가 v2 response의 `model_key=unified_walksafe`로 나오고 class id가 13-class order와 맞는다.
+- legacy fallback에서는 custom tactile result가 `model_key=custom_tactile`, COCO result가 `model_key=coco_general`로 나온다.
+- unified 13-class 밖 또는 COCO allowlist 밖 class는 response에 없다.
 - `normal_tactile_block`은 `/reports/v2`에서 계속 거부된다.
-- `damaged_tactile_block`만 `/reports/v2`에 저장된다.
+- `unified_walksafe` 또는 legacy `custom_tactile`의 `damaged_tactile_block`만 `/reports/v2`에 저장된다.
 - `tactile_damage_area`는 손상 부위 bbox 보조 정보로만 두고 `/reports/v2` 저장은 거부된다.
 - bbox는 response에서 `{x, y, width, height}`로 유지된다.
 

@@ -1,13 +1,19 @@
 # Reviewed YOLO26s model rollout checklist
 
-- 기준일: 2026-05-24 KST
+- 기준일: 2026-06-02 KST
 - 대상 학습: `walksafe_tactile3_reviewed_yolo26s` reviewed tactile 3-class pipeline
-- 목적: 학습 종료 직후 평가, 모델 선택, `/detect/v2` 실제 연결을 지연 없이 진행하기 위한 체크리스트
+- 목적: legacy fallback용 reviewed YOLO26s 학습 결과, backend `/detect/v2` fallback 연결, Android TFLite fallback export/검증을 확인하기 위한 체크리스트
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 연결은 bbox/depth 좌표 정합 gate 이후 진행한다.
 
 ## 0. 2026-05-23 선택 결과
 
 - Pipeline done: `2026-05-23 19:28:17 KST`
-- 선택 후보: Stage1 `best.pt`
+- legacy fallback 선택 후보: Stage1 `best.pt`
 - checkpoint:
   - `runs/detect/walksafe_tactile3_reviewed_yolo26s_img960_musgd_e200_20260522/weights/best.pt`
 - 초기 runtime config:
@@ -15,7 +21,7 @@
 - health-only env smoke:
   - `bash scripts/check_detect_v2_stage1_candidate_health_20260523.sh`
 
-Stage2 high-res fine-tune은 Stage1보다 best val/test mAP50-95가 낮아 현재 MVP 후보로 쓰지 않는다.
+Stage2 high-res fine-tune은 Stage1보다 best val/test mAP50-95가 낮아 legacy fallback 후보로 쓰지 않는다. 현재 primary 모델 방향은 `unified_walksafe` 13-class다.
 
 ## 1. 학습 완료 확인
 
@@ -87,10 +93,12 @@ OUT_DIR=runs/reports/walksafe_tactile3_reviewed_yolo26s_20260523 \
 
 신고 대상:
 
+- `unified_walksafe:damaged_tactile_block` (primary 13-class 단일 모델)
 - `custom_tactile:damaged_tactile_block`
 
 신고 제외:
 
+- `unified_walksafe`의 일반 객체/경로·장애물 class — 위험 경고 입력은 가능하지만 시설물 신고 저장 대상은 아님
 - `custom_tactile:tactile_damage_area` — 현재 신고 기준이 아니라 보조 bbox 정보
 - `custom_tactile:normal_tactile_block`
 - 모든 `coco_general` 일반 객체
@@ -126,9 +134,9 @@ python3 scripts/evaluate_yolo_image_level_presence_20260523.py \
 
 이 스크립트는 inference를 새로 돌리지 않고, GT label과 prediction label txt만 비교한다.
 
-## 5. Backend 연결 단계
+## 5. Backend legacy fallback 연결 단계
 
-실제 모델 연결은 v2 계약을 유지한 채 진행한다.
+이 섹션은 reviewed YOLO26s custom tactile + COCO helper를 legacy fallback으로 연결할 때의 기준이다. 2026-06-02 현재 primary 연결은 `DETECT_V2_UNIFIED_MODEL_PATH` 하나로 unified 13-class checkpoint를 지정하는 방식이다.
 
 1. 선택 checkpoint path를 정한다.
    - Stage1 후보: `runs/detect/walksafe_tactile3_reviewed_yolo26s_img960_musgd_e200_20260522/weights/best.pt`
@@ -138,7 +146,7 @@ python3 scripts/evaluate_yolo_image_level_presence_20260523.py \
 3. `custom_tactile` adapter가 YOLO 결과를 `model.two_model_runtime.Detection` 입력 형태로 변환하게 한다.
 4. COCO helper는 `coco_general` model_key와 allowlist를 유지한다.
 5. `/detect/v2` 응답의 `model_key`, `model_class_id`, `source_model`, `threshold_used`를 유지한다.
-6. `/reports/v2`는 `damaged_tactile_block`만 저장하도록 둔다.
+6. `/reports/v2`는 `unified_walksafe` 또는 legacy `custom_tactile`의 `damaged_tactile_block`만 저장하도록 둔다.
 
 안전장치:
 
@@ -213,7 +221,7 @@ npm run typecheck
 - 각 이미지에 대해 `model_key`, `class_name`, `confidence`, `threshold_used`, bbox, 응답 지연시간을 기록한다.
 - damage-positive 후보는 `--expect-target-detected`를 켜고 실행한다. selected image 중 `target_class=damaged_tactile_block` 검출이 하나도 없으면 smoke는 `status=failed`, exit 1이어야 한다.
 - known-negative 단일 이미지 smoke는 `--expect-target-detected` 없이 실행하며, `damaged_tactile_block` 검출이 없어도 PASS 가능해야 한다.
-- 실제 Stage1 detection payload에 `model_key=custom_tactile`, `class_name=damaged_tactile_block`, `threshold_used`, bbox, confidence가 남는지 확인한다.
+- 실제 unified detection payload에 `model_key=unified_walksafe`, `class_name=damaged_tactile_block`, `threshold_used`, bbox, confidence가 남는지 확인한다. legacy Stage1 fallback smoke에서는 `model_key=custom_tactile`도 허용한다.
 - `damaged_tactile_block` 후보는 자동 신고 후보로 이어질 수 있는지 확인하고, `tactile_damage_area`/일반 객체는 report 저장 대상이 아닌지 확인한다.
 - 실폰 카메라 입력이 아니므로 field 성능, 착용 각도, TalkBack/TTS 지연 근거로 쓰지 않는다.
 - 정리된 로컬 데이터셋이 없으면 `scripts/check_detect_v2_stage1_image_smoke_20260524.py --image <image>` 또는 `--image-dir <images/test>`로 재실행한다. 입력 이미지가 없으면 smoke 결과는 `blocked`와 다음 실행 명령을 기록해야 한다.

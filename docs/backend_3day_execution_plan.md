@@ -1,5 +1,8 @@
 # Backend 3-Day Execution Plan
 
+> **문서 상태(2026-06-02): superseded.** 2026-05-14~16 backend 계획 기록이다. 현재 backend 기준은 `docs/walksafe-v2/backend_api_contract.md`와 `docs/backend_environment.md`다.
+
+
 작성 기준일: 2026-05-13 KST
 실행 기간: 2026-05-14(목) ~ 2026-05-16(토)
 담당 범위: FastAPI/PostGIS 백엔드, 신고 API, 업로드 정책, `/detect` 서버 추론 연결 준비

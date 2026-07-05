@@ -5,6 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}/apps/web"
 
+grep -q 'REPORT_MODEL_FILTER_OPTIONS.*unified_walksafe' "${PWD}/app/admin/page.tsx" || {
+  echo "FAIL: admin model filter must expose unified_walksafe"
+  exit 1
+}
+
 OUT_DIR="${OUT_DIR:-/tmp/hanium_frontend_admin_report_summary_policy_20260525}"
 case "${OUT_DIR}" in
   /tmp/hanium_frontend_*) ;;

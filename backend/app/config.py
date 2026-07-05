@@ -28,6 +28,8 @@ DEFAULT_TMAP_TIMEOUT_SECONDS = 4.0
 DEFAULT_TMAP_PEDESTRIAN_SPEED_KMH = 4.0
 DEFAULT_TMAP_POI_PROVIDER = "live"
 DEFAULT_MAX_REPORT_METADATA_BYTES = 64 * 1024
+DEFAULT_MAX_ANDROID_DEBUG_LOG_BYTES = 64 * 1024
+DEFAULT_ANDROID_DEBUG_LOG_ENABLED = "false"
 
 
 def _env_text(name: str, default: str = "") -> str:
@@ -82,6 +84,15 @@ def _parse_positive_float(name: str, default: float) -> float:
     return value
 
 
+def _parse_bool(name: str, default: str = "false") -> bool:
+    value = _env_text(name, default).lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off", ""}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 class Settings:
     def __init__(self) -> None:
         backend_root = Path(__file__).resolve().parents[1]
@@ -123,6 +134,12 @@ class Settings:
         self.detect_v2_coco_model_path = (
             Path(detect_v2_coco_model_path).expanduser().resolve()
             if detect_v2_coco_model_path
+            else None
+        )
+        detect_v2_unified_model_path = _env_text("DETECT_V2_UNIFIED_MODEL_PATH")
+        self.detect_v2_unified_model_path = (
+            Path(detect_v2_unified_model_path).expanduser().resolve()
+            if detect_v2_unified_model_path
             else None
         )
         detect_v2_runtime_config_path = _env_text("DETECT_V2_RUNTIME_CONFIG_PATH")
@@ -170,6 +187,17 @@ class Settings:
         self.max_report_metadata_bytes = _parse_positive_int(
             "MAX_REPORT_METADATA_BYTES",
             DEFAULT_MAX_REPORT_METADATA_BYTES,
+        )
+        self.android_debug_log_dir = Path(
+            os.getenv("ANDROID_DEBUG_LOG_DIR", str(backend_root / "android_debug_logs"))
+        ).resolve()
+        self.android_debug_log_enabled = _parse_bool(
+            "ANDROID_DEBUG_LOG_ENABLED",
+            DEFAULT_ANDROID_DEBUG_LOG_ENABLED,
+        )
+        self.max_android_debug_log_bytes = _parse_positive_int(
+            "MAX_ANDROID_DEBUG_LOG_BYTES",
+            DEFAULT_MAX_ANDROID_DEBUG_LOG_BYTES,
         )
         self.cors_origins = [
             origin.strip()

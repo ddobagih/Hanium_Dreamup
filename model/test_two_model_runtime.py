@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from two_model_runtime import (  # noqa: E402
     DEFAULT_RUNTIME_CONFIG,
     Detection,
+    filter_detections,
     filter_and_merge_detections,
     load_threshold_config,
     to_response_dict,
@@ -73,6 +74,22 @@ def test_filter_does_not_run_cross_model_nms() -> None:
     assert merged == [custom_detection, coco_detection]
 
 
+def test_unified_walksafe_filters_general_and_tactile_classes() -> None:
+    config = copy.deepcopy(DEFAULT_RUNTIME_CONFIG)
+    config["models"]["unified_walksafe"]["thresholds"]["normal_tactile_block"] = 0.55
+    detections = [
+        Detection("unified_walksafe", "car", 0.50, BBOX, "YOLO26n unified", "vehicle"),
+        Detection("unified_walksafe", "normal_tactile_block", 0.54, BBOX, "YOLO26n unified", "tactile_normal"),
+        Detection("unified_walksafe", "damaged_tactile_block", 0.80, BBOX, "YOLO26n unified", "tactile_damage"),
+        Detection("unified_walksafe", "dog", 0.99, BBOX, "YOLO26n unified", "unknown"),
+    ]
+
+    filtered = filter_detections(detections, config)
+
+    assert [d.class_name for d in filtered] == ["car", "damaged_tactile_block"]
+    assert {d.model_key for d in filtered} == {"unified_walksafe"}
+
+
 def test_mapping_input_and_response_dict_are_json_serializable() -> None:
     raw_detection = {
         "model_key": "coco_general",
@@ -121,11 +138,11 @@ def test_load_threshold_config_accepts_json(tmp_path: Path) -> None:
     ]
     assert config["models"]["coco_general"]["allowlist"] == [
         "person",
+        "bicycle",
         "car",
+        "motorcycle",
         "bus",
         "truck",
-        "bicycle",
-        "motorcycle",
         "traffic light",
         "bench",
     ]

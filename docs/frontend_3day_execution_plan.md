@@ -1,5 +1,8 @@
 # 프론트엔드 3일 실행 계획
 
+> **문서 상태(2026-06-02): superseded.** PWA 중심 3일 계획 기록이다. 현재 주 경로는 Android native이며 PWA 정책은 `docs/walksafe-v2/frontend_display_policy.md`를 본다.
+
+
 작성 기준일: 2026-05-13 KST
 실행 기간: 2026-05-14 ~ 2026-05-16
 담당 범위: `apps/web` 기반 PWA/관리자 화면의 검증, 연동 준비, 접근성 점검

@@ -1,4 +1,4 @@
-import { Loader2, MapPin, Mic, Navigation, RefreshCw, Save, Send, UserRound, Volume2, VolumeX } from "lucide-react";
+import { Loader2, Mic, RefreshCw, Save, Send, UserRound, Volume2, VolumeX } from "lucide-react";
 import { labelForTwoModelDetection } from "@/lib/detector-v2";
 import type { DetectionEvent, GpsFix } from "@/types/inference";
 import type { TwoModelDetection } from "@/types/inference-v2";
@@ -55,7 +55,7 @@ type AssistPanelProps = {
   reportButtonLabel: string;
   reportHelpText: string;
   reconnectCameraAndSensors: () => void;
-  modeText: string;
+  permissionRequestMessage: string | null;
   guardianSummary: string;
   settingsMessage: string;
   settingsExpanded: boolean;
@@ -69,6 +69,11 @@ type AssistPanelProps = {
   motionSampleCount: number;
   stepLengthConfidence: number;
   storedStepCalibrationActive: boolean;
+  depthStatusText: string;
+  depthDetailText: string;
+  depthSensorStatus: string;
+  depthFrameCount: number;
+  disableDepthSensorControls?: boolean;
   isOnline: boolean;
   pwaInstallMessage: string;
   pwaUpdateMessage: string;
@@ -81,6 +86,8 @@ type AssistPanelProps = {
   onRemoveEmergencyContact: (contactId: string) => void;
   onRequestMotionPermission: () => void;
   onResetStepLengthCalibration: () => void;
+  onRequestDepthSensor: () => void;
+  onStopDepthSensor: () => void;
   onInstallPwa: () => void;
   onApplyPwaUpdate: () => void;
   onSaveSettings: () => void;
@@ -134,7 +141,7 @@ export function AssistPanel({
   reportButtonLabel,
   reportHelpText,
   reconnectCameraAndSensors,
-  modeText,
+  permissionRequestMessage,
   guardianSummary,
   settingsMessage,
   settingsExpanded,
@@ -146,6 +153,11 @@ export function AssistPanel({
   motionSampleCount,
   stepLengthConfidence,
   storedStepCalibrationActive,
+  depthStatusText,
+  depthDetailText,
+  depthSensorStatus,
+  depthFrameCount,
+  disableDepthSensorControls = false,
   isOnline,
   pwaInstallMessage,
   pwaUpdateMessage,
@@ -158,12 +170,19 @@ export function AssistPanel({
   onRemoveEmergencyContact,
   onRequestMotionPermission,
   onResetStepLengthCalibration,
+  onRequestDepthSensor,
+  onStopDepthSensor,
   onInstallPwa,
   onApplyPwaUpdate,
   onSaveSettings,
   onClearSettings,
   onToggleSettingsExpanded
 }: AssistPanelProps) {
+  const hasReportStatus = reportState !== "idle" || lastDuplicateCount > 0;
+  const hasVoiceStatus = voiceState !== "idle" || Boolean(voiceResultText);
+  const hasNavigationStatus = navigationActive || navigationSearchActive || navigationDestinationCandidates.length > 0;
+  const depthSensorRunning = depthSensorStatus === "running" || depthSensorStatus === "active";
+
   return (
     <section id={panelId} className="assist-panel" aria-label="보행 보조 상태와 신고">
       <div className="status-grid">
@@ -174,25 +193,13 @@ export function AssistPanel({
             {riskActive && detection
               ? `신뢰도 ${formatPercent(detection.confidence)}`
               : riskActive && v2Primary
-                ? `primary · ${v2Primary.model_key === "custom_tactile" ? "tactile" : "general"} · ${formatPercent(v2Primary.confidence)}`
-                : detectorStatusText}
+                ? `primary · ${v2Primary.model_key === "custom_tactile" || v2Primary.class_name.includes("tactile_block") || v2Primary.class_name === "tactile_damage_area" ? "tactile" : "general"} · ${formatPercent(v2Primary.confidence)}`
+                : isV2Mode
+                  ? `감지 ${v2Detections.length}개 · ${detectorStatusText}`
+                  : detectorStatusText}
           </small>
           {riskActive && v2Secondary ? <small>secondary · {labelForTwoModelDetection(v2Secondary)}</small> : null}
         </div>
-        {isV2Mode ? (
-          <>
-            <div className="status-item channel-card tactile">
-              <span className="status-label">tactile 채널</span>
-              <strong>{v2Detections.filter((item) => item.model_key === "custom_tactile").length}개 감지</strong>
-              <small>{v2Detections.filter((item) => item.model_key === "custom_tactile").map(labelForTwoModelDetection).join(" · ") || "대기"}</small>
-            </div>
-            <div className="status-item channel-card general">
-              <span className="status-label">general 채널</span>
-              <strong>{v2Detections.filter((item) => item.model_key === "coco_general").length}개 감지</strong>
-              <small>{v2Detections.filter((item) => item.model_key === "coco_general").map(labelForTwoModelDetection).join(" · ") || "대기"}</small>
-            </div>
-          </>
-        ) : null}
         <div className="status-item">
           <span className="status-label">위치</span>
           <strong>{gpsError ?? formatGps(gps)}</strong>
@@ -203,17 +210,28 @@ export function AssistPanel({
           <strong>{directionLabel}</strong>
           <small>{heading === null ? headingMessage : `${heading}도`}</small>
         </div>
-        <div className="status-item" aria-live="polite">
+        <div className="status-item">
+          <span className="status-label">깊이</span>
+          <strong>{depthStatusText}</strong>
+          <small>{depthDetailText}</small>
+          {depthSensorRunning ? <small>센서 프레임 {depthFrameCount}개 수신</small> : null}
+        </div>
+        {hasReportStatus ? (
+          <div className="status-item" aria-live="polite">
           <span className="status-label">신고</span>
           <strong>{reportMessage}</strong>
           {lastDuplicateCount > 0 ? <small>중복 후보 {lastDuplicateCount}건</small> : null}
-        </div>
-        <div className="status-item" aria-live="polite">
-          <span className="status-label">음성 명령</span>
-          <strong>{voiceMessage}</strong>
-          <small>{voiceResultText}</small>
-        </div>
-        <div className={`status-item navigation-card ${navigationActive ? "active" : ""}`} aria-live="polite">
+          </div>
+        ) : null}
+        {hasVoiceStatus ? (
+          <div className="status-item" aria-live="polite">
+            <span className="status-label">음성 명령</span>
+            <strong>{voiceMessage}</strong>
+            <small>{voiceResultText}</small>
+          </div>
+        ) : null}
+        {hasNavigationStatus ? (
+          <div className={`status-item navigation-card ${navigationActive ? "active" : ""}`} aria-live="polite">
           <span className="status-label">길안내</span>
           <strong>{navigationInstructionText}</strong>
           <small>{navigationStatusText}</small>
@@ -228,7 +246,8 @@ export function AssistPanel({
               검색 취소
             </button>
           ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       {navigationDestinationCandidates.length > 0 ? (
@@ -300,11 +319,11 @@ export function AssistPanel({
 
 
 
-      <section className="settings-card" aria-label="보호자와 보폭 자동 측정 설정">
+      <section className={`settings-card ${settingsExpanded ? "expanded" : "collapsed"}`} aria-label="보호자와 보폭 자동 측정 설정">
         <div className="settings-card-header">
           <span>
             <UserRound aria-hidden="true" size={18} />
-            초기 설정
+            설정
           </span>
           <small>{guardianSummary}</small>
           <button
@@ -316,96 +335,102 @@ export function AssistPanel({
             {settingsExpanded ? "접기" : "펼치기"}
           </button>
         </div>
-        <div className="setup-checklist" aria-label="첫 실행 확인 목록">
-          {setupChecklist.map((item) => (
-            <span key={item.id} className={item.done ? "done" : undefined}>
-              {item.done ? "완료" : "확인"} · {item.label}
-            </span>
-          ))}
-        </div>
-        <div className="settings-fields" hidden={!settingsExpanded}>
-          <div className="emergency-contact-list" aria-label="긴급 연락처 목록">
-            {settingsForm.emergencyContacts.map((contact, index) => (
-              <fieldset key={contact.id} className="emergency-contact-row">
-                <legend>{index === 0 ? "주 긴급 연락처" : `추가 연락처 ${index + 1}`}</legend>
-                <label>
-                  이름
-                  <input
-                    type="text"
-                    value={contact.name}
-                    onChange={(event) => onEmergencyContactNameChange(contact.id, event.target.value)}
-                    placeholder="예: 홍길동"
-                    autoComplete="off"
-                  />
-                </label>
-                <label>
-                  전화번호
-                  <input
-                    type="tel"
-                    value={contact.phone}
-                    onChange={(event) => onEmergencyContactPhoneChange(contact.id, event.target.value)}
-                    placeholder="예: 010-0000-0000"
-                    autoComplete="tel"
-                  />
-                </label>
-                {settingsForm.emergencyContacts.length > 1 ? (
-                  <button className="inline-action" type="button" onClick={() => onRemoveEmergencyContact(contact.id)}>
-                    이 연락처 삭제
+        {settingsExpanded ? (
+          <>
+            <div className="setup-checklist" aria-label="첫 실행 확인 목록">
+              {setupChecklist.map((item) => (
+                <span key={item.id} className={item.done ? "done" : undefined}>
+                  {item.done ? "완료" : "확인"} · {item.label}
+                </span>
+              ))}
+            </div>
+            <div className="settings-fields">
+              <div className="emergency-contact-list" aria-label="긴급 연락처 목록">
+                {settingsForm.emergencyContacts.map((contact, index) => (
+                  <fieldset key={contact.id} className="emergency-contact-row">
+                    <legend>{index === 0 ? "주 긴급 연락처" : `추가 연락처 ${index + 1}`}</legend>
+                    <label>
+                      이름
+                      <input
+                        type="text"
+                        value={contact.name}
+                        onChange={(event) => onEmergencyContactNameChange(contact.id, event.target.value)}
+                        placeholder="예: 홍길동"
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label>
+                      전화번호
+                      <input
+                        type="tel"
+                        value={contact.phone}
+                        onChange={(event) => onEmergencyContactPhoneChange(contact.id, event.target.value)}
+                        placeholder="예: 010-0000-0000"
+                        autoComplete="tel"
+                      />
+                    </label>
+                    {settingsForm.emergencyContacts.length > 1 ? (
+                      <button className="inline-action" type="button" onClick={() => onRemoveEmergencyContact(contact.id)}>
+                        이 연락처 삭제
+                      </button>
+                    ) : null}
+                  </fieldset>
+                ))}
+                {settingsForm.emergencyContacts.length < 3 ? (
+                  <button className="inline-action" type="button" onClick={onAddEmergencyContact}>
+                    연락처 추가
                   </button>
                 ) : null}
-              </fieldset>
-            ))}
-            {settingsForm.emergencyContacts.length < 3 ? (
-              <button className="inline-action" type="button" onClick={onAddEmergencyContact}>
-                연락처 추가
+              </div>
+              <div className="step-length-readout" aria-live="polite">
+                <span>보폭 자동 측정</span>
+                <strong>{stepLengthSummary}</strong>
+                <small>{stepLengthDetail}</small>
+                <small>
+                  움직임 권한 {motionPermissionLabel} · 샘플 {motionSampleCount}개 · 신뢰도 {Math.round(stepLengthConfidence * 100)}%
+                  {storedStepCalibrationActive ? " · 저장값 사용 중" : ""}
+                </small>
+                <div className="settings-actions compact">
+                  <button className="inline-action" type="button" onClick={onRequestMotionPermission}>
+                    움직임 권한/측정 시작
+                  </button>
+                  <button className="inline-action" type="button" onClick={onResetStepLengthCalibration}>
+                    보폭 재보정
+                  </button>
+                </div>
+                <small>정지 중 GPS 흔들림은 보폭 보정에서 제외합니다.</small>
+              </div>
+              <div className="pwa-status-card" aria-live="polite">
+                <span>앱 설치/오프라인</span>
+                <strong>{isOnline ? "온라인" : "오프라인 셸 사용 중"}</strong>
+                <small>{pwaInstallMessage}</small>
+                <small>{pwaUpdateMessage}</small>
+                {swVersion ? <small>서비스워커 버전 {swVersion}</small> : null}
+                <div className="settings-actions compact">
+                  <button className="inline-action" type="button" onClick={onInstallPwa} disabled={!canInstallPwa}>
+                    앱 설치
+                  </button>
+                  <button className="inline-action" type="button" onClick={onApplyPwaUpdate} disabled={!canApplyPwaUpdate}>
+                    오프라인 셸 업데이트 적용
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="settings-actions">
+              <button className="control-button secondary" type="button" onClick={onSaveSettings}>
+                <Save aria-hidden="true" size={18} />
+                설정 저장
               </button>
-            ) : null}
-          </div>
-          <div className="step-length-readout" aria-live="polite">
-            <span>보폭 자동 측정</span>
-            <strong>{stepLengthSummary}</strong>
-            <small>{stepLengthDetail}</small>
-            <small>
-              움직임 권한 {motionPermissionLabel} · 샘플 {motionSampleCount}개 · 신뢰도 {Math.round(stepLengthConfidence * 100)}%
-              {storedStepCalibrationActive ? " · 저장값 사용 중" : ""}
-            </small>
-            <div className="settings-actions compact">
-              <button className="inline-action" type="button" onClick={onRequestMotionPermission}>
-                움직임 권한/측정 시작
-              </button>
-              <button className="inline-action" type="button" onClick={onResetStepLengthCalibration}>
-                보폭 재보정
+              <button className="control-button secondary" type="button" onClick={onClearSettings}>
+                연락처 지우기
               </button>
             </div>
-            <small>실기기 측정 완료가 아니라 local dry-run 보정 로그입니다.</small>
-          </div>
-          <div className="pwa-status-card" aria-live="polite">
-            <span>앱 설치/오프라인</span>
-            <strong>{isOnline ? "온라인" : "오프라인 셸 사용 중"}</strong>
-            <small>{pwaInstallMessage}</small>
-            <small>{pwaUpdateMessage}</small>
-            {swVersion ? <small>서비스워커 버전 {swVersion}</small> : null}
-            <div className="settings-actions compact">
-              <button className="inline-action" type="button" onClick={onInstallPwa} disabled={!canInstallPwa}>
-                앱 설치
-              </button>
-              <button className="inline-action" type="button" onClick={onApplyPwaUpdate} disabled={!canApplyPwaUpdate}>
-                오프라인 셸 업데이트 적용
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="settings-actions">
-          <button className="control-button secondary" type="button" onClick={onSaveSettings}>
-            <Save aria-hidden="true" size={18} />
-            설정 저장
-          </button>
-          <button className="control-button secondary" type="button" onClick={onClearSettings}>
-            연락처 지우기
-          </button>
-        </div>
-        <p>{settingsMessage}</p>
-        <p className="assist-note">보호자 연락처는 report/STT payload로 전송하지 않으며 실제 전화/SMS도 발신하지 않습니다.</p>
+            <p>{settingsMessage}</p>
+            <p className="assist-note">보호자 연락처는 report/STT payload로 전송하지 않으며 실제 전화/SMS도 발신하지 않습니다.</p>
+          </>
+        ) : (
+          <p>초기 설정, 보폭 보정, 앱 설치는 필요할 때만 펼쳐서 확인합니다.</p>
+        )}
       </section>
 
       <button
@@ -429,16 +454,27 @@ export function AssistPanel({
 
       <button className="control-button secondary sensor-action" type="button" onClick={reconnectCameraAndSensors}>
         <RefreshCw aria-hidden="true" size={20} />
-        카메라/센서 재연결
+        카메라/GPS 권한 요청
       </button>
-      <p className="assist-note">
-        <MapPin aria-hidden="true" size={16} />
-        {gpsError ? "위치 없음 상태" : `위치 정확도 ${gps?.accuracy_m?.toFixed(1) ?? "대기"}m`}
-      </p>
-      <p className="assist-note">
-        <Navigation aria-hidden="true" size={16} />
-        목걸이 착용 · {modeText}
-      </p>
+      {disableDepthSensorControls && !depthSensorRunning ? (
+        <p className="permission-request-note" role="status">
+          WebXR 깊이는 브라우저 AR 실험 기능이라 현재 실기기 카메라/서버 인식 테스트에서는 비활성화했습니다.
+        </p>
+      ) : (
+        <button
+          className="control-button secondary sensor-action"
+          type="button"
+          onClick={depthSensorRunning ? onStopDepthSensor : onRequestDepthSensor}
+        >
+          <RefreshCw aria-hidden="true" size={20} />
+          {depthSensorRunning ? "WebXR 깊이 중지" : "WebXR 깊이 시작"}
+        </button>
+      )}
+      {permissionRequestMessage ? (
+        <p className="permission-request-note" role="status" aria-live="assertive">
+          {permissionRequestMessage}
+        </p>
+      ) : null}
     </section>
   );
 }

@@ -13,8 +13,8 @@ function assert(condition: boolean, message: string): asserts condition {
   }
 }
 
-function sample(latitude: number, observedAtMs: number): GpsStepLengthSample {
-  return { latitude, longitude: 127, accuracy_m: 8, observedAtMs };
+function sample(latitude: number, observedAtMs: number, speed_mps: number | null = 1): GpsStepLengthSample {
+  return { latitude, longitude: 127, accuracy_m: 8, speed_mps, observedAtMs };
 }
 
 function testWaitsForEnoughWalkingEvidence() {
@@ -27,8 +27,12 @@ function testWaitsForEnoughWalkingEvidence() {
 }
 
 function testEstimatesStepLengthFromGpsDistanceAndStepCount() {
-  const samples = [sample(37, 0), sample(37.000036, 4000), sample(37.000072, 8000)];
-  const steps = [500, 1000, 1500, 2200, 2800, 3500, 4300, 5100, 5900, 6700, 7500, 7900];
+  const samples = [sample(37, 0), sample(37.000054, 12000), sample(37.000108, 16000), sample(37.000162, 20000)];
+  const steps = [
+    1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000,
+    12600, 13200, 13800, 14400, 15000, 15600,
+    16600, 17200, 17800, 18400, 19000, 19600
+  ];
   const result = estimateStepLengthFromGpsAndMotion(samples, steps, 0.65);
 
   assert(result.status === "estimated", "enough GPS and motion evidence should estimate");
@@ -46,12 +50,26 @@ function testIgnoresGpsJumpTooFastForWalking() {
   assert(evidence.ignoredSegmentCount === 1, "ignored GPS jump should be counted as outlier");
 }
 
+function testStationaryGpsJitterDoesNotEstimateStepLength() {
+  const samples = [sample(37, 0, 0), sample(37.000018, 12000, 0), sample(37.000036, 16000, 0)];
+  const steps = [400, 900, 1400, 1900, 2400, 2900, 3400, 3900];
+  const result = estimateStepLengthFromGpsAndMotion(samples, steps, 0.65);
+
+  assert(result.status === "collecting", "stationary GPS jitter should not estimate step length");
+  assert(result.distanceM === 0, "stationary GPS jitter should not count as walking distance");
+  assert(result.stepLengthM === 0.65, "stationary jitter should keep default step length");
+}
+
 function testStoredCalibrationTtlAndFallback() {
   const now = 100_000;
   const stored = createStoredStepLengthCalibration(
     estimateStepLengthFromGpsAndMotion(
-      [sample(37, 0), sample(37.000036, 4000), sample(37.000072, 8000)],
-      [500, 1000, 1500, 2200, 2800, 3500, 4300, 5100, 5900, 6700, 7500, 7900],
+      [sample(37, 0), sample(37.000054, 12000), sample(37.000108, 16000), sample(37.000162, 20000)],
+      [
+        1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000,
+        12600, 13200, 13800, 14400, 15000, 15600,
+        16600, 17200, 17800, 18400, 19000, 19600
+      ],
       0.65
     ),
     now
@@ -71,6 +89,7 @@ function main() {
   testWaitsForEnoughWalkingEvidence();
   testEstimatesStepLengthFromGpsDistanceAndStepCount();
   testIgnoresGpsJumpTooFastForWalking();
+  testStationaryGpsJitterDoesNotEstimateStepLength();
   testStoredCalibrationTtlAndFallback();
   console.log("step length policy checks passed");
 }

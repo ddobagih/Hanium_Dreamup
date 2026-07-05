@@ -1,8 +1,15 @@
 # WalkSafe v2 voice command strategy
 
-- 기준일: 2026-05-24 KST
+- 기준일: 2026-06-02 KST
 - 구현 위치: `voice/intents.py`, `voice/server.py`, `apps/web/lib/voice-api.ts`, `apps/web/app/_walksafe/hooks/useVoiceCommands.ts`
 - 상태: rule-based intent 1차 구현과 regression test 추가. 전체 문장 녹음/나열 방식은 사용하지 않는다.
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android native에는 `SpeechRecognizer` 기반 "신고해줘" 버튼 경로가 explicit report upload/TTS 정책에 연결되어 있다.
+- 실폰 mic/TTS 청취, TalkBack, 보행 중 인식률은 아직 Device PASS가 아니다.
 
 ## 1. 기본 방향
 
@@ -39,7 +46,7 @@
 
 - 사용자가 명시적으로 “신고해줘”라고 요청하면 자동 신고보다 우선한다.
 - 음성 요청 신고는 자동 신고 cooldown을 우회한다.
-- 현재 신고 대상은 `custom_tactile`의 tactile damage class다.
+- 현재 신고 대상은 `unified_walksafe` 또는 legacy `custom_tactile`의 `damaged_tactile_block`이다.
 - 일반 객체는 신고하지 않는다.
 - 음성 요청 신고는 완료/실패를 짧게 TTS로 알려야 한다.
 - 자동 신고는 사용자가 들어야 할 안내가 아니므로 성공 TTS를 하지 않는다.

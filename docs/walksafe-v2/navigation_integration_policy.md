@@ -1,8 +1,14 @@
 # WalkSafe v2 TMAP walking navigation integration policy
 
-- 기준일: 2026-05-25 KST
+- 기준일: 2026-06-02 KST
 - 구현 위치: `backend/app/api/navigation.py`, `backend/app/services/tmap_pedestrian.py`, `backend/app/services/kakao_mobility.py`, `apps/web/lib/navigation-api.ts`, `apps/web/app/_walksafe/hooks/useNavigationGuidance.ts`
 - 외부 근거: TMAP 보행자 경로안내 공식 문서 <https://tmap-skopenapi.readme.io/reference/%EB%B3%B4%ED%96%89%EC%9E%90-%EA%B2%BD%EB%A1%9C%EC%95%88%EB%82%B4>
+
+## 2026-06-02 현재 우선순위 보정
+
+- 주 사용자 앱 경로는 Android native ARCore/TFLite APK다.
+- 이 문서는 backend/Web/PWA/voice/정책 기준으로 유지하되, Android Device evidence를 대체하지 않는다.
+- Android report upload, TTS/haptic, navigation 연결은 bbox/depth 좌표 정합 gate 이후 진행한다.
 
 ## 1. 목적
 
@@ -114,8 +120,8 @@ WalkSafe route priority는 provider별 옵션으로 변환한다.
 실폰 없이 가능한 검증/문서화부터 진행한다. 실폰 경로 보정은 이 목록의 완료 조건에 넣지 않는다.
 
 1. Stage1 image smoke
-   - reviewed YOLO26s Stage1 후보로 저장된 damage-positive 후보 이미지와 known-negative 이미지 3~5장을 `/detect/v2`에 통과시켜 `damaged_tactile_block`/`tactile_damage_area`/일반 객체 응답과 지연시간을 확인한다.
-   - damage-positive 후보는 실제 payload의 `model_key=custom_tactile`, `class_name=damaged_tactile_block`, `threshold_used`, bbox, confidence를 smoke 기준으로 기록한다.
+   - unified 13-class 후보 또는 legacy reviewed YOLO26s Stage1 후보 이미지 3~5장을 `/detect/v2`에 통과시켜 `damaged_tactile_block`/일반 객체 응답과 지연시간을 확인한다.
+   - damage-positive 후보는 실제 payload의 `model_key=unified_walksafe`, `class_name=damaged_tactile_block`, `threshold_used`, bbox, confidence를 smoke 기준으로 기록한다. legacy fallback smoke에서는 `model_key=custom_tactile`도 허용한다.
    - 데모용 fake-v2가 아니라 `server-v2` 실제 provider 기준으로 확인하되, 실폰 field 성능 근거로 쓰지 않는다.
 2. 실제 Stage1 detection payload → report → export trace
    - 손상 점자블록 감지 1건이 실제 Stage1 `/detect/v2` payload에서 `/reports/v2` 자동 신고 저장으로 이어지고, 같은 건이 `/reports/export` CSV/JSON/GeoJSON에 필요한 운영 필드와 함께 나타나는지 trace를 남긴다.

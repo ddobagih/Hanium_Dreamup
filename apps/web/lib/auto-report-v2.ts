@@ -1,11 +1,12 @@
 import type { GpsFixV2, TwoModelDetection } from "@/types/inference-v2";
 
 const AUTO_REPORT_CLASSES = new Set(["damaged_tactile_block"]);
+const AUTO_REPORT_MODEL_KEYS = new Set(["custom_tactile", "unified_walksafe"]);
 export const AUTO_REPORT_COOLDOWN_MS = 10 * 60 * 1000;
 export const AUTO_REPORT_LOCATION_PRECISION = 4;
 
 export function isAutoReportV2Target(detection: TwoModelDetection): boolean {
-  return detection.model_key === "custom_tactile" && AUTO_REPORT_CLASSES.has(detection.class_name);
+  return AUTO_REPORT_MODEL_KEYS.has(detection.model_key) && AUTO_REPORT_CLASSES.has(detection.class_name);
 }
 
 export function selectAutoReportV2Detection(detections: readonly TwoModelDetection[]): TwoModelDetection | null {

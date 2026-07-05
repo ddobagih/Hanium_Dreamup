@@ -1,5 +1,8 @@
 # AI 기반 시각장애인 보행 지원 시스템 프로젝트 구현 계획
 
+> **문서 상태(2026-06-02): superseded.** 현재 source of truth는 `README.md`, `docs/current_status.md`, `docs/README.md`다. 이 문서는 2026-05-13 PWA/fake/v1 중심 계획 기록으로만 본다.
+
+
 작성 기준일: 2026-05-13
 기준 문서:
 

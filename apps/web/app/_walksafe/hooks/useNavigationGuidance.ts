@@ -517,7 +517,10 @@ export function buildNavigationGuidePrompt(args: {
 }
 
 function isNormalTactileBlock(detection: TwoModelDetection): boolean {
-  return detection.model_key === "custom_tactile" && detection.class_name === "normal_tactile_block";
+  return (
+    (detection.model_key === "custom_tactile" || detection.model_key === "unified_walksafe") &&
+    detection.class_name === "normal_tactile_block"
+  );
 }
 
 function routeId(route: WalkingRouteResponse): string {

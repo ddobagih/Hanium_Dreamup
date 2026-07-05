@@ -25,6 +25,10 @@ export function labelForTwoModelDetection(detection: TwoModelDetection) {
     person: "보행자",
     bicycle: "자전거",
     "traffic light": "신호등",
+    crosswalk: "횡단보도",
+    curb_step: "보도 턱",
+    uneven_sidewalk: "고르지 않은 보도",
+    e_scooter_obstruction: "방치 킥보드",
     bench: "벤치"
   };
 
@@ -33,64 +37,46 @@ export function labelForTwoModelDetection(detection: TwoModelDetection) {
 
 export function createFakeTwoModelDetections(index: number, gps: GpsFixV2 | null, heading: number | null) {
   const capturedAt = new Date().toISOString();
-  const tactileDamage = index % 3 !== 1;
-  const primaryTactileClass = tactileDamage ? "damaged_tactile_block" : "normal_tactile_block";
-  const tactileDetections: TwoModelDetection[] = [
+  const unifiedClasses = [
+    { className: "damaged_tactile_block", classId: 8, category: "tactile_damage", confidence: 0.86 + (index % 2) * 0.05, bbox: TACTILE_BOXES[index % TACTILE_BOXES.length] },
+    { className: "normal_tactile_block", classId: 7, category: "tactile_normal", confidence: 0.72, bbox: TACTILE_BOXES[(index + 1) % TACTILE_BOXES.length] },
+    { className: "crosswalk", classId: 9, category: "path_guidance", confidence: 0.78, bbox: { x: 0.10, y: 0.68, width: 0.74, height: 0.16 } },
+    { className: "curb_step", classId: 10, category: "surface_hazard", confidence: 0.74, bbox: { x: 0.18, y: 0.58, width: 0.62, height: 0.14 } },
+    { className: "uneven_sidewalk", classId: 11, category: "surface_hazard", confidence: 0.76, bbox: { x: 0.26, y: 0.54, width: 0.44, height: 0.22 } },
+    { className: "e_scooter_obstruction", classId: 12, category: "obstruction", confidence: 0.82, bbox: GENERAL_BOXES[(index + 2) % GENERAL_BOXES.length] }
+  ] as const;
+  const generalClasses = [
+    { className: "car", classId: 2, category: "vehicle", confidence: 0.76 + (index % 3) * 0.04 },
+    { className: "person", classId: 0, category: "vulnerable_road_user", confidence: 0.68 },
+    { className: "bicycle", classId: 1, category: "vulnerable_road_user", confidence: 0.70 },
+    { className: "traffic light", classId: 6, category: "traffic_signal", confidence: 0.66 }
+  ] as const;
+
+  const primaryCustom = unifiedClasses[index % unifiedClasses.length];
+  const primaryGeneral = generalClasses[index % generalClasses.length];
+  const detections: TwoModelDetection[] = [
     {
       schema_version: "detect.v2",
-      model_key: "custom_tactile",
-      source_model: "fake-custom-tactile-v2",
-      model_class_id: tactileDamage ? 1 : 0,
-      class_name: primaryTactileClass,
-      category: tactileDamage ? "tactile_damage" : "tactile_normal",
-      confidence: tactileDamage ? 0.86 + (index % 2) * 0.05 : 0.82,
-      bbox: TACTILE_BOXES[index % TACTILE_BOXES.length],
-      threshold_used: 0.55,
+      model_key: "unified_walksafe",
+      source_model: "fake-unified-walksafe-v2",
+      model_class_id: primaryCustom.classId,
+      class_name: primaryCustom.className,
+      category: primaryCustom.category,
+      confidence: primaryCustom.confidence,
+      bbox: primaryCustom.bbox,
+      threshold_used: 0.35,
       captured_at: capturedAt,
       gps,
       heading
     },
     {
       schema_version: "detect.v2",
-      model_key: "custom_tactile",
-      source_model: "fake-custom-tactile-v2",
-      model_class_id: 0,
-      class_name: "normal_tactile_block",
-      category: "tactile_normal",
-      confidence: 0.72,
-      bbox: TACTILE_BOXES[(index + 1) % TACTILE_BOXES.length],
-      threshold_used: 0.55,
-      captured_at: capturedAt,
-      gps,
-      heading
-    }
-  ];
-
-  const generalClassIds = {
-    person: 0,
-    car: 1,
-    bicycle: 4,
-    "traffic light": 6,
-    bench: 7
-  } as const;
-  const generalClasses = ["car", "person", "bicycle", "traffic light", "bench"] as const;
-  const primaryGeneralClass = generalClasses[index % generalClasses.length];
-  const generalDetections: TwoModelDetection[] = [
-    {
-      schema_version: "detect.v2",
-      model_key: "coco_general",
-      source_model: "fake-coco-general-v2",
-      model_class_id: generalClassIds[primaryGeneralClass],
-      class_name: primaryGeneralClass,
-      category:
-        primaryGeneralClass === "car"
-          ? "vehicle"
-          : primaryGeneralClass === "person" || primaryGeneralClass === "bicycle"
-            ? "vulnerable_road_user"
-            : primaryGeneralClass === "traffic light"
-              ? "traffic_signal"
-              : "street_furniture",
-      confidence: 0.76 + (index % 3) * 0.04,
+      model_key: "unified_walksafe",
+      source_model: "fake-unified-walksafe-v2",
+      model_class_id: primaryGeneral.classId,
+      class_name: primaryGeneral.className,
+      category: primaryGeneral.category,
+      confidence: primaryGeneral.confidence,
       bbox: GENERAL_BOXES[index % GENERAL_BOXES.length],
       threshold_used: 0.35,
       captured_at: capturedAt,
@@ -99,9 +85,9 @@ export function createFakeTwoModelDetections(index: number, gps: GpsFixV2 | null
     },
     {
       schema_version: "detect.v2",
-      model_key: "coco_general",
-      source_model: "fake-coco-general-v2",
-      model_class_id: generalClassIds.person,
+      model_key: "unified_walksafe",
+      source_model: "fake-unified-walksafe-v2",
+      model_class_id: 0,
       class_name: "person",
       category: "vulnerable_road_user",
       confidence: 0.68,
@@ -113,7 +99,6 @@ export function createFakeTwoModelDetections(index: number, gps: GpsFixV2 | null
     }
   ];
 
-  const detections = [...tactileDetections, ...generalDetections];
   return {
     detections,
     ...selectTwoModelPriorityDetections(detections)

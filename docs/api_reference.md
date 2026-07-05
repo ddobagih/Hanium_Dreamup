@@ -1,10 +1,10 @@
 # Backend API Reference
 
-작성 기준일: 2026-05-23
+작성 기준일: 2026-06-02 KST
 
 ## 범위
 
-이 문서는 프론트엔드와 백엔드가 공유해야 하는 FastAPI 계약만 정리한다. v1 탐지 이벤트 필드의 상세 규칙은 `docs/inference_contract.md`를 기준으로 한다.
+이 문서는 프론트엔드와 백엔드가 공유해야 하는 FastAPI 계약만 정리한다. v1 legacy 탐지 이벤트 필드의 상세 규칙은 `docs/inference_contract.md`를 참고하되, 현재 v2/unified 기준은 이 문서와 `docs/walksafe-v2/backend_api_contract.md`를 우선한다.
 
 기본 서버 주소:
 
@@ -111,7 +111,7 @@ v1 서버 추론 API. `MODEL_ARTIFACT_PATH`가 준비된 개발 환경에서는 
 
 ## GET /detect/v2/health
 
-v2 탐지 provider 설정 상태를 확인한다. `DETECT_V2_MODE` 기본값은 `fake`이며, `yolo` 또는 `real`이면 custom tactile/COCO model path 설정 여부만 확인한다. 이 health API는 Ultralytics/Pillow/model weight를 실제로 로드하지 않는다.
+v2 탐지 provider 설정 상태를 확인한다. `DETECT_V2_MODE` 기본값은 `fake`이며, `yolo` 또는 `real`이면 unified model path를 우선 확인하고 없으면 legacy custom tactile/COCO model path pair를 확인한다. 이 health API는 Ultralytics/Pillow/model weight를 실제로 로드하지 않는다.
 
 응답 예:
 
@@ -121,8 +121,12 @@ v2 탐지 provider 설정 상태를 확인한다. `DETECT_V2_MODE` 기본값은 
   "mode": "fake",
   "status": "ready",
   "reason": null,
+  "runtime_primary_model": "unified_walksafe",
+  "runtime_fallback_model": "legacy_two_model",
+  "configured_runtime": null,
   "custom_tactile_model_path": null,
   "coco_model_path": null,
+  "unified_model_path": null,
   "runtime_config_path": null
 }
 ```
@@ -131,7 +135,7 @@ v2 탐지 provider 설정 상태를 확인한다. `DETECT_V2_MODE` 기본값은 
 
 ## POST /detect/v2
 
-v2 서버 탐지 API. 기본은 fake provider이며, `DETECT_V2_MODE=yolo` 또는 `real`에서 model path가 설정되어 있으면 `LazyYoloDetectV2Runtime`/`YoloDetectV2Provider`를 사용한다. 실제 Ultralytics/Pillow/model load는 첫 실제 `/detect/v2` 요청 시점까지 지연된다.
+v2 서버 탐지 API. 기본은 fake provider이며, `DETECT_V2_MODE=yolo` 또는 `real`에서 model path가 설정되어 있으면 `LazyYoloDetectV2Runtime`/`YoloDetectV2Provider`를 사용한다. `DETECT_V2_UNIFIED_MODEL_PATH`가 있으면 `unified_walksafe` 단일 모델을 우선 사용하고, 없으면 legacy custom tactile + COCO pair로 fallback한다. 실제 Ultralytics/Pillow/model load는 첫 실제 `/detect/v2` 요청 시점까지 지연된다.
 
 요청:
 
@@ -148,9 +152,9 @@ v2 서버 탐지 API. 기본은 fake provider이며, `DETECT_V2_MODE=yolo` 또�
   "detections": [
     {
       "schema_version": "detect.v2",
-      "model_key": "custom_tactile",
-      "source_model": "fake-custom-tactile",
-      "model_class_id": 1,
+      "model_key": "unified_walksafe",
+      "source_model": "walksafe_unified_yolo26n",
+      "model_class_id": 8,
       "class_name": "damaged_tactile_block",
       "category": "tactile",
       "confidence": 0.91,
@@ -168,8 +172,8 @@ v2 서버 탐지 API. 기본은 fake provider이며, `DETECT_V2_MODE=yolo` 또�
 
 | 필드 | 의미 |
 | --- | --- |
-| `model_key` | `custom_tactile` 또는 `coco_general` |
-| `model_class_id` | 해당 `model_key` 안에서만 의미 있는 class id |
+| `model_key` | primary `unified_walksafe`; fallback/legacy에서는 `custom_tactile` 또는 `coco_general` |
+| `model_class_id` | 해당 `model_key` 안에서만 의미 있는 class id. `unified_walksafe`는 13-class order 기준 |
 | `class_name` | v2 class name 문자열 |
 | `category` | `tactile` 또는 `general_obstacle` 계열 |
 | `threshold_used` | runtime filter에 사용된 threshold |
@@ -290,7 +294,8 @@ TMAP 보행 경로를 WalkSafe 앱 전용 schema로 정규화한다. provider ke
       "turn_type": 13,
       "point_type": "GP",
       "distance_from_start_m": 20,
-      "remaining_distance_m": 1261
+      "remaining_distance_m": 1261,
+      "bearing_deg": 12.4
     }
   ],
   "provider_result_code": 0,
@@ -298,7 +303,7 @@ TMAP 보행 경로를 WalkSafe 앱 전용 schema로 정규화한다. provider ke
 }
 ```
 
-`guide_points`는 TMAP Point feature의 안내 지점이다. 프론트는 `distance_from_start_m`/`remaining_distance_m`와 현재 진행 거리, 보행 속도/보폭 추정값을 비교해 “10초 뒤 좌회전 준비”, “약 15보 앞”, “지금 좌회전하세요” 같은 안내를 만들 수 있다. Kakao fallback provider는 현재 `guide_points: []`를 반환한다.
+`guide_points`는 TMAP Point feature의 안내 지점이다. `bearing_deg`는 route polyline의 다음 segment 방향에서 계산한 0 이상 360 미만의 보조 heading이다. 프론트는 `distance_from_start_m`/`remaining_distance_m`와 현재 진행 거리, 보행 속도/보폭 추정값을 비교해 “10초 뒤 좌회전 준비”, “약 15보 앞”, “지금 좌회전하세요” 같은 안내를 만들 수 있다. Kakao fallback provider는 현재 `guide_points: []`를 반환한다.
 
 오류:
 
@@ -363,7 +368,7 @@ TMAP 보행 경로를 WalkSafe 앱 전용 schema로 정규화한다. provider ke
 
 ## POST /reports/v2
 
-v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 현재 custom tactile의 손상 점자블록(`damaged_tactile_block`)이다. 손상 점자블록은 자동 신고만 수행할 때 사용자 TTS 기본값이 없다. 손상 영역 bbox(`tactile_damage_area`)와 일반 객체(`coco_general` 등)는 시설물 신고 대상이 아니라 보조 정보/사용자 위험 경고 입력이므로 저장을 거부한다. 사용자 위험 경고는 장애물, 보행자에게 접근하는 객체, 경로 차단 중심이며, `낙상 위험`은 현재 MVP에서 별도 경고 카테고리로 쓰지 않는다.
+v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 `unified_walksafe` 또는 legacy `custom_tactile`의 손상 점자블록(`damaged_tactile_block`)이다. 손상 점자블록은 자동 신고만 수행할 때 사용자 TTS 기본값이 없다. 손상 영역 bbox(`tactile_damage_area`)와 일반 객체(`coco_general`, unified 일반 객체 등)는 시설물 신고 대상이 아니라 보조 정보/사용자 위험 경고 입력이므로 저장을 거부한다. 사용자 위험 경고는 장애물, 보행자에게 접근하는 객체, 경로 차단 중심이며, `낙상 위험`은 현재 MVP에서 별도 경고 카테고리로 쓰지 않는다.
 
 요청 metadata는 `/detect/v2` detection 필드에 다음 필드를 추가한다.
 
@@ -371,11 +376,14 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 현�
 | --- | --- |
 | `trigger` | `auto` 또는 `voice` |
 | `auto_reported` | 자동 신고 여부 boolean |
+| `source` | optional `android`. Android native upload source를 backend/admin/export에서 분리 |
+| `coordinate_gate_status` | optional string. Android bbox/depth gate 상태 |
 
 현재 허용 저장 대상:
 
 | model_key | class_name |
 | --- | --- |
+| `unified_walksafe` | `damaged_tactile_block` |
 | `custom_tactile` | `damaged_tactile_block` |
 
 그 외 v2 metadata는 `422`로 거부된다. v2 손상 점자블록 신고는 GPS가 있어야 저장된다.
@@ -391,7 +399,7 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 현�
 | `limit` | 아니오 | `1..100`, 기본 `25` |
 | `status` | 아니오 | `new`, `reviewed`, `resolved` |
 | `class_name` | 아니오 | v1 4개 탐지 클래스 또는 v2 class name 문자열 |
-| `source` | 아니오 | `fake`, `onnx`, `server` |
+| `source` | 아니오 | `fake`, `onnx`, `server`, `android` |
 | `model_key` | 아니오 | v2 metadata `model_key` |
 | `trigger` | 아니오 | v2 metadata `trigger` (`auto`, `voice`) |
 | `auto_reported` | 아니오 | v2 metadata `auto_reported` boolean |
@@ -404,6 +412,13 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 현�
 `lat`, `lng`, `radius_m`는 셋을 함께 보내야 한다.
 
 
+## GET /reports/summary
+
+`GET /reports`와 같은 필터 조건으로 전체 신고 수, 상태/source count, 위치 있음/없음, grid cluster 요약을 반환한다. Admin 목록 limit와 별개로 현재 필터 전체를 요약한다.
+
+주요 query는 `GET /reports`와 동일하며 `source=android`, `model_key`, `trigger`, `auto_reported`, `demo_filter`를 함께 사용할 수 있다.
+
+
 ## GET /reports/export
 
 신고 목록을 내보낸다. 기본은 CSV이고 `format=json`, `format=geojson`을 지원한다. 필터는 `GET /reports`와 같은 v2 metadata 필터(`model_key`, `trigger`, `auto_reported`) 및 위치/시간 필터를 재사용한다. GeoJSON은 위치가 있는 신고를 Point Feature로 내보내며, 위치가 없는 신고는 `geometry: null`로 둔다.
@@ -412,10 +427,10 @@ v2 탐지 metadata와 이미지를 신고로 저장한다. 저장 대상은 현�
 
 | 이름 | 필수 | 설명 |
 | --- | --- | --- |
-| `format` | 아니오 | `csv` 기본, `json` 지원 |
+| `format` | 아니오 | `csv` 기본, `json`, `geojson` 지원 |
 | `status` | 아니오 | `new`, `reviewed`, `resolved` |
 | `class_name` | 아니오 | v1/v2 class name 문자열 |
-| `source` | 아니오 | `fake`, `onnx`, `server` |
+| `source` | 아니오 | `fake`, `onnx`, `server`, `android` |
 | `model_key` | 아니오 | v2 metadata `model_key` |
 | `trigger` | 아니오 | v2 metadata `trigger` |
 | `auto_reported` | 아니오 | v2 metadata `auto_reported` boolean |
@@ -446,8 +461,8 @@ id,status,class_name,confidence,source,latitude,longitude,accuracy_m,heading,bbo
 | `captured_at` | 필수 | 탐지 시각 |
 | `lat` | 필수 | 위도 |
 | `lng` | 필수 | 경도 |
-| `radius_m` | `25` | 같은 위치로 볼 반경 |
-| `minutes` | `10` | `captured_at` 전후 시간 범위 |
+| `radius_m` | `10` | 같은 위치로 볼 반경 |
+| `minutes` | `1` | `captured_at` 전후 시간 범위 |
 
 응답:
 

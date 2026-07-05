@@ -5,6 +5,7 @@ export type GpsStepLengthSample = {
   latitude: number;
   longitude: number;
   accuracy_m?: number | null;
+  speed_mps?: number | null;
   observedAtMs: number;
 };
 
@@ -62,13 +63,20 @@ export const STEP_LENGTH_CALIBRATION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 export const MIN_STEP_LENGTH_CALIBRATION_DISTANCE_M = 4;
 export const MIN_STEP_LENGTH_CALIBRATION_STEPS = 8;
 export const MIN_STEP_LENGTH_CALIBRATION_CONFIDENCE = 0.45;
-const MAX_GPS_ACCURACY_M = 35;
+const MAX_GPS_ACCURACY_M = 20;
 const MIN_SEGMENT_INTERVAL_MS = 500;
 const MAX_SEGMENT_INTERVAL_MS = 15000;
-const MIN_SEGMENT_DISTANCE_M = 0.4;
+const MIN_SEGMENT_DISTANCE_M = 1.2;
 const MAX_SEGMENT_DISTANCE_M = 25;
 const MIN_WALKING_SPEED_MPS = 0.2;
 const MAX_WALKING_SPEED_MPS = 2.2;
+const MAX_STATIONARY_SPEED_MPS = 0.15;
+const MIN_CADENCE_STEPS_PER_MIN = 50;
+const MAX_CADENCE_STEPS_PER_MIN = 140;
+const MIN_STEPS_PER_VALID_SEGMENT = 2;
+const INITIAL_GPS_SETTLE_MS = 12000;
+const MIN_ACCURACY_DISTANCE_RATIO = 0.35;
+const MAX_ACCURACY_ADJUSTED_MIN_DISTANCE_M = 5;
 
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) {
@@ -95,16 +103,32 @@ function haversineMeters(from: GpsStepLengthSample, to: GpsStepLengthSample): nu
 }
 
 function gpsAccuracyOk(sample: GpsStepLengthSample): boolean {
-  return sample.accuracy_m === null || sample.accuracy_m === undefined || sample.accuracy_m <= MAX_GPS_ACCURACY_M;
+  return typeof sample.accuracy_m === "number" && sample.accuracy_m <= MAX_GPS_ACCURACY_M;
 }
 
-function countStepsInSampleWindow(samples: GpsStepLengthSample[], stepEventTimesMs: number[]): number {
-  const firstObservedAtMs = samples[0]?.observedAtMs ?? null;
-  const lastObservedAtMs = samples[samples.length - 1]?.observedAtMs ?? null;
-  if (firstObservedAtMs === null || lastObservedAtMs === null) {
-    return 0;
+function stepsInWindow(stepEventTimesMs: number[], startMs: number, endMs: number): number[] {
+  return stepEventTimesMs.filter((observedAtMs) => observedAtMs >= startMs && observedAtMs <= endMs);
+}
+
+function cadenceOk(stepTimesMs: number[], elapsedMs: number): boolean {
+  if (stepTimesMs.length < MIN_STEPS_PER_VALID_SEGMENT || elapsedMs <= 0) {
+    return false;
   }
-  return stepEventTimesMs.filter((observedAtMs) => observedAtMs >= firstObservedAtMs && observedAtMs <= lastObservedAtMs).length;
+  const cadenceStepsPerMin = stepTimesMs.length / (elapsedMs / 60000);
+  return cadenceStepsPerMin >= MIN_CADENCE_STEPS_PER_MIN && cadenceStepsPerMin <= MAX_CADENCE_STEPS_PER_MIN;
+}
+
+function stationaryBySensorSpeed(previous: GpsStepLengthSample, current: GpsStepLengthSample): boolean {
+  const speeds = [previous.speed_mps, current.speed_mps].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return speeds.length > 0 && Math.max(...speeds) <= MAX_STATIONARY_SPEED_MPS;
+}
+
+function minSegmentDistanceForAccuracy(previous: GpsStepLengthSample, current: GpsStepLengthSample): number {
+  const accuracyM = Math.max(previous.accuracy_m ?? 0, current.accuracy_m ?? 0);
+  return Math.min(
+    MAX_ACCURACY_ADJUSTED_MIN_DISTANCE_M,
+    Math.max(MIN_SEGMENT_DISTANCE_M, accuracyM * MIN_ACCURACY_DISTANCE_RATIO)
+  );
 }
 
 export function summarizeStepLengthEvidence(
@@ -115,10 +139,16 @@ export function summarizeStepLengthEvidence(
   let validSegmentCount = 0;
   let ignoredSegmentCount = 0;
   let validDurationMs = 0;
+  const validStepEvents = new Set<number>();
+  const firstObservedAtMs = samples[0]?.observedAtMs ?? null;
 
   for (let index = 1; index < samples.length; index += 1) {
     const previous = samples[index - 1];
     const current = samples[index];
+    if (firstObservedAtMs !== null && current.observedAtMs - firstObservedAtMs < INITIAL_GPS_SETTLE_MS) {
+      ignoredSegmentCount += 1;
+      continue;
+    }
     if (!gpsAccuracyOk(previous) || !gpsAccuracyOk(current)) {
       ignoredSegmentCount += 1;
       continue;
@@ -127,13 +157,16 @@ export function summarizeStepLengthEvidence(
     const elapsedMs = current.observedAtMs - previous.observedAtMs;
     const segmentDistanceM = haversineMeters(previous, current);
     const speedMps = elapsedMs > 0 ? segmentDistanceM / (elapsedMs / 1000) : Number.POSITIVE_INFINITY;
+    const segmentSteps = stepsInWindow(stepEventTimesMs, previous.observedAtMs, current.observedAtMs);
     const validSegment =
       elapsedMs >= MIN_SEGMENT_INTERVAL_MS &&
       elapsedMs <= MAX_SEGMENT_INTERVAL_MS &&
-      segmentDistanceM >= MIN_SEGMENT_DISTANCE_M &&
+      segmentDistanceM >= minSegmentDistanceForAccuracy(previous, current) &&
       segmentDistanceM <= MAX_SEGMENT_DISTANCE_M &&
       speedMps >= MIN_WALKING_SPEED_MPS &&
-      speedMps <= MAX_WALKING_SPEED_MPS;
+      speedMps <= MAX_WALKING_SPEED_MPS &&
+      !stationaryBySensorSpeed(previous, current) &&
+      cadenceOk(segmentSteps, elapsedMs);
 
     if (!validSegment) {
       ignoredSegmentCount += 1;
@@ -143,11 +176,12 @@ export function summarizeStepLengthEvidence(
     distanceM += segmentDistanceM;
     validDurationMs += elapsedMs;
     validSegmentCount += 1;
+    segmentSteps.forEach((observedAtMs) => validStepEvents.add(observedAtMs));
   }
 
   return {
     distanceM,
-    stepCount: countStepsInSampleWindow(samples, stepEventTimesMs),
+    stepCount: validStepEvents.size,
     gpsSampleCount: samples.length,
     validSegmentCount,
     ignoredSegmentCount,

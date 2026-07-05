@@ -6,21 +6,24 @@ path. Tests should pass fake result/box objects and must not load YOLO models.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, Iterable, Literal, Mapping, Sequence
 
 from model.two_model_runtime import (
     COCO_GENERAL_ALLOWLIST,
     CUSTOM_TACTILE_CLASSES,
     DEFAULT_RUNTIME_CONFIG,
+    UNIFIED_WALKSAFE_CLASSES,
 )
 
-ModelKey = Literal["custom_tactile", "coco_general"]
+ModelKey = Literal["custom_tactile", "coco_general", "unified_walksafe"]
 RawDetection = dict[str, Any]
 
 CUSTOM_TACTILE_CLASS_MAP: dict[int, str] = {
     index: class_name for index, class_name in enumerate(CUSTOM_TACTILE_CLASSES)
 }
 DEFAULT_COCO_ALLOWLIST: tuple[str, ...] = tuple(COCO_GENERAL_ALLOWLIST)
+DEFAULT_UNIFIED_ALLOWLIST: tuple[str, ...] = tuple(UNIFIED_WALKSAFE_CLASSES)
 
 
 def ultralytics_result_to_raw_detections(
@@ -41,7 +44,7 @@ def ultralytics_result_to_raw_detections(
     process partial results.
     """
 
-    if model_key not in ("custom_tactile", "coco_general"):
+    if model_key not in ("custom_tactile", "coco_general", "unified_walksafe"):
         raise ValueError(f"unsupported model_key: {model_key}")
 
     boxes = getattr(result, "boxes", None)
@@ -49,10 +52,9 @@ def ultralytics_result_to_raw_detections(
         return []
 
     class_names = _class_name_map(result, model_key, class_name_by_id)
-    allowed_names = set(allowlist if allowlist is not None else DEFAULT_COCO_ALLOWLIST)
+    allowed_names = _allowed_class_names(model_key, allowlist)
     model_config = DEFAULT_RUNTIME_CONFIG["models"][model_key]
     resolved_source_model = source_model or model_config["source_model"]
-    category = model_config["category"]
 
     detections: list[RawDetection] = []
     for box in _iter_boxes(boxes):
@@ -66,8 +68,9 @@ def ultralytics_result_to_raw_detections(
         class_name = class_names.get(class_id)
         if class_name is None:
             continue
-        if model_key == "coco_general" and class_name not in allowed_names:
+        if allowed_names is not None and class_name not in allowed_names:
             continue
+        category = _category_for_detection(model_key, class_name, model_config)
 
         clipped_xyxy = _clip_bbox_xyxy(bbox)
         if clipped_xyxy is None:
@@ -90,6 +93,7 @@ def ultralytics_result_to_raw_detections(
     return detections
 
 
+@lru_cache(maxsize=4)
 def load_yolo_model(model_path: str | None = None, **kwargs: Any) -> Any:
     """Lazily import and construct an Ultralytics YOLO model.
 
@@ -119,6 +123,27 @@ def _class_name_map(
     if isinstance(names, Sequence) and not isinstance(names, (str, bytes)):
         return {index: str(name) for index, name in enumerate(names)}
     return {}
+
+
+def _allowed_class_names(model_key: ModelKey, allowlist: Sequence[str] | None) -> set[str] | None:
+    if allowlist is not None:
+        return {str(name) for name in allowlist}
+    if model_key == "coco_general":
+        return set(DEFAULT_COCO_ALLOWLIST)
+    if model_key == "unified_walksafe":
+        return set(DEFAULT_UNIFIED_ALLOWLIST)
+    return None
+
+
+def _category_for_detection(model_key: ModelKey, class_name: str, model_config: Mapping[str, Any]) -> str:
+    if model_key == "unified_walksafe":
+        class_categories = model_config.get("class_categories")
+        if isinstance(class_categories, Mapping):
+            category = class_categories.get(class_name)
+            if isinstance(category, str) and category:
+                return category
+    category = model_config.get("category")
+    return str(category) if isinstance(category, str) and category else "unknown"
 
 
 def _iter_boxes(boxes: Any) -> Iterable[Any]:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU-only helpers for filtering and merging two-model detections.
+"""CPU-only helpers for filtering and merging detect.v2 detections.
 
 This module intentionally does not import Ultralytics, PIL, or GPU-backed
 runtime libraries. It only works with detections that were already produced
@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence
 
 
-ModelKey = Literal["custom_tactile", "coco_general"]
+ModelKey = Literal["custom_tactile", "coco_general", "unified_walksafe"]
 BBox = tuple[float, float, float, float]
 
 CUSTOM_TACTILE_CLASSES = (
@@ -25,18 +25,55 @@ CUSTOM_TACTILE_CLASSES = (
 )
 COCO_GENERAL_ALLOWLIST = (
     "person",
+    "bicycle",
     "car",
+    "motorcycle",
     "bus",
     "truck",
-    "bicycle",
-    "motorcycle",
     "traffic light",
     "bench",
 )
-MODEL_KEYS = ("custom_tactile", "coco_general")
+UNIFIED_GENERAL_CLASSES = (
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "bus",
+    "truck",
+    "traffic light",
+)
+UNIFIED_CUSTOM_CLASSES = (
+    "normal_tactile_block",
+    "damaged_tactile_block",
+    "crosswalk",
+    "curb_step",
+    "uneven_sidewalk",
+    "e_scooter_obstruction",
+)
+UNIFIED_TACTILE_CLASSES = UNIFIED_CUSTOM_CLASSES
+UNIFIED_WALKSAFE_CLASSES = UNIFIED_GENERAL_CLASSES + UNIFIED_CUSTOM_CLASSES
+UNIFIED_WALKSAFE_CLASS_CATEGORIES = {
+    "person": "vulnerable_road_user",
+    "bicycle": "vulnerable_road_user",
+    "car": "vehicle",
+    "motorcycle": "vehicle",
+    "bus": "vehicle",
+    "truck": "vehicle",
+    "traffic light": "traffic_signal",
+    "normal_tactile_block": "tactile_normal",
+    "damaged_tactile_block": "tactile_damage",
+    "crosswalk": "path_guidance",
+    "curb_step": "surface_hazard",
+    "uneven_sidewalk": "surface_hazard",
+    "e_scooter_obstruction": "obstruction",
+}
+MODEL_KEYS = ("custom_tactile", "coco_general", "unified_walksafe")
+PRIMARY_MODEL_KEYS = ("legacy_two_model", "unified_walksafe")
 
 DEFAULT_RUNTIME_CONFIG: dict[str, Any] = {
     "version": 1,
+    "primary_model": "unified_walksafe",
+    "fallback_model": "legacy_two_model",
     "models": {
         "custom_tactile": {
             "source_model": "YOLO26s custom",
@@ -56,13 +93,35 @@ DEFAULT_RUNTIME_CONFIG: dict[str, Any] = {
             "thresholds": {
                 "default": 0.25,
                 "person": 0.25,
+                "bicycle": 0.25,
                 "car": 0.25,
+                "motorcycle": 0.25,
                 "bus": 0.25,
                 "truck": 0.25,
-                "bicycle": 0.25,
-                "motorcycle": 0.25,
                 "traffic light": 0.25,
                 "bench": 0.25,
+            },
+        },
+        "unified_walksafe": {
+            "source_model": "YOLO26n COCO+WalkSafe tactile unified",
+            "category": "unified",
+            "classes": list(UNIFIED_WALKSAFE_CLASSES),
+            "class_categories": dict(UNIFIED_WALKSAFE_CLASS_CATEGORIES),
+            "thresholds": {
+                "default": 0.25,
+                "person": 0.25,
+                "bicycle": 0.25,
+                "car": 0.25,
+                "motorcycle": 0.25,
+                "bus": 0.25,
+                "truck": 0.25,
+                "traffic light": 0.25,
+                "normal_tactile_block": 0.25,
+                "damaged_tactile_block": 0.25,
+                "crosswalk": 0.25,
+                "curb_step": 0.25,
+                "uneven_sidewalk": 0.25,
+                "e_scooter_obstruction": 0.25,
             },
         },
     },
@@ -163,12 +222,30 @@ def validate_threshold_config(config: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(models, Mapping):
         raise ValueError("config.models must be a mapping")
 
+    primary_model = str(config.get("primary_model", "unified_walksafe"))
+    if primary_model not in PRIMARY_MODEL_KEYS:
+        raise ValueError("config.primary_model must be legacy_two_model or unified_walksafe")
+    raw_fallback_model = config.get("fallback_model", "legacy_two_model")
+    fallback_model = None if raw_fallback_model in {None, ""} else str(raw_fallback_model)
+    if fallback_model is not None and fallback_model != "legacy_two_model":
+        raise ValueError("config.fallback_model must be absent/null or legacy_two_model")
+
     normalized: dict[str, Any] = {
         "version": config.get("version", 1),
+        "primary_model": primary_model,
+        "fallback_model": fallback_model,
         "models": {},
     }
 
-    for model_key in MODEL_KEYS:
+    configured_model_keys = tuple(str(model_key) for model_key in models.keys())
+    supported_configured_keys = tuple(model_key for model_key in configured_model_keys if model_key in MODEL_KEYS)
+    if not supported_configured_keys:
+        raise ValueError("config.models must include at least one supported detect.v2 model")
+    unsupported_keys = sorted(set(configured_model_keys) - set(MODEL_KEYS))
+    if unsupported_keys:
+        raise ValueError("config.models contains unsupported model keys: " + ", ".join(unsupported_keys))
+
+    for model_key in supported_configured_keys:
         model_config = models.get(model_key)
         if not isinstance(model_config, Mapping):
             raise ValueError(f"config.models.{model_key} must be a mapping")
@@ -191,7 +268,7 @@ def validate_threshold_config(config: Mapping[str, Any]) -> dict[str, Any]:
                     + ", ".join(CUSTOM_TACTILE_CLASSES)
                 )
             normalized_model["classes"] = classes
-        else:
+        elif model_key == "coco_general":
             allowlist = _require_string_list(model_config.get("allowlist"), f"{model_key}.allowlist")
             if tuple(allowlist) != COCO_GENERAL_ALLOWLIST:
                 raise ValueError(
@@ -199,6 +276,21 @@ def validate_threshold_config(config: Mapping[str, Any]) -> dict[str, Any]:
                     + ", ".join(COCO_GENERAL_ALLOWLIST)
                 )
             normalized_model["allowlist"] = allowlist
+        else:
+            classes = _require_string_list(model_config.get("classes"), f"{model_key}.classes")
+            if tuple(classes) != UNIFIED_WALKSAFE_CLASSES:
+                raise ValueError(
+                    "unified_walksafe.classes must be exactly: "
+                    + ", ".join(UNIFIED_WALKSAFE_CLASSES)
+                )
+            normalized_model["classes"] = classes
+            class_categories = model_config.get("class_categories")
+            if class_categories is not None:
+                normalized_model["class_categories"] = _validate_class_categories(
+                    class_categories,
+                    classes,
+                    model_key,
+                )
 
         allowed_names = set(normalized_model.get("classes", normalized_model.get("allowlist", [])))
         unknown_thresholds = sorted(set(thresholds) - allowed_names - {"default"})
@@ -211,6 +303,25 @@ def validate_threshold_config(config: Mapping[str, Any]) -> dict[str, Any]:
         normalized["models"][model_key] = normalized_model
 
     return copy.deepcopy(normalized)
+
+
+def filter_detections(
+    detections: Sequence[Detection | Mapping[str, Any]],
+    config: Mapping[str, Any] | None = None,
+) -> list[Detection]:
+    """Filter already-produced detections by their model config.
+
+    This accepts legacy two-model detections and the single-model
+    ``unified_walksafe`` detections. It is intentionally NMS-free.
+    """
+
+    runtime_config = validate_threshold_config(config if config is not None else DEFAULT_RUNTIME_CONFIG)
+    filtered: list[Detection] = []
+    for raw_detection in detections:
+        detection = _to_detection(raw_detection)
+        if _passes_filters(detection, runtime_config):
+            filtered.append(detection)
+    return filtered
 
 
 def filter_and_merge_detections(
@@ -262,12 +373,17 @@ def to_response_dict(
 
 
 def _passes_filters(detection: Detection, config: Mapping[str, Any]) -> bool:
-    model_config = config["models"][detection.model_key]
+    model_config = config.get("models", {}).get(
+        detection.model_key,
+        DEFAULT_RUNTIME_CONFIG["models"][detection.model_key],
+    )
 
     if detection.model_key == "custom_tactile":
         if detection.class_name not in model_config["classes"]:
             return False
-    elif detection.class_name not in model_config["allowlist"]:
+    elif detection.model_key == "coco_general" and detection.class_name not in model_config["allowlist"]:
+        return False
+    elif detection.model_key == "unified_walksafe" and detection.class_name not in model_config["classes"]:
         return False
 
     thresholds = model_config["thresholds"]
@@ -368,6 +484,22 @@ def _require_string_list(value: Any, field_name: str) -> list[str]:
     return items
 
 
+def _validate_class_categories(raw_categories: Any, classes: Sequence[str], model_key: str) -> dict[str, str]:
+    if not isinstance(raw_categories, Mapping):
+        raise ValueError(f"{model_key}.class_categories must be a mapping")
+    categories = {
+        str(class_name): _require_string(category, f"{model_key}.class_categories.{class_name}")
+        for class_name, category in raw_categories.items()
+    }
+    unknown_categories = sorted(set(categories) - set(classes))
+    if unknown_categories:
+        raise ValueError(
+            f"{model_key}.class_categories contains unknown classes: "
+            + ", ".join(unknown_categories)
+        )
+    return categories
+
+
 def _as_float(value: Any, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{field_name} must be a number")
@@ -381,6 +513,10 @@ __all__ = [
     "DEFAULT_RUNTIME_CONFIG",
     "Detection",
     "ModelKey",
+    "PRIMARY_MODEL_KEYS",
+    "UNIFIED_WALKSAFE_CLASSES",
+    "UNIFIED_WALKSAFE_CLASS_CATEGORIES",
+    "filter_detections",
     "filter_and_merge_detections",
     "load_threshold_config",
     "to_response_dict",

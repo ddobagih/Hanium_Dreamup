@@ -110,7 +110,28 @@ def test_create_report_v2_stores_allowed_tactile_damage(client: ASGITestClient) 
 
 
 def test_create_report_v2_drops_unknown_extra_metadata_but_keeps_review_flags(client: ASGITestClient) -> None:
-    metadata = sample_v2_metadata(review_flags=["fake_source"], guardianPhone="010-1234-5678", unknown_extra="drop-me")
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile-contract",
+        review_flags=["fake_source"],
+        guardianPhone="010-1234-5678",
+        unknown_extra="drop-me",
+        raw_depth_ref="drop-depth",
+        rgb_frame_ref="drop-rgb",
+        raw_debug_payload={"drop": True},
+        apk_sha256="abc123def456abc123def456abc123def456abc123def456abc123def456abc123de",
+        model_config_sha256="def456abc123def456abc123def456abc123def456abc123def456abc123def456ab",
+        android_model_version="1.0.0",
+        bbox_coordinate_space="normalized_xywh",
+        depth_coordinate_space="zed_disp16",
+        depth_sample_count=123,
+        depth_valid_sample_ratio=0.82,
+        detection_age_ms=150,
+        coordinate_gate_status="pass",
+        fallback_used=True,
+        loaded_model_key="legacy_two_model",
+        model_load_reason="unified_unavailable_legacy_loaded",
+    )
 
     response = post_report_v2(client, metadata)
 
@@ -118,8 +139,69 @@ def test_create_report_v2_drops_unknown_extra_metadata_but_keeps_review_flags(cl
     body = response.json()
     assert "guardianPhone" not in body["metadata"]
     assert "unknown_extra" not in body["metadata"]
+    assert "raw_depth_ref" not in body["metadata"]
+    assert "rgb_frame_ref" not in body["metadata"]
+    assert "raw_debug_payload" not in body["metadata"]
     assert body["metadata"]["review_flags"] == ["fake_source"]
     assert "fake_source" in body["review_flags"]
+    assert body["metadata"]["apk_sha256"] == metadata["apk_sha256"]
+    assert body["metadata"]["model_config_sha256"] == metadata["model_config_sha256"]
+    assert body["metadata"]["android_model_version"] == metadata["android_model_version"]
+    assert body["metadata"]["bbox_coordinate_space"] == metadata["bbox_coordinate_space"]
+    assert body["metadata"]["depth_coordinate_space"] == metadata["depth_coordinate_space"]
+    assert body["metadata"]["depth_sample_count"] == metadata["depth_sample_count"]
+    assert body["metadata"]["depth_valid_sample_ratio"] == metadata["depth_valid_sample_ratio"]
+    assert body["metadata"]["detection_age_ms"] == metadata["detection_age_ms"]
+    assert body["metadata"]["coordinate_gate_status"] == metadata["coordinate_gate_status"]
+    assert body["metadata"]["fallback_used"] is True
+    assert body["metadata"]["loaded_model_key"] == metadata["loaded_model_key"]
+    assert body["metadata"]["model_load_reason"] == metadata["model_load_reason"]
+
+
+def test_create_report_v2_marks_coordinate_gate_pending_as_performance_excluded(client: ASGITestClient) -> None:
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile-contract",
+        coordinate_gate_status="pending",
+    )
+
+    response = post_report_v2(client, metadata)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["metadata"]["performance_excluded"] is True
+    assert "coordinate_gate_status=pending" in body["metadata"]["performance_exclusion_reason"]
+    assert "fake_source" not in body["review_flags"]
+
+
+def test_create_report_v2_marks_missing_coordinate_gate_as_performance_excluded(client: ASGITestClient) -> None:
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile-contract",
+    )
+
+    response = post_report_v2(client, metadata)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["metadata"]["performance_excluded"] is True
+    assert "coordinate_gate_status=pending" in body["metadata"]["performance_exclusion_reason"]
+    assert "fake_source" not in body["review_flags"]
+
+
+def test_create_report_v2_keeps_performance_included_when_coordinate_gate_passes(client: ASGITestClient) -> None:
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile-contract",
+        coordinate_gate_status="pass",
+    )
+
+    response = post_report_v2(client, metadata)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["metadata"]["performance_excluded"] is False
+    assert body["metadata"]["performance_exclusion_reason"] == ""
 
 
 def test_create_report_v2_maps_non_fake_source_to_server(client: ASGITestClient) -> None:
@@ -137,6 +219,22 @@ def test_create_report_v2_maps_non_fake_source_to_server(client: ASGITestClient)
     assert body["class_id"] == 1
     assert body["class_name"] == "damaged_tactile_block"
     assert body["source"] == "server"
+
+
+def test_create_report_v2_preserves_android_source_metadata(client: ASGITestClient) -> None:
+    metadata = sample_v2_metadata(
+        source="android",
+        source_model="android/custom-tactile",
+        trace_id="android-trace-1",
+    )
+
+    response = post_report_v2(client, metadata)
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["source"] == "android"
+    assert body["metadata"]["source"] == "android"
+    assert body["metadata"]["trace_id"] == "android-trace-1"
 
 
 @pytest.mark.parametrize(
@@ -226,13 +324,32 @@ def test_create_report_v2_reuses_duplicate_policy(client: ASGITestClient) -> Non
     second = post_report_v2(
         client,
         sample_v2_metadata(
-            captured_at="2026-05-22T13:04:00.000Z",
+            captured_at="2026-05-22T13:00:30.000Z",
             gps={"latitude": 37.50003, "longitude": 127.00003, "accuracy_m": 10.0},
         ),
     )
 
     assert second.status_code == 201, second.text
-    assert first.json()["id"] in second.json()["duplicate_report_ids"]
+    second_body = second.json()
+    assert first.json()["id"] in second_body["duplicate_report_ids"]
+    assert first.json()["id"] in second_body["metadata"]["duplicate_report_ids"]
+    assert "duplicate_candidate" in second_body["review_flags"]
+    assert "duplicate_candidate" in second_body["metadata"]["review_flags"]
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    [
+        {"x": 0.8, "y": 0.35, "width": 0.4, "height": 0.1},
+        {"x": 0.2, "y": 0.9, "width": 0.4, "height": 0.2},
+    ],
+)
+def test_create_report_v2_rejects_bbox_overflow(client: ASGITestClient, bbox: dict[str, float]) -> None:
+    metadata = sample_v2_metadata(bbox=bbox)
+
+    response = post_report_v2(client, metadata)
+
+    assert response.status_code == 422
 
 
 def test_list_reports_filters_v2_metadata(client: ASGITestClient) -> None:

@@ -387,11 +387,15 @@ def test_tmap_pedestrian_route_service_normalizes_provider_response(monkeypatch)
     assert result.guide_points[0].point_type == "S"
     assert result.guide_points[0].distance_from_start_m == 0
     assert result.guide_points[0].remaining_distance_m == 30
+    assert result.guide_points[0].bearing_deg is not None
+    assert 0 <= result.guide_points[0].bearing_deg < 360
     assert result.guide_points[1].instruction is None
     assert result.guide_points[1].turn_type == 13
     assert result.guide_points[1].point_type == "GP"
     assert result.guide_points[1].distance_from_start_m == 20
     assert result.guide_points[1].remaining_distance_m == 10
+    assert result.guide_points[1].bearing_deg is not None
+    assert 0 <= result.guide_points[1].bearing_deg < 360
     assert len(result.polyline) == 3
 
 

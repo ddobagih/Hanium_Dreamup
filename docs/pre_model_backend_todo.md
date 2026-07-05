@@ -1,5 +1,8 @@
 # Pre-Model Backend TODO
 
+> **문서 상태(2026-06-02): legacy v1.** 모델 연결 전 backend TODO 기록이다. 현재 backend 기준은 `docs/walksafe-v2/backend_api_contract.md`다.
+
+
 작성 기준일: 2026-05-12
 
 ## 목적
