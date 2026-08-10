@@ -1,0 +1,33 @@
+{
+  "schema_version": "walksafe.local_deployment.v1",
+  "generation": 2,
+  "updated_at": "2026-07-11T22:14:00+09:00",
+  "targets": {
+    "android": {
+      "active_model_id": "walksafe-13cls-yolo26n-img768-epoch270-20260708",
+      "previous_model_id": null,
+      "runtime_state": "development_candidate_active",
+      "runtime_config": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "model_artifact": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite"
+    },
+    "backend": {
+      "active_model_id": "walksafe-13cls-yolo26n-img768-epoch270-20260708",
+      "previous_model_id": null,
+      "runtime_state": "development_candidate_active",
+      "runtime_config": "environment:DETECT_V2_RUNTIME_CONFIG_PATH",
+      "model_artifact": "environment:DETECT_V2_UNIFIED_MODEL_PATH",
+      "resolved_repository_artifact": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt"
+    }
+  },
+  "history": [
+    {
+      "action": "activate_runtime",
+      "target": "backend_and_android",
+      "from": null,
+      "to": "walksafe-13cls-yolo26n-img768-epoch270-20260708",
+      "at": "2026-07-11T22:14:00+09:00",
+      "release_eligible": false,
+      "reason": "explicit user-requested development runtime integration"
+    }
+  ]
+}

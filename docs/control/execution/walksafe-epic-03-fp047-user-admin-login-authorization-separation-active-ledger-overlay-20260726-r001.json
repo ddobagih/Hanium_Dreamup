@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "overlay_id": "WS-EPIC-03-FP047-USER-ADMIN-LOGIN-AUTHORIZATION-SEPARATION-ACTIVE-LEDGER-OVERLAY-20260726-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-26",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-03 FP-047 user/admin login and authorization separation successor overlay"
+  },
+  "authority_boundary": {
+    "predecessor_overlay_preserved": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_product_policy": false,
+    "formal_test_completion_claimed": false,
+    "external_database_integration_completion_claimed": false,
+    "actual_user_admin_device_completion_claimed": false,
+    "single_admin_recovery_drill_completion_claimed": false,
+    "external_review_completion_claimed": false,
+    "production_deployment_completion_claimed": false,
+    "epic_in_progress_claimed": true,
+    "epic_complete_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": {
+    "predecessor_overlay": {
+      "path": "docs/control/execution/walksafe-epic-02-fp012-multi-device-session-ledger-active-ledger-overlay-20260726-r001.json",
+      "bytes": 3452,
+      "sha256": "b4f30dc0f2c1279f491eee42675004e36399378a0389c0e22775aaf73652f572"
+    },
+    "implementation_record": {
+      "name": "fp047_implementation",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/implementation-record.json",
+      "sha256": "2762f94a7a27fc0186b9328d8eb38825589322bc66bffcc3f425d6e7b1f0dc4a"
+    },
+    "verification_result": {
+      "name": "fp047_verification",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/verification-result.json",
+      "sha256": "ca2c55dd73370c82f5e2919e77ad3476989d71aa56777f9f6459fed3348b40d5"
+    },
+    "implementation_gap": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260726-021",
+      "file_sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a"
+    },
+    "implementation_backlog": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-021",
+      "file_sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0"
+    }
+  },
+  "goal_state": {
+    "goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+    "internal_result": "PARTIAL_IMPLEMENTATION_VERIFIED",
+    "gap_id": "GAP-056",
+    "gap_status": "PARTIAL",
+    "next_source_policy_id": "FP-048",
+    "next_gap_id": "GAP-057"
+  },
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-047-01",
+      "TC-FP-047-02",
+      "TC-FP-047-03",
+      "TC-FP-047-04",
+      "TC-FP-047-05",
+      "TC-FP-047-06",
+      "TC-FP-047-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "external_postgis_integration_status": "NOT_RUN",
+    "external_reports_integration_status": "NOT_RUN",
+    "postgresql_concurrency_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_admin_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "single_admin_recovery_drill_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_accessibility_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

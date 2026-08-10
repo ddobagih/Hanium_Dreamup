@@ -1,0 +1,21 @@
+{
+  "schema_version": "walksafe.validation-receipt.v1",
+  "command_scope": "android-report-r4-targeted",
+  "observed_at": "2026-07-27T15:00:58.102445+00:00",
+  "gradle_exit_code": 0,
+  "test_execution_started": true,
+  "junit_xml_files": 14,
+  "tests": 82,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "result": "PASS",
+  "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+  "log_sha256": "e4832666eae394efa0cb8fb8fa9061f84b49018f70df543407adaa37fdc5c53b",
+  "resource_policy": {
+    "parallel_heavy_lanes": 1,
+    "gradle_max_workers": 1,
+    "gradle_xmx": "1536m",
+    "offline": true
+  }
+}

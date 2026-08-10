@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATION-QUICK-GATE-20260725-001",
+  "evidence_type": "PACKAGE_ACTIVATION_QUICK_GATE",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATED-20260725-001",
+  "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+  "authorization_receipt_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATION-AUTHORIZATION-20260725-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATED-20260725-001/authorization.json",
+    "file_sha256": "6a9220c38628067bbab547369ebd5b4540bb095ff39fb2c796e2bd554e967daa"
+  },
+  "check_command_contract_version": "2026-07-25.4",
+  "check_command_contract_sha256": "7b66c4610e0ad2c84e1937915704b0635b1762dc65dc06762b36e4afacdd813a",
+  "repository_snapshot": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 498,
+    "path_set_sha256": "3f97945dfff2f7868b31e6f5b0f808d3fcb953caa29764fa4cdd5154d0ff62f2",
+    "content_set_sha256": "843d811f28ff80ce268d28cadee33650ced21b361c1b2e1ad2e56c2b1d0c1629"
+  },
+  "execution_window": {
+    "started_at": "2026-07-25T09:50:33+09:00",
+    "ended_at": "2026-07-25T09:50:38+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "CONTINUATION_QUICK",
+      "command": "python3 -B scripts/check_walksafe_project_continuation_v2_4.py",
+      "executed_at": "2026-07-25T09:50:34+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATED-20260725-001/01-CONTINUATION_QUICK.log",
+      "output_sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7"
+    },
+    {
+      "check_id": "GOAL_GRAPH_QUICK",
+      "command": "python3 -B scripts/check_walksafe_goal_graph_v2_4.py",
+      "executed_at": "2026-07-25T09:50:37+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATED-20260725-001/02-GOAL_GRAPH_QUICK.log",
+      "output_sha256": "c11079b82d649f98d23fd6ed08ca4dd310366cd0e7f8e67ea102373f16ec6fa4"
+    }
+  ],
+  "generated_at": "2026-07-25T09:50:39+09:00"
+}

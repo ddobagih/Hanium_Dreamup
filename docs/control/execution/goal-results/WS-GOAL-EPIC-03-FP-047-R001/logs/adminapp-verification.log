@@ -1,0 +1,83 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :adminapp:preBuild UP-TO-DATE
+> Task :adminapp:preDebugBuild UP-TO-DATE
+> Task :adminapp:generateDebugBuildConfig UP-TO-DATE
+> Task :adminapp:generateDebugResources UP-TO-DATE
+> Task :adminapp:packageDebugResources UP-TO-DATE
+> Task :adminapp:processDebugNavigationResources UP-TO-DATE
+> Task :adminapp:parseDebugLocalResources UP-TO-DATE
+> Task :adminapp:generateDebugRFile UP-TO-DATE
+> Task :adminapp:compileDebugKotlin NO-SOURCE
+> Task :adminapp:javaPreCompileDebug UP-TO-DATE
+> Task :adminapp:compileDebugJavaWithJavac UP-TO-DATE
+> Task :adminapp:checkDebugAarMetadata UP-TO-DATE
+> Task :adminapp:mapDebugSourceSetPaths UP-TO-DATE
+> Task :adminapp:compileDebugNavigationResources UP-TO-DATE
+> Task :adminapp:mergeDebugResources UP-TO-DATE
+> Task :adminapp:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :adminapp:extractDeepLinksDebug UP-TO-DATE
+> Task :adminapp:processDebugMainManifest UP-TO-DATE
+> Task :adminapp:processDebugManifest UP-TO-DATE
+> Task :adminapp:processDebugManifestForPackage UP-TO-DATE
+> Task :adminapp:processDebugResources UP-TO-DATE
+> Task :adminapp:bundleDebugClassesToRuntimeJar UP-TO-DATE
+> Task :adminapp:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :adminapp:preDebugUnitTestBuild UP-TO-DATE
+> Task :adminapp:compileDebugUnitTestKotlin NO-SOURCE
+> Task :adminapp:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :adminapp:compileDebugUnitTestJavaWithJavac UP-TO-DATE
+> Task :adminapp:processDebugJavaRes NO-SOURCE
+> Task :adminapp:processDebugUnitTestJavaRes NO-SOURCE
+> Task :adminapp:testDebugUnitTest UP-TO-DATE
+> Task :adminapp:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :adminapp:generateDebugAssets UP-TO-DATE
+> Task :adminapp:mergeDebugAssets UP-TO-DATE
+> Task :adminapp:compressDebugAssets UP-TO-DATE
+> Task :adminapp:desugarDebugFileDependencies UP-TO-DATE
+> Task :adminapp:dexBuilderDebug UP-TO-DATE
+> Task :adminapp:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :adminapp:mergeDebugJavaResource UP-TO-DATE
+> Task :adminapp:checkDebugDuplicateClasses UP-TO-DATE
+> Task :adminapp:mergeExtDexDebug UP-TO-DATE
+> Task :adminapp:mergeLibDexDebug UP-TO-DATE
+> Task :adminapp:mergeProjectDexDebug UP-TO-DATE
+> Task :adminapp:mergeDebugJniLibFolders UP-TO-DATE
+> Task :adminapp:mergeDebugNativeLibs NO-SOURCE
+> Task :adminapp:stripDebugDebugSymbols NO-SOURCE
+> Task :adminapp:validateSigningDebug UP-TO-DATE
+> Task :adminapp:writeDebugAppMetadata UP-TO-DATE
+> Task :adminapp:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :adminapp:packageDebug UP-TO-DATE
+> Task :adminapp:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :adminapp:assembleDebug UP-TO-DATE
+> Task :adminapp:preDebugAndroidTestBuild SKIPPED
+> Task :adminapp:generateDebugAndroidTestLintModel UP-TO-DATE
+> Task :adminapp:extractProguardFiles UP-TO-DATE
+> Task :adminapp:generateDebugLintReportModel UP-TO-DATE
+> Task :adminapp:generateDebugUnitTestLintModel UP-TO-DATE
+> Task :adminapp:lintAnalyzeDebug UP-TO-DATE
+> Task :adminapp:lintAnalyzeDebugAndroidTest UP-TO-DATE
+> Task :adminapp:lintAnalyzeDebugUnitTest UP-TO-DATE
+> Task :adminapp:lintReportDebug UP-TO-DATE
+> Task :adminapp:lintDebug
+
+BUILD SUCCESSFUL in 3s
+48 actionable tasks: 1 executed, 47 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+WALKSAFE_JUNIT_XML_FILES=6
+WALKSAFE_JUNIT_TESTS=37
+WALKSAFE_JUNIT_FAILURES=0
+WALKSAFE_JUNIT_ERRORS=0
+WALKSAFE_JUNIT_SKIPPED=0
+WALKSAFE_JUNIT_XML_CONTENT_SET_SHA256=25ae53b79af9c19db78dcc92845fe3487ad3ea9661f203e952399f0651a997bc
+WALKSAFE_JUNIT_SUMMARIZER_SHA256=8bf3077e736d30dff45052e8a5e1f2efc98d1900c907d29c854046dced8ca314
+WALKSAFE_RUN_ID=FP047-20260726-ADMINAPP-007
+WALKSAFE_COMMAND_SHA256=be99e02da89f8434e85ac3a032b3c2997c0a55ec8a9149371604c26d14f8073e
+WALKSAFE_COMMAND_STARTED_AT=2026-07-26T19:22:29+09:00
+WALKSAFE_COMMAND_ENDED_AT=2026-07-26T19:22:33+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0
+WALKSAFE_EXECUTION_EVENT_SEQUENCE=36
+WALKSAFE_EXECUTION_EVENT_ID=WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP047-20260726-002
+WALKSAFE_EXECUTION_EVENT_SHA256=6f68014716055713d91bf51a8f5dcb12bb1db4e5821985c0d63ad9ce817d8f7b
+WALKSAFE_IMPLEMENTATION_EXACT_31_CONTENT_SET_SHA256=322f38341785f847591276684d848bf864d0dafc4f3ad108a171197449e16cc7

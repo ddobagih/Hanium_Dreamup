@@ -1,0 +1,1562 @@
+........................................................................ [ 12%]
+.................................F..............F....................... [ 25%]
+......F...............FF..F......F..............F....................... [ 37%]
+....F...FF.................................F............................ [ 50%]
+..........FFFF............F............F................F.....F......... [ 62%]
+...F...........................F....F.........F..F......F..............F [ 75%]
+......................F...FF.................................F.......... [ 87%]
+........F......F.............F...................................F.....  [100%]
+=================================== FAILURES ===================================
+_ WalkSafeGoalGraphV23HistoryTest.test_activation_then_in_progress_focus_is_valid _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_activation_then_in_progress_focus_is_valid>
+
+    def test_activation_then_in_progress_focus_is_valid(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13482 chars]med'] != []
+E       
+E       First list contains 142 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14698 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:5336: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_artifact_graph_has_257_nodes_and_698_dependency_edges _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_artifact_graph_has_257_nodes_and_698_dependency_edges>
+
+    def test_artifact_graph_has_257_nodes_and_698_dependency_edges(self) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        bindings = graph.canonical_binding_map(checkpoint)
+>       self.assertEqual(graph.validate_artifact_graph(ROOT, bindings), [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differs'] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       - ['ARTIFACT_REGISTER binding SHA-256 differs']
+E       + []
+
+tests/test_walksafe_goal_graph.py:256: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_completed_historical_goal_survives_new_current_backlog_binding _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_completed_historical_goal_survives_new_current_backlog_binding>
+
+    def test_completed_historical_goal_survives_new_current_backlog_binding(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            bindings = graph.canonical_binding_map(checkpoint)
+            old_binding = bindings["IMPLEMENTATION_BACKLOG"]
+            new_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-remediation-backlog-future-test.json"
+            )
+            new_path = root / new_relative
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / old_binding["path"], new_path)
+            for binding in checkpoint["canonical_bindings"]:
+                if binding["role"] == "IMPLEMENTATION_BACKLOG":
+                    binding["path"] = new_relative
+                    binding["file_sha256"] = graph.sha256_file(new_path)
+                    break
+            self.append_binding_update_event(
+                root,
+                checkpoint,
+                ["IMPLEMENTATION_BACKLOG"],
+                occurred_at="2026-07-24T19:49:00+09:00",
+                event_id="WS-GOAL-GRAPH-BACKLOG-UPDATED-TEST-001",
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[14914 chars]med'] != []
+E       
+E       First list contains 161 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 16187 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7012: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_current_artifact_queue_has_exact_partition_and_first_candidate _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_current_artifact_queue_has_exact_partition_and_first_candidate>
+
+    def test_current_artifact_queue_has_exact_partition_and_first_candidate(
+        self,
+    ) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        state = checkpoint["goal_execution"]
+        manifest = graph.load_json(ROOT / graph.MANIFEST_RELATIVE)
+        nodes = self.load_nodes(ROOT, manifest, include_dynamic=True)
+    
+        errors, queue = graph.derive_artifact_work_queue(
+            ROOT,
+            graph.canonical_binding_map(checkpoint),
+            nodes,
+            state["status_by_goal"],
+        )
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['artifact work queue source binding differs'] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       'artifact work queue source binding differs'
+E       
+E       - ['artifact work queue source binding differs']
+E       + []
+
+tests/test_walksafe_goal_graph.py:279: AssertionError
+_______ WalkSafeGoalGraphV23HistoryTest.test_current_goal_graph_is_valid _______
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_current_goal_graph_is_valid>
+
+    def test_current_goal_graph_is_valid(self) -> None:
+>       self.assertEqual(graph.validate(ROOT, check_continuation=False), [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[21208 chars]eue'] != []
+E       
+E       First list contains 233 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 22937 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:40: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_current_work_session_argument_binds_latest_gate_event _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_current_work_session_argument_binds_latest_gate_event>
+
+    def test_current_work_session_argument_binds_latest_gate_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                valid_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+                stale_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id="STALE-WORK-SESSION",
+                )
+    
+>       self.assertEqual(valid_errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13482 chars]med'] != []
+E       
+E       First list contains 142 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14698 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6043: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_dynamic_goal_materialization_does_not_rewrite_static_anchors _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_dynamic_goal_materialization_does_not_rewrite_static_anchors>
+
+    def test_dynamic_goal_materialization_does_not_rewrite_static_anchors(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            manifest_before = graph.sha256_file(root / graph.MANIFEST_RELATIVE)
+            initial_event_before = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(graph.sha256_file(root / graph.MANIFEST_RELATIVE), manifest_before)
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_event_before,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13750 chars]med'] != []
+E       
+E       First list contains 145 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14987 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6248: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_fixture_projects_immutable_prepared_phase _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_fixture_projects_immutable_prepared_phase>
+
+    def test_fixture_projects_immutable_prepared_phase(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(
+                root / graph.CHECKPOINT_RELATIVE
+            )
+            state = checkpoint["goal_execution"]
+            prepared = state["transition_history"][0]
+    
+            self.assertEqual(state["schema_version"], "2.1")
+            self.assertEqual(len(state["transition_history"]), 1)
+            self.assertEqual(
+                prepared["event_type"],
+                "PACKAGE_PREPARED",
+            )
+            self.assertEqual(
+                prepared["event_sha256"],
+                graph.EXPECTED_INITIAL_EVENT_SHA256,
+            )
+            self.assertEqual(
+                (
+                    state["activation_status"],
+                    state["package_status"],
+                ),
+                (
+                    "READY_NOT_ACTIVATED",
+                    "PREPARED_NOT_ACTIVATED",
+                ),
+            )
+            self.assertEqual(
+                state["status_by_goal"],
+                prepared["status_changes"],
+            )
+            self.assertEqual(state["managed_goal_path_count"], 23)
+            self.assertEqual(state["goal_document_count"], 17)
+            self.assertEqual(
+                len(state["imported_predecessor_goal_bindings"]),
+                17,
+            )
+            self.assertEqual(
+                graph.canonical_binding_snapshot(
+                    graph.canonical_binding_map(checkpoint)
+                ),
+                prepared["canonical_binding_snapshot_after"],
+            )
+>           self.assertEqual(
+                graph.validate(root, check_continuation=False),
+                [],
+            )
+E           AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13182 chars]eue'] != []
+E           
+E           First list contains 138 additional elements.
+E           First extra element 0:
+E           'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E           
+E           Diff is 14386 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph_v2_3.py:1091: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_historical_start_snapshot_may_differ_from_reconciled_checkpoint _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_historical_start_snapshot_may_differ_from_reconciled_checkpoint>
+
+    def test_historical_start_snapshot_may_differ_from_reconciled_checkpoint(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            start_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            historical_snapshot = json.loads(
+                json.dumps(start_event["repository_snapshot_before"])
+            )
+            checkpoint["working_tree_snapshot"][
+                "content_set_sha256"
+            ] = "a" * 64
+            self.assertNotEqual(
+                historical_snapshot[
+                    "checkpoint_content_set_sha256"
+                ],
+                checkpoint["working_tree_snapshot"][
+                    "content_set_sha256"
+                ],
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13482 chars]med'] != []
+E       
+E       First list contains 142 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14698 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:5365: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_in_progress_goal_can_open_a_fresh_resume_session _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_in_progress_goal_can_open_a_fresh_resume_session>
+
+    def test_in_progress_goal_can_open_a_fresh_resume_session(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            goal_id = checkpoint["goal_execution"]["focus_goal_id"]
+            self.resume_goal(root, checkpoint, goal_id)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13704 chars]med'] != []
+E       
+E       First list contains 145 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14929 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6085: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_inactive_pwa_artifact_cannot_be_materialized _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_inactive_pwa_artifact_cannot_be_materialized>
+
+    def test_inactive_pwa_artifact_cannot_be_materialized(self) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        binding = graph.canonical_binding_map(checkpoint)[
+            "ARTIFACT_REGISTER"
+        ]
+        errors = graph.validate_artifact_work_materialization_scope(
+            ROOT,
+            "GOAL",
+            {
+                "work_item_type": "ARTIFACT_WORK",
+                "materialized_from_role": "ARTIFACT_REGISTER",
+                "materialized_from_path": binding["path"],
+                "materialized_from_document_id": binding["document_id"],
+                "materialized_from_sha256": binding["file_sha256"],
+                "output_subject_ids_by_role": {
+                    "ARTIFACT_REGISTER": ["DLV-WS-16"],
+                    "ARTIFACT_CHANGE_LOG": ["DLV-WS-16"],
+                },
+            },
+        )
+    
+>       self.assertTrue(
+            any("target is not active" in error for error in errors)
+        )
+E       AssertionError: False is not true
+
+tests/test_walksafe_goal_graph.py:4764: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_planned_goal_can_become_ready_after_dependencies_complete _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_planned_goal_can_become_ready_after_dependencies_complete>
+
+    def test_planned_goal_can_become_ready_after_dependencies_complete(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(
+                root,
+                checkpoint,
+                initial_status="PLANNED",
+            )
+            self.ready_materialized_artifact(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13972 chars]med'] != []
+E       
+E       First list contains 148 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 15218 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6314: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_snapshot_cutoff_can_advance_without_rewriting_initial_event _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_snapshot_cutoff_can_advance_without_rewriting_initial_event>
+
+    def test_snapshot_cutoff_can_advance_without_rewriting_initial_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            initial_hash = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self._activate_package_only(root, checkpoint)
+            state = checkpoint["goal_execution"]
+            state["validation_cutoff_at"] = (
+                "2026-07-24T23:59:58+09:00"
+            )
+            self.rehash_event(checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_hash,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13260 chars]med'] != []
+E       
+E       First list contains 139 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14467 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7215: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_staged_fp005_completion_preserves_newer_live_bytes _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_staged_fp005_completion_preserves_newer_live_bytes>
+
+    def test_staged_fp005_completion_preserves_newer_live_bytes(
+        self,
+    ) -> None:
+        current_checkpoint, current_archive = (
+            self.load_current_v24_successor_context()
+        )
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(
+                root / graph.CHECKPOINT_RELATIVE
+            )
+            deferred_errors = set(
+>               self.archived_changed_artifact_errors(root)
+            )
+
+tests/test_walksafe_goal_graph_v2_3_history.py:190: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_walksafe_goal_graph_v2_3.py:375: in archived_changed_artifact_errors
+    self.assertEqual(hard_errors, [])
+E   AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[12161 chars]eue'] != []
+E   
+E   First list contains 124 additional elements.
+E   First extra element 0:
+E   'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E   
+E   Diff is 13311 characters long. Set self.maxDiff to None to see it.
+_ WalkSafeGoalGraphV23HistoryTest.test_staged_fp005_completion_rejects_broken_before_hash _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_staged_fp005_completion_rejects_broken_before_hash>
+
+    def test_staged_fp005_completion_rejects_broken_before_hash(
+        self,
+    ) -> None:
+        current_checkpoint, current_archive = (
+            self.load_current_v24_successor_context()
+        )
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(
+                root / graph.CHECKPOINT_RELATIVE
+            )
+>           event, binding = self.stage_fp005_completion_witness(
+                root,
+                checkpoint,
+            )
+
+tests/test_walksafe_goal_graph_v2_3_history.py:236: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_walksafe_goal_graph_v2_3_history.py:132: in stage_fp005_completion_witness
+    for error in self.archived_changed_artifact_errors(root)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_walksafe_goal_graph_v2_3.py:375: in archived_changed_artifact_errors
+    self.assertEqual(hard_errors, [])
+E   AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[12161 chars]eue'] != []
+E   
+E   First list contains 124 additional elements.
+E   First extra element 0:
+E   'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E   
+E   Diff is 13311 characters long. Set self.maxDiff to None to see it.
+_ WalkSafeGoalGraphV23HistoryTest.test_staged_fp005_completion_requires_event_and_receipt _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_staged_fp005_completion_requires_event_and_receipt>
+
+    def test_staged_fp005_completion_requires_event_and_receipt(
+        self,
+    ) -> None:
+        for missing in ("event", "receipt"):
+            with self.subTest(missing=missing), self.fixture_root() as root:
+                checkpoint = graph.load_json(
+                    root / graph.CHECKPOINT_RELATIVE
+                )
+>               event, binding = self.stage_fp005_completion_witness(
+                    root,
+                    checkpoint,
+                    append_event=missing != "event",
+                )
+
+tests/test_walksafe_goal_graph_v2_3.py:940: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_walksafe_goal_graph_v2_3_history.py:132: in stage_fp005_completion_witness
+    for error in self.archived_changed_artifact_errors(root)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_walksafe_goal_graph_v2_3.py:375: in archived_changed_artifact_errors
+    self.assertEqual(hard_errors, [])
+E   AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[12161 chars]eue'] != []
+E   
+E   First list contains 124 additional elements.
+E   First extra element 0:
+E   'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E   
+E   Diff is 13311 characters long. Set self.maxDiff to None to see it.
+_____ WalkSafeGoalGraphV23HistoryTest.test_superseded_v21_package_is_valid _____
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_superseded_v21_package_is_valid>
+
+    def test_superseded_v21_package_is_valid(self) -> None:
+        manifest = graph.load_json(ROOT / graph.MANIFEST_RELATIVE)
+        errors, _ = graph.validate_superseded_v2_2(
+            ROOT,
+            manifest,
+        )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[12161 chars]eue'] != []
+E       
+E       First list contains 124 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 13311 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph_v2_3.py:1607: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_unbound_fp006_result_files_do_not_change_graph_discovery _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_unbound_fp006_result_files_do_not_change_graph_discovery>
+
+    def test_unbound_fp006_result_files_do_not_change_graph_discovery(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            before_paths = graph.discover_package_paths(root)
+            before_errors = graph.validate(
+                root,
+                check_continuation=False,
+            )
+            self.write_json(
+                root
+                / "docs/control/execution/goal-results/"
+                "WS-GOAL-EPIC-02-FP-006-R001/"
+                "completion-receipt.json",
+                {
+                    "document_id": "UNBOUND-FP006-RESULT-FIXTURE",
+                    "status": "ACCEPTED",
+                },
+            )
+    
+            after_paths = graph.discover_package_paths(root)
+            after_errors = graph.validate(
+                root,
+                check_continuation=False,
+            )
+    
+        self.assertEqual(before_paths, after_paths)
+>       self.assertEqual(before_errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[13182 chars]eue'] != []
+E       
+E       First list contains 138 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 14386 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph_v2_3.py:907: AssertionError
+_ WalkSafeGoalGraphV23HistoryTest.test_work_item_completion_binds_start_receipt_and_event _
+
+self = <test_walksafe_goal_graph_v2_3_history._load_history_test_case.<locals>.WalkSafeGoalGraphV23HistoryTest testMethod=test_work_item_completion_binds_start_receipt_and_event>
+
+    def test_work_item_completion_binds_start_receipt_and_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['archived v2.2: ARTIFACT_REGISTER binding[14309 chars]med'] != []
+E       
+E       First list contains 153 additional elements.
+E       First extra element 0:
+E       'archived v2.2: ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 15558 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6842: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_activation_then_in_progress_focus_is_valid _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_activation_then_in_progress_focus_is_valid>
+
+    def test_activation_then_in_progress_focus_is_valid(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1496 chars]med'] != []
+E       
+E       First list contains 21 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1623 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:5336: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_artifact_graph_has_257_nodes_and_698_dependency_edges _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_artifact_graph_has_257_nodes_and_698_dependency_edges>
+
+    def test_artifact_graph_has_257_nodes_and_698_dependency_edges(self) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        bindings = graph.canonical_binding_map(checkpoint)
+>       self.assertEqual(graph.validate_artifact_graph(ROOT, bindings), [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differs'] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       - ['ARTIFACT_REGISTER binding SHA-256 differs']
+E       + []
+
+tests/test_walksafe_goal_graph.py:256: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_completed_historical_goal_survives_new_current_backlog_binding _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_completed_historical_goal_survives_new_current_backlog_binding>
+
+    def test_completed_historical_goal_survives_new_current_backlog_binding(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            bindings = graph.canonical_binding_map(checkpoint)
+            old_binding = bindings["IMPLEMENTATION_BACKLOG"]
+            new_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-remediation-backlog-future-test.json"
+            )
+            new_path = root / new_relative
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / old_binding["path"], new_path)
+            for binding in checkpoint["canonical_bindings"]:
+                if binding["role"] == "IMPLEMENTATION_BACKLOG":
+                    binding["path"] = new_relative
+                    binding["file_sha256"] = graph.sha256_file(new_path)
+                    break
+            self.append_binding_update_event(
+                root,
+                checkpoint,
+                ["IMPLEMENTATION_BACKLOG"],
+                occurred_at="2026-07-24T19:49:00+09:00",
+                event_id="WS-GOAL-GRAPH-BACKLOG-UPDATED-TEST-001",
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[2928 chars]med'] != []
+E       
+E       First list contains 40 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 3112 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7012: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_completed_workstream_reopens_without_rewriting_its_completion _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_completed_workstream_reopens_without_rewriting_its_completion>
+
+    def test_completed_workstream_reopens_without_rewriting_its_completion(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            self.refresh_integrity(root)
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_package(root, checkpoint)
+            state = checkpoint["goal_execution"]
+            bindings_before = next(
+                event["canonical_binding_snapshot_after"]
+                for event in reversed(state["transition_history"])
+                if "canonical_binding_snapshot_after" in event
+            )
+            gap_binding = graph.canonical_binding_map(checkpoint)[
+                "IMPLEMENTATION_GAP"
+            ]
+            gap_payload = graph.load_json(root / gap_binding["path"])
+            gap_payload = json.loads(json.dumps(gap_payload))
+            changed_row = next(
+                row
+                for row in gap_payload["assessments"]
+                if row["gap_id"] == "GAP-010"
+            )
+            changed_row["rationale"] += " 회귀 재평가가 필요하다."
+            carried = sorted(
+                row["gap_id"]
+                for row in gap_payload["assessments"]
+                if row["gap_id"] != "GAP-010"
+            )
+            gap_payload["reassessment_scope"] = {
+                "mode": "TEST_COMPLETED_WORKSTREAM_REOPEN",
+                "directly_reassessed_gap_ids": ["GAP-010"],
+                "impact_reviewed_gap_ids": [],
+                "reviewed_gap_ids": ["GAP-010"],
+                "carried_forward_gap_count": len(carried),
+                "carried_forward_gap_ids": carried,
+            }
+            gap_payload["metadata"]["report_id"] = "TEST-GAP-R009"
+            gap_payload["metadata"]["version"] = "0.9.0"
+            gap_payload["report_content_sha256"] = graph.canonical_json_sha256(
+                gap_payload,
+                omit={"report_content_sha256"},
+            )
+            gap_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-gap-analysis-test-r009.json"
+            )
+            gap_path = root / gap_relative
+            self.write_json(gap_path, gap_payload)
+            backlog_binding = graph.canonical_binding_map(checkpoint)[
+                "IMPLEMENTATION_BACKLOG"
+            ]
+            backlog_payload = graph.load_json(root / backlog_binding["path"])
+            backlog_payload = json.loads(json.dumps(backlog_payload))
+            backlog_payload["metadata"]["backlog_id"] = "TEST-BACKLOG-R009"
+            backlog_payload["metadata"]["version"] = "0.9.0"
+            backlog_payload["metadata"]["predecessor_backlog_id"] = (
+                backlog_binding["document_id"]
+            )
+            backlog_payload["source_predecessor"] = {
+                "path": backlog_binding["path"],
+                "file_sha256": backlog_binding["file_sha256"],
+                "preserved_unchanged": True,
+            }
+            backlog_payload["gap_report_content_sha256"] = gap_payload[
+                "report_content_sha256"
+            ]
+            backlog_payload["backlog_content_sha256"] = (
+                graph.canonical_json_sha256(
+                    backlog_payload,
+                    omit={"backlog_content_sha256"},
+                )
+            )
+            backlog_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-remediation-backlog-test-r009.json"
+            )
+            backlog_path = root / backlog_relative
+            self.write_json(backlog_path, backlog_payload)
+            for binding in checkpoint["canonical_bindings"]:
+                if binding["role"] == "IMPLEMENTATION_GAP":
+                    binding["path"] = gap_relative
+                    binding["document_id"] = "TEST-GAP-R009"
+                    binding["file_sha256"] = graph.sha256_file(gap_path)
+                elif binding["role"] == "IMPLEMENTATION_BACKLOG":
+                    binding["path"] = backlog_relative
+                    binding["document_id"] = "TEST-BACKLOG-R009"
+                    binding["file_sha256"] = graph.sha256_file(backlog_path)
+            bindings_after = graph.canonical_binding_snapshot(
+                graph.canonical_binding_map(checkpoint)
+            )
+            diff_errors, changed_subjects = (
+                graph.canonical_changed_subject_ids_by_role(
+                    root,
+                    changed_roles=[
+                        "IMPLEMENTATION_BACKLOG",
+                        "IMPLEMENTATION_GAP",
+                    ],
+                    bindings_before=bindings_before,
+                    bindings_after=bindings_after,
+                )
+            )
+            self.assertEqual(diff_errors, [])
+            self.assertEqual(
+                changed_subjects,
+                {
+                    "IMPLEMENTATION_BACKLOG": [],
+                    "IMPLEMENTATION_GAP": ["FP-001", "GAP-010"],
+                },
+            )
+    
+            epic_id = "WS-GOAL-EPIC-01"
+            previous_focus_id = state["focus_goal_id"]
+            previous_focus_path = root / state["focus_goal_path"]
+            state["status_by_goal"][epic_id] = "READY"
+            state["status_by_goal"]["WS-GOAL-EPIC-02"] = "PLANNED"
+            state["status_by_goal"][
+                "WS-GOAL-EPIC-02-FP-018-R001"
+            ] = "PLANNED"
+            state["status_by_goal"]["WS-GOAL-EPIC-03"] = "PLANNED"
+            state["completion_evidence_by_goal"].pop(epic_id)
+            manifest = graph.load_json(root / graph.MANIFEST_RELATIVE)
+            nodes = self.load_nodes(root, manifest, include_dynamic=True)
+            backlog = self.load_binding_json_from_root(
+                root,
+                checkpoint,
+                "IMPLEMENTATION_BACKLOG",
+            )
+            state["ready_frontier_goal_ids"] = graph.ready_frontier(
+                nodes,
+                state["status_by_goal"],
+                state["materialized_child_goal_ids_by_parent"],
+                state["blockers_by_goal"],
+                backlog,
+            )
+            state["focus_goal_id"] = state["ready_frontier_goal_ids"][0]
+            focus_node = nodes[state["focus_goal_id"]]
+            focus_relative = next(
+                relative
+                for relative in state["goal_document_paths"]
+                if graph.parse_goal(root / relative)[0]["goal_id"]
+                == state["focus_goal_id"]
+            )
+            state["focus_goal_path"] = focus_relative
+            state["focus_work_item_id"] = (
+                focus_node.get("work_item_id")
+                if focus_node.get("goal_kind") == "WORK_ITEM"
+                else ""
+            )
+            state["focus_source"] = (
+                focus_node.get("materialized_from_role")
+                if focus_node.get("goal_kind") == "WORK_ITEM"
+                else "WORKSTREAM_GRAPH"
+            )
+            focus_path = root / state["focus_goal_path"]
+            closure_goal_ids = [
+                "WS-GOAL-EPIC-01",
+                "WS-GOAL-EPIC-02",
+                "WS-GOAL-EPIC-02-FP-018-R001",
+                "WS-GOAL-EPIC-03",
+            ]
+            event = {
+                "sequence": len(state["transition_history"]) + 1,
+                "event_id": "WS-GOAL-GRAPH-CANONICAL-REOPEN-TEST-001",
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "changed_binding_roles": [
+                    "IMPLEMENTATION_BACKLOG",
+                    "IMPLEMENTATION_GAP",
+                ],
+                "changed_subject_ids_by_role": changed_subjects,
+                "impact_closure_goal_ids": closure_goal_ids,
+                "impact_disposition_by_goal": {
+                    epic_id: {
+                        "result": "REOPEN_CONTAINER",
+                        "target_status": "READY",
+                    },
+                    "WS-GOAL-EPIC-02": {
+                        "result": "REVALIDATION_REFRESH_REQUIRED",
+                        "target_status": "PLANNED",
+                    },
+                    "WS-GOAL-EPIC-02-FP-018-R001": {
+                        "result": "DEPENDENCY_INVALIDATED",
+                        "target_status": "PLANNED",
+                    },
+                    "WS-GOAL-EPIC-03": {
+                        "result": "REVALIDATION_REFRESH_REQUIRED",
+                        "target_status": "PLANNED",
+                    },
+                },
+                "reopened_completion_event_sha256_by_goal": {
+                    epic_id: state["transition_history"][0]["event_sha256"]
+                },
+                "canonical_binding_snapshot_after": bindings_after,
+                "occurred_on": "2026-07-24",
+                "occurred_at": "2026-07-24T19:42:00+09:00",
+                "previous_focus_goal_id": previous_focus_id,
+                "previous_focus_content_sha256": graph.sha256_file(
+                    previous_focus_path
+                ),
+                "focus_goal_id": state["focus_goal_id"],
+                "focus_goal_content_sha256": graph.sha256_file(focus_path),
+                "from_status": state["status_by_goal"][state["focus_goal_id"]],
+                "to_status": state["status_by_goal"][state["focus_goal_id"]],
+                "static_plan_manifest_sha256": state[
+                    "static_plan_manifest_sha256"
+                ],
+                "status_changes": {
+                    epic_id: "READY",
+                    "WS-GOAL-EPIC-02": "PLANNED",
+                    "WS-GOAL-EPIC-02-FP-018-R001": "PLANNED",
+                    "WS-GOAL-EPIC-03": "PLANNED",
+                },
+                "runtime_after": self.runtime_snapshot(root, checkpoint),
+                "blockers_after": json.loads(json.dumps(state["blockers_by_goal"])),
+                "blocker_resolution_ids_after": [],
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "IMPLEMENTATION_BACKLOG",
+                    "IMPLEMENTATION_GAP",
+                ],
+                "previous_event_sha256": state["transition_history"][-1][
+                    "event_sha256"
+                ],
+            }
+            event["event_sha256"] = graph.event_sha256(event)
+            state["transition_history"].append(event)
+            state["transition_history_anchor_sha256"] = event["event_sha256"]
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph,
+                "validate_canonical_update_authorization",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+>           self.assertEqual(errors, [])
+E           AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1879 chars]med'] != []
+E           
+E           First list contains 26 additional elements.
+E           First extra element 0:
+E           'ARTIFACT_REGISTER binding SHA-256 differs'
+E           
+E           Diff is 2021 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:2819: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_current_artifact_queue_has_exact_partition_and_first_candidate _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_current_artifact_queue_has_exact_partition_and_first_candidate>
+
+    def test_current_artifact_queue_has_exact_partition_and_first_candidate(
+        self,
+    ) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        state = checkpoint["goal_execution"]
+        manifest = graph.load_json(ROOT / graph.MANIFEST_RELATIVE)
+        nodes = self.load_nodes(ROOT, manifest, include_dynamic=True)
+    
+        errors, queue = graph.derive_artifact_work_queue(
+            ROOT,
+            graph.canonical_binding_map(checkpoint),
+            nodes,
+            state["status_by_goal"],
+        )
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['artifact work queue source binding differs'] != []
+E       
+E       First list contains 1 additional elements.
+E       First extra element 0:
+E       'artifact work queue source binding differs'
+E       
+E       - ['artifact work queue source binding differs']
+E       + []
+
+tests/test_walksafe_goal_graph.py:279: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_current_work_session_argument_binds_latest_gate_event _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_current_work_session_argument_binds_latest_gate_event>
+
+    def test_current_work_session_argument_binds_latest_gate_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                valid_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+                stale_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id="STALE-WORK-SESSION",
+                )
+    
+>       self.assertEqual(valid_errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1496 chars]med'] != []
+E       
+E       First list contains 21 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1623 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6043: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_dynamic_goal_materialization_does_not_rewrite_static_anchors _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_dynamic_goal_materialization_does_not_rewrite_static_anchors>
+
+    def test_dynamic_goal_materialization_does_not_rewrite_static_anchors(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            manifest_before = graph.sha256_file(root / graph.MANIFEST_RELATIVE)
+            initial_event_before = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(graph.sha256_file(root / graph.MANIFEST_RELATIVE), manifest_before)
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_event_before,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['WS-GOAL-EPIC-03-ARTIFACT-TEST-R001: mate[1764 chars]med'] != []
+E       
+E       First list contains 24 additional elements.
+E       First extra element 0:
+E       'WS-GOAL-EPIC-03-ARTIFACT-TEST-R001: materialization source hash differs'
+E       
+E       Diff is 1912 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6248: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_fixture_projects_immutable_prepared_phase _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_fixture_projects_immutable_prepared_phase>
+
+    def test_fixture_projects_immutable_prepared_phase(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            state = checkpoint["goal_execution"]
+            prepared = state["transition_history"][0]
+    
+            self.assertEqual(len(state["transition_history"]), 1)
+            self.assertEqual(prepared["event_type"], "PACKAGE_PREPARED")
+            self.assertEqual(
+                prepared["event_sha256"],
+                graph.EXPECTED_INITIAL_EVENT_SHA256,
+            )
+            self.assertEqual(
+                (
+                    state["activation_status"],
+                    state["package_status"],
+                ),
+                (
+                    "READY_NOT_ACTIVATED",
+                    "PREPARED_NOT_ACTIVATED",
+                ),
+            )
+            self.assertEqual(
+                state["status_by_goal"],
+                prepared["status_changes"],
+            )
+            self.assertEqual(state["managed_goal_path_count"], 20)
+            self.assertEqual(state["goal_document_count"], 14)
+            self.assertEqual(
+                graph.canonical_binding_snapshot(
+                    graph.canonical_binding_map(checkpoint)
+                ),
+                prepared["canonical_binding_snapshot_after"],
+            )
+>           self.assertEqual(
+                graph.validate(root, check_continuation=False),
+                [],
+            )
+E           AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[974 chars]eue'] != []
+E           
+E           First list contains 14 additional elements.
+E           First extra element 0:
+E           'ARTIFACT_REGISTER binding SHA-256 differs'
+E           
+E           Diff is 1080 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:76: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_historical_start_snapshot_may_differ_from_reconciled_checkpoint _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_historical_start_snapshot_may_differ_from_reconciled_checkpoint>
+
+    def test_historical_start_snapshot_may_differ_from_reconciled_checkpoint(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            start_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            historical_snapshot = json.loads(
+                json.dumps(start_event["repository_snapshot_before"])
+            )
+            checkpoint["working_tree_snapshot"][
+                "content_set_sha256"
+            ] = "a" * 64
+            self.assertNotEqual(
+                historical_snapshot[
+                    "checkpoint_content_set_sha256"
+                ],
+                checkpoint["working_tree_snapshot"][
+                    "content_set_sha256"
+                ],
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1496 chars]med'] != []
+E       
+E       First list contains 21 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1623 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:5365: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_in_progress_goal_can_open_a_fresh_resume_session _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_in_progress_goal_can_open_a_fresh_resume_session>
+
+    def test_in_progress_goal_can_open_a_fresh_resume_session(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            goal_id = checkpoint["goal_execution"]["focus_goal_id"]
+            self.resume_goal(root, checkpoint, goal_id)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1718 chars]med'] != []
+E       
+E       First list contains 24 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1854 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6085: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_inactive_pwa_artifact_cannot_be_materialized _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_inactive_pwa_artifact_cannot_be_materialized>
+
+    def test_inactive_pwa_artifact_cannot_be_materialized(self) -> None:
+        checkpoint = graph.load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        binding = graph.canonical_binding_map(checkpoint)[
+            "ARTIFACT_REGISTER"
+        ]
+        errors = graph.validate_artifact_work_materialization_scope(
+            ROOT,
+            "GOAL",
+            {
+                "work_item_type": "ARTIFACT_WORK",
+                "materialized_from_role": "ARTIFACT_REGISTER",
+                "materialized_from_path": binding["path"],
+                "materialized_from_document_id": binding["document_id"],
+                "materialized_from_sha256": binding["file_sha256"],
+                "output_subject_ids_by_role": {
+                    "ARTIFACT_REGISTER": ["DLV-WS-16"],
+                    "ARTIFACT_CHANGE_LOG": ["DLV-WS-16"],
+                },
+            },
+        )
+    
+>       self.assertTrue(
+            any("target is not active" in error for error in errors)
+        )
+E       AssertionError: False is not true
+
+tests/test_walksafe_goal_graph.py:4764: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_planned_goal_can_become_ready_after_dependencies_complete _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_planned_goal_can_become_ready_after_dependencies_complete>
+
+    def test_planned_goal_can_become_ready_after_dependencies_complete(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(
+                root,
+                checkpoint,
+                initial_status="PLANNED",
+            )
+            self.ready_materialized_artifact(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['WS-GOAL-EPIC-03-ARTIFACT-TEST-R001: mate[1986 chars]med'] != []
+E       
+E       First list contains 27 additional elements.
+E       First extra element 0:
+E       'WS-GOAL-EPIC-03-ARTIFACT-TEST-R001: materialization source hash differs'
+E       
+E       Diff is 2143 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6314: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_prestart_control_repair_commits_valid_noop _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_prestart_control_repair_commits_valid_noop>
+
+    def test_prestart_control_repair_commits_valid_noop(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(
+                root / graph.CHECKPOINT_RELATIVE
+            )
+            self.commit_prestart_control_repair(root, checkpoint)
+            self.write_json(
+                root / graph.CHECKPOINT_RELATIVE,
+                checkpoint,
+            )
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1274 chars]med'] != []
+E       
+E       First list contains 18 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1392 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7650: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_prestart_control_repair_uses_split_semantic_regression_contract _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_prestart_control_repair_uses_split_semantic_regression_contract>
+
+    def test_prestart_control_repair_uses_split_semantic_regression_contract(
+        self,
+    ) -> None:
+        full_command = dict(
+            graph.IMPLEMENTATION_START_GATE_CHECKS
+        )["GOAL_CONTROL_PYTEST"]
+        semantic_command = (
+            graph.PRESTART_CONTROL_REPAIR_SEMANTIC_REGRESSION_COMMAND
+        )
+        expected_deselections = {
+            (
+                "tests/test_walksafe_goal_graph.py::"
+                "WalkSafeGoalGraphTest::test_current_goal_graph_is_valid"
+            ),
+            (
+                "tests/test_walksafe_project_continuation.py::"
+                "WalkSafeProjectContinuationTest::"
+                "test_current_checkpoint_is_valid"
+            ),
+        }
+        semantic_tokens = semantic_command.split()
+        deselections = {
+            token.removeprefix("--deselect=")
+            for token in semantic_tokens
+            if token.startswith("--deselect=")
+        }
+    
+        self.assertNotEqual(semantic_command, full_command)
+        self.assertEqual(
+            graph.PRESTART_CONTROL_REPAIR_CHECKS,
+            (
+                (
+                    "FAIL_BEFORE",
+                    full_command,
+                    1,
+                    "01-FAIL_BEFORE.log",
+                ),
+                (
+                    "PASS_AFTER",
+                    semantic_command,
+                    0,
+                    "02-PASS_AFTER.log",
+                ),
+            ),
+        )
+        self.assertIn(
+            "tests/test_walksafe_goal_graph.py",
+            semantic_tokens,
+        )
+        self.assertIn(
+            "tests/test_walksafe_project_continuation.py",
+            semantic_tokens,
+        )
+        self.assertEqual(deselections, expected_deselections)
+        self.assertEqual(
+            {
+                deselection
+                for deselection in deselections
+                if deselection.startswith(
+                    "tests/test_walksafe_goal_graph.py::"
+                )
+            },
+            {
+                (
+                    "tests/test_walksafe_goal_graph.py::"
+                    "WalkSafeGoalGraphTest::"
+                    "test_current_goal_graph_is_valid"
+                )
+            },
+        )
+    
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(
+                root / graph.CHECKPOINT_RELATIVE
+            )
+            repair = self.commit_prestart_control_repair(
+                root,
+                checkpoint,
+            )
+            self.assertEqual(
+                [
+                    (
+                        run["check_id"],
+                        run["command"],
+                        run["exit_code"],
+                    )
+                    for run in repair["receipt"]["check_runs"]
+                ],
+                [
+                    ("FAIL_BEFORE", full_command, 1),
+                    ("PASS_AFTER", semantic_command, 0),
+                ],
+            )
+            self.write_json(
+                root / graph.CHECKPOINT_RELATIVE,
+                checkpoint,
+            )
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1274 chars]med'] != []
+E       
+E       First list contains 18 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1392 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7752: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_snapshot_cutoff_can_advance_without_rewriting_initial_event _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_snapshot_cutoff_can_advance_without_rewriting_initial_event>
+
+    def test_snapshot_cutoff_can_advance_without_rewriting_initial_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            initial_hash = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self._activate_package_only(root, checkpoint)
+            state = checkpoint["goal_execution"]
+            state["validation_cutoff_at"] = (
+                "2026-07-24T23:59:58+09:00"
+            )
+            self.rehash_event(checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_hash,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[1052 chars]med'] != []
+E       
+E       First list contains 15 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 1161 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:7215: AssertionError
+_ WalkSafeGoalGraphV22HistoryTest.test_work_item_completion_binds_start_receipt_and_event _
+
+self = <test_walksafe_goal_graph_v2_2_history._load_history_test_case.<locals>.WalkSafeGoalGraphV22HistoryTest testMethod=test_work_item_completion_binds_start_receipt_and_event>
+
+    def test_work_item_completion_binds_start_receipt_and_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['ARTIFACT_REGISTER binding SHA-256 differ[2323 chars]med'] != []
+E       
+E       First list contains 32 additional elements.
+E       First extra element 0:
+E       'ARTIFACT_REGISTER binding SHA-256 differs'
+E       
+E       Diff is 2483 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:6842: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_activation_then_in_progress_focus_is_valid
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_artifact_graph_has_257_nodes_and_698_dependency_edges
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_completed_historical_goal_survives_new_current_backlog_binding
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_current_artifact_queue_has_exact_partition_and_first_candidate
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_current_goal_graph_is_valid
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_current_work_session_argument_binds_latest_gate_event
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_dynamic_goal_materialization_does_not_rewrite_static_anchors
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_fixture_projects_immutable_prepared_phase
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_historical_start_snapshot_may_differ_from_reconciled_checkpoint
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_in_progress_goal_can_open_a_fresh_resume_session
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_inactive_pwa_artifact_cannot_be_materialized
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_planned_goal_can_become_ready_after_dependencies_complete
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_snapshot_cutoff_can_advance_without_rewriting_initial_event
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_staged_fp005_completion_preserves_newer_live_bytes
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_staged_fp005_completion_rejects_broken_before_hash
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_staged_fp005_completion_requires_event_and_receipt
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_superseded_v21_package_is_valid
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_unbound_fp006_result_files_do_not_change_graph_discovery
+FAILED tests/test_walksafe_goal_graph_v2_3_history.py::WalkSafeGoalGraphV23HistoryTest::test_work_item_completion_binds_start_receipt_and_event
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_activation_then_in_progress_focus_is_valid
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_artifact_graph_has_257_nodes_and_698_dependency_edges
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_completed_historical_goal_survives_new_current_backlog_binding
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_completed_workstream_reopens_without_rewriting_its_completion
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_current_artifact_queue_has_exact_partition_and_first_candidate
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_current_work_session_argument_binds_latest_gate_event
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_dynamic_goal_materialization_does_not_rewrite_static_anchors
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_fixture_projects_immutable_prepared_phase
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_historical_start_snapshot_may_differ_from_reconciled_checkpoint
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_in_progress_goal_can_open_a_fresh_resume_session
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_inactive_pwa_artifact_cannot_be_materialized
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_planned_goal_can_become_ready_after_dependencies_complete
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_prestart_control_repair_commits_valid_noop
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_prestart_control_repair_uses_split_semantic_regression_contract
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_snapshot_cutoff_can_advance_without_rewriting_initial_event
+FAILED tests/test_walksafe_goal_graph_v2_2_history.py::WalkSafeGoalGraphV22HistoryTest::test_work_item_completion_binds_start_receipt_and_event
+35 failed, 540 passed in 89.27s (0:01:29)

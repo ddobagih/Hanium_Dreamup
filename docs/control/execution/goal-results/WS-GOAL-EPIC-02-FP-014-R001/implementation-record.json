@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-IMPLEMENTATION-20260726-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-014-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-26T05:00:16+09:00",
+  "implementation_content_set_sha256": "c76a1f9f57fadde5e0304d91b94f918102e01656733e5bc2b5c0c1bd5ae44fb9",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "before_sha256": "7646f8cf176d900e2e9765effe3a838e4915073076c2d771911679738ee3f652",
+      "after_sha256": "b4d4c203e597a733b8aaf58ec7278daf40e0ad79b469b85d38c2d6d91a65b89f",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "before_sha256": "cf6d0cebc06e91fe335c33f95d35f54a64b9d9dd6ecd53c0bff908c994a82d9e",
+      "after_sha256": "cbf728e983e238fa1f56372c05770219050bd8466a8ee1bba67951580f3d237f",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+      "before_sha256": "ffd3e85c6888dcf1f13ea55f5f2899067c9687dedaffe33558e4509d352d858a",
+      "after_sha256": "6327b1a28a595b0c7d35a75493f77a59edb6a25d1374d5d5d277b33374ad8de0",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "before_sha256": "3b9042d0f8a2e5768e388fe5e7edf2fa73ccd745f5baa83b388a5ef1378dafbf",
+      "after_sha256": "b94f6b3401e04bb3e7297fcae3f73b3aebd6f23e2e3baab797173bdc56b012b7",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "before_sha256": "24288a3ed0795089b47f78cb9fb9968ee5c2f3c0f2991ae47be6284cf7ec9366",
+      "after_sha256": "abedf388188385d1e57174304198eae33c534fc9021ba42ab1ce4ae62aee2c59",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "before_sha256": "e9c10fcec7436dd8b28df4fafc1df1f415adaf75f70398b6b896485c5ab5aaf5",
+      "after_sha256": "f59b11159e0a3c4aef3864a6be50bd6c4652dfe9894a206ec7b9da7914292e45",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "before_sha256": "b8fec270095f2187263ab8bb7fd364f753c2b80067dee232cfcef329d34146ac",
+      "after_sha256": "c835181310fd9da0489cbcffcb7c98cf4977c76771be3fcc6f85fd9e661b77af",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+      "before_sha256": "f284085e3daa7d9ffed1ffab11c07c012787bf79642b9ad6ee4ef95a7287e8c2",
+      "after_sha256": "17dce1211a62d8853b56829112738ed9615a9dd7f0d953363a5c01ef760ab820",
+      "before_source": "GATE_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "934d805830e5e311af8d1cb97a342bcbccfdf89403e68d9e246b4f71430f90fd",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "964629a9fc621fa8ac47cdb9508c462759d238ed4f0e9c98e6d195fbc15a9028",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "before_sha256": "95c4beea24837526a420efbae281fe7082bae88033b2bdc8722373b2304fa9b1",
+      "after_sha256": "129368142df38b5ddf9ddde55853db21a030e07a738a885a04509d544a4ea1ed",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "purpose-specific permission denial remains an explicit no-access state",
+    "permission revocation closes active purpose access and walk-session processing",
+    "permission restoration never silently resumes a previously stopped walk session",
+    "lifecycle observation rechecks permission state before protected work continues",
+    "camera and location entry points remain guarded by current permission state",
+    "denial and revocation surfaces provide explicit recovery controls",
+    "permission-state changes stop persistent field-session activity fail closed",
+    "repeated denial and revocation transitions remain deterministic and idempotent",
+    "accessibility semantics expose denial, revocation and recovery status",
+    "focused Android regressions cover policy, lifecycle, accessibility and field logging",
+    "the trace binds the exact eleven-file implementation scope to canonical verification logs"
+  ],
+  "remaining_implementation_boundaries": [
+    "TC-FP-014-01 through TC-FP-014-03 and the 279 formal tests were not run",
+    "actual users, TalkBack users and Android devices were not tested",
+    "Android platform review was not performed",
+    "the operational permission profile was not approved",
+    "production credentials, networks and deployment were not used",
+    "the five release gates were not run or waived"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-014-01",
+      "TC-FP-014-02",
+      "TC-FP-014-03"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "android_platform_review_status": "NOT_RUN",
+    "operational_permission_profile_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

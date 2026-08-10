@@ -1,0 +1,24 @@
+{
+  "date": "2026-05-22",
+  "status": "manual_bbox_queue_prepared",
+  "external_decisions": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_external_ai_review_decisions_2026-05-22.csv",
+  "decision_template": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
+  "queue_out": "ai_tasks/walksafe_tactile_damage_area_review_20260522/bbox_review/manual_bbox_required_40_template_2026-05-22.csv",
+  "rows": 40,
+  "decision_counts_in_external_csv": {
+    "fix_tactile_damage_area_bbox": 14,
+    "add_missing_tactile_damage_area": 26,
+    "accept_existing_labels": 60,
+    "exclude_unclear": 11,
+    "remove_false_damage_area_label": 9
+  },
+  "manual_bbox_decision_counts": {
+    "fix_tactile_damage_area_bbox": 14,
+    "add_missing_tactile_damage_area": 26
+  },
+  "review_order_min": 1,
+  "review_order_max": 117,
+  "unique_review_orders": 40,
+  "required_output_column": "manual_damage_area_boxes_xywhn",
+  "bbox_format": "2:x_center,y_center,width,height; semicolon separated for multiple boxes; normalized to the original full image"
+}

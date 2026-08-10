@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5d4e">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>WalkSafe 기능별 종합 정책서 — 검토용 초안</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18211e;
+      --muted: #56625e;
+      --paper: #f3f6f4;
+      --surface: #fff;
+      --line: #d5ddd9;
+      --brand: #0b5d4e;
+      --brand-dark: #07463b;
+      --brand-soft: #e4f3ed;
+      --blue: #24517e;
+      --blue-soft: #e9f2fc;
+      --amber: #7a4304;
+      --amber-soft: #fff3dc;
+      --red: #8b2929;
+      --red-soft: #fff0f0;
+      --shadow: 0 10px 28px rgba(20, 49, 39, .08);
+      --radius: 18px;
+      --top: 76px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: auto; }
+    body {
+      margin: 0;
+      min-width: 280px;
+      overflow-x: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      font-size: 16px;
+      line-height: 1.68;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    a { color: var(--brand-dark); text-underline-offset: .18em; }
+    button, input, select, textarea { font: inherit; }
+    button, input, select, textarea { min-height: 44px; }
+    button {
+      border: 1px solid #aab7b1;
+      border-radius: 11px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: .58rem .8rem;
+      cursor: pointer;
+      font-weight: 750;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(11, 93, 78, .18);
+    }
+    button:hover { border-color: var(--brand); background: var(--brand-soft); }
+    :focus-visible { outline: 3px solid #176fc1; outline-offset: 3px; }
+    [hidden] { display: none !important; }
+    h1, h2, h3, h4 { line-height: 1.25; text-wrap: balance; }
+    p, li { text-wrap: pretty; }
+    [id] { scroll-margin-top: var(--top); }
+    .skip-link {
+      position: fixed;
+      z-index: 100;
+      top: .5rem;
+      left: .5rem;
+      transform: translateY(-160%);
+      background: white;
+      color: black;
+      border: 2px solid black;
+      padding: .7rem 1rem;
+    }
+    .skip-link:focus { transform: none; }
+    .topbar {
+      position: sticky;
+      z-index: 50;
+      top: 0;
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      min-height: 62px;
+      padding: .5rem max(1rem, env(safe-area-inset-right)) .5rem max(1rem, env(safe-area-inset-left));
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .97);
+      backdrop-filter: blur(10px);
+    }
+    .brand { margin-right: auto; color: var(--ink); text-decoration: none; font-weight: 900; }
+    .topnav, .toolbar { display: flex; gap: .35rem; }
+    .topnav a { padding: .45rem .55rem; border-radius: 8px; text-decoration: none; font-weight: 750; }
+    .topnav a:hover { background: var(--brand-soft); }
+    main { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .hero {
+      margin: 2rem 0 1.5rem;
+      padding: clamp(1.5rem, 5vw, 3.4rem);
+      border-radius: 28px;
+      background: linear-gradient(135deg, #073c33, #0b705b);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+    .eyebrow { margin: 0 0 .35rem; color: inherit; font-size: .78rem; font-weight: 900; letter-spacing: .07em; }
+    .hero h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.6rem); letter-spacing: -.035em; }
+    .hero .subtitle { color: #cff2e6; font-size: 1.22rem; font-weight: 800; }
+    .lead { max-width: 880px; font-size: 1.08rem; }
+    .state-strip { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.15rem 0; }
+    .state-pill { border: 1px solid rgba(255,255,255,.42); border-radius: 999px; background: rgba(0,0,0,.16); padding: .35rem .7rem; font-weight: 800; }
+    .document-meta, .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; }
+    .document-meta div { padding: .8rem; border-radius: 12px; background: rgba(255,255,255,.12); }
+    .document-meta dt { color: #cff2e6; font-size: .8rem; }
+    .document-meta dd { margin: .12rem 0 0; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .report-section, .feature {
+      margin: 1.5rem 0;
+      padding: clamp(1.15rem, 3vw, 2rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .section-heading, .feature-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .section-heading h2, .feature-header h3 { margin: 0; }
+    .section-heading .eyebrow, .feature-header .eyebrow { color: var(--brand); }
+    .metrics div { padding: .9rem; border: 1px solid var(--line); border-radius: 12px; background: #f8faf9; }
+    .metrics strong { display: block; color: var(--brand-dark); font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+    .metrics span { color: var(--muted); font-size: .86rem; }
+    .notice { padding: 1rem; border-left: 6px solid var(--amber); border-radius: 0 12px 12px 0; background: var(--amber-soft); }
+    .notice strong { color: var(--amber); }
+    .reading-grid, .flow-grid, .common-grid, .gate-grid, .area-index, .two-col, .three-col {
+      display: grid;
+      gap: .8rem;
+    }
+    .reading-grid, .common-grid, .area-index { grid-template-columns: repeat(3, 1fr); }
+    .flow-grid, .gate-grid, .two-col { grid-template-columns: repeat(2, 1fr); }
+    .three-col { grid-template-columns: repeat(3, 1fr); }
+    .card, .flow-card, .common-card, .gate-card, .area-index article, .panel {
+      min-width: 0;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: #fbfcfb;
+    }
+    .card h3, .flow-card h3, .common-card h3, .gate-card h3, .panel h4 { margin: 0 0 .45rem; }
+    .flow-card ol { margin-bottom: 0; }
+    .flow-id, .trace-id { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .78rem; color: var(--muted); }
+    .common-card { border-top: 5px solid var(--brand); }
+    .common-card ul, .gate-card ul { margin-bottom: 0; }
+    .gate-card { border-color: #dfbd7d; background: #fffaf1; }
+    .status-badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+    .badge { border-radius: 999px; padding: .32rem .62rem; background: var(--blue-soft); color: var(--blue); font-size: .78rem; font-weight: 850; }
+    .badge.policy { background: var(--brand-soft); color: var(--brand-dark); }
+    .badge.pending { background: var(--amber-soft); color: var(--amber); }
+    .badge.blocked { background: var(--red-soft); color: var(--red); }
+    .filter-panel { display: grid; grid-template-columns: 2fr 1fr 1fr auto; align-items: end; gap: .7rem; padding: 1rem; border-radius: 14px; background: #eef3f0; }
+    .filter-panel label { font-size: .82rem; font-weight: 800; }
+    .filter-panel input, .filter-panel select { display: block; width: 100%; margin-top: .25rem; border: 1px solid #9eada6; border-radius: 9px; background: white; color: var(--ink); padding: .55rem .65rem; }
+    .filter-result { color: var(--muted); }
+    .area-index article { padding: .85rem; }
+    .area-index a { display: block; text-decoration: none; font-weight: 850; }
+    .area-index span { display: block; margin-top: .2rem; color: var(--muted); font-size: .86rem; }
+    .area-index ul { margin: .55rem 0 0; padding-left: 1.15rem; font-size: .86rem; }
+    .area { margin: 2.2rem 0; }
+    .area-header { padding: 1.25rem; border-left: 7px solid var(--brand); border-radius: 0 var(--radius) var(--radius) 0; background: #dfece7; }
+    .area-header h2 { margin: 0; font-size: clamp(1.55rem, 4vw, 2.25rem); }
+    .area-header p { margin-bottom: 0; }
+    .feature { margin-bottom: 2rem; }
+    .feature-header h3 { font-size: clamp(1.4rem, 4vw, 2.05rem); }
+    .policy-summary { margin: 1rem 0; padding: 1.1rem; border: 2px solid var(--brand); border-radius: 14px; background: var(--brand-soft); }
+    .policy-summary span { display: block; color: var(--brand-dark); font-size: .8rem; font-weight: 900; }
+    .policy-summary p { margin: .35rem 0 0; font-size: 1.05rem; font-weight: 750; }
+    .panel ul { margin-bottom: 0; }
+    .arrow { display: grid; place-items: center; color: var(--brand); font-weight: 900; }
+    .io-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: .7rem; align-items: stretch; }
+    .io-grid .panel { background: #edf5fc; }
+    details { margin-top: .8rem; border: 1px solid var(--line); border-radius: 13px; background: white; }
+    details > summary { min-height: 48px; padding: .75rem .9rem; cursor: pointer; font-weight: 850; touch-action: manipulation; }
+    details[open] > summary { border-bottom: 1px solid var(--line); background: #f1f5f3; border-radius: 13px 13px 0 0; }
+    .details-body { padding: .9rem 1rem; }
+    .decision-card { padding: .8rem; border-left: 4px solid var(--blue); background: var(--blue-soft); }
+    .decision-card + .decision-card { margin-top: .7rem; }
+    .decision-card h5 { margin: 0 0 .4rem; font-size: 1rem; }
+    .decision-card p { margin: .35rem 0; }
+    .not-applicable { color: var(--muted); font-style: italic; }
+    .common-effects { padding: 0; list-style: none; }
+    .common-effects li { margin-top: .45rem; padding: .7rem; border: 1px solid #bfd4cb; border-radius: 10px; background: #f6fbf8; }
+    .common-effects strong { display: block; }
+    .superseded-note { padding: .75rem; border-radius: 10px; background: #f4f4f4; color: var(--muted); }
+    .trace-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    .trace-table th, .trace-table td { padding: .55rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .trace-table th { background: #eef3f0; }
+    .table-wrap { max-width: 100%; overflow-x: auto; }
+    .table-wrap[tabindex]:focus-visible { outline: 3px solid #176fc1; outline-offset: 3px; }
+    #reviewer-name {
+      width: min(100%, 28rem);
+      border: 1px solid #9eada6;
+      border-radius: 9px;
+      background: white;
+      color: var(--ink);
+      padding: .55rem .65rem;
+    }
+    #import-review-file { max-width: 100%; padding: .35rem; }
+    #review-progress {
+      min-height: 1.7em;
+      margin: .65rem 0 .25rem;
+      color: var(--brand-dark);
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+    }
+    #review-status { min-height: 1.7em; margin: .25rem 0 0; color: var(--muted); }
+    #review-status[data-state="success"] { color: var(--brand-dark); }
+    #review-status[data-state="error"] { color: var(--red); font-weight: 750; }
+    .review-controls {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid #bfd4cb;
+      border-radius: 13px;
+      background: #f6fbf8;
+    }
+    .review-controls fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+    .review-controls legend { margin-bottom: .55rem; font-weight: 900; }
+    .review-controls fieldset label {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      min-height: 44px;
+      padding: .45rem .65rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(11, 93, 78, .18);
+    }
+    .review-controls fieldset label:hover { border-color: var(--brand); background: var(--brand-soft); }
+    .review-controls fieldset label:focus-within { border-color: #176fc1; }
+    .review-controls input[type="radio"] {
+      flex: 0 0 auto;
+      width: 1.2rem;
+      height: 1.2rem;
+      min-height: 0;
+      margin: 0;
+      accent-color: var(--brand);
+    }
+    .review-controls textarea {
+      display: block;
+      width: 100%;
+      min-height: 6.5rem;
+      margin-top: .75rem;
+      border: 1px solid #9eada6;
+      border-radius: 9px;
+      background: white;
+      color: var(--ink);
+      padding: .65rem;
+      resize: vertical;
+    }
+    .back-link { display: inline-block; margin-top: 1rem; font-weight: 800; }
+    footer { margin: 2rem 0 3rem; color: var(--muted); text-align: center; }
+    @media (max-width: 900px) {
+      .document-meta, .metrics, .reading-grid, .common-grid, .area-index, .three-col { grid-template-columns: repeat(2, 1fr); }
+      .topnav { display: none; }
+      .filter-panel { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 620px) {
+      main { width: min(100% - 1rem, 1180px); }
+      .hero { margin-top: .8rem; border-radius: 20px; }
+      .document-meta, .metrics, .reading-grid, .flow-grid, .common-grid, .gate-grid, .area-index, .two-col, .three-col, .filter-panel, .io-grid { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .feature-header, .section-heading { display: block; }
+      .status-badges { justify-content: flex-start; margin-top: .65rem; }
+      .topbar .toolbar button:not(#print-report) { display: none; }
+      #policy-review .toolbar { flex-direction: column; align-items: stretch; gap: .6rem; }
+      #policy-review .toolbar > button, #policy-review .toolbar > label { width: 100%; }
+      #import-review-file { display: block; width: 100%; margin-top: .35rem; }
+      .review-controls fieldset { display: grid; grid-template-columns: 1fr; gap: .45rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+    }
+    @media print {
+      @page { size: A4; margin: 13mm; }
+      body { background: white; font-size: 10.5pt; }
+      .topbar, .filter-panel, .filter-result, .toolbar, .back-link, .screen-only, .review-controls, footer { display: none !important; }
+      main { width: 100%; }
+      .hero { margin-top: 0; color: black; background: white; border: 2px solid #333; box-shadow: none; }
+      .hero .subtitle, .document-meta dt { color: #333; }
+      .document-meta div { border: 1px solid #bbb; background: white; }
+      .report-section, .feature { box-shadow: none; break-inside: auto; }
+      .feature-header, .policy-summary, .panel, .decision-card, .common-card, .gate-card { break-inside: avoid; }
+      details { break-inside: auto; }
+      details > summary { display: none; }
+      .details-body { padding: .6rem 0; }
+      .trace-only { display: none !important; }
+      a { color: black; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">본문으로 바로가기</a>
+  <header class="topbar">
+    <a class="brand" href="#document-top">WalkSafe 정책서</a>
+    <nav class="topnav" aria-label="문서 주요 목차">
+      <a href="#reading-guide">읽는 방법</a>
+      <a href="#policy-review">검토 저장</a>
+      <a href="#common-policies">공통 정책</a>
+      <a href="#feature-index">기능 목차</a>
+      <a href="#remaining-gates">남은 확인</a>
+    </nav>
+    <div class="toolbar">
+      <button type="button" id="expand-all">세부내용 모두 펼치기</button>
+      <button type="button" id="collapse-all">세부내용 모두 접기</button>
+      <button type="button" id="print-report">인쇄·PDF</button>
+    </div>
+  </header>
+  <main id="main-content">
+    __STATIC_REPORT__
+  </main>
+  <footer>이 문서는 검토용 정책 초안이며 공식 승인된 설계 기준이나 출시 허가가 아닙니다.</footer>
+  <script id="report-data" type="application/json">__REPORT_DATA__</script>
+  <script>
+    (() => {
+      "use strict";
+      const report = JSON.parse(document.getElementById("report-data").textContent);
+      const search = document.getElementById("feature-search");
+      const area = document.getElementById("area-filter");
+      const gate = document.getElementById("gate-filter");
+      const result = document.getElementById("filter-result");
+      const REVIEW_SCHEMA = "walksafe.feature-policy-baseline-review-answers.v1";
+      const REVIEW_DECISIONS = new Set(["confirm", "revise", "hold"]);
+
+      function captureView() {
+        const active = document.activeElement;
+        const canSelect = active && typeof active.selectionStart === "number";
+        return {
+          active,
+          selectionStart: canSelect ? active.selectionStart : null,
+          selectionEnd: canSelect ? active.selectionEnd : null,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+        };
+      }
+
+      function restoreView(view) {
+        if (view.active?.isConnected && document.activeElement !== view.active) {
+          view.active.focus({ preventScroll: true });
+        }
+        if (view.active?.isConnected && view.selectionStart !== null && typeof view.active.setSelectionRange === "function") {
+          view.active.setSelectionRange(view.selectionStart, view.selectionEnd);
+        }
+        if (window.scrollX !== view.scrollX || window.scrollY !== view.scrollY) {
+          window.scrollTo(view.scrollX, view.scrollY);
+        }
+      }
+
+      function preserveView(change) {
+        const view = captureView();
+        change();
+        restoreView(view);
+      }
+
+      function readQuery() {
+        const params = new URLSearchParams(location.search);
+        search.value = params.get("q") || "";
+        const requestedArea = params.get("area") || "all";
+        const requestedGate = params.get("gate") || "all";
+        const hasArea = Array.from(area.options).some((option) => option.value === requestedArea);
+        const hasGate = Array.from(gate.options).some((option) => option.value === requestedGate);
+        area.value = hasArea ? requestedArea : "all";
+        gate.value = hasGate ? requestedGate : "all";
+        return !hasArea || !hasGate;
+      }
+
+      function writeQuery() {
+        const params = new URLSearchParams();
+        if (search.value.trim()) params.set("q", search.value.trim());
+        if (area.value !== "all") params.set("area", area.value);
+        if (gate.value !== "all") params.set("gate", gate.value);
+        const query = params.toString();
+        history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}${location.hash}`);
+      }
+
+      function applyFilters({ updateUrl = true, preservePosition = true } = {}) {
+        const update = () => {
+          const query = search.value.trim().toLocaleLowerCase("ko");
+          let visible = 0;
+          document.querySelectorAll(".feature[data-feature-id]").forEach((feature) => {
+            const gates = (feature.dataset.gateIds || "").split(" ").filter(Boolean);
+            const matches = (!query || feature.dataset.search.toLocaleLowerCase("ko").includes(query))
+              && (area.value === "all" || feature.dataset.areaId === area.value)
+              && (gate.value === "all" || (gate.value === "none" ? gates.length === 0 : gates.includes(gate.value)));
+            feature.hidden = !matches;
+            if (matches) visible += 1;
+          });
+          document.querySelectorAll("[data-area-section]").forEach((section) => {
+            section.hidden = !section.querySelector(".feature:not([hidden])");
+          });
+          result.textContent = `${report.summary.feature_count}개 기능 중 ${visible}개를 표시하고 있습니다.`;
+          if (updateUrl) writeQuery();
+        };
+        if (preservePosition) preserveView(update);
+        else update();
+      }
+
+      function clearFilters() {
+        search.value = "";
+        area.value = "all";
+        gate.value = "all";
+        applyFilters();
+      }
+
+      function scrollAfterLayout(target) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+        });
+      }
+
+      function revealFilteredHashTarget(target) {
+        if (!target || !target.closest("[hidden]")) return false;
+        clearFilters();
+        scrollAfterLayout(target);
+        return true;
+      }
+
+      function initializeReview() {
+        const reviewer = document.getElementById("reviewer-name");
+        const progress = document.getElementById("review-progress");
+        const status = document.getElementById("review-status");
+        const exportButton = document.getElementById("export-review");
+        const importFile = document.getElementById("import-review-file");
+        const clearButton = document.getElementById("clear-review");
+        const units = Array.from(document.querySelectorAll("[data-review-unit-id]"));
+        if (!reviewer || !progress || !status || !exportButton || !importFile || !clearButton || units.length === 0) return;
+
+        progress.setAttribute("aria-live", "polite");
+        status.setAttribute("role", "status");
+        status.setAttribute("aria-live", "polite");
+
+        const expectedCount = report.summary.feature_count + report.summary.normalized_constant_count;
+        const ids = units.map((unit) => unit.dataset.reviewUnitId);
+        const idSet = new Set(ids);
+        const storageKey = `walksafe-feature-policy-review:${report.document_content_sha256}`;
+
+        function setStatus(message, state = "") {
+          status.textContent = message;
+          if (state) status.dataset.state = state;
+          else delete status.dataset.state;
+        }
+
+        function failConfiguration(message) {
+          exportButton.disabled = true;
+          importFile.disabled = true;
+          clearButton.disabled = true;
+          setStatus(`검토 입력을 시작할 수 없습니다: ${message} 문서를 다시 생성하세요.`, "error");
+        }
+
+        if (ids.length !== expectedCount || idSet.size !== ids.length || ids.some((id) => !id)) {
+          failConfiguration("검토 항목 ID 구성이 문서와 맞지 않습니다.");
+          return;
+        }
+
+        const controls = new Map();
+        for (const unit of units) {
+          const id = unit.dataset.reviewUnitId;
+          const reviewControls = unit.matches(".review-controls") ? unit : unit.querySelector(".review-controls");
+          const radios = Array.from(reviewControls?.querySelectorAll('input[type="radio"]') || []);
+          const note = reviewControls?.querySelector("[data-review-note]");
+          const values = new Set(radios.map((radio) => radio.value));
+          if (radios.length !== REVIEW_DECISIONS.size || values.size !== REVIEW_DECISIONS.size
+              || Array.from(REVIEW_DECISIONS).some((value) => !values.has(value))
+              || radios.some((radio) => radio.name !== `review-${id}`) || !note) {
+            failConfiguration(`${id}의 선택지나 메모 입력란이 올바르지 않습니다.`);
+            return;
+          }
+          controls.set(id, { radios, note });
+        }
+
+        function collectItems({ requireDecision = false } = {}) {
+          return ids.map((id) => {
+            const control = controls.get(id);
+            const selected = control.radios.find((radio) => radio.checked);
+            if (requireDecision && !selected) throw new Error(`${id} 항목을 아직 선택하지 않았습니다.`);
+            return { id, decision: selected?.value || null, note: control.note.value };
+          });
+        }
+
+        function updateProgress() {
+          const items = collectItems();
+          const answered = items.filter((item) => item.decision !== null).length;
+          const revise = items.filter((item) => item.decision === "revise").length;
+          const hold = items.filter((item) => item.decision === "hold").length;
+          progress.textContent = `${ids.length}개 중 ${answered}개 확인 · 수정 필요 ${revise}개 · 보류 ${hold}개`;
+        }
+
+        function saveLocal() {
+          const state = {
+            schema_version: REVIEW_SCHEMA,
+            report_id: report.metadata.document_id,
+            document_content_sha256: report.document_content_sha256,
+            source_binding_sha256: report.source_binding_sha256,
+            reviewer: reviewer.value,
+            items: collectItems(),
+          };
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(state));
+          } catch (error) {
+            setStatus("브라우저 자동 저장에 실패했습니다. 입력을 마친 뒤 검토 결과 파일을 내보내 보관하세요.", "error");
+          }
+        }
+
+        function applyItems(items, reviewerName) {
+          const byId = new Map(items.map((item) => [item.id, item]));
+          preserveView(() => {
+            reviewer.value = reviewerName;
+            for (const id of ids) {
+              const item = byId.get(id);
+              const control = controls.get(id);
+              control.radios.forEach((radio) => { radio.checked = radio.value === item.decision; });
+              control.note.value = item.note;
+            }
+            updateProgress();
+          });
+        }
+
+        function validateImport(payload) {
+          if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("JSON 최상위 형식이 올바르지 않습니다.");
+          if (payload.schema_version !== REVIEW_SCHEMA) throw new Error("답변 파일 형식 버전이 다릅니다.");
+          if (payload.report_id !== report.metadata.document_id) throw new Error("다른 정책서에서 만든 답변입니다.");
+          if (payload.document_content_sha256 !== report.document_content_sha256) throw new Error("정책서 내용 지문이 다릅니다.");
+          if (payload.source_binding_sha256 !== report.source_binding_sha256) throw new Error("정책서 입력자료 지문이 다릅니다.");
+          if (payload.baseline_status !== "NOT_APPROVED") throw new Error("기준선 상태가 NOT_APPROVED가 아닙니다.");
+          if (typeof payload.reviewer !== "string" || !payload.reviewer.trim()) throw new Error("검토자 이름이 비어 있습니다.");
+          if (typeof payload.exported_at !== "string" || Number.isNaN(Date.parse(payload.exported_at))) throw new Error("내보낸 시각이 올바르지 않습니다.");
+          if (!Array.isArray(payload.items) || payload.items.length !== ids.length) throw new Error("검토 항목 수가 현재 문서와 다릅니다.");
+          const importedIds = new Set();
+          for (const item of payload.items) {
+            if (!item || typeof item !== "object" || Array.isArray(item) || typeof item.id !== "string") {
+              throw new Error("검토 항목 형식이 올바르지 않습니다.");
+            }
+            if (!idSet.has(item.id) || importedIds.has(item.id)) throw new Error(`검토 항목 ID ${item.id}가 없거나 중복되었습니다.`);
+            if (!REVIEW_DECISIONS.has(item.decision)) throw new Error(`${item.id}의 선택값이 올바르지 않습니다.`);
+            if (typeof item.note !== "string") throw new Error(`${item.id}의 메모가 문자열이 아닙니다.`);
+            importedIds.add(item.id);
+          }
+          if (importedIds.size !== idSet.size || ids.some((id) => !importedIds.has(id))) {
+            throw new Error("현재 문서의 검토 항목 ID가 모두 들어 있지 않습니다.");
+          }
+          return payload;
+        }
+
+        function restoreLocal() {
+          let saved;
+          try {
+            saved = localStorage.getItem(storageKey);
+            if (!saved) return;
+            const payload = JSON.parse(saved);
+            if (payload.schema_version !== REVIEW_SCHEMA || payload.report_id !== report.metadata.document_id
+                || payload.document_content_sha256 !== report.document_content_sha256
+                || payload.source_binding_sha256 !== report.source_binding_sha256
+                || typeof payload.reviewer !== "string" || !Array.isArray(payload.items)
+                || payload.items.length !== ids.length) {
+              throw new Error("저장된 답변이 현재 문서와 맞지 않습니다.");
+            }
+            const savedIds = new Set();
+            for (const item of payload.items) {
+              if (!item || typeof item.id !== "string" || !idSet.has(item.id) || savedIds.has(item.id)
+                  || (item.decision !== null && !REVIEW_DECISIONS.has(item.decision)) || typeof item.note !== "string") {
+                throw new Error("저장된 답변 항목이 올바르지 않습니다.");
+              }
+              savedIds.add(item.id);
+            }
+            if (savedIds.size !== idSet.size) throw new Error("저장된 답변 항목이 빠졌습니다.");
+            applyItems(payload.items, payload.reviewer);
+            setStatus("이 문서에 자동 저장된 검토 내용을 복원했습니다.", "success");
+          } catch (error) {
+            try { localStorage.removeItem(storageKey); } catch (storageError) { /* 다음 입력 때 다시 안내합니다. */ }
+            setStatus(`${error.message} 새로 검토하거나 올바른 검토 결과 파일을 불러오세요.`, "error");
+          }
+        }
+
+        function exportReview() {
+          try {
+            const reviewerName = reviewer.value.trim();
+            if (!reviewerName) throw new Error("검토자 이름을 먼저 입력하세요.");
+            const payload = {
+              schema_version: REVIEW_SCHEMA,
+              report_id: report.metadata.document_id,
+              document_content_sha256: report.document_content_sha256,
+              source_binding_sha256: report.source_binding_sha256,
+              baseline_status: "NOT_APPROVED",
+              reviewer: reviewerName,
+              exported_at: new Date().toISOString(),
+              items: collectItems({ requireDecision: true }),
+            };
+            const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const download = document.createElement("a");
+            download.href = url;
+            download.download = "walksafe-feature-policy-baseline-review-answers.json";
+            download.click();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
+            setStatus("검토 결과 파일을 저장했습니다. 이 파일은 승인 기록이 아니라 설계 기준 검토 입력입니다.", "success");
+          } catch (error) {
+            setStatus(`내보내지 못했습니다: ${error.message}`, "error");
+          }
+        }
+
+        async function importReview() {
+          const file = importFile.files?.[0];
+          if (!file) return;
+          try {
+            const text = (await file.text()).replace(/^\uFEFF/, "");
+            const payload = validateImport(JSON.parse(text));
+            applyItems(payload.items, payload.reviewer);
+            saveLocal();
+            setStatus("현재 정책서와 결속된 검토 답변을 불러왔습니다.", "success");
+          } catch (error) {
+            setStatus(`불러오지 못했습니다: ${error.message} 현재 문서에서 내보낸 답변 파일을 선택하세요.`, "error");
+          } finally {
+            importFile.value = "";
+          }
+        }
+
+        function clearReview() {
+          if (!window.confirm("이 문서에 저장된 검토 선택, 메모, 검토자 이름을 모두 지울까요?")) return;
+          preserveView(() => {
+            reviewer.value = "";
+            for (const control of controls.values()) {
+              control.radios.forEach((radio) => { radio.checked = false; });
+              control.note.value = "";
+            }
+            updateProgress();
+          });
+          try {
+            localStorage.removeItem(storageKey);
+            setStatus("이 문서의 검토 입력과 브라우저 자동 저장 내용을 모두 지웠습니다.", "success");
+          } catch (error) {
+            setStatus("화면 입력은 지웠지만 브라우저 저장 내용을 지우지 못했습니다. 브라우저 사이트 데이터를 확인하세요.", "error");
+          }
+        }
+
+        reviewer.addEventListener("input", () => preserveView(() => { updateProgress(); saveLocal(); }));
+        for (const control of controls.values()) {
+          control.radios.forEach((radio) => radio.addEventListener("change", () => preserveView(() => { updateProgress(); saveLocal(); })));
+          control.note.addEventListener("input", () => preserveView(() => { updateProgress(); saveLocal(); }));
+        }
+        exportButton.addEventListener("click", exportReview);
+        importFile.addEventListener("change", importReview);
+        clearButton.addEventListener("click", clearReview);
+        updateProgress();
+        restoreLocal();
+      }
+
+      for (const control of [search, area, gate]) {
+        control.addEventListener(control === search ? "input" : "change", () => applyFilters());
+      }
+      document.getElementById("clear-filters").addEventListener("click", clearFilters);
+      document.getElementById("expand-all").addEventListener("click", () => {
+        document.querySelectorAll("details").forEach((item) => { item.open = true; });
+      });
+      document.getElementById("collapse-all").addEventListener("click", () => {
+        document.querySelectorAll("details").forEach((item) => { item.open = false; });
+      });
+      document.getElementById("print-report").addEventListener("click", () => window.print());
+      document.addEventListener("click", (event) => {
+        const link = event.target.closest?.('a[href^="#fp-"]');
+        if (!link) return;
+        const target = document.getElementById(link.getAttribute("href").slice(1));
+        if (target?.hidden || target?.closest(".area")?.hidden) {
+          event.preventDefault();
+          clearFilters();
+          history.pushState(null, "", `${location.pathname}${location.search}${link.getAttribute("href")}`);
+          scrollAfterLayout(target);
+        }
+      });
+      window.addEventListener("hashchange", () => {
+        const target = location.hash && document.getElementById(location.hash.slice(1));
+        revealFilteredHashTarget(target);
+      });
+      let printState = [];
+      window.addEventListener("beforeprint", () => {
+        printState = Array.from(document.querySelectorAll("details")).map((item) => item.open);
+        document.querySelectorAll("details").forEach((item) => { item.open = true; });
+      });
+      window.addEventListener("afterprint", () => {
+        document.querySelectorAll("details").forEach((item, index) => { item.open = printState[index]; });
+      });
+      const queryWasNormalized = readQuery();
+      applyFilters({ updateUrl: queryWasNormalized, preservePosition: false });
+      const hashTarget = location.hash && document.getElementById(location.hash.slice(1));
+      revealFilteredHashTarget(hashTarget);
+      initializeReview();
+    })();
+  </script>
+</body>
+</html>

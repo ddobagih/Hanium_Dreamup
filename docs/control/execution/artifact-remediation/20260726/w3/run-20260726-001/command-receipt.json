@@ -1,0 +1,119 @@
+{
+  "claim_boundary": {
+    "internal_execution_evidence_only": true,
+    "signing_release_or_approval_claimed": false,
+    "signing_status": "NOT_ASSESSED"
+  },
+  "commands": [
+    {
+      "argv": [
+        "./gradlew",
+        ":app:assembleDebug",
+        ":adminapp:assembleDebug"
+      ],
+      "command_id": "android-internal-build",
+      "cwd": "apps/android",
+      "end": "2026-07-26T15:42:34.053402Z",
+      "exit_code": 0,
+      "log_path": "logs/android-internal-build.log",
+      "log_sha256": "7800998fe62b3111645b05d11e41a21de7c7ba8462be88c0914ce2c7a9394d53",
+      "output_paths": [],
+      "role": "ANDROID_INTERNAL_BUILD",
+      "start": "2026-07-26T15:42:24.672189Z",
+      "tool_version": "Gradle 9.3.1"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "-c",
+        "import shutil\nimport sys\nfrom pathlib import Path\n\nrepo = Path.cwd().resolve()\nrun = (repo / sys.argv[1]).resolve() if not Path(sys.argv[1]).is_absolute() else Path(sys.argv[1]).resolve()\nsources = {\n    \"user-app-internal.apk\": repo / \"apps/android/app/build/outputs/apk/debug/app-debug.apk\",\n    \"admin-app-internal.apk\": repo / \"apps/android/adminapp/build/outputs/apk/debug/adminapp-debug.apk\",\n}\nfor name, source in sources.items():\n    if source.is_symlink() or not source.is_file() or source.stat().st_size <= 0:\n        raise SystemExit(f\"invalid Android build output: {source}\")\n    target = run / \"artifacts\" / name\n    target.parent.mkdir(parents=True, exist_ok=True)\n    shutil.copyfile(source, target)\n",
+        "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-001"
+      ],
+      "command_id": "android-artifact-stage",
+      "cwd": ".",
+      "end": "2026-07-26T15:42:34.085484Z",
+      "exit_code": 0,
+      "log_path": "logs/android-artifact-stage.log",
+      "log_sha256": "6ea6a9c718ca87e66624c62b18459e0a7be8b16c138d0816088c9fbd434541d0",
+      "output_paths": [
+        "artifacts/user-app-internal.apk",
+        "artifacts/admin-app-internal.apk"
+      ],
+      "role": "ANDROID_ARTIFACT_STAGE",
+      "start": "2026-07-26T15:42:34.055138Z",
+      "tool_version": "Python 3.14.6"
+    },
+    {
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "command_id": "gateway-internal-build",
+      "cwd": "apps/android-gateway",
+      "end": "2026-07-26T15:42:35.502839Z",
+      "exit_code": 0,
+      "log_path": "logs/gateway-internal-build.log",
+      "log_sha256": "378d920e7c7c8525590ccfadb2d54ee807e45bc5395c51e03a1846bc26cafecc",
+      "output_paths": [],
+      "role": "GATEWAY_INTERNAL_BUILD",
+      "start": "2026-07-26T15:42:34.086173Z",
+      "tool_version": "node v22.22.1; npm 9.2.0"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "-c",
+        "import sys\nimport tarfile\nfrom pathlib import Path\n\nrepo = Path.cwd().resolve()\nrun = (repo / sys.argv[1]).resolve() if not Path(sys.argv[1]).is_absolute() else Path(sys.argv[1]).resolve()\nroot = repo / \"apps/android-gateway\"\npaths = [root / \"package.json\", root / \"package-lock.json\"]\npaths.extend(sorted((root / \"dist\").rglob(\"*\")))\nfiles = []\nfor source in paths:\n    if source.is_symlink():\n        raise SystemExit(f\"gateway package symlink rejected: {source}\")\n    if source.is_file():\n        files.append(source)\ntarget = run / \"artifacts/android-gateway-dist.tar.gz\"\ntarget.parent.mkdir(parents=True, exist_ok=True)\nwith tarfile.open(target, \"w:gz\", format=tarfile.PAX_FORMAT) as archive:\n    for source in files:\n        relative = source.relative_to(root).as_posix()\n        info = tarfile.TarInfo(relative)\n        data = source.read_bytes()\n        info.size = len(data)\n        info.mode = 0o644\n        info.mtime = 0\n        archive.addfile(info, __import__(\"io\").BytesIO(data))\n",
+        "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-001"
+      ],
+      "command_id": "gateway-artifact-package",
+      "cwd": ".",
+      "end": "2026-07-26T15:42:35.534764Z",
+      "exit_code": 0,
+      "log_path": "logs/gateway-artifact-package.log",
+      "log_sha256": "32c1d110f447c7b7dd72f3e65e6fcee1500367e1c14a1b1010347928cf07708a",
+      "output_paths": [
+        "artifacts/android-gateway-dist.tar.gz"
+      ],
+      "role": "GATEWAY_ARTIFACT_PACKAGE",
+      "start": "2026-07-26T15:42:35.510588Z",
+      "tool_version": "Python 3.14.6"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "-c",
+        "import sys\nfrom pathlib import Path\nfrom scripts import build_walksafe_w3_engineering_evidence_20260726 as builder\n\nrepo = Path.cwd().resolve()\nrun = (repo / sys.argv[1]).resolve() if not Path(sys.argv[1]).is_absolute() else Path(sys.argv[1]).resolve()\nfor subject_id in (\"backend\", \"model\", \"config\"):\n    path = run / \"subjects\" / f\"{subject_id}.json\"\n    path.parent.mkdir(parents=True, exist_ok=True)\n    path.write_bytes(builder._json_bytes(builder.build_subject_payload(repo, subject_id)))\n",
+        "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-001"
+      ],
+      "command_id": "source-subject-capture",
+      "cwd": ".",
+      "end": "2026-07-26T15:42:35.595224Z",
+      "exit_code": 0,
+      "log_path": "logs/source-subject-capture.log",
+      "log_sha256": "ebdcfabc8dc8eb00c1720f68d108983704d1237013b831b78346c191b8f69784",
+      "output_paths": [
+        "subjects/backend.json",
+        "subjects/model.json",
+        "subjects/config.json"
+      ],
+      "role": "SOURCE_SUBJECT_CAPTURE",
+      "start": "2026-07-26T15:42:35.535368Z",
+      "tool_version": "Python 3.14.6"
+    }
+  ],
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "6b110cf8a946d29b6c6f43f9427a0a7c788e9b75b8665a9e5c34712a65e439be"
+    }
+  },
+  "schema_version": "walksafe.w3-engineering-evidence.command-receipt.v1",
+  "source_commit": null,
+  "source_identity_basis": "FILESYSTEM_TRAVERSAL_NOT_GIT"
+}

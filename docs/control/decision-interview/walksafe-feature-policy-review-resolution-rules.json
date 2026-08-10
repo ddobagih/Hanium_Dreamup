@@ -1,0 +1,964 @@
+{
+  "schema_version": "walksafe.feature-policy-review-resolution-rules.v1",
+  "resolution_id": "WS-POLICY-RESOLUTION-20260720-001",
+  "rules_version": "1.0.0",
+  "as_of": "2026-07-20",
+  "lifecycle_status": "IN_REVIEW",
+  "change_reason": "최종 종합 검토 답변 76개와 2026-07-20 후속 확정 메모를 기능별 정책 작성 전에 하나의 통제된 적용 입력으로 정규화하고 기능 간 연쇄 영향을 명시한다.",
+  "source_bindings": [
+    {
+      "id": "SRC-CONTROLLED-COMPREHENSIVE-ANSWERS",
+      "path": "docs/control/decision-interview/source-records/walksafe-feature-policy-comprehensive-review-20260719-answers.json",
+      "sha256": "ef840c33215767d210fc930a8087f09e5eda7b99af695ded5cd9d226d8ab5150"
+    },
+    {
+      "id": "SRC-COMPREHENSIVE-ANSWER-INTAKE",
+      "path": "docs/control/decision-interview/source-records/walksafe-feature-policy-comprehensive-review-20260719-answers.intake.json",
+      "sha256": "d837163b9b815e15e1f82bb329511bd4b388ef9b87d4ff6e037e5e57c05c8825"
+    },
+    {
+      "id": "SRC-COMPREHENSIVE-PROPOSALS",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-proposals.json",
+      "sha256": "0bd1764fa2361a27362ead0d022ce8ac80c7b0f8a678800309cda4a611f79401"
+    },
+    {
+      "id": "SRC-BASE-EFFECTIVE-FEATURE-POLICY",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-effective-candidate.json",
+      "sha256": "7d96d66a856409e878127bfc049ee4847fee4ad82c2f15ba93add8923c330bc7"
+    },
+    {
+      "id": "SRC-BASE-EFFECTIVE-DECISION-REGISTER",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register.json",
+      "sha256": "cabec4a7ada26dd9e95827084a3679983eec766df543d7112d7a836cf1bd2009"
+    }
+  ],
+  "expected_review": {
+    "report_id": "WS-POLICY-COMPREHENSIVE-20260719",
+    "report_binding_sha256": "045aa517bb36a77d68f50486f2bd0748b360a9b4519332301340b5ef56b544ce",
+    "reviewed": 76,
+    "accepted": 54,
+    "revision_requested": 22,
+    "held": 0,
+    "global_policy_count": 7,
+    "shared_policy_count": 15,
+    "feature_count": 54,
+    "review_decision_note_binding_sha256": "306a67b6f1da06b157d4547c478fe74a84734e3ac4723c05ee9b0924f63dba8d",
+    "non_empty_note_count": 37,
+    "dated_correction_count": 35,
+    "direct_changed_feature_count": 31,
+    "revised_global_policy_ids": [
+      "GP-04"
+    ],
+    "revised_shared_policy_ids": [
+      "SP-11",
+      "SP-13"
+    ],
+    "revised_feature_ids": [
+      "FP-003",
+      "FP-013",
+      "FP-014",
+      "FP-015",
+      "FP-018",
+      "FP-019",
+      "FP-020",
+      "FP-021",
+      "FP-022",
+      "FP-023",
+      "FP-025",
+      "FP-026",
+      "FP-031",
+      "FP-032",
+      "FP-034",
+      "FP-035",
+      "FP-044",
+      "FP-046",
+      "FP-047"
+    ],
+    "dated_changed_feature_ids": [
+      "FP-003",
+      "FP-011",
+      "FP-013",
+      "FP-014",
+      "FP-015",
+      "FP-017",
+      "FP-018",
+      "FP-019",
+      "FP-020",
+      "FP-021",
+      "FP-022",
+      "FP-023",
+      "FP-024",
+      "FP-025",
+      "FP-026",
+      "FP-031",
+      "FP-032",
+      "FP-033",
+      "FP-034",
+      "FP-035",
+      "FP-036",
+      "FP-038",
+      "FP-041",
+      "FP-042",
+      "FP-043",
+      "FP-044",
+      "FP-045",
+      "FP-046",
+      "FP-047",
+      "FP-048",
+      "FP-053"
+    ]
+  },
+  "policy_precedence": [
+    {
+      "rank": 1,
+      "source": "DATED_CONTROLLED_REVIEW_NOTE",
+      "rule": "2026-07-20 후속 확정 메모는 충돌하는 종합 제안과 이전 유효 후보 문구를 대체한다."
+    },
+    {
+      "rank": 2,
+      "source": "CONTROLLED_REVIEW_DECISION_AND_NOTE",
+      "rule": "accept는 제안을 유지하고 일반 메모를 함께 보존하며 revise는 메모가 다루는 충돌 부분을 교체한다."
+    },
+    {
+      "rank": 3,
+      "source": "COMPREHENSIVE_PROPOSAL",
+      "rule": "후속 메모와 충돌하지 않는 목적·흐름·시험·금지 규칙은 유지한다."
+    },
+    {
+      "rank": 4,
+      "source": "PREVIOUS_EFFECTIVE_CANDIDATE",
+      "rule": "이전 구현 근거와 미결 gate는 정책 변경 뒤 재검증 대상으로 보존한다."
+    }
+  ],
+  "application_rules": {
+    "accept_without_note": "KEEP_PROPOSAL",
+    "accept_with_note": "KEEP_PROPOSAL_AND_APPLY_NOTE",
+    "revise_with_note": "SUPERSEDE_CONFLICTING_CLAUSES_AND_APPLY_NOTE",
+    "hold_with_note": "DO_NOT_AUTHOR_UNTIL_RESOLVED",
+    "dated_note_is_policy_amendment": true,
+    "ordinary_note_is_preserved": true,
+    "cascade_source_notes_are_trace_only": true,
+    "cascade_application_uses_normalized_constants": true,
+    "last_write_wins_allowed": false,
+    "implicit_decision_register_updates_allowed": false,
+    "implementation_evidence_after_policy_change": "REVALIDATION_REQUIRED"
+  },
+  "normalized_policy_constants": [
+    {
+      "id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "scope": "CONSENTED_ACTIVE_WALK_SESSION",
+      "source_review_ids": [
+        "GP-04",
+        "FP-013",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-025",
+        "FP-034",
+        "FP-046"
+      ],
+      "collection_starts": "활성 보행 시작",
+      "collection_stops": [
+        "보행 일시중지",
+        "보행 종료",
+        "철회된 권한에 의존하는 원본 항목의 수집 중지. 남은 기능이 안전하지 않으면 세션 전체 안전정지",
+        "전체 개인정보 삭제 요청",
+        "서버 또는 휴대폰 용량정책에 따른 새 수집 보류"
+      ],
+      "consent_required": true,
+      "non_consent_behavior": "원본 수집을 시작하지 않는다.",
+      "original_definition": "수집 시 생성된 source-quality 압축 원본",
+      "items": [
+        "카메라 영상",
+        "RGB·depth·confidence",
+        "마이크 음성과 STT 입력·결과",
+        "정확 위치·속도·이동방향",
+        "TMAP 검색어·목적지·경로",
+        "가속도·회전·보폭·걸음 수",
+        "객체 탐지·거리·위험판정·모델·설정 버전",
+        "자동신고 사진·위치·판정근거",
+        "성능·오류·업로드 상태"
+      ],
+      "bystander_face_plate_voice_masking_at_collection": "NONE",
+      "required_first_consent_explanation": [
+        "수집 항목",
+        "이용 목적",
+        "전송 시점",
+        "보존기간",
+        "삭제방법"
+      ]
+    },
+    {
+      "id": "NPC-DATA-LIFECYCLE",
+      "source_review_ids": [
+        "FP-023",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-046"
+      ],
+      "retention": {
+        "receipt_confirmed_local_copy_hours": 24,
+        "unsent_local_original_days": 30,
+        "server_intake_and_quarantine_days": 14,
+        "server_general_and_auto_report_original_days": 180,
+        "approved_training_original_label_and_fixed_validation_calendar_years": 3,
+        "approved_intake_copy_delete_rule": "MIN(APPROVAL_PLUS_30_DAYS, UPLOAD_PLUS_180_DAYS)",
+        "rotating_backup_days": 35,
+        "route_cache_delete_rule": "MIN(SESSION_END, 24_HOURS)"
+      },
+      "full_deletion_request_deadlines": {
+        "new_collection_and_transfer": "IMMEDIATE_STOP",
+        "phone_hours": 24,
+        "server_original_quarantine_and_copies_days": 7,
+        "dataset_labels_and_derivatives_days": 30,
+        "backup_days": 35,
+        "hash_only_deletion_receipt_calendar_years": 3
+      },
+      "auto_report_off_deadlines": {
+        "new_candidates": "IMMEDIATE_STOP",
+        "unsent_candidate_hours": 24,
+        "server_original_days": 7
+      },
+      "expiry_normalization": "30일은 모든 미전송 로컬 원본의 절대 상한이다. 용량 압박 정리에서는 만료된 낮은 신뢰도 신고 후보를 먼저 처리하지만, 신뢰도가 높아도 30일이 지나면 정기 만료 처리로 삭제한다.",
+      "route_data_objects": {
+        "local_operational_route_cache": "현재 세션 안내용 사본이며 세션 종료와 24시간 중 먼저 도달한 때 삭제",
+        "consented_uploaded_activity_original": "동의한 활성 보행의 TMAP 검색어·목적지·경로 원본이며 서버 일반 원본 180일 정책 적용"
+      }
+    },
+    {
+      "id": "NPC-SERVER-STORAGE-CAPACITY",
+      "scope": "SERVER_PRIMARY_ORIGINALS_ONLY",
+      "source_review_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "region": "asia-northeast3",
+      "primary_storage_class": "STANDARD",
+      "backup_storage_class": "NEARLINE",
+      "primary_limit_gib": 300,
+      "backup_limit_gib": 300,
+      "physical_total_limit_gib": 600,
+      "system_reserve_outside_primary_limit": true,
+      "monthly_storage_budget_krw": 30000,
+      "pricing_assumption": {
+        "standard_usd_per_gib_month": 0.023,
+        "nearline_usd_per_gib_month": 0.016,
+        "policy_exchange_rate_krw_per_usd": 1500,
+        "calculated_storage_only_krw": 17550
+      },
+      "thresholds": [
+        {
+          "percent": 70,
+          "gib": 210,
+          "action": "ADMIN_ONLY_WARNING"
+        },
+        {
+          "percent": 85,
+          "gib": 255,
+          "action": "STOP_ADDING_NEW_FIELD_TEST_PARTICIPANTS"
+        },
+        {
+          "percent": 95,
+          "gib": 285,
+          "action": "CLEAN_EXPIRED_DATA_THEN_HOLD_NEW_RAW_COLLECTION_SESSIONS"
+        },
+        {
+          "percent": 100,
+          "gib": 300,
+          "action": "SILENTLY_HOLD_NEW_TRAINING_DATA_AND_AUTO_REPORT_CANDIDATES"
+        }
+      ],
+      "always_preserve": [
+        "만료되지 않은 기존 암호화 자료",
+        "실시간 객체 탐지",
+        "실시간 길안내"
+      ],
+      "early_delete_unexpired_originals_for_cost": false,
+      "pipeline_auto_resume_when_capacity_recovers": true,
+      "walking_session_auto_resume": false,
+      "cloud_provisioning_status": "NOT_AUTHORIZED_IN_THIS_STAGE"
+    },
+    {
+      "id": "NPC-PHONE-QUEUE-CAPACITY",
+      "scope": "PHONE_LOCAL_QUEUE_ONLY",
+      "source_review_ids": [
+        "SP-11",
+        "SP-13",
+        "FP-032",
+        "FP-035",
+        "FP-043",
+        "FP-044",
+        "FP-045"
+      ],
+      "byte_limit_status": "MEASUREMENT_REQUIRED_PER_SUPPORTED_DEVICE",
+      "server_gib_or_percentage_thresholds_apply": false,
+      "user_notification_for_data_pipeline_hold": false,
+      "administrator_metric_required": true,
+      "delete_or_hold_order": [
+        "RECREATABLE_TEMP_CACHE",
+        "SERVER_RECEIPT_CONFIRMED_LOCAL_COPY",
+        "EXPIRED_OPTIONAL_TRAINING_DATA",
+        "EXPIRED_LOW_CONFIDENCE_UNSENT_REPORT_CANDIDATE",
+        "HOLD_NEW_TRAINING_DATA_AND_AUTO_REPORT_CANDIDATE_CREATION"
+      ],
+      "priority_protected_records": [
+        "보존기간 안의 미전송 신고",
+        "동의 기록",
+        "철회 기록",
+        "삭제 기록",
+        "보안 기록"
+      ],
+      "safety_stop_notification_rule": "저장공간 때문에 실시간 안전기능을 신뢰할 수 없게 된 경우에만 이유와 중지 상태를 사용자에게 알린다."
+    },
+    {
+      "id": "NPC-AUTO-REPORT",
+      "source_review_ids": [
+        "SP-11",
+        "SP-13",
+        "FP-026",
+        "FP-031",
+        "FP-032",
+        "FP-033",
+        "FP-035",
+        "FP-044",
+        "FP-046"
+      ],
+      "first_consent_explanation_required": true,
+      "candidate_notification": "NONE",
+      "per_candidate_cancel": false,
+      "manual_voice_report_result_notification": true,
+      "settings_master_off": true,
+      "off_behavior": [
+        "새 후보 생성 즉시 중단",
+        "미전송 후보의 전송 중단 및 24시간 안 삭제",
+        "전송 중인 자료의 서버 처리 여부 확인",
+        "서버 원본을 삭제요청 상태로 바꾸고 7일 안 삭제",
+        "처리 결과를 내부 감사기록에 남김"
+      ],
+      "mobile_network_transfer": "OPT_IN_ONLY",
+      "wifi_unavailable_behavior": "암호화 대기열에 보관하고 다음 Wi-Fi 연결 때 전송",
+      "long_unsent_user_notification": false,
+      "upload_after_walk_session_ends": true,
+      "stable_idempotency_key_required": true,
+      "unknown_response_behavior": "같은 idempotency key로 서버 상태를 먼저 조회한 뒤 필요한 경우에만 재시도",
+      "completion_condition": "서버의 전체 파일 commit과 hash 일치 receipt 확인",
+      "local_copy_deletion_condition": "completion_condition 충족 뒤 NPC-DATA-LIFECYCLE 기한에 따라 삭제",
+      "safety_guarantee_claim_allowed": false
+    },
+    {
+      "id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "source_review_ids": [
+        "SP-09",
+        "FP-011",
+        "FP-014",
+        "FP-015",
+        "FP-017",
+        "FP-018"
+      ],
+      "independent_state_axes": [
+        "운영체제 카메라·위치·마이크 권한",
+        "로그인 세션",
+        "원본 수집 동의",
+        "자동신고 ON/OFF",
+        "이동통신망 전송 opt-in"
+      ],
+      "repeat_prompt_for_already_granted_permission": false,
+      "check_os_permission_immediately_before_use": true,
+      "revoked_permission_behavior": "그 권한에 의존하는 기능만 멈추고 기능을 다시 사용할 때 필요한 권한만 요청한다.",
+      "unsafe_remaining_function_behavior": "일반 안전정지 정책에 따라 이유를 알리고 보행기능을 중지한다.",
+      "login_persists_until": [
+        "명시적 로그아웃",
+        "인증 만료",
+        "보안사고"
+      ],
+      "logout_revokes_os_permissions": false,
+      "logout_deletes_server_data_or_consent": false,
+      "app_uninstall_effect": "로컬 로그인 세션과 로컬 자료만 제거",
+      "server_rights_request_channel_outside_app_required": true,
+      "walk_or_route_auto_resume_after_reboot_crash_or_os_kill": false
+    },
+    {
+      "id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "source_review_ids": [
+        "SP-14",
+        "FP-022",
+        "FP-023",
+        "FP-024",
+        "FP-042",
+        "FP-044"
+      ],
+      "direction_responsibility": {
+        "actual_movement_direction": "TRUSTED_GPS",
+        "desired_direction_and_turn": "STORED_TMAP_ROUTE",
+        "camera_view_direction": "ROTATION_SENSOR_AND_ARCORE",
+        "stride_for_direction": "PROHIBITED"
+      },
+      "stride_policy": {
+        "before_personalization": "GENERAL_AVERAGE_STRIDE",
+        "personalization_input": "TRUSTED_GPS_DISTANCE_AND_STEP_COUNT",
+        "remaining_distance_role": "SUPPORTING_INPUT_ONLY",
+        "arrival_role": "SUPPORTING_INPUT_ONLY",
+        "route_deviation_role": "PROGRESS_VALIDATION_ONLY",
+        "gps_unreliable_behavior": "보폭으로 위치나 방향을 대신 판단하지 않고 방향 안내를 일시중지"
+      },
+      "remaining_distance_primary": "GPS_AND_STORED_TMAP_ROUTE",
+      "arrival_confirmation": "GPS, 경로 끝, 보폭 진행량을 함께 확인한 뒤 사용자 확인",
+      "deviation_primary": "GPS_TO_STORED_ROUTE_DISTANCE_WITH_ACCURACY_AND_CONSECUTIVE_OBSERVATIONS",
+      "deviation_flow": [
+        "최초 TMAP 경로 전체를 휴대폰에 저장",
+        "현재 위치와 저장 경로를 휴대폰에서 비교",
+        "GPS 한 점만으로 확정하지 않음",
+        "위치 정확도·경로 거리·연속 관측을 함께 사용",
+        "이탈 의심 시 오래된 회전안내 일시중지",
+        "이탈 확정 시 상황 설명",
+        "새 경로 요청·위치 다시 확인·길안내 종료 중 사용자 선택",
+        "새 경로 요청을 선택한 경우에만 TMAP 재호출",
+        "안전시험 전 기존 경로 계속 따라가기 미제공",
+        "저장 경로를 세션 종료와 24시간 중 먼저 도달한 때 삭제"
+      ],
+      "reroute_on_network_recovery": false
+    },
+    {
+      "id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "source_review_ids": [
+        "SP-15",
+        "FP-003",
+        "FP-047",
+        "FP-048"
+      ],
+      "administrator_count": 1,
+      "final_approver_count": 1,
+      "two_independent_recovery_approvers_required": false,
+      "authentication": "MFA_OR_PASSKEY",
+      "recovery_material_location": "관리자 휴대전화 밖의 복구코드 또는 보안키",
+      "remote_device_session_revocation_required": true,
+      "separate_encrypted_backup_items": [
+        "서버키",
+        "서명키",
+        "관리자 복구자료"
+      ],
+      "shared_or_hidden_bypass_password_allowed": false,
+      "access_loss_behavior": "복구할 때까지 출시·권한 변경·데이터 삭제 등 고위험 작업 동결",
+      "pre_field_test_or_deployment_recovery_drill_count": 1,
+      "independent_domain_review_gates_removed": false
+    },
+    {
+      "id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "scope": "SERVER_TO_PHONE_CONTROL_STATE",
+      "source_review_ids": [
+        "SP-11",
+        "FP-032",
+        "FP-053"
+      ],
+      "parameter_status": "PENDING_ENGINEERING_REVIEW",
+      "state_version_and_observed_at_required": true,
+      "required_refresh_events": [
+        "앱 시작 때 온라인이면 조회",
+        "네트워크 재연결 때 조회"
+      ],
+      "online_poll_interval_minutes": null,
+      "state_ttl_minutes": null,
+      "offline_or_stale_behavior": "휴대폰 자체 대기열 상한을 적용하고 후보를 로컬에 보관하며, 재연결 뒤 최신 서버 상태를 받은 후 업로드·새 서버 수집 세션 허용 여부를 다시 판정한다.",
+      "server_rejection_behavior": "미전송 원본의 30일 보존기간 안에서 휴대폰 암호화 대기열에 유지하고 서버 용량이 확보되면 재시도한다. 30일 만료 시 내부 감사기록을 남기고 정기 만료 처리로 삭제한다."
+    }
+  ],
+  "cascade_groups": [
+    {
+      "id": "CAS-SERVER-AND-PHONE-CAPACITY",
+      "title": "서버와 휴대폰 용량 경계",
+      "constant_ids": [
+        "NPC-SERVER-STORAGE-CAPACITY",
+        "NPC-PHONE-QUEUE-CAPACITY",
+        "NPC-SERVER-CAPACITY-STATE-SYNC"
+      ],
+      "source_review_ids": [
+        "SP-11",
+        "SP-13",
+        "SP-14",
+        "FP-031",
+        "FP-032",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-041",
+        "FP-043",
+        "FP-044",
+        "FP-045",
+        "FP-046",
+        "FP-048",
+        "FP-053"
+      ],
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-041",
+        "FP-043",
+        "FP-044",
+        "FP-045",
+        "FP-046",
+        "FP-048",
+        "FP-052",
+        "FP-053",
+        "FP-054"
+      ]
+    },
+    {
+      "id": "CAS-RAW-COLLECTION-RETENTION-DELETION",
+      "title": "원본 수집·보존·삭제",
+      "constant_ids": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "source_review_ids": [
+        "GP-04",
+        "FP-013",
+        "FP-015",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-022",
+        "FP-023",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-041",
+        "FP-046",
+        "FP-048",
+        "FP-053"
+      ],
+      "affected_feature_ids": [
+        "FP-013",
+        "FP-015",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-022",
+        "FP-023",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-041",
+        "FP-046",
+        "FP-048",
+        "FP-053",
+        "FP-054"
+      ]
+    },
+    {
+      "id": "CAS-AUTO-REPORT",
+      "title": "자동신고 생성·전송·중단·삭제",
+      "constant_ids": [
+        "NPC-AUTO-REPORT",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-PHONE-QUEUE-CAPACITY"
+      ],
+      "source_review_ids": [
+        "SP-11",
+        "SP-13",
+        "FP-026",
+        "FP-031",
+        "FP-032",
+        "FP-033",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-043",
+        "FP-044",
+        "FP-046",
+        "FP-053"
+      ],
+      "affected_feature_ids": [
+        "FP-026",
+        "FP-031",
+        "FP-032",
+        "FP-033",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-043",
+        "FP-044",
+        "FP-046",
+        "FP-053"
+      ]
+    },
+    {
+      "id": "CAS-PERMISSION-LOGIN-CONSENT",
+      "title": "권한·로그인·동의·철회 상태",
+      "constant_ids": [
+        "NPC-PERMISSION-SESSION-LIFECYCLE",
+        "NPC-RAW-ORIGINAL-COLLECTION"
+      ],
+      "source_review_ids": [
+        "SP-09",
+        "FP-010",
+        "FP-011",
+        "FP-013",
+        "FP-014",
+        "FP-015",
+        "FP-017",
+        "FP-018",
+        "FP-019",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-043",
+        "FP-046",
+        "FP-047"
+      ],
+      "affected_feature_ids": [
+        "FP-010",
+        "FP-011",
+        "FP-013",
+        "FP-014",
+        "FP-015",
+        "FP-017",
+        "FP-018",
+        "FP-019",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-043",
+        "FP-046",
+        "FP-047"
+      ]
+    },
+    {
+      "id": "CAS-ROUTE-STRIDE-DIRECTION",
+      "title": "경로·보폭·방향 책임",
+      "constant_ids": [
+        "NPC-NAVIGATION-ROUTE-DIRECTION",
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "source_review_ids": [
+        "SP-14",
+        "FP-017",
+        "FP-018",
+        "FP-022",
+        "FP-023",
+        "FP-024",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-040",
+        "FP-042",
+        "FP-043",
+        "FP-044"
+      ],
+      "affected_feature_ids": [
+        "FP-017",
+        "FP-018",
+        "FP-022",
+        "FP-023",
+        "FP-024",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-040",
+        "FP-042",
+        "FP-043",
+        "FP-044"
+      ]
+    },
+    {
+      "id": "CAS-SINGLE-ADMIN-RECOVERY",
+      "title": "단일 관리자·복구·고위험 작업 동결",
+      "constant_ids": [
+        "NPC-SINGLE-ADMIN-RECOVERY"
+      ],
+      "source_review_ids": [
+        "SP-08",
+        "SP-12",
+        "SP-15",
+        "FP-003",
+        "FP-008",
+        "FP-033",
+        "FP-039",
+        "FP-047",
+        "FP-048",
+        "FP-051",
+        "FP-052",
+        "FP-053",
+        "FP-054"
+      ],
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-008",
+        "FP-033",
+        "FP-039",
+        "FP-047",
+        "FP-048",
+        "FP-051",
+        "FP-052",
+        "FP-053",
+        "FP-054"
+      ]
+    }
+  ],
+  "known_conflict_replacements": [
+    {
+      "id": "KCR-RAW-MINIMUM-AND-MASKING",
+      "superseding_review_ids": [
+        "GP-04",
+        "FP-013",
+        "FP-034",
+        "FP-046"
+      ],
+      "affected_feature_ids": [
+        "FP-013",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-025",
+        "FP-034",
+        "FP-036",
+        "FP-046"
+      ],
+      "stale_active_concepts": [
+        "필요한 최소 원본만 수집",
+        "얼굴·번호판·주변 목소리를 저장 전에 기본 가림",
+        "호출어 뒤 짧은 음성만 저장"
+      ],
+      "replacement": "동의한 활성 보행 세션에서 NPC-RAW-ORIGINAL-COLLECTION 범위의 무가림 원본을 수집한다."
+    },
+    {
+      "id": "KCR-PERMISSION-ALL-STOP",
+      "superseding_review_ids": [
+        "SP-09",
+        "FP-014",
+        "FP-018"
+      ],
+      "affected_feature_ids": [
+        "FP-014",
+        "FP-015",
+        "FP-017",
+        "FP-018",
+        "FP-043"
+      ],
+      "stale_active_concepts": [
+        "권한 하나 철회 시 항상 모든 기능 종료",
+        "로그아웃이 운영체제 권한을 자동 철회"
+      ],
+      "replacement": "철회 권한에 의존하는 기능만 멈추되 남은 기능이 안전하지 않을 때만 전체 안전정지한다."
+    },
+    {
+      "id": "KCR-AUTO-REPORT-NOTIFY-CANCEL",
+      "superseding_review_ids": [
+        "FP-026",
+        "FP-031",
+        "FP-033"
+      ],
+      "affected_feature_ids": [
+        "FP-026",
+        "FP-031",
+        "FP-033"
+      ],
+      "stale_active_concepts": [
+        "자동신고 후보마다 음성·진동·푸시 알림",
+        "자동신고 후보별 취소 절차"
+      ],
+      "replacement": "후보별 알림·취소 없이 설정에서 전체 기능을 끄고 권리요청 화면에서 상태·삭제 결과를 확인한다."
+    },
+    {
+      "id": "KCR-AUTOMATIC-REROUTE",
+      "superseding_review_ids": [
+        "FP-023",
+        "FP-042",
+        "FP-044"
+      ],
+      "affected_feature_ids": [
+        "FP-022",
+        "FP-023",
+        "FP-042",
+        "FP-044"
+      ],
+      "stale_active_concepts": [
+        "경로 이탈 시 자동 재탐색",
+        "네트워크 복구만으로 경로 API 재호출"
+      ],
+      "replacement": "이탈 확정 뒤 사용자가 새 경로 요청을 선택한 경우에만 TMAP을 다시 호출한다."
+    },
+    {
+      "id": "KCR-TWO-RECOVERY-APPROVERS",
+      "superseding_review_ids": [
+        "FP-003",
+        "FP-047"
+      ],
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-047",
+        "FP-048",
+        "FP-052"
+      ],
+      "stale_active_concepts": [
+        "두 명의 독립 확인자",
+        "두 명의 복구 승인자"
+      ],
+      "replacement": "단일 관리자와 휴대전화 밖의 복구수단을 사용하고 복구 전까지 고위험 작업을 동결한다."
+    },
+    {
+      "id": "KCR-CAPACITY-NOTIFICATION-AND-SCOPE",
+      "superseding_review_ids": [
+        "SP-11",
+        "SP-13",
+        "FP-032",
+        "FP-043",
+        "FP-045",
+        "FP-053"
+      ],
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-043",
+        "FP-044",
+        "FP-045",
+        "FP-053"
+      ],
+      "stale_active_concepts": [
+        "자료 대기열 용량 부족을 사용자에게 알림",
+        "휴대폰에 서버 300GiB와 70·85·95·100% 기준 적용"
+      ],
+      "replacement": "자료 pipeline 보류는 사용자에게 알리지 않고 서버와 휴대폰 용량정책을 분리한다."
+    },
+    {
+      "id": "KCR-STRIDE-DIRECTION",
+      "superseding_review_ids": [
+        "FP-022",
+        "FP-024"
+      ],
+      "affected_feature_ids": [
+        "FP-022",
+        "FP-023",
+        "FP-024"
+      ],
+      "stale_active_concepts": [
+        "보폭으로 위치 또는 방향 판단"
+      ],
+      "replacement": "보폭은 진행량 검증에만 쓰고 실제·목표·카메라 방향은 GPS·TMAP·회전센서/ARCore가 각각 담당한다."
+    },
+    {
+      "id": "KCR-FP053-ZERO-COST-CONFLICT",
+      "superseding_review_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "affected_feature_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "stale_active_concepts": [
+        "클라우드 비용 0원과 무기한 원본 보존을 동시에 요구"
+      ],
+      "replacement": "주 원본 300GiB·백업 300GiB·월 30,000원 상한과 만료정책을 적용하며 실제 비용은 측정 gate로 검증한다."
+    }
+  ],
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "kind": "MEASUREMENT",
+      "status": "NOT_RUN",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-044",
+        "FP-045"
+      ],
+      "closure": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다."
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "kind": "ENGINEERING_REVIEW",
+      "status": "NOT_RUN",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-040",
+        "FP-044",
+        "FP-052",
+        "FP-053"
+      ],
+      "closure": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다."
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "kind": "INDEPENDENT_REVIEW",
+      "status": "NOT_RUN",
+      "affected_feature_ids": [
+        "FP-013",
+        "FP-015",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-022",
+        "FP-023",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-041",
+        "FP-046",
+        "FP-048",
+        "FP-049",
+        "FP-050",
+        "FP-053",
+        "FP-054"
+      ],
+      "closure": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다."
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "kind": "MEASUREMENT",
+      "status": "NOT_RUN",
+      "affected_feature_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "closure": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다."
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "kind": "RECOVERY_DRILL",
+      "status": "NOT_RUN",
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-008",
+        "FP-047",
+        "FP-048",
+        "FP-050",
+        "FP-051",
+        "FP-052",
+        "FP-053"
+      ],
+      "closure": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다."
+    }
+  ],
+  "approval_boundary": {
+    "owner_policy_review_status": "REVIEW_COMPLETE_WITH_REVISIONS",
+    "baseline_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "approved_by": null,
+    "approved_at": null,
+    "baseline_approval_recorded": false
+  },
+  "generation_boundary": {
+    "formal_deliverables_generated": false,
+    "html_report_generated": false,
+    "purpose": "다음 기능별 정책 문서 작성에 사용할 통제된 해석·연쇄 영향 입력만 만든다."
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "W4-VALIDATION-20260726-002",
+  "supersedes_failed_run": "W4-VALIDATION-20260726-001",
+  "scope": "FORMAL_DRAFT_AND_TRACE_DETERMINISTIC_REGENERATION_STRUCTURE_ONLY",
+  "commands": [
+    {
+      "command_id": "formal-dev-test-generate",
+      "exit_code": 0,
+      "started_at": "2026-07-27T02:51:15+09:00",
+      "ended_at": "2026-07-27T02:51:16+09:00",
+      "log_sha256": "edfc07941eb1c41f6cc0eb6832ca39f2caf001481009ea00365170d089b495e1"
+    },
+    {
+      "command_id": "trace-integration-generate",
+      "exit_code": 0,
+      "started_at": "2026-07-27T02:51:16+09:00",
+      "ended_at": "2026-07-27T02:51:18+09:00",
+      "log_sha256": "08121f18665215f99174a491fba44c58b6ea99078a94d6cf9b884038451d3f3a"
+    },
+    {
+      "command_id": "formal-dev-test-check",
+      "exit_code": 0,
+      "started_at": "2026-07-27T02:51:18+09:00",
+      "ended_at": "2026-07-27T02:51:19+09:00",
+      "log_sha256": "0e48eafd5a5326e5f315ceae759f06e25329a4abb61f94338168b5da9eb79128"
+    },
+    {
+      "command_id": "trace-integration-check",
+      "exit_code": 0,
+      "started_at": "2026-07-27T02:51:19+09:00",
+      "ended_at": "2026-07-27T02:51:21+09:00",
+      "log_sha256": "827758533d02f233cd083b384ec7b0d26ca3b901caa85e07b18246e70a32677c"
+    },
+    {
+      "command_id": "formal-trace-unit-tests",
+      "exit_code": 0,
+      "started_at": "2026-07-27T02:51:21+09:00",
+      "ended_at": "2026-07-27T02:51:34+09:00",
+      "log_sha256": "2bffe95880569701b0b3ba0606d784c6b5529b450c6c33e070f307fa931d1e30"
+    }
+  ],
+  "subject_bindings": [
+    {
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595",
+      "byte_length": 6221
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+      "byte_length": 248944
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+      "byte_length": 62222
+    },
+    {
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "sha256": "cca58df18d82bb0e8c404309867ac1cbc454ba655d04182ecf6631be61304e65",
+      "byte_length": 52836
+    },
+    {
+      "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+      "sha256": "6969dd85f8cd1270296380bc6a6669fe80f3cd2e832c06613aa1cff29debd1e9",
+      "byte_length": 15004
+    },
+    {
+      "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "sha256": "477faf31e04bbdc5fc7d4d795e58391e915165acae2e7f5961525cf80b743610",
+      "byte_length": 306664
+    },
+    {
+      "path": "docs/deliverables/traceability/README.md",
+      "sha256": "f6036c8d2601e338543aa2043976b3e2e5911440358eb51c4c807425135ebf1f",
+      "byte_length": 4453
+    }
+  ],
+  "result": "PASS",
+  "formal_execution": {
+    "total": 279,
+    "status": "NOT_RUN",
+    "pass_claimed": false
+  },
+  "automated_results_do_not_change_formal_status": true,
+  "release_eligibility": "NOT_ELIGIBLE"
+}

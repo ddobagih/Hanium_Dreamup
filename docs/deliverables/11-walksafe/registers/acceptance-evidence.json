@@ -1,0 +1,282 @@
+{
+  "schema_version": "walksafe.ws-acceptance-evidence-register.v1",
+  "metadata": {
+    "register_id": "WS-ACCEPTANCE-EVIDENCE-001",
+    "title": "WalkSafe 실기기·현장·접근성 증거 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "planned_artifact_type_ids": [
+    "WS-06",
+    "WS-07",
+    "WS-09",
+    "WS-10",
+    "WS-12",
+    "WS-13",
+    "WS-14",
+    "WS-15",
+    "WS-16",
+    "WS-17",
+    "WS-20"
+  ],
+  "scope_rule": "Android 사용자 앱과 별도 Android 관리자 앱이 현행 범위이며 Web/PWA는 WS-16 재승인 전 비활성",
+  "sensitive_evidence_rule": "영상·음성·정확 위치·참여자 원본은 Git 밖에 저장하고 Git에는 외부 ID·SHA-256·접근등급·보존기한만 기록",
+  "items": [
+    {
+      "artifact_type_id": "WS-06",
+      "title": "GPS 정확도·이탈·음영지역 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "지원 Android 기기·장착·통제 경로와 WS-21 안전계획이 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "사전 승인한 거리·시간 기준과 모든 안전중지 case 충족",
+      "blocker": "기기별 실제 수치 기준과 현장 실행이 없음"
+    },
+    {
+      "artifact_type_id": "WS-07",
+      "title": "실제 경로 탐색 현장시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "개발자 통제시험 통과 후 WS-21 참여자 동의·안전요원·중단계획이 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "승인 시나리오 통과, 안전 위해·중단 미처리 0, 대상 사용자 확인",
+      "blocker": "현장시험·참여자 동의가 실행되지 않음"
+    },
+    {
+      "artifact_type_id": "WS-09",
+      "title": "기기별 카메라 추론 성능",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "지원 후보 Android 기기·OS·장착방법·TFLite model이 고정되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "사전 승인한 기기별 성능·안전정지 기준 충족",
+      "blocker": "지원 기기별 임계값과 실측 결과가 없음"
+    },
+    {
+      "artifact_type_id": "WS-10",
+      "title": "TFLite 변환 동등성",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "학습 model과 배포 TFLite, 고정 검증 dataset·전처리·threshold가 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "사전 승인한 동등성 허용오차와 안전 class 기준 충족",
+      "blocker": "AIML-21 동등성 protocol·실행 결과가 없음"
+    },
+    {
+      "artifact_type_id": "WS-12",
+      "title": "소음환경 STT 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "기기 내 한국어 호출어·STT 후보, 정식 명령, 목표 사용자 발화와 소음조건이 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "사전 승인한 명령별 오실행 상한·정확도·지연 충족",
+      "blocker": "STT 조합·허용 발음·시간·수치 기준과 실행이 없음"
+    },
+    {
+      "artifact_type_id": "WS-13",
+      "title": "TTS·진동 안내 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "Android TTS·진동 pattern과 전체 위험·길안내 우선순위 build가 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "모든 필수 안내·중재·장애 안전정지 case 충족",
+      "blocker": "실기기 TTS·진동 결과가 없음"
+    },
+    {
+      "artifact_type_id": "WS-14",
+      "title": "TalkBack·스크린리더 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "가입·로그인·동의·권한·장애·계정관리 화면이 Android build에 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "필수 흐름을 화면을 보지 않고 완료, 접근 불가 차단결함 0",
+      "blocker": "TalkBack 실제 실행 증거가 없음"
+    },
+    {
+      "artifact_type_id": "WS-15",
+      "title": "색상·글자·터치영역 접근성 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "정식 Android 화면과 design token·지원 글자배율이 고정되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "승인 접근성 기준 충족, 필수 화면 차단결함 0",
+      "blocker": "정식 build 기준 실기기 결과가 없음"
+    },
+    {
+      "artifact_type_id": "WS-16",
+      "title": "PWA 설치·오프라인·업데이트 시험",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "NOT_ACTIVE_CURRENT_BASELINE",
+      "activation_condition": "Web/PWA를 공식 지원 제품으로 별도 재승인한 경우에만 활성",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "재승인된 Web/PWA acceptance 기준 충족",
+      "blocker": "현재 기준선에서는 NOT_ACTIVE_CURRENT_BASELINE이며 실행하지 않음"
+    },
+    {
+      "artifact_type_id": "WS-17",
+      "title": "브라우저·OS·기기 호환성 매트릭스",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "둘 이상의 Android OS·기기 조합을 공식 지원할 때 활성",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "공식 지원 조합마다 필수 흐름 결과와 차단결함 0",
+      "blocker": "지원 matrix와 실기기 결과가 없음"
+    },
+    {
+      "artifact_type_id": "WS-20",
+      "title": "실제 휴대폰 E2E 영상·결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_status": "ACTIVE_OR_PENDING_EXECUTION",
+      "activation_condition": "이름 붙인 Android APK·앱·model·설정·서버와 실제 휴대전화 환경이 준비되면 실행",
+      "generation": {
+        "apk_sha256": null,
+        "model_sha256": null,
+        "config_sha256": null,
+        "server_manifest_sha256": null
+      },
+      "device_and_environment": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "동일 release 묶음의 승인 E2E 시나리오 통과, 안전·개인정보·접근성 차단결함 0",
+      "blocker": "Android 실제 휴대전화 E2E를 실행하지 않음"
+    }
+  ],
+  "summary": {
+    "planned": 11,
+    "not_run": 11,
+    "passed": 0,
+    "failed": 0,
+    "inactive_current_baseline": 1,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

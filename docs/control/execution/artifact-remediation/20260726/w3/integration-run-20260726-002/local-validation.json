@@ -1,0 +1,149 @@
+{
+  "checks": [
+    {
+      "check_id": "APPEND-ONLY-PREDECESSOR-BINDING",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-ONE-DEV21-DISPOSITION",
+      "status": "PASS"
+    },
+    {
+      "check_id": "DEV21-NOT-OK-ON-POSTGRES-FAIL",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-SIX-COVERAGE",
+      "status": "PASS"
+    },
+    {
+      "check_id": "COMMAND-RECEIPT-HASHES",
+      "status": "PASS"
+    },
+    {
+      "check_id": "DBFREE-32-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "POSTGRES-EXACT-ONE-FAIL-RECORDED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CLEANUP-CONTAINER-AND-SECRET",
+      "status": "PASS"
+    },
+    {
+      "check_id": "SOURCE-HASH-BINDINGS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "STABLE-W4-W8-GAPS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "FORMAL-GATE-RELEASE-BOUNDARY",
+      "status": "PASS"
+    },
+    {
+      "check_id": "COMMON-CONTENT-FINGERPRINTS",
+      "status": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "actual_cross_process_android_gateway_backend": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "command_receipt_bindings": [
+    {
+      "command_id": "backend-admin-dbfree",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/backend-admin-dbfree.json",
+      "sha256": "46003094e98098620d342e9190d9eab5c8d9ec38068ef7e72b4f500d225119ed"
+    },
+    {
+      "command_id": "docker-image-preflight",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/docker-image-preflight.json",
+      "sha256": "89eb9a816b463e1bd77624523db78f191efdf0ad74101a40d4a8921d340d5870"
+    },
+    {
+      "command_id": "postgis-container-start",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/postgis-container-start.json",
+      "sha256": "763a7590dbc0ca30ae2eb1b27ed21def3693f4217ec2423a0173b2dfe802a2b8"
+    },
+    {
+      "command_id": "postgis-readiness",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/postgis-readiness.json",
+      "sha256": "c2cf5efdea27b34bcbc838dcc56bf98a073f6457434080bd33f7d84b91d7c987"
+    },
+    {
+      "command_id": "postgis-port-discovery",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/postgis-port-discovery.json",
+      "sha256": "26614f855096240ade800d4c05613b63187ee752bc4ba5c78e13e28d217a9083"
+    },
+    {
+      "command_id": "test-database-preflight",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/test-database-preflight.json",
+      "sha256": "2d39ab1d2f8cceddb0dd28d8b2067c3a45d5c281059f3c3691004ec72955c811"
+    },
+    {
+      "command_id": "alembic-upgrade-head",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/alembic-upgrade-head.json",
+      "sha256": "38dcb5a7b8f0b67f63018974df2259e5b04576b161a5d1f9cea895b9c0f766db"
+    },
+    {
+      "command_id": "backend-admin-postgres-node",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/backend-admin-postgres-node.json",
+      "sha256": "cc95b0de2383c939df4d91a33198d0ba0e03f64748ada6836f2e7251d86e2563"
+    },
+    {
+      "command_id": "postgis-container-cleanup",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/postgis-container-cleanup.json",
+      "sha256": "7924706fe6b58262e9171b8b603c901465f9267e87792e08a9162eb1a6ad4943"
+    },
+    {
+      "command_id": "secret-file-removal",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/receipts/secret-file-removal.json",
+      "sha256": "3f7e56af10a667f0386a0ae52ae5006fcca0a1d83bbd86050be31969862cb4b7"
+    }
+  ],
+  "document_id": "WALKSAFE-W3-DEV21-LOCAL-VALIDATION-20260726-002",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "e94f110b373084b4c8e932eb6ef6a7a0c016604c0f2dfe8c8cf25b1103e6faf2"
+    }
+  },
+  "output_bindings": [
+    {
+      "bytes": 25117,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/execution-summary.json",
+      "role": "EXECUTION_SUMMARY",
+      "sha256": "947527ed36df7fb06033aba83e83258ce826f350bdf71be11f0e808d7fa4386b"
+    },
+    {
+      "bytes": 12210,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/integration-current-state.json",
+      "role": "INTEGRATION_CURRENT_STATE_JSON",
+      "sha256": "78fd40fe98a878563eaa11ff2e7e498b6422a807c0e2a9a03842745911da6361"
+    },
+    {
+      "bytes": 2718,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/integration-current-state.md",
+      "role": "INTEGRATION_CURRENT_STATE_MARKDOWN",
+      "sha256": "f58ff0d7ebb113297f31d3ed29cadaccfc27e6b91c5c180985c1b2be9d5dbdb5"
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "schema_version": "walksafe.w3-dev21-local-validation.v2",
+  "status": "PASS"
+}

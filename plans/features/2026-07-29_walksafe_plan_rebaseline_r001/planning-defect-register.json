@@ -1,0 +1,112 @@
+{
+  "schema_version": "1.0",
+  "register_id": "WS-PLANNING-DEFECT-REGISTER-20260729-R001",
+  "prepared_on": "2026-07-29",
+  "status": "PLAN_ONLY_CANDIDATE",
+  "records": [
+    {
+      "defect_id": "PLAN-DEF-001",
+      "severity": "P0",
+      "subject": "STALE_HANDOFF_NEXT_ACTION",
+      "finding": "R001 handoff still selects artifact-register self-digest correction even though R011 closed it with findings zero.",
+      "plan_resolution": "Publish an add-only plan handoff R002 that marks the old action complete and freezes execution.",
+      "status": "CANDIDATE_FILE_CREATED_NOT_ACTIVATED"
+    },
+    {
+      "defect_id": "PLAN-DEF-002",
+      "severity": "P0",
+      "subject": "GAP_R021_FRESHNESS",
+      "finding": "GAP r021 directly reassessed one of 68 rows and carried 67 rows forward.",
+      "plan_resolution": "Require an exact-68 live reassessment with explicit changed and carry-forward sets before r022.",
+      "status": "MITIGATED_IN_PLAN_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-003",
+      "severity": "P0",
+      "subject": "ADMINAPP_FALSE_MISSING",
+      "finding": "GAP-008 and GAP-017 say the separate Android admin app or its recovery boundary is missing although current code and internal tests exist.",
+      "plan_resolution": "Reassess both as at most PARTIAL and preserve operational workflow, provisioning, signing, device and drill residuals.",
+      "status": "REASSESSMENT_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-004",
+      "severity": "P0",
+      "subject": "PRIVACY_DELETION_CROSS_IMPACT",
+      "finding": "GAP-055 does not reflect privacy deletion policy, Android client, Gateway rights ledger and internal tests created by prior work.",
+      "plan_resolution": "Reassess GAP-055 as at most PARTIAL while retaining real-store deletion, backup expiry, legal and operational residuals.",
+      "status": "REASSESSMENT_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-005",
+      "severity": "P0",
+      "subject": "BACKLOG_NEXT_POINTER_SKIP",
+      "finding": "Backlog orders FP-008, FP-046 and NPC-SINGLE-ADMIN-RECOVERY before FP-048 but next_single_action jumps to FP-048 using stale statuses.",
+      "plan_resolution": "Recompute the pointer only after exact-68 reassessment and ready-frontier dependency filtering.",
+      "status": "MITIGATED_IN_PLAN_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-006",
+      "severity": "P1",
+      "subject": "GAP_025_TEXT_COPY",
+      "finding": "GAP-025 current implementation text duplicates another permission gap instead of describing FP-016.",
+      "plan_resolution": "Replace only in a successor with the actual camera-centered, voice and back-navigation boundary.",
+      "status": "TEXT_FIX_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-007",
+      "severity": "P1",
+      "subject": "STALE_RUNTIME_DESCRIPTIONS",
+      "finding": "Current controls change the status basis for GAP-036, GAP-044, GAP-052 and GAP-054; GAP-052 and GAP-054 also need separate current-text correction, and several status-keep rows omit newer partial implementations.",
+      "plan_resolution": "Use hash-bound per-Gap evidence and separate status_disposition from text_fix_required in gap-reassessment-candidates.json.",
+      "status": "REASSESSMENT_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-008",
+      "severity": "P1",
+      "subject": "ARTIFACT_OPEN_COUNT_STALE",
+      "finding": "R003 artifact planning uses open 133 while the current R011 ledger has 126 closed-equivalent and 131 open.",
+      "plan_resolution": "Use the R011 exact routes 62/6/14/4/24/21 in an add-only R004 plan successor.",
+      "status": "MITIGATED_IN_PLAN_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-009",
+      "severity": "P1",
+      "subject": "BASELINE_COMPLETION_CONFLATION",
+      "finding": "OK_BASELINE 124 can be misread as 124 globally completed artifacts.",
+      "plan_resolution": "Report baseline, authored content, acceptance, approval, run, event, closure and release as separate axes.",
+      "status": "MITIGATED_IN_PLAN_CANDIDATE"
+    },
+    {
+      "defect_id": "PLAN-DEF-010",
+      "severity": "P2",
+      "subject": "HISTORICAL_REPLAY_LIVE_DRIFT",
+      "finding": "The expanded frozen wrapper has 35 failing tests and 233 equal seq38/seq39 residuals because some historical checks read current live bytes.",
+      "plan_resolution": "Plan a nonblocking binding-aware historical resolver lane; do not alter frozen v2.2/v2.3 bytes or suppress error strings.",
+      "status": "TECHNICAL_DEBT_PLANNED"
+    },
+    {
+      "defect_id": "PLAN-DEF-011",
+      "severity": "P2",
+      "subject": "RESUMPTION_GUIDE_STATE_DRIFT",
+      "finding": "AGENTS and parts of the runbook or Goal README preserve v2.3 or pre-activation focus text while the checkpoint is active v2.4.",
+      "plan_resolution": "Prepare a versioned addendum or successor only after deciding whether a static plan package change is required.",
+      "status": "SUCCESSOR_REQUIRED_NOT_APPLIED"
+    },
+    {
+      "defect_id": "PLAN-DEF-012",
+      "severity": "P0",
+      "subject": "PREMATURE_NEXT_LEAF_SELECTION",
+      "finding": "No current leaf should be selected from stale r021 status and pointer data.",
+      "plan_resolution": "Freeze product execution until exact-68 reassessment, r022 candidate review and deterministic ready-frontier selection complete.",
+      "status": "MITIGATED_IN_PLAN_CANDIDATE"
+    }
+  ],
+  "summary": {
+    "record_count": 12,
+    "p0_count": 6,
+    "p1_count": 4,
+    "p2_count": 2,
+    "canonical_state_changed": false,
+    "execution_credit": 0
+  }
+}

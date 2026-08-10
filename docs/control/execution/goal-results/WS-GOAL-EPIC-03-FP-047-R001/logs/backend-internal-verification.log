@@ -1,0 +1,16 @@
+........................................................................ [ 19%]
+........................................................................ [ 39%]
+........................................................................ [ 59%]
+........................................................................ [ 79%]
+........................................................................ [ 99%]
+.                                                                        [100%]
+361 passed, 18 deselected in 2.80s
+WALKSAFE_RUN_ID=FP047-20260726-BACKEND-007
+WALKSAFE_COMMAND_SHA256=f94cb5f4e042e07482cc9f79e47d5ce120ddfa2bc7fdfb83a46fb0cb6054d2a0
+WALKSAFE_COMMAND_STARTED_AT=2026-07-26T19:22:26+09:00
+WALKSAFE_COMMAND_ENDED_AT=2026-07-26T19:22:29+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0
+WALKSAFE_EXECUTION_EVENT_SEQUENCE=36
+WALKSAFE_EXECUTION_EVENT_ID=WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP047-20260726-002
+WALKSAFE_EXECUTION_EVENT_SHA256=6f68014716055713d91bf51a8f5dcb12bb1db4e5821985c0d63ad9ce817d8f7b
+WALKSAFE_IMPLEMENTATION_EXACT_31_CONTENT_SET_SHA256=322f38341785f847591276684d848bf864d0dafc4f3ad108a171197449e16cc7

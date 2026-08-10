@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-REVIEW-20260724-001",
+  "evidence_type": "PRESTART_CONTROL_REPAIR_INDEPENDENT_REVIEW",
+  "status": "ACCEPTED",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001",
+  "repository_snapshot_before": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 332,
+    "path_set_sha256": "3c0f927bdca9b78b0cf392665c017e336c1d3135a739b80dddaf692babe74f25",
+    "content_set_sha256": "301f869232b5054890150cace6ab0e6a5d770c26bdb06a7f961396def2db4e89"
+  },
+  "repository_snapshot_after": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 332,
+    "path_set_sha256": "3c0f927bdca9b78b0cf392665c017e336c1d3135a739b80dddaf692babe74f25",
+    "content_set_sha256": "67905dcf2a090cedde9add8b2d0d1756e6595b74616caad0c2e2d73d6c670786"
+  },
+  "changed_paths": [
+    {
+      "path": "scripts/check_walksafe_goal_graph.py",
+      "before_archive_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/before/scripts/check_walksafe_goal_graph.py",
+      "before_sha256": "e8b153a7981d036acab54d577b0aff9ebe985f52fbeecb95e75c3c3c6a3a2b1f",
+      "after_sha256": "64c5e733499029f608dc56d76096bb25a97bfdf043fa483180565a55d7d68d9e"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph.py",
+      "before_archive_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/before/tests/test_walksafe_goal_graph.py",
+      "before_sha256": "4892c0a6e14f6d0445d8a32d1d3cac465ed347af69e77cbe014c27bf6ebea3ce",
+      "after_sha256": "ba195e5c26d8a91eca6b88e09587d2f58fcc213590977d7ef95b434e781db297"
+    }
+  ],
+  "controlled_content_witness_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-CONTROLLED-CONTENT-WITNESS-20260724-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/controlled-content-witness.json",
+    "file_sha256": "7093c693a808ff62fcb87721ef720c55b8a2cb7592ea93642c56541fb4cd160e"
+  },
+  "reviewer": {
+    "id": "CODEX-INDEPENDENT-REVIEWER-WALKSAFE-PRESTART-REPAIR-20260724-001",
+    "role": "INDEPENDENT_CONTROL_REVIEWER",
+    "authority": "INTERNAL_REPOSITORY_CONTROL"
+  },
+  "reviewed_at": "2026-07-24T10:51:21+09:00",
+  "generated_at": "2026-07-24T10:51:21+09:00"
+}

@@ -1,0 +1,211 @@
+{
+  "checks": [
+    {
+      "check_id": "CHK-001",
+      "expected": 257,
+      "name": "LEDGER_RECORD_COUNT_257",
+      "observed": 257,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-002",
+      "expected": 257,
+      "name": "LEDGER_IDS_UNIQUE",
+      "observed": 257,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-003",
+      "expected": true,
+      "name": "LEDGER_QUEUE_EXACT_SET_EQUAL",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-004",
+      "expected": {
+        "EXTERNAL": 49,
+        "INTERNAL_GAP": 48,
+        "N_A_CANDIDATE": 36,
+        "OK": 124
+      },
+      "name": "CANONICAL_COUNTS_MATCH",
+      "observed": {
+        "EXTERNAL": 49,
+        "INTERNAL_GAP": 48,
+        "N_A_CANDIDATE": 36,
+        "OK": 124
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-005",
+      "expected": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "INTERNAL_READY": 37,
+        "INTERNAL_RUN_REQUIRED": 16,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14,
+        "REAL_EVENT_PENDING": 11,
+        "SCOPE_DECISION_PENDING": 45
+      },
+      "name": "QUEUE_COUNTS_MATCH",
+      "observed": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "INTERNAL_READY": 37,
+        "INTERNAL_RUN_REQUIRED": 16,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14,
+        "REAL_EVENT_PENDING": 11,
+        "SCOPE_DECISION_PENDING": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-006",
+      "expected": true,
+      "name": "QUEUE_PARTITIONS_DISJOINT_EXHAUSTIVE",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-007",
+      "expected": true,
+      "name": "PREDECESSOR_FIELDS_PRESERVED",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-008",
+      "expected": 0,
+      "name": "CLOSURE_DELTA_ZERO",
+      "observed": 0,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-009",
+      "expected": {
+        "formal_pass": 0,
+        "owner_approval": 0,
+        "real_event": 0,
+        "release_eligible": 0,
+        "scope_decision": 0,
+        "verified_fact": 0
+      },
+      "name": "APPROVAL_FACT_SCOPE_EVENT_FORMAL_RELEASE_ZERO",
+      "observed": {
+        "formal_pass": 0,
+        "owner_approval": 0,
+        "real_event": 0,
+        "release_eligible": 0,
+        "scope_decision": 0,
+        "verified_fact": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-010",
+      "expected": true,
+      "name": "PACKET_PER_ID_OBSERVATIONS_EXPLICIT_COVERAGE_ONLY",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-011",
+      "expected": 0,
+      "name": "ANDROID_W3_PER_ID_CREDIT_ZERO",
+      "observed": 0,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-012",
+      "expected": 37,
+      "name": "ALL_SOURCE_BINDINGS_HAVE_PHYSICAL_BYTES_SHA256",
+      "observed": 37,
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-013",
+      "expected": {
+        "formal_pass_count": 0,
+        "test_case_count": 279
+      },
+      "name": "FORMAL279_NOT_RUN_PASS_ZERO",
+      "observed": {
+        "formal_pass_count": 0,
+        "test_case_count": 279
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-014",
+      "expected": "0f26d086c21d99b76b12169d02f3da5fafa9f6f52750ebe280899d136a80df92",
+      "name": "LEDGER_NONSELF_INTEGRITY",
+      "observed": "0f26d086c21d99b76b12169d02f3da5fafa9f6f52750ebe280899d136a80df92",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CHK-015",
+      "expected": "a495379086dfcd04a0fcd7221663805c130e1009a8f7af94d669e4fa724cd69c",
+      "name": "EVIDENCE_NONSELF_INTEGRITY",
+      "observed": "a495379086dfcd04a0fcd7221663805c130e1009a8f7af94d669e4fa724cd69c",
+      "status": "PASS"
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, ensure_ascii=false, recursive lexicographic key order, compact separators, final LF",
+    "content_sha256": "d8310fdea09287b6c7a7b956de8f89fdbdec4d09bd82f6e5d8b842449923c064",
+    "projection": "SET /integrity/content_sha256 AND /integrity/projection_byte_length TO null",
+    "projection_byte_length": 4298
+  },
+  "output_bindings": [
+    {
+      "byte_length": 2498803,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_OUTPUT"
+    },
+    {
+      "byte_length": 27535,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor/evidence.json",
+      "sha256": "e377a4d52ec21185d0e243337b852f36293d780ca437f1ca26087972ef930e55",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_EVIDENCE_OUTPUT"
+    }
+  ],
+  "prepared_on": "2026-07-28",
+  "receipt_id": "WS-PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-20260728-001",
+  "schema_version": "walksafe.phase1-exact257-successor-check-receipt.v1",
+  "status": "PASS",
+  "summary": {
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "check_count": 15,
+    "closure_delta_count": 0,
+    "fail_count": 0,
+    "formal_pass_count": 0,
+    "owner_approval_count": 0,
+    "pass_count": 15,
+    "queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 37,
+      "INTERNAL_RUN_REQUIRED": 16,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 11,
+      "SCOPE_DECISION_PENDING": 45
+    },
+    "real_event_count": 0,
+    "record_count": 257,
+    "release_eligible_count": 0,
+    "scope_decision_count": 0,
+    "verified_external_fact_count": 0
+  }
+}

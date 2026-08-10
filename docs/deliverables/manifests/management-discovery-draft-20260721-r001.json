@@ -1,0 +1,341 @@
+{
+  "schema_version": "walksafe.formal-management-discovery-draft-manifest.v1",
+  "metadata": {
+    "title": "WalkSafe MGT·DSC 정식 산출물 Draft manifest",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-01",
+      "MGT-02",
+      "MGT-03",
+      "MGT-04",
+      "MGT-05",
+      "MGT-06",
+      "MGT-07",
+      "MGT-08",
+      "MGT-09",
+      "MGT-10",
+      "MGT-11",
+      "MGT-12",
+      "MGT-13",
+      "MGT-14",
+      "MGT-15",
+      "MGT-16",
+      "MGT-17",
+      "MGT-18",
+      "DSC-01",
+      "DSC-02",
+      "DSC-03",
+      "DSC-04",
+      "DSC-05",
+      "DSC-06",
+      "DSC-07",
+      "DSC-08",
+      "DSC-09",
+      "DSC-10",
+      "DSC-11",
+      "DSC-12",
+      "DSC-13",
+      "DSC-14",
+      "DSC-15"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py",
+    "manifest_id": "WS-FORMAL-MGT-DSC-DRAFT-20260721-001",
+    "controlled_revision": 1
+  },
+  "source_bindings": {
+    "policy": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    "policy_approval_record": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    "policy_baseline_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    "aligned_decision_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    "artifact_catalog": {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    "project_decision_answers": {
+      "path": "docs/control/questionnaire/source-records/walksafe-project-decisions-20260717-answers.json",
+      "sha256": "6e132df56ab5004be1130fdcb31e48be30cc5e3536747d90367253302817df24"
+    },
+    "fp035_correction_candidate_not_effective": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "policy_approval_validator_source": {
+      "path": "scripts/build_walksafe_feature_policy_baseline_approval_20260721.py",
+      "sha256": "116a8a1d948e81389ca9679b0473ee39e3d5519727a7ecc58fa65f8688e09b7d"
+    },
+    "decision_alignment_validator_source": {
+      "path": "scripts/build_walksafe_effective_decision_register_alignment_20260721.py",
+      "sha256": "400e3217bd38aca3e7ac045f12fdd5b74718262a12e8ec20ea72d9b84eb58255"
+    },
+    "generator": {
+      "path": "scripts/build_walksafe_formal_management_discovery_20260721.py",
+      "sha256": "5828aeed2e33e44f12708d5785b0bdbf9706e772e866b6dbedde5e7e47b592e7"
+    }
+  },
+  "source_binding_sha256": "b152d2b32e7d9709cac17d1086e12b12dbf24ebfe717a12f33f5a3bdbab64885",
+  "coverage": {
+    "MGT": {
+      "expected": 18,
+      "covered": 18
+    },
+    "DSC": {
+      "expected": 15,
+      "covered": 15
+    },
+    "missing_artifact_type_ids": [],
+    "duplicate_artifact_type_ids": [],
+    "artifact_management_rule_sections": 33
+  },
+  "approved_planning_inputs_reflected": {
+    "project_owner": "김민호",
+    "delivery_mode": "1인 프로젝트; 필요한 독립·외부 검토는 미배정으로 유지",
+    "controlled_demo_date": "2026-07-26",
+    "separately_allocated_project_budget": "NONE",
+    "weekday_support_hours": "09:00-18:00 Asia/Seoul",
+    "release_strategy": "단계 배포; TST-22와 gate 전 공개 출시 금지",
+    "research_execution_status": "NOT_RUN",
+    "source_answer_refs": {
+      "budget_and_demo": "notes.Q-GOV-011",
+      "milestone_management": "answers.Q-GOV-011",
+      "support_hours_mode": "answers.Q-OPS-002"
+    }
+  },
+  "generated_files": [
+    {
+      "path": "docs/deliverables/01-management/project-charter.md",
+      "sha256": "0cb97e9ba61924485e2b27ad40c0e2dca4dddc3e9d88481c59eeac17f6f7190e",
+      "byte_length": 20452,
+      "artifact_type_ids": [
+        "MGT-01",
+        "MGT-02",
+        "MGT-03",
+        "MGT-04"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/project-control-registers.md",
+      "sha256": "174db8700dd42dee6a139724601d094185496cbd175b23caf5ce845631e5833d",
+      "byte_length": 16457,
+      "artifact_type_ids": [
+        "MGT-14",
+        "MGT-15",
+        "MGT-16",
+        "MGT-17",
+        "MGT-18"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/project-management-plan.md",
+      "sha256": "a1c6579e27fd07284902bce5c23ddab14539557b5320d0dd257da47b89857cb0",
+      "byte_length": 33187,
+      "artifact_type_ids": [
+        "MGT-05",
+        "MGT-06",
+        "MGT-07",
+        "MGT-08",
+        "MGT-09",
+        "MGT-10",
+        "MGT-11",
+        "MGT-12",
+        "MGT-13"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/actions.json",
+      "sha256": "fa85797f587cfeb275c1f896017de09abb5180682c35592b480e0ad1f8fbf80a",
+      "byte_length": 4028,
+      "artifact_type_ids": [
+        "MGT-18"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/change-requests.json",
+      "sha256": "64f69a0aee2e4817c682f09fd22948da77115ec9c4227d5943e195f67c4783a5",
+      "byte_length": 4534,
+      "artifact_type_ids": [
+        "MGT-16"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/dashboard.json",
+      "sha256": "46ed20166cc98bf3b0a3086d4ee6a8342b2c973bf0931256620fadaba59bc8bd",
+      "byte_length": 2415,
+      "artifact_type_ids": [
+        "MGT-17"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/decisions.json",
+      "sha256": "3992669f257e0a78e0c84214ec47cd62f5304877e3bdffc2e3efb88fb3a0d713",
+      "byte_length": 1846,
+      "artifact_type_ids": [
+        "MGT-15"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/raci.json",
+      "sha256": "6eda3f98f87736e899c8e478043680c293e3b90673c6d5f28625ad4fb7f5812a",
+      "byte_length": 3924,
+      "artifact_type_ids": [
+        "MGT-10"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/raid.json",
+      "sha256": "465d65f3c823c65938c8ee60bd91f9b07977906d2531e5ad4d2076c20f8552c7",
+      "byte_length": 15626,
+      "artifact_type_ids": [
+        "MGT-14"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/schedule.json",
+      "sha256": "87ac14b3b7781364518d580a59d30064b1733d42c753f1619adb33f275b2fe93",
+      "byte_length": 4119,
+      "artifact_type_ids": [
+        "MGT-07"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/stakeholders.json",
+      "sha256": "b503a85891ad3607d39d4103349f5bf622b8ebbe3514dc23d2ffcd01fdd31292",
+      "byte_length": 4504,
+      "artifact_type_ids": [
+        "MGT-09"
+      ]
+    },
+    {
+      "path": "docs/deliverables/01-management/registers/wbs.json",
+      "sha256": "5d1045a098da6ba9885ed0cfed1a17d5b689514f17c18cfc3e72e51840b00487",
+      "byte_length": 5219,
+      "artifact_type_ids": [
+        "MGT-06"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "sha256": "8bd0acb7210a58624da3ec9721b38e7ac8a31281f78a231f7ae18a2f22e5979f",
+      "byte_length": 35720,
+      "artifact_type_ids": [
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-04",
+        "DSC-05",
+        "DSC-06",
+        "DSC-07",
+        "DSC-08",
+        "DSC-09"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/product-definition.md",
+      "sha256": "38a18a03d7522f55c8ec0ce67fd651157ec30d3c55ea6d736bcc6a35a4391af0",
+      "byte_length": 21494,
+      "artifact_type_ids": [
+        "DSC-10",
+        "DSC-11",
+        "DSC-12",
+        "DSC-13"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/product-registers.md",
+      "sha256": "46f59d6e0acf2a05badd1fb84ca703a3bdd0dde636355b205fb1072d7096f2d6",
+      "byte_length": 7603,
+      "artifact_type_ids": [
+        "DSC-14",
+        "DSC-15"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/registers/backlog.json",
+      "sha256": "9aa0833e7801865a67e5adff8b8cc7677b4ab09e7fb077e0caf79840204d1780",
+      "byte_length": 162782,
+      "artifact_type_ids": [
+        "DSC-14"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/registers/discovery-evidence.json",
+      "sha256": "a594cb582cb77c430a906c813b2935b8eb2dd20591bc89079d4ced3be09bc779",
+      "byte_length": 5131,
+      "artifact_type_ids": [
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-04",
+        "DSC-05",
+        "DSC-06",
+        "DSC-07",
+        "DSC-08",
+        "DSC-09"
+      ]
+    },
+    {
+      "path": "docs/deliverables/02-discovery/registers/stage-decisions.json",
+      "sha256": "1a6af5c44908f8df3cf84c135211943462e40977f1640815344e4d6b2c7292a4",
+      "byte_length": 4300,
+      "artifact_type_ids": [
+        "DSC-15"
+      ]
+    }
+  ],
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "authorization_boundary": {
+    "policy_baseline_status": "BASELINED",
+    "decision_alignment_status": "COMPLETE",
+    "formal_deliverable_lifecycle_status": "DRAFT",
+    "formal_deliverables_approved": false,
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "manifest_content_sha256": "04bd1f57ea22a72c9183d31f3e49340b21481ac7fdd7a4dec0da2876e4b1d628"
+}

@@ -1,0 +1,261 @@
+{
+  "claim_boundary": {
+    "formal_test_count": 279,
+    "formal_test_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "document_id": "WALKSAFE-W3-DEV21-EVIDENCE-REUSE-20260726-001",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "3aeb8bb63b361bc707590d905b79329bba25ffebf347cf3e450a2ae5a5a9465c"
+    }
+  },
+  "prepared_on": "2026-07-27",
+  "reuse_records": [
+    {
+      "bindings": [
+        {
+          "allowed_claim": "Internal deterministic runtime OpenAPI bytes.",
+          "bytes": 128867,
+          "path": "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+          "prohibited_claim": "Deployed API or external compatibility.",
+          "role": "W2_RUNTIME_OPENAPI",
+          "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b"
+        },
+        {
+          "allowed_claim": "Current canonical bytes equal the W2 runtime bytes.",
+          "bytes": 128867,
+          "path": "contracts/walksafe.openapi.json",
+          "prohibited_claim": "Production deployment or release completion.",
+          "role": "CANONICAL_OPENAPI",
+          "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b"
+        },
+        {
+          "allowed_claim": "Two-run determinism and byte-identical record.",
+          "bytes": 26961,
+          "path": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+          "prohibited_claim": "Formal or external PASS.",
+          "role": "W2_VALIDATION_SUMMARY",
+          "sha256": "9280ded6353ba5cbc4b1056eaaafb7d0ec8dbb9578f7e43b253901caf42bbb24"
+        },
+        {
+          "allowed_claim": "Exact generator source identity.",
+          "bytes": 5479,
+          "path": "scripts/generate_walksafe_openapi.py",
+          "prohibited_claim": "That the generator was rerun in this integration command set.",
+          "role": "OPENAPI_GENERATOR",
+          "sha256": "849f0bb411a834f4f2bd147825c49f40cadaa963df67acafedc5f80423c54b02"
+        }
+      ],
+      "decision": "REUSED_PASS_INTERNAL_CONTRACT_EVIDENCE",
+      "facts": {
+        "current_canonical_sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+        "deterministic": true,
+        "run_count": 2,
+        "run_hashes": [
+          "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+          "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b"
+        ],
+        "runtime_canonical_byte_identical": true
+      },
+      "reuse_id": "W3-DEV21-REUSE-OPENAPI-001",
+      "scope": "CONTRACT_OPENAPI"
+    },
+    {
+      "bindings": [
+        {
+          "allowed_claim": "Fresh W3 ephemeral PostGIS migration roundtrip execution.",
+          "bytes": 32918,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/execution-summary.json",
+          "prohibited_claim": "Application-level or production database integration.",
+          "role": "AUX003_EXECUTION_SUMMARY",
+          "sha256": "3921208d4b5ee4efc09227f4008ffd425cfc74b4fc113930a9ddf4927d66477a"
+        },
+        {
+          "allowed_claim": "First migration upgrade log.",
+          "bytes": 1748,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/logs/alembic-upgrade-head-1.log",
+          "prohibited_claim": "Production migration.",
+          "role": "ALEMBIC_UPGRADE_HEAD_1_LOG",
+          "sha256": "04ac63352155ce970d96aa6044e11b90aee7d65ae99387d3d88db30419869453"
+        },
+        {
+          "allowed_claim": "Migration rollback log.",
+          "bytes": 398,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/logs/alembic-downgrade-minus-one.log",
+          "prohibited_claim": "Production rollback.",
+          "role": "ALEMBIC_DOWNGRADE_MINUS_ONE_LOG",
+          "sha256": "cc6c28f67a9025bde094e1638026269f59d96b3d5d25c57436e231b79dbf8b80"
+        },
+        {
+          "allowed_claim": "Migration re-upgrade log.",
+          "bytes": 391,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/logs/alembic-upgrade-head-2.log",
+          "prohibited_claim": "Production re-upgrade.",
+          "role": "ALEMBIC_UPGRADE_HEAD_2_LOG",
+          "sha256": "2432925cea9eb02b38d4728583a2a41086f712679d01ad9eaa1bd8e605656b3e"
+        },
+        {
+          "allowed_claim": "Final migration current-head log.",
+          "bytes": 264,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/logs/alembic-current.log",
+          "prohibited_claim": "Application traffic validation.",
+          "role": "ALEMBIC_CURRENT_LOG",
+          "sha256": "7714e07107b1dc1f3493f7f60d84e024be6929f5362a0b5b0ee6e3b3814540b0"
+        }
+      ],
+      "decision": "REUSED_PASS_INTERNAL_EPHEMERAL_MIGRATION",
+      "facts": {
+        "all_exit_codes": 0,
+        "ephemeral_loopback_container": true,
+        "production_database": false,
+        "sequence": [
+          "upgrade head",
+          "downgrade -1",
+          "upgrade head",
+          "current"
+        ]
+      },
+      "reuse_id": "W3-DEV21-REUSE-POSTGIS-001",
+      "scope": "POSTGIS_MIGRATION_ROUNDTRIP"
+    },
+    {
+      "bindings": [
+        {
+          "allowed_claim": "Historical exact31 subject and verification receipt identities.",
+          "bytes": 10783,
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/review-subject.json",
+          "prohibited_claim": "Current evidence002 backend-subject equality.",
+          "role": "FP047_REVIEW_SUBJECT",
+          "sha256": "fbf1466bedcb54ad2ab1675924584f4bc2d25ca85c89f74ef0ac566268e92d04"
+        },
+        {
+          "allowed_claim": "Historical FP047 result and backend test count.",
+          "bytes": 8667,
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/verification-result.json",
+          "prohibited_claim": "Fresh W3 backend execution.",
+          "role": "FP047_VERIFICATION_RESULT",
+          "sha256": "ca2c55dd73370c82f5e2919e77ad3476989d71aa56777f9f6459fed3348b40d5"
+        },
+        {
+          "allowed_claim": "Historical backend internal test output only.",
+          "bytes": 1120,
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/logs/backend-internal-verification.log",
+          "prohibited_claim": "Reuse against a non-identical or unproven current subject.",
+          "role": "FP047_BACKEND_LOG",
+          "sha256": "c2b1acde9bfdbef978943d1f301b3063d3fc29111e3e72ea3b119eac7649b8fd"
+        },
+        {
+          "allowed_claim": "Current no-retry checker failure and reuse-prohibition decision.",
+          "bytes": 1402,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/fp047-current-check.json",
+          "prohibited_claim": "Product defect or formal failure.",
+          "role": "FP047_CURRENT_CHECK_RECEIPT",
+          "sha256": "a8e4f4b5562d5411971cd19ed191402a2dcfef2675bc7ef40a7259d69dc0183f"
+        }
+      ],
+      "decision": "REUSE_PROHIBITED_NOT_RUN",
+      "facts": {
+        "current_fp047_checker_exit_code": 1,
+        "evidence002_backend_content_set_sha256": "7b0ade319b3ec511e7813f018d88e7636f60ee51f69ac7fb721294bc4f62e492",
+        "evidence002_backend_subject_current_exact": true,
+        "fp047_implementation_content_set_sha256": "322f38341785f847591276684d848bf864d0dafc4f3ad108a171197449e16cc7",
+        "fp047_receipt_subject_kind": "EXACT_31_PRODUCT_AND_TOOLING_PATH_SET",
+        "retry_count": 0,
+        "same_subject_sha_recorded_in_both_evidence_sets": false
+      },
+      "reason": "FP047 backend result is bound to a combined exact31 SHA rather than the evidence002 backend subject SHA, and the current FP047 checker reports that exact31 log binding differs. Exact reusable subject identity is therefore not established.",
+      "reuse_id": "W3-DEV21-REUSE-FP047-BACKEND-001",
+      "scope": "BACKEND_INTERNAL_TESTS"
+    }
+  ],
+  "schema_version": "walksafe.w3-dev21-evidence-reuse-receipt.v1",
+  "source_commit": null,
+  "subject_baseline": {
+    "bindings": [
+      {
+        "allowed_claim": "W3 evidence002 claim boundary and module content-set identity.",
+        "bytes": 5215,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/engineering-evidence-manifest.json",
+        "prohibited_claim": "Release, signing, device or formal PASS.",
+        "role": "EVIDENCE002_MANIFEST",
+        "sha256": "261bcfe5f64962ccf6dcf3b594ba83732a4f769f5f626df6fe65f9d97b4b947e"
+      },
+      {
+        "allowed_claim": "Exact dirty-worktree source snapshot recorded by evidence002.",
+        "bytes": 605082,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/source-snapshot.json",
+        "prohibited_claim": "Current whole-worktree identity after subsequent evidence-only files were added.",
+        "role": "EVIDENCE002_SOURCE_SNAPSHOT",
+        "sha256": "10d641852af4b09dba8890477980f7725aae8e302252bba420762f998dccb807"
+      },
+      {
+        "allowed_claim": "Exact user/admin/gateway/backend module path and content sets.",
+        "bytes": 86869,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/module-inventory.json",
+        "prohibited_claim": "Modules or generated build outputs outside the recorded inventory.",
+        "role": "EVIDENCE002_MODULE_INVENTORY",
+        "sha256": "1a3527e327c0c5d6e82a30281c303d66fe40e30cd77e4a50c77c97bddff63254"
+      },
+      {
+        "allowed_claim": "Backend 79-path subject identity; current payload equality was established.",
+        "bytes": 14437,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-002/subjects/backend.json",
+        "prohibited_claim": "Identity with FP047 exact31 combined product/tooling subject.",
+        "role": "EVIDENCE002_BACKEND_SUBJECT",
+        "sha256": "3b01206c783458992881bda6cd08a50e713ed2357314782d7a46fa8a342588fb"
+      }
+    ],
+    "evidence_run": "evidence-20260726-002",
+    "module_bindings": {
+      "admin_android": {
+        "component_scope": "admin",
+        "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+        "current_mismatch_count": 0,
+        "module_id": "adminapp",
+        "path_count": 25,
+        "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f"
+      },
+      "backend": {
+        "component_scope": "backend",
+        "content_set_sha256": "7b0ade319b3ec511e7813f018d88e7636f60ee51f69ac7fb721294bc4f62e492",
+        "current_mismatch_count": 0,
+        "current_payload_equal_to_evidence002": true,
+        "module_id": "backend",
+        "path_count": 79,
+        "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+        "subject_content_fingerprint": "110a8cf97c5cb0af4b2b8cbeb059eba37c4bf321535642d38333990a84bef3ac"
+      },
+      "gateway": {
+        "component_scope": "gateway",
+        "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+        "current_mismatch_count": 0,
+        "module_id": "android-gateway",
+        "path_count": 26,
+        "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3"
+      },
+      "user_android": {
+        "component_scope": "user",
+        "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+        "current_mismatch_count": 0,
+        "module_id": "app",
+        "path_count": 208,
+        "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782"
+      }
+    },
+    "source_files_equal_to_recorded_module_inventory": true,
+    "source_summary": {
+      "content_set_sha256": "976ba4d9cec00fdc56891f06e8927c34d9686cbb460dc9b88f5ac678afba3bcf",
+      "path_count": 2830,
+      "path_set_sha256": "5bfddedec67738c17c1dc9157b87bf2f617031b6050d97c677e2ff39ab1e0ceb"
+    }
+  },
+  "wave_snapshot_date": "2026-07-26",
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS"
+}

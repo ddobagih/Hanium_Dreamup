@@ -1,0 +1,439 @@
+{
+  "schema_version": "walksafe.requirements-glossary-draft.v1",
+  "metadata": {
+    "document_id": "WS-REQ-GLOSSARY-DRAFT-20260721-R001",
+    "document_version": "0.2.0",
+    "artifact_type_id": "DLV-REQ-19",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "baseline_status": "NOT_BASELINED",
+    "as_of": "2026-07-22"
+  },
+  "entries": [
+    {
+      "entry_id": "GLO-001",
+      "term": "WalkSafe",
+      "english_or_abbreviation": null,
+      "easy_definition": "전맹과 저시력 사용자를 같은 우선순위로 둔 시각장애인이 휴대전화 카메라·위치·음성 안내를 이용해 도심 보행 중 위험을 알아차리고 길을 따라가도록 돕는 프로젝트다.",
+      "source_refs": [
+        "FP-001"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-001-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-002",
+      "term": "정책 기준선",
+      "english_or_abbreviation": "Policy baseline",
+      "easy_definition": "사용자가 검토하고 승인하여 뒤 문서가 따라야 하는 정책 묶음이다. 정책 승인이 곧 요구·설계·시험의 완료를 뜻하지는 않는다.",
+      "source_refs": [
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-DATA-LIFECYCLE-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-003",
+      "term": "요구사항",
+      "english_or_abbreviation": "Requirement",
+      "easy_definition": "시스템이 해야 하거나 지켜야 할 일을 구현·시험 가능한 문장으로 적은 것이다.",
+      "source_refs": [
+        "FP-001"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-001-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-004",
+      "term": "기능 정책",
+      "english_or_abbreviation": "FP",
+      "easy_definition": "FP-001부터 FP-054까지 특정 기능 하나의 목적, 흐름, 실패 동작과 금지 동작을 정한 정책이다.",
+      "source_refs": [
+        "FP-001"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-001-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-005",
+      "term": "공통정책",
+      "english_or_abbreviation": "NPC",
+      "easy_definition": "여러 기능이 함께 지켜야 하는 데이터, 저장공간, 권한, 경로 안내 같은 규칙이다.",
+      "source_refs": [
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-DATA-LIFECYCLE-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-006",
+      "term": "미결 게이트",
+      "english_or_abbreviation": "Gate",
+      "easy_definition": "정책 방향은 정했지만 실제 수치·전문가 검토·운영 증거가 없어 출시 전에 반드시 닫아야 하는 항목이다.",
+      "source_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT"
+      ],
+      "related_requirement_ids": [
+        "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-007",
+      "term": "활성 보행",
+      "english_or_abbreviation": "Active walk",
+      "easy_definition": "사용자가 보행 시작을 확인한 뒤 종료·일시중지하기 전까지의 한 번의 보행 세션이다.",
+      "source_refs": [
+        "NPC-PERMISSION-SESSION-LIFECYCLE"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-008",
+      "term": "원본 자료",
+      "english_or_abbreviation": "Raw original",
+      "easy_definition": "학습이나 신고 처리를 위해 가공하기 전의 영상·음성·위치 등 최초 자료다.",
+      "source_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-RAW-ORIGINAL-COLLECTION-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-009",
+      "term": "목적에 필요한 최소 수집",
+      "english_or_abbreviation": "Data minimization",
+      "easy_definition": "정한 기능 목적에 꼭 필요한 항목만 수집하고, 목적·접근자·보존기간·삭제조건을 미리 정하는 원칙이다.",
+      "source_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-RAW-ORIGINAL-COLLECTION-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-010",
+      "term": "자동신고 후보",
+      "english_or_abbreviation": null,
+      "easy_definition": "위험 탐지 결과가 신고 정책 조건을 충족해 휴대전화의 전송 대기열에 들어간 자료 묶음이다.",
+      "source_refs": [
+        "NPC-AUTO-REPORT"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-AUTO-REPORT-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-011",
+      "term": "전송 대기열",
+      "english_or_abbreviation": "Queue",
+      "easy_definition": "통신이 가능할 때 서버로 보내기 위해 휴대전화에 암호화해 잠시 보관하는 신고 후보 목록이다.",
+      "source_refs": [
+        "NPC-PHONE-QUEUE-CAPACITY"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-PHONE-QUEUE-CAPACITY-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-012",
+      "term": "서버 용량 상태",
+      "english_or_abbreviation": null,
+      "easy_definition": "서버 저장공간 사용률에 따라 경고·참여자 추가 중단·새 원본 세션 보류 같은 동작을 선택하는 상태다.",
+      "source_refs": [
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-SERVER-STORAGE-CAPACITY-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-013",
+      "term": "동기화",
+      "english_or_abbreviation": "Sync",
+      "easy_definition": "서버의 현재 용량 상태를 휴대전화가 받아 기능 시작 가능 여부를 같은 기준으로 판단하도록 맞추는 일이다.",
+      "source_refs": [
+        "NPC-SERVER-CAPACITY-STATE-SYNC"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-SERVER-CAPACITY-STATE-SYNC-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-014",
+      "term": "위치 좌표",
+      "english_or_abbreviation": "GPS location",
+      "easy_definition": "휴대전화 위치 센서가 추정한 현재 지점이다. 오차가 있으므로 단독으로 안전을 보장하는 값으로 쓰지 않는다.",
+      "source_refs": [
+        "FP-022"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-022-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-015",
+      "term": "TMAP 경로",
+      "english_or_abbreviation": null,
+      "easy_definition": "TMAP 경로 서비스에서 받은 보행 경로 선과 경로 단계 정보다.",
+      "source_refs": [
+        "FP-022"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-022-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-016",
+      "term": "보폭",
+      "english_or_abbreviation": "Step length",
+      "easy_definition": "한 걸음에 이동한 것으로 추정하는 거리다. 남은 거리·도착·이탈 판단의 보조 입력이며 현재 좌표나 진행 방향을 대신하지 않는다.",
+      "source_refs": [
+        "FP-022"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-022-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-017",
+      "term": "경로 이탈",
+      "english_or_abbreviation": "Route deviation",
+      "easy_definition": "현재 위치와 저장된 경로의 거리가 정책 기준을 벗어난 상태다. 사용자에게 알리고 사용자가 다음 행동을 판단하게 한다.",
+      "source_refs": [
+        "FP-023"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-023-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-018",
+      "term": "객체 탐지",
+      "english_or_abbreviation": "Object detection",
+      "easy_definition": "카메라 영상에서 학습된 모델이 위험물의 종류와 위치 후보를 찾는 기능이다. 탐지 결과만으로 안전을 보장하지 않는다.",
+      "source_refs": [
+        "FP-013"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-013-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-019",
+      "term": "오탐",
+      "english_or_abbreviation": "False positive",
+      "easy_definition": "실제 위험물이 아닌데 위험물이라고 탐지한 경우다.",
+      "source_refs": [
+        "FP-013"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-013-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-020",
+      "term": "미탐",
+      "english_or_abbreviation": "False negative",
+      "easy_definition": "실제 위험물이 있는데 탐지하지 못한 경우다.",
+      "source_refs": [
+        "FP-013"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-013-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-021",
+      "term": "안전 정지",
+      "english_or_abbreviation": "Safe stop",
+      "easy_definition": "필수 입력·권한·외부 연결을 믿을 수 없을 때 추측 안내를 계속하지 않고 관련 처리를 멈추는 동작이다.",
+      "source_refs": [
+        "NPC-NAVIGATION-ROUTE-DIRECTION"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-022",
+      "term": "STT",
+      "english_or_abbreviation": "Speech-to-text",
+      "easy_definition": "사용자의 음성을 글자나 명령 의도로 바꾸는 기능이다.",
+      "source_refs": [
+        "FP-027"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-027-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-023",
+      "term": "TTS",
+      "english_or_abbreviation": "Text-to-speech",
+      "easy_definition": "안내 문장을 음성으로 읽어 주는 기능이다.",
+      "source_refs": [
+        "FP-028"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-028-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-024",
+      "term": "TalkBack",
+      "english_or_abbreviation": null,
+      "easy_definition": "Android 화면 내용을 음성으로 읽고 조작을 돕는 화면 읽기 기능이다.",
+      "source_refs": [
+        "FP-009"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-009-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-025",
+      "term": "RTM",
+      "english_or_abbreviation": "Requirements Traceability Matrix",
+      "easy_definition": "정책 결정부터 요구, 인수조건, 예정 시험, 존재하는 코드·증거까지 연결 상태를 보여 주는 표다.",
+      "source_refs": [
+        "FP-001"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-001-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-026",
+      "term": "인수조건",
+      "english_or_abbreviation": "Acceptance condition",
+      "easy_definition": "요구가 충족됐다고 판단하려면 무엇을 준비하고, 무엇을 실행하며, 무엇이 보여야 하는지 적은 조건이다.",
+      "source_refs": [
+        "FP-001"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-001-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-027",
+      "term": "기준선",
+      "english_or_abbreviation": "Baseline",
+      "easy_definition": "검토와 승인을 마쳐 이후 변경을 정식 변경절차로만 할 수 있게 고정한 버전이다.",
+      "source_refs": [
+        "FP-002"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-002-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-028",
+      "term": "출처만 연결",
+      "english_or_abbreviation": "SOURCE_ONLY",
+      "easy_definition": "파일이나 코드가 실제로 존재한다는 연결이다. 최신 요구를 충족했다거나 시험을 통과했다는 뜻은 아니다.",
+      "source_refs": [
+        "FP-002"
+      ],
+      "related_requirement_ids": [
+        "RQ-FP-002-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-029",
+      "term": "MFA",
+      "english_or_abbreviation": "Multi-factor authentication",
+      "easy_definition": "비밀번호 하나 외에 다른 인증수단을 함께 요구하는 관리자 로그인 방식이다.",
+      "source_refs": [
+        "NPC-SINGLE-ADMIN-RECOVERY"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    },
+    {
+      "entry_id": "GLO-030",
+      "term": "복구코드",
+      "english_or_abbreviation": "Recovery code",
+      "easy_definition": "관리자 휴대전화를 잃었을 때 계정 접근을 복구하기 위해 별도로 안전하게 보관하는 일회성 코드다.",
+      "source_refs": [
+        "NPC-SINGLE-ADMIN-RECOVERY"
+      ],
+      "related_requirement_ids": [
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001"
+      ],
+      "lifecycle_status": "DRAFT",
+      "owner_role": "요구사항책임자"
+    }
+  ],
+  "coverage": {
+    "term_count": 30,
+    "requirements_linked_count": 18
+  },
+  "content_sha256": "218aef42a3fcf75947d5ddde8834e6b1ace3290de5816fcaa3c534191ad77124"
+}

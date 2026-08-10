@@ -1,0 +1,406 @@
+{
+  "schema_version": "walksafe.aiml-data-source-register.v1",
+  "metadata": {
+    "document_id": "WS-AIML-DATA-SOURCE-REGISTER-20260721",
+    "title": "data-source-register",
+    "document_version": "0.2.0",
+    "as_of": "2026-07-27",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "AIML-03"
+    ]
+  },
+  "fp034_current_source_control": {
+    "traceability": {
+      "gap_ids": [
+        "GAP-043"
+      ],
+      "requirement_ids": [
+        "RQ-FP-034-001"
+      ],
+      "policy_feature_ids": [
+        "FP-034"
+      ],
+      "artifact_type_ids": [
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04"
+      ],
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "policy_manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "current_state_snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+      "current_state_snapshot_path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json"
+    },
+    "inventory_role_boundary": {
+      "existing_entries_role": "HISTORIC_OR_CANDIDATE_METADATA_ARTIFACTS",
+      "current_declared_sources_role": "CURRENT_13_CLASS_DATASET_SOURCE_DECLARATIONS_NOT_REPRODUCED",
+      "sets_are_not_equivalent": true
+    },
+    "current_state_binding": {
+      "snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json",
+      "prepared_on": "2026-07-27",
+      "inspection_mode": "SELECTED_REPOSITORY_METADATA_INSPECTION"
+    },
+    "counts": {
+      "declared_source_entry_count": 6,
+      "declared_unique_dataset_provider_pair_count": 5,
+      "rights_verified_unique_pair_count": 0,
+      "privacy_reviewed_unique_pair_count": 0
+    },
+    "unique_provider_dataset_pairs": [
+      {
+        "pair_id": "PAIR-COCO-2017-PROVIDER-UNKNOWN",
+        "provider": "UNKNOWN_IN_REPOSITORY",
+        "dataset_identity": "COCO 2017",
+        "source_keys": [
+          "COCO-2017"
+        ]
+      },
+      {
+        "pair_id": "PAIR-AIHUB-186",
+        "provider": "AIHub",
+        "dataset_identity": "AIHub 186",
+        "source_keys": [
+          "AIHUB-186"
+        ]
+      },
+      {
+        "pair_id": "PAIR-AIHUB-513",
+        "provider": "AIHub",
+        "dataset_identity": "AIHub 513",
+        "source_keys": [
+          "AIHUB-513"
+        ]
+      },
+      {
+        "pair_id": "PAIR-AIHUB-189",
+        "provider": "AIHub",
+        "dataset_identity": "AIHub 189",
+        "source_keys": [
+          "AIHUB-189-SURFACE",
+          "AIHUB-189-E-SCOOTER-MANUAL"
+        ]
+      },
+      {
+        "pair_id": "PAIR-AIHUB-572",
+        "provider": "AIHub",
+        "dataset_identity": "AIHub 572",
+        "source_keys": [
+          "AIHUB-572-E-SCOOTER"
+        ]
+      }
+    ],
+    "current_declared_sources": [
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-COCO-2017-PROVIDER-UNKNOWN",
+        "source_key": "COCO-2017",
+        "name": "COCO 2017",
+        "provider": "UNKNOWN_IN_REPOSITORY",
+        "source_url": "UNKNOWN_IN_REPOSITORY",
+        "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+        "declaration_path": "data_sources/README.md",
+        "license_declaration": "NOT_VERIFIED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "privacy_status": "NOT_VERIFIED",
+        "consent_applicability": "UNDETERMINED",
+        "consent_verification_status": "NOT_VERIFIED"
+      },
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-AIHUB-186",
+        "source_key": "AIHUB-186",
+        "name": "AIHub 186",
+        "provider": "AIHub",
+        "source_url": "UNKNOWN_IN_REPOSITORY",
+        "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+        "declaration_path": "data_sources/README.md",
+        "license_declaration": "NOT_VERIFIED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "consent_status": "UNKNOWN",
+        "privacy_status": "NOT_VERIFIED"
+      },
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-AIHUB-513",
+        "source_key": "AIHUB-513",
+        "name": "보행 안전을 위한 도로 시설물 데이터",
+        "provider": "AIHub",
+        "source_url": "https://www.aihub.or.kr/aihubdata/data/view.do?aihubDataSe=data&currMenu=115&dataSetSn=513&topMenu=100",
+        "inclusion_status": "DECLARED_INCLUDED_WITH_HISTORIC_DERIVED_MANIFESTS",
+        "declaration_paths": [
+          "data_sources/README.md",
+          "data_sources/manifests/korean_dataset_candidates.md",
+          "data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+          "ai_tasks/walksafe_v3_relabel_20260521/image_manifest.csv"
+        ],
+        "license_declaration": "DOWNLOAD_APPROVAL_OR_API_NEEDED_LICENSE_TEXT_NOT_CAPTURED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "consent_status": "UNKNOWN",
+        "privacy_status": "CONTACT_SHEET_NO_OBVIOUS_FACE_OR_PLATE_SOURCE_LEVEL_AUDIT_NOT_RUN"
+      },
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-AIHUB-189",
+        "source_key": "AIHUB-189-SURFACE",
+        "name": "인도(人道) 보행 영상 Surface subset",
+        "provider": "AIHub",
+        "source_url": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=189",
+        "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+        "declaration_paths": [
+          "data_sources/README.md",
+          "model/README.md",
+          "data_sources/manifests/korean_dataset_candidates.md"
+        ],
+        "license_declaration": "DOWNLOAD_APPROVAL_OR_API_NEEDED_LICENSE_TEXT_NOT_CAPTURED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "consent_status": "UNKNOWN",
+        "privacy_status": "NOT_VERIFIED"
+      },
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-AIHUB-572",
+        "source_key": "AIHUB-572-E-SCOOTER",
+        "name": "이륜자동차 안전 위험 시설물 approved e_scooter_obstruction subset",
+        "provider": "AIHub",
+        "source_url": "UNKNOWN_IN_REPOSITORY",
+        "declared_image_count": 16005,
+        "inclusion_status": "DECLARED_HUMAN_APPROVED_LABEL_SUBSET_NOT_REPRODUCED",
+        "declaration_paths": [
+          "data_sources/README.md",
+          "model/README.md"
+        ],
+        "license_declaration": "NOT_VERIFIED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "consent_status": "UNKNOWN",
+        "privacy_status": "NOT_VERIFIED",
+        "boundary": "Human label approval is not evidence of source rights or participant consent."
+      },
+      {
+        "normalized_provider_dataset_pair_id": "PAIR-AIHUB-189",
+        "source_key": "AIHUB-189-E-SCOOTER-MANUAL",
+        "name": "AIHub 189 manually approved e_scooter_obstruction subset",
+        "provider": "AIHub",
+        "source_url": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=189",
+        "declared_image_count": 7,
+        "inclusion_status": "DECLARED_HUMAN_APPROVED_LABEL_SUBSET_NOT_REPRODUCED",
+        "declaration_paths": [
+          "data_sources/README.md",
+          "model/README.md"
+        ],
+        "license_declaration": "NOT_VERIFIED",
+        "training_permission": "NOT_VERIFIED",
+        "redistribution_permission": "NOT_VERIFIED",
+        "consent_status": "UNKNOWN",
+        "privacy_status": "NOT_VERIFIED",
+        "boundary": "Manual relabel approval is not evidence of source rights or participant consent."
+      }
+    ],
+    "direct_or_user_provided_source_boundary": {
+      "directly_captured_source_inclusion": "UNKNOWN",
+      "user_provided_source_inclusion": "UNKNOWN",
+      "consent_fact": "UNKNOWN",
+      "absence_claimed": false,
+      "required_fact_request_id": "EFR-DATA-SOURCE-COMPLETENESS"
+    },
+    "source_gate": {
+      "status": "FAIL_CLOSED_NOT_ELIGIBLE",
+      "promotion_eligible": false,
+      "allowed": "후보 metadata 조사와 통제 저장소 참조 등록",
+      "prohibited": "권리·privacy·동의 확인 전 source promotion, dataset materialization, 학습 사용",
+      "fail_closed": "UNKNOWN/NOT_VERIFIED 유지와 후속 gate 차단"
+    },
+    "owner_due_predicates": [
+      {
+        "predicate_id": "FP034-OWNER-DUE-01",
+        "owner_role": "DATA_OWNER",
+        "due_predicate": "BEFORE_NEXT_SOURCE_ACQUISITION_OR_DATASET_MATERIALIZATION",
+        "completion_predicate": "현재 학습·검증 source 목록의 완전성, 6개 entry와 5개 고유 provider/dataset pair, 직접촬영·사용자제공 포함 여부를 증거 ID로 확정한다.",
+        "status": "OPEN_EVIDENCE_FACT_REQUIRED"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-02",
+        "owner_role": "LEGAL_AND_PRIVACY_REVIEWER",
+        "due_predicate": "BEFORE_ANY_SOURCE_PROMOTION_OR_DATASET_MATERIALIZATION",
+        "completion_predicate": "실제 사용 source마다 취득 근거, 공식 URL·약관 또는 license, 학습·재배포 권한, 개인정보·동의 적용성과 철회 영향을 검토한다.",
+        "status": "OPEN_ZERO_OF_FIVE_UNIQUE_PAIRS_VERIFIED"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-03",
+        "owner_role": "DATA_ENGINEER_AND_QA_OWNER",
+        "due_predicate": "BEFORE_ANY_TRAINING_OR_INDEPENDENT_EVALUATION_COMMAND",
+        "completion_predicate": "불변 materialized manifest와 data.yaml을 만들고 content hash, 품질·라벨 검사, capture-group sequence-safe split과 누수 검사를 실행해 증거를 등록한다.",
+        "status": "OPEN_MANIFEST_AND_DATA_YAML_MISSING"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-04",
+        "owner_role": "PRODUCT_OWNER_AND_INDEPENDENT_REVIEWER",
+        "due_predicate": "BEFORE_TST_22_RELEASE_READINESS_OR_REL_02_APPROVAL",
+        "completion_predicate": "GATE-RAW-COLLECTION-RELEASE-REVIEW를 실행하고 고지·동의·권리행사 절차와 잔여 위험을 승인한다.",
+        "status": "OPEN_GATE_NOT_RUN_NOT_WAIVED"
+      }
+    ]
+  },
+  "storage_boundary": {
+    "raw_personal_data_in_git_allowed": false,
+    "git_content": "최소 metadata·통제 저장소 ID·hash·권한·보존정책만 허용"
+  },
+  "entries": [
+    {
+      "source_id": "SRC-CANDIDATE-WALKSAFE-V1",
+      "path": "data_sources/manifests/walksafe_v1_sources.md",
+      "purpose": "공개 baseline 후보의 출처 설명",
+      "exists": true,
+      "sha256": "fcaac487301c80171aec6b83dd0d4c2444edb2ca8162297041d06c58d117684b",
+      "byte_length": 1482,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    },
+    {
+      "source_id": "SRC-CANDIDATE-KR-V3-POLICY",
+      "path": "data_sources/manifests/walksafe_kr_v3_policy_2026-05-19.md",
+      "purpose": "한국 환경 v3 후보의 보류·포함 정책",
+      "exists": true,
+      "sha256": "c99edb678230629e3d133692f284d19768809c987ef667acbde3928476bfe270",
+      "byte_length": 1785,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    },
+    {
+      "source_id": "SRC-CANDIDATE-KR-V3-INDEX",
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_2026-05-19.csv",
+      "purpose": "v3 후보 행 인덱스",
+      "exists": true,
+      "sha256": "6ac7cb425577d977afaaf67a0cc97ad97bb32479012620fdcb3ea289b6eaa690",
+      "byte_length": 47179,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    },
+    {
+      "source_id": "SRC-CANDIDATE-KR-V3-SUMMARY",
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_summary_2026-05-19.json",
+      "purpose": "v3 후보 인덱스 요약",
+      "exists": true,
+      "sha256": "1b995efe15563e6587a43ccf89b2b36a251d5d9ecad6415decd959c1dc51c744",
+      "byte_length": 1102,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    },
+    {
+      "source_id": "SRC-CANDIDATE-CURATION",
+      "path": "data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+      "purpose": "과거 수동 선별 후보",
+      "exists": true,
+      "sha256": "e2fa27a0fcdee5e9ddad5402d8b3b52a78034a2772b3c6a4018354ef9f723b46",
+      "byte_length": 27823,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    },
+    {
+      "source_id": "SRC-CANDIDATE-RELABEL-CLASSES",
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/classes.txt",
+      "purpose": "과거 재라벨 작업의 class 후보",
+      "exists": true,
+      "sha256": "2033cad2bc10f27f9a45b89e2ebff52eef440259c11dc53065d9cf4c281f17f0",
+      "byte_length": 24,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false,
+      "provider": null,
+      "source_url": null,
+      "acquired_at": null,
+      "source_version": null,
+      "license_or_consent_status": "NOT_VERIFIED",
+      "training_permission_status": "NOT_VERIFIED",
+      "redistribution_status": "NOT_VERIFIED",
+      "privacy_review_status": "NOT_RUN",
+      "promotion_eligible": false,
+      "blockers": [
+        "RIGHTS_EVIDENCE_MISSING",
+        "PRIVACY_REVIEW_NOT_RUN"
+      ]
+    }
+  ],
+  "summary": {
+    "candidate_count": 6,
+    "rights_verified_count": 0,
+    "privacy_reviewed_count": 0,
+    "promotion_eligible_count": 0,
+    "historic_candidate_metadata_entry_count": 6,
+    "current_declared_source_entry_count": 6,
+    "current_declared_unique_provider_dataset_pair_count": 5,
+    "current_rights_verified_unique_pair_count": 0,
+    "current_privacy_reviewed_unique_pair_count": 0,
+    "directly_captured_source_inclusion": "UNKNOWN",
+    "user_provided_source_inclusion": "UNKNOWN",
+    "current_source_promotion_eligible": false
+  }
+}

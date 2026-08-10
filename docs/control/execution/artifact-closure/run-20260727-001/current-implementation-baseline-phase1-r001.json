@@ -1,0 +1,389 @@
+{
+  "schema_version": "walksafe.current-implementation-baseline-phase1.v1",
+  "metadata": {
+    "document_id": "WALKSAFE-CURRENT-IMPLEMENTATION-BASELINE-PHASE1-20260728-R001",
+    "prepared_on": "2026-07-28",
+    "as_of": "2026-07-28T00:16:10+09:00",
+    "lifecycle_status": "CURRENT_INTERNAL_PHASE1_FACT_BASELINE",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "successor_only": true
+  },
+  "lineage": {
+    "relationship": "ADD_ONLY_PHASE1_SUCCESSOR",
+    "scope": "PHASE1_CURRENT_IMPLEMENTATION_DELTA_ONLY",
+    "predecessor_binding_id": "PREDECESSOR",
+    "predecessor_mutated_by_this_authoring": false,
+    "whole_baseline_replacement_claimed": false
+  },
+  "claim_boundary": {
+    "phase1_partial_delta_only": true,
+    "whole_implementation_completion_claimed": false,
+    "formal_test_completion_claimed": false,
+    "physical_device_completion_claimed": false,
+    "real_backend_completion_claimed": false,
+    "cross_process_e2e_completion_claimed": false,
+    "deployment_claimed": false,
+    "server_contract_completion_claimed": false,
+    "legal_approval_claimed": false,
+    "approval_claimed": false,
+    "release_claimed": false
+  },
+  "policy_binding": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "phase1_control_id": "FP035",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "manifest_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+    "manifest_binding_basis": "INHERITED_FROM_CONTENT_ADDRESSED_PREDECESSOR",
+    "manifest_rehashed_during_this_authoring": false
+  },
+  "source_binding": {
+    "binding_kind": "DIRTY_WORKTREE_CONTENT_ADDRESSED_PHASE1_PACKET",
+    "source_commit": null,
+    "dirty_worktree": true,
+    "clean_commit_claimed": false,
+    "packet_binding_id": "ANDROID_PHASE1_PACKET",
+    "packet_capture_mode": "CURRENT_FILES_CONTENT_ADDRESSED_WITHOUT_PROOF_OF_EXECUTION_TIME_IDENTITY",
+    "execution_receipts_embed_source_manifest": false,
+    "execution_time_source_identity_proven": false,
+    "packet_source_manifest_sha256": "d22bbc3f5f4a007f8f848356104800a3180de7f05a9cb103bd2ecc0526931c9f",
+    "packet_source_count": 12,
+    "packet_test_source_count": 20,
+    "packet_source_total_bytes": 875532,
+    "packet_test_source_total_bytes": 198101
+  },
+  "current_implementation_delta": [
+    {
+      "delta_id": "PHASE1-PERSISTENT-REPORT-PAYLOAD-QUEUE",
+      "policy_control": "FP035",
+      "state": "DISABLED_FAIL_CLOSED_CLEANUP_ONLY",
+      "implemented": false,
+      "feature_flag": "PERSISTENT_REPORT_QUEUE_ENABLED",
+      "feature_flag_value": false,
+      "persistent_payload_operations": {
+        "enqueue": "OPEN",
+        "load": "OPEN",
+        "decrypt": "OPEN",
+        "drain": "OPEN"
+      },
+      "claim": "Persistent report payload persistence is deliberately disabled and cleanup-only; no completed durable payload queue is claimed.",
+      "evidence_binding_id": "ANDROID_PHASE1_PACKET"
+    },
+    {
+      "delta_id": "PHASE1-DIRECT-UPLOAD-RESPONSE-BINDING",
+      "policy_control": "FP035",
+      "state": "IMPLEMENTED",
+      "implemented": true,
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "claim": "Direct upload response binding is implemented at host-tested code level.",
+      "evidence_binding_id": "ANDROID_PHASE1_PACKET"
+    },
+    {
+      "delta_id": "PHASE1-COOLDOWN-AND-RETRY-METADATA",
+      "policy_control": "FP035",
+      "state": "IMPLEMENTED",
+      "implemented": true,
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "claim": "Cooldown and retry metadata handling is implemented at host-tested code level, excluding HTTP-date Retry-After and atomic preference/state persistence.",
+      "evidence_binding_id": "ANDROID_PHASE1_PACKET"
+    },
+    {
+      "delta_id": "PHASE1-ACCOUNT-DELETION-FALLBACK-MARKER",
+      "policy_control": "FP035",
+      "state": "IMPLEMENTED",
+      "implemented": true,
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "claim": "Account-deletion fallback marker behavior is implemented at host-tested code level; real-device timing and UI-blocking closure are not claimed.",
+      "evidence_binding_id": "ANDROID_PHASE1_PACKET"
+    }
+  ],
+  "current_validation": {
+    "interpretation": "PASS is limited to the exact recorded host commands and receipts; overlapping Android sets are not summed as unique tests and do not establish device, server, field, product, formal, approval, or release completion.",
+    "android": {
+      "evidence_boundary": "HOST_GRADLE_JUNIT_STATIC_AND_LINT_ONLY",
+      "checks": [
+        {
+          "check_id": "android-report-r4-targeted",
+          "binding_id": "ANDROID_TARGETED_RECEIPT",
+          "result": "PASS",
+          "tests": 82,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit_xml_files": 14,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+          "log_sha256": "e4832666eae394efa0cb8fb8fa9061f84b49018f70df543407adaa37fdc5c53b"
+        },
+        {
+          "check_id": "android-full-debug-unit-r4",
+          "binding_id": "ANDROID_FULL_UNIT_RECEIPT",
+          "result": "PASS",
+          "tests": 759,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit_xml_files": 99,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4.log",
+          "log_sha256": "abacad53db8291319976a7ea0adbde5637eb92c200b630566a9935900db46dc4"
+        },
+        {
+          "check_id": "android-full-failure-clusters-r4",
+          "binding_id": "ANDROID_CLUSTER_RECEIPT",
+          "result": "PASS",
+          "tests": 45,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit_xml_files": 5,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4.log",
+          "log_sha256": "e8869170b0b9af4c25537d16cf0c6d164f7d813713ed192986ecf378ba0c9776"
+        },
+        {
+          "check_id": "android-lint-debug-r4",
+          "binding_id": "ANDROID_LINT_RECEIPT",
+          "result": "PASS",
+          "tests": 0,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4.log",
+          "log_sha256": "d7cb7493cb40965999427b6972cd8835fa0a1a32e2c05c90ac2ac6d2b2954e5d"
+        }
+      ],
+      "aggregate_unique_test_count_claimed": false,
+      "packet_validation_manifest_sha256": "f8bcd36b6c64fb68da9e8205b363add8ab46aa4a9c85dcd81d5c9a54a46bf9a2",
+      "packet_logs": 10,
+      "packet_receipts": 9,
+      "packet_direct_path_and_sha_match_count": 6,
+      "packet_count_self_check": "PASS"
+    },
+    "w3_available_checks": {
+      "binding_id": "W3_CURRENT_RECEIPT",
+      "dependency_install_performed": false,
+      "checks": [
+        {
+          "check_id": "w3-openapi-check",
+          "result": "BLOCKED_ENVIRONMENT",
+          "exit_code": 1,
+          "reason": "ModuleNotFoundError: fastapi; dependency installation intentionally not performed",
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-openapi-check.log",
+          "log_sha256": "8baf0daf3abd924d6fa82c2255730de8393c781eab59df485bf034f56aed3693"
+        },
+        {
+          "check_id": "w3-web-lint",
+          "result": "PASS",
+          "exit_code": 0,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-web-lint.log",
+          "log_sha256": "148014f17481780d723175b71227cb35ac097ce1154b569669f5ef59de8637ab"
+        },
+        {
+          "check_id": "w3-web-typecheck",
+          "result": "PASS",
+          "exit_code": 0,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-web-typecheck.log",
+          "log_sha256": "75303bbd476b9f2e9236d99c2c852b3b0aa586607f5c4f563e58017bb482f2fe"
+        },
+        {
+          "check_id": "w3-gateway-typecheck",
+          "result": "PASS",
+          "exit_code": 0,
+          "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-gateway-typecheck.log",
+          "log_sha256": "d5d0638f1e783856ec81d08b289bd34c2f6b2eb795fb750977498948a02744bb"
+        }
+      ],
+      "summary": {
+        "total": 4,
+        "pass": 3,
+        "fail": 0,
+        "blocked_environment": 1
+      }
+    },
+    "formal279": {
+      "binding_id": "FORMAL279_CONTROL_RECEIPT",
+      "planned_test_count": 279,
+      "status": "NOT_RUN",
+      "formal_pass_count": 0,
+      "formal_test_credit": false,
+      "release_credit": false,
+      "verdict": "NO_GO"
+    }
+  },
+  "open_gaps": [
+    {
+      "gap_id": "OPEN-PERSISTENT-PAYLOAD-QUEUE",
+      "status": "OPEN",
+      "detail": "Persistent payload enqueue, load, decrypt, and drain are not implemented or enabled."
+    },
+    {
+      "gap_id": "OPEN-HTTP-DATE-RETRY-AFTER",
+      "status": "OPEN",
+      "detail": "HTTP-date Retry-After handling is absent."
+    },
+    {
+      "gap_id": "OPEN-SERVER-IDEMPOTENCY-PAYLOAD-RECEIPT",
+      "status": "OPEN",
+      "detail": "Server idempotency and payload receipt binding are not established."
+    },
+    {
+      "gap_id": "OPEN-CONSENT-RESPONSE-TUPLE",
+      "status": "OPEN",
+      "detail": "Consent-response tuple binding is not established."
+    },
+    {
+      "gap_id": "OPEN-NONATOMIC-COOLDOWN-PREFS-V2-STATE",
+      "status": "OPEN",
+      "detail": "Cooldown preferences and v2 state update are not atomic."
+    },
+    {
+      "gap_id": "OPEN-MARKER-MAX2S-UI-BLOCK",
+      "status": "OPEN",
+      "detail": "Safety marker creation can block the UI for up to 2 seconds."
+    },
+    {
+      "gap_id": "OPEN-REAL-SEPARATE-PROCESS-LEGACY-FIXTURE",
+      "status": "OPEN",
+      "detail": "Real separate-process coverage and real legacy fixture coverage remain insufficient."
+    },
+    {
+      "gap_id": "OPEN-REAL-DEVICE-BACKEND-E2E",
+      "status": "OPEN",
+      "detail": "Real-device, real backend, and Android-to-gateway-to-backend end-to-end evidence is absent."
+    }
+  ],
+  "governance": {
+    "legal_approval_granted": false,
+    "approval_granted": false,
+    "approval_status": "NOT_APPROVED",
+    "release_eligible": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "physical_evidence_bindings": {
+    "hash_algorithm": "SHA-256",
+    "binding_count": 8,
+    "bindings": [
+      {
+        "binding_id": "PREDECESSOR",
+        "role": "READ_ONLY_PREDECESSOR",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "byte_length": 12949,
+        "sha256": "ccc0c7ecad9cf0f4c803a3dfc961c7e5c6fd1c1c007020401deb3db08d769de7"
+      },
+      {
+        "binding_id": "ANDROID_PHASE1_PACKET",
+        "role": "CURRENT_PHASE1_ANDROID_SOURCE_TEST_AND_VALIDATION_PACKET",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-android-report-successor/evidence.json",
+        "byte_length": 30287,
+        "sha256": "1e6aa72ef3306e4385d45336e90cecb699694aea6b19a8f8313c0989414adaa8"
+      },
+      {
+        "binding_id": "ANDROID_TARGETED_RECEIPT",
+        "role": "CURRENT_VALIDATION_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-receipt.json",
+        "byte_length": 668,
+        "sha256": "e26bcddb987e44b5d920d67e29e621cdb49d3bfa0e77152614078b970c625111"
+      },
+      {
+        "binding_id": "ANDROID_FULL_UNIT_RECEIPT",
+        "role": "CURRENT_VALIDATION_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-receipt.json",
+        "byte_length": 688,
+        "sha256": "94b0eafea6345122971afa44dc61d8281646cdabc294bff8ef1b48efac961d97"
+      },
+      {
+        "binding_id": "ANDROID_CLUSTER_RECEIPT",
+        "role": "CURRENT_VALIDATION_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4-receipt.json",
+        "byte_length": 682,
+        "sha256": "d31570d79744860fd7131c6b0afa56b4072eb58edee291f9574efb2c70f5be7d"
+      },
+      {
+        "binding_id": "ANDROID_LINT_RECEIPT",
+        "role": "CURRENT_VALIDATION_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4-receipt.json",
+        "byte_length": 530,
+        "sha256": "5d9cf1b4313b49f7440a365111f9745316c233004193459ff9db3f7fa2aed873"
+      },
+      {
+        "binding_id": "W3_CURRENT_RECEIPT",
+        "role": "CURRENT_W3_AVAILABLE_CHECKS_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-light-available-checks-receipt.json",
+        "byte_length": 1748,
+        "sha256": "8cee9f0a390d79cf644146f596bd2b71a9901d4dd09d606eac64b3dde122ef92"
+      },
+      {
+        "binding_id": "FORMAL279_CONTROL_RECEIPT",
+        "role": "FORMAL_NOT_RUN_CONTROL_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+        "byte_length": 2048,
+        "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d"
+      }
+    ],
+    "binding_manifest_canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF",
+    "binding_manifest_sha256": "a22ff428bed3c2d357bccd1c20e41d98abcb77a33120b27fbb2274babefe3ed2",
+    "receipt_declared_log_note": "Log paths and hashes under current_validation are transcribed from their content-addressed receipts; only the eight files in bindings are direct physical bindings of this successor."
+  },
+  "self_check": {
+    "status": "PASS",
+    "meaning": "Document-internal count, uniqueness, SHA-format, and declared outcome consistency only; not an external artifact revalidation.",
+    "counts": {
+      "physical_bindings": {
+        "expected": 8,
+        "observed": 8
+      },
+      "implementation_delta_facts": {
+        "expected": 4,
+        "observed": 4
+      },
+      "implemented_delta_facts": {
+        "expected": 3,
+        "observed": 3
+      },
+      "disabled_cleanup_only_delta_facts": {
+        "expected": 1,
+        "observed": 1
+      },
+      "android_current_checks": {
+        "expected": 4,
+        "observed": 4
+      },
+      "android_pass_checks": {
+        "expected": 4,
+        "observed": 4
+      },
+      "w3_current_checks": {
+        "expected": 4,
+        "observed": 4
+      },
+      "w3_pass_checks": {
+        "expected": 3,
+        "observed": 3
+      },
+      "w3_blocked_environment_checks": {
+        "expected": 1,
+        "observed": 1
+      },
+      "open_gaps": {
+        "expected": 8,
+        "observed": 8
+      },
+      "formal_planned_tests": {
+        "expected": 279,
+        "observed": 279
+      },
+      "binding_sha256_format": {
+        "expected": 8,
+        "observed": 8
+      },
+      "unique_binding_paths": {
+        "expected": 8,
+        "observed": 8
+      }
+    }
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "scope": "UTF-8 canonical JSON with the top-level $.integrity member excluded",
+    "canonicalization": "sort_keys=true compact separators ensure_ascii=false trailing LF",
+    "self_reference_included": false,
+    "canonical_byte_length": 12102,
+    "sha256": "6447127364dd5249551d6b93c71ef2a87559f661c792b791c228394a23d8163c"
+  }
+}

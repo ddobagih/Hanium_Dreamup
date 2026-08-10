@@ -1,0 +1,6 @@
+# EPIC-02 FP-018 Active ledger overlay
+
+- Overlay: `WS-EPIC-02-FP018-ACTIVE-LEDGER-OVERLAY-20260724-001`
+- FP-018 내부 구현·검증: `PARTIAL_IMPLEMENTATION_VERIFIED`
+- 실제 기기·정식 시험: `NOT_RUN`
+- 출시: `NOT_ELIGIBLE`

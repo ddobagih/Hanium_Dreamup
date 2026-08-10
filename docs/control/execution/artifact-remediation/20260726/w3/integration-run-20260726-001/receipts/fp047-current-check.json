@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py",
+    "--check"
+  ],
+  "command_id": "fp047-current-check",
+  "cwd": ".",
+  "end": "2026-07-26T16:23:09.564759860Z",
+  "environment_constraints": {
+    "product_or_source_modification": false,
+    "retry_count": 0
+  },
+  "exit_code": 1,
+  "finding": "FP-047 focused administrator security tests log WALKSAFE_IMPLEMENTATION_EXACT_31_CONTENT_SET_SHA256 binding differs",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "597519466d94b1331fc93892050d90c025042e5b32e928ccafee3bfd648b0839"
+    }
+  },
+  "log_path": "logs/fp047-current-check.log",
+  "log_sha256": "1a833db433b51b4ac8d22519e344dc31075d98bef77f10f43fd32aabfea38d92",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 32880,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-integration-command-receipt.v1",
+  "start": "2026-07-26T16:23:09.497536646Z",
+  "status": "FAIL_REPORTED_NO_RETRY",
+  "time_log_path": "logs/fp047-current-check.time",
+  "time_log_sha256": "b952a431f0d9bb8259ec89917e1ad57160a5168c31bdf994c3ac312fa73f4dc3",
+  "tool": {
+    "python": "python3"
+  }
+}

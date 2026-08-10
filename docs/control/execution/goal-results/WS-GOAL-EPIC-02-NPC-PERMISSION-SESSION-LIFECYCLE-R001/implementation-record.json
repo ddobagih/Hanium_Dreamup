@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-IMPLEMENTATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-24T13:42:00+09:00",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/README.md",
+      "after_sha256": "0a347b4f47916abea1232b3c41ce64d2cf7e91031591627742ecebc9a5f2bddd"
+    },
+    {
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "101f5c44c7693852081aa8a7520e88bef8405aab8e6ef184e94d18e13774b368"
+    },
+    {
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "after_sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "4ff2d1034acc5910b1310dd5947b0676cb2863dc25b90e990c78cf4f816b7b74",
+      "before_sha256": "562e3843c2eadec531bfb9084478629e8fc5d1347fe48fb0b8e9ea113b78e883"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "after_sha256": "8a7c6cdab0b94d4b7172bfbe10d213840aee8719326e5f8c0edcecb595c15dae"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "after_sha256": "5579d99f737f434d050ad5fe79b14d15d7b1f86f8a86df58c4963708c50b0502"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "after_sha256": "59688fff65b7b613fe814235f7ac8ee2578db7f18577a7f364da1a9860ca3d7d",
+      "before_sha256": "98a4e4758164317bc2a76d01ea3d76cab8fd9e5ae25d2f33b86e9eda63553a57"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+      "after_sha256": "272d1122e67f106934f49aa2ce0555cb85e498da790342f7f96e8a42ded2d995"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "fd42fa8001180547b1ba1ece425adf628bb5926898e2e62b10d3736b140f5982"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "after_sha256": "2fc06aeab1776a2347b8eb646e845d4b55b7d3678b54279a99fe97fde82ee7a8"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "75cd31e0c2d99590c3f35c7218a7cbbdab7b46191ef4ba2831707f216647f6d5",
+      "before_sha256": "d45a9ea330a6dbd4a7fb2eb8c4d4061e2c88ee2287dec02e635dc0842e41a941"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "after_sha256": "93f6d183ac3e2c46e03f01f60d437c30f75a6f9d2cc4320a21348efa445b3563"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "after_sha256": "98dddc0297e187c89a4f65c93784a968a50cd6eac9b3ed3ae987cc8c5a334ab7"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "after_sha256": "9b0419c5e055860c960ff6c5297860bff97cf4b2368feba188cc6af4bd3df63d"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "after_sha256": "64ca718b81d7e215931a0611c67377b672dba4f12e62a66732c7865df4bf3abe",
+      "before_sha256": "3d840e3706c88f4ddd479dca672670df2e8544b09d448913a1a0dccc54407e65"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "after_sha256": "1b7a5e093f8835154ce802f07735bec9793c8281f52659b833791146fec51341"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "after_sha256": "bb5895b79d09b00f836d08ec3dd8ff729d280364924cd91009d3b21a19aa94cb"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "after_sha256": "eb8a09646210ad57965e2f72e5e813c68d745bfd31ba008d68fb9f7ae5bed542"
+    },
+    {
+      "path": "apps/android-gateway/README.md",
+      "after_sha256": "b89ed746a788b519b3f54897cd40a5fb0a0c2cf5687a89cd6d83d5f157a1c43a"
+    },
+    {
+      "path": "apps/android-gateway/server.ts",
+      "after_sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd"
+    },
+    {
+      "path": "apps/android-gateway/src/config.ts",
+      "after_sha256": "374360f7e324901dcad48397f4d6f96c26945cb45d8e5ba41c4bf8c023e6ff67"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "after_sha256": "4fb388ae97f7b8171f1ab8d17e22c7abe72ef901c64ac7dcfaf2a2e95a447e99"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "after_sha256": "9dd04f01e6fac76d48c5cd80fa57722c9510688f068edf5005123fa05d150bf1"
+    },
+    {
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "after_sha256": "d314cbce598c1fce797f24ae807f2d67ea1f448fda1ac9674ed4efd34b7f0e56"
+    },
+    {
+      "path": "deploy/README.md",
+      "after_sha256": "670bcfe87f15020e86104b40e9877905a14d3735f1150f63a465b133ecd6c09f"
+    },
+    {
+      "path": "deploy/config/walksafe-android-gateway.env.example",
+      "after_sha256": "b9c1f41466e2970156ec170a44226ce78e11b79d58a781f6ed11031c487ebf64"
+    },
+    {
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "after_sha256": "10f27296803d2f5155e69c767734f8723ae761cfed75e2b3d603da4fcbee782c"
+    },
+    {
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "after_sha256": "a0ec591c7f31cd29ee3c5bf4df8b97fc28969578c2bbd77bf05f7b30bd298fc3"
+    },
+    {
+      "path": "tests/test_walksafe_android_gateway_boundary_20260723.py",
+      "after_sha256": "e02211cfc4aa31e76746530710fbc581de7c5f131ebf00b9da26deca3fac49ee"
+    }
+  ],
+  "state_ownership_matrix": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/state-ownership-matrix.json",
+    "sha256": "8e19d83411b610ee25e538c2a10d6b8beceefe9470dbe884ad1fbc01cd7b6389"
+  },
+  "implemented_controls": [
+    "OS permissions, account login, raw consent, automatic-report consent, and network choice are independent states",
+    "Gateway sessions persist only as bounded encrypted Android app-private state and are revalidated before protected actions",
+    "logout and authentication expiry clear authenticated capability without withdrawing unrelated permissions or consent",
+    "permission observations stop only dependent features unless a walk safety prerequisite is absent",
+    "automatic-report withdrawal cancels automatic work without changing explicit-report consent",
+    "restart never restores an active walk or route",
+    "a public non-API rights page remains independent of app installation and login"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-NPC-PERMISSION-SESSION-LIFECYCLE-01"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_rights_operation_status": "NOT_RUN",
+    "release_gate_count": 4,
+    "release_gate_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

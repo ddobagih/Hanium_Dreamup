@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-WORK-ITEM-COMPLETION-20260724-001",
+  "evidence_type": "WORK_ITEM_EXECUTION_RECEIPT",
+  "status": "ACCEPTED",
+  "result": "PASS",
+  "target_goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "target_goal_content_sha256": "06ec8298dcc18cb8a8e3f04c05c9bbad2d09709a9538177c842141e3f01ec490",
+  "work_item_id": "EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE",
+  "source_policy_ids": [
+    "NPC-PERMISSION-SESSION-LIFECYCLE"
+  ],
+  "gap_ids": [
+    "GAP-006"
+  ],
+  "target_completion_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+  "execution_start_event_sha256": "68bdd0f4ab0e2ced7cb6b3d038b23dac63e54d19ad9cc9efd5ae6ecfcb366c88",
+  "execution_window": {
+    "started_at": "2026-07-24T13:18:12+09:00",
+    "ended_at": "2026-07-24T13:49:00+09:00"
+  },
+  "completed_at": "2026-07-24T13:49:00+09:00",
+  "executor": {
+    "id": "CODEX-NPC-PERMISSION-IMPLEMENTER-20260724-001",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "authority": "GRAPH_V2_STANDING_EXECUTION_AUTHORITY"
+  },
+  "reviewer": {
+    "id": "CODEX-NPC-PERMISSION-SEPARATE-REVIEW-20260724-001",
+    "role": "SEPARATE_INTERNAL_REVIEWER",
+    "authority": "INTERNAL_REPOSITORY_CONTROL",
+    "decision": "APPROVED",
+    "decided_at": "2026-07-24T13:51:00+09:00"
+  },
+  "reviewer_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/independent-review.json",
+    "sha256": "541ec3d660119a5b46b5db54dacb62a17709fad702042620911ea0e316f7834f"
+  },
+  "result_evidence": [
+    {
+      "kind": "IMPLEMENTATION_RECORD",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/implementation-record.json",
+      "sha256": "b626e05849a72ab93b8792c0fa9d791fa12d7ade81d22a4b71b226787afe2776"
+    },
+    {
+      "kind": "VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/verification-result.json",
+      "sha256": "e27b3beaa0067a561e6670b8662b13bce68d966a485165b8c502353ade887a0a"
+    },
+    {
+      "kind": "SUCCESSOR_TRACE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/successor-trace.json",
+      "sha256": "32e6705570f5c23fef331b37192255dfa9c5d52e646e433e6fb141ec708bad15"
+    }
+  ],
+  "generated_at": "2026-07-24T13:52:00+09:00"
+}

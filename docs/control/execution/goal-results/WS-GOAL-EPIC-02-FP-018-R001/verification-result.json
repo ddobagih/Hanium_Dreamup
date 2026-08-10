@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP018-VERIFICATION-RESULT-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-24T12:34:00+09:00",
+  "checks": [
+    {
+      "name": "FP-018 focused lifecycle/readiness tests",
+      "command": "./gradlew :app:testDebugUnitTest --tests MainActivityWalkSessionLifecycleStaticTest --tests WalkSessionDeviceResourceSnapshotTest --tests WalkSessionLifecycleTest --tests WalkSessionLifecycleFp018Test --tests WalkSessionReadinessTest --tests GatewayFieldSessionTest --tests WalkSafeFeedbackPolicyTest --offline --no-daemon",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/focused-tests.log",
+      "output_sha256": "6c7c58c7f57ec518b445d6012716353aba424252be3ad509fec27f3b8920d7f1",
+      "executed_at": "2026-07-24T12:31:00+09:00"
+    },
+    {
+      "name": "related asynchronous composition tests",
+      "command": "./gradlew :app:testDebugUnitTest --tests CameraXFallbackCompositionStaticTest --tests MainActivityAccessibilityStaticTest --tests MainActivityNavigationCompositionTest --tests MainActivityStartupCapabilityStaticTest --tests RuntimeMetricMainActivityStaticTest --tests ArCoreTactileProjectionContextFactoryTest --tests MainActivityReportUploadStaticTest --tests AndroidSensorLifecycleStaticTest --offline --no-daemon",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/related-static-tests.log",
+      "output_sha256": "2c2a77a58c87e045ccf3d880e87015dcc33b3cc87b3d236b6f940c163077eb0d",
+      "executed_at": "2026-07-24T12:32:00+09:00"
+    },
+    {
+      "name": "full Android unit/build/lint",
+      "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/full-android-test-build-lint.log",
+      "output_sha256": "dbe11797c6fdf5e27b55e53665240ec90d999101f157facf34c92fd114cdc3d4",
+      "executed_at": "2026-07-24T12:33:00+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "tests": 434,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "evidence_boundary": {
+    "repository_internal": true,
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN"
+  }
+}

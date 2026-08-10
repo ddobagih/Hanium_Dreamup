@@ -1,0 +1,3111 @@
+{
+  "schema_version": "walksafe.artifact-change-log.v1",
+  "metadata": {
+    "register_id": "ART-DOC-05-001",
+    "artifact_type_code": "DLV-DOC-05",
+    "title": "WalkSafe 산출물 변경 이력",
+    "document_version": "1.0.1",
+    "as_of": "2026-07-22",
+    "generated_at": "2026-07-22T13:15:00+09:00",
+    "lifecycle_status": "ACTIVE",
+    "approval_status": "APPROVED_OPENING_SNAPSHOT",
+    "canonical_path": "docs/deliverables/00-control/artifact-change-log.json",
+    "baseline_status": "ACTIVE_CONTINUOUSLY_UPDATED",
+    "opening_snapshot_id": "ART-DOC-05-001-SNAPSHOT-001",
+    "updated_at": "2026-07-22T14:22:21+09:00"
+  },
+  "source_bindings": [
+    {
+      "name": "aligned_effective_decision_register",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    {
+      "name": "approval_materializer",
+      "path": "scripts/materialize_walksafe_artifact_baseline_approval_20260722.py",
+      "sha256": "cf06e2c8c5e6635f90dfa73f10b73cf4a47d841fb79e96c2c97e2b4ef9b45607"
+    },
+    {
+      "name": "approval_prepare_receipt",
+      "path": "docs/control/baselines/walksafe-artifact-approval-prepare-receipt-20260722-r001.json",
+      "sha256": "5a146ec328fb72aab4fe43af62482915e2cca0e251d9f990b12d322f6e0ed962"
+    },
+    {
+      "name": "approved_policy_payload",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    {
+      "name": "artifact_authoring_goal_intake",
+      "path": "docs/control/decision-interview/source-records/walksafe-artifact-authoring-goal-20260722-r001.intake.json",
+      "sha256": "38234fb4cfd07f13044470a3c07d58c9d63532cc81946a616aaec47af2e58ed8"
+    },
+    {
+      "name": "artifact_baseline_approval",
+      "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+      "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b"
+    },
+    {
+      "name": "artifact_content_readiness_audit",
+      "path": "docs/control/audits/walksafe-artifact-content-readiness-audit-20260722-r001.json",
+      "sha256": "8551c2ad5ee3a3ddae8b10b3ab7488a07d0d7fab8e9da4601e720a84a6df0439"
+    },
+    {
+      "name": "artifact_state_transition",
+      "path": "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json",
+      "sha256": "0b6695b40ef54aa279671da60809dc3cacea9bc95f96b0620d45dc7e9aba5b48"
+    },
+    {
+      "name": "artifact_type_catalog",
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    {
+      "name": "authoring_plan",
+      "path": "docs/control/documentation-authoring-preparation-plan.md",
+      "sha256": "3055ea42c33d3f3f81dd4fa41fd9b8ffcaac67d24cc2c509124364a1de641e92"
+    },
+    {
+      "name": "design_traceability_register",
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa"
+    },
+    {
+      "name": "document_control_manual",
+      "path": "docs/deliverables/00-control/document-control-manual.md",
+      "sha256": "a776e066a60dee20c61f0f7f6b07da435d1f03c6f6b877e56597723667762ea5"
+    },
+    {
+      "name": "effective_policy_1_0_1_manifest",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+    },
+    {
+      "name": "formal_7_to_12_trace_integration_report",
+      "path": "docs/deliverables/traceability/formal-7-12-integration-report-20260721-r001.json",
+      "sha256": "03b66c52eafe6e633b54b10120984182e2adb80e6f10187c630734a8bea86d6d"
+    },
+    {
+      "name": "formal_7_to_12_trace_integration_summary",
+      "path": "docs/deliverables/traceability/formal-7-12-integration-summary.md",
+      "sha256": "018d252ecda4003ea553461d4f634d370debe390e1fb3528b9252580709aee52"
+    },
+    {
+      "name": "fp035_correction_candidate",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    {
+      "name": "generator",
+      "path": "scripts/build_walksafe_control_bootstrap.py",
+      "sha256": "6b791acc8854925ebb8d7e8f174f0b3ebfc734d94cc79600e5669ce4b8e08f49"
+    },
+    {
+      "name": "management_change_request_register",
+      "path": "docs/deliverables/01-management/registers/change-requests.json",
+      "sha256": "64f69a0aee2e4817c682f09fd22948da77115ec9c4227d5943e195f67c4783a5"
+    },
+    {
+      "name": "management_raid_register",
+      "path": "docs/deliverables/01-management/registers/raid.json",
+      "sha256": "465d65f3c823c65938c8ee60bd91f9b07977906d2531e5ad4d2076c20f8552c7"
+    },
+    {
+      "name": "module_register",
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49"
+    },
+    {
+      "name": "policy_approval",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    {
+      "name": "policy_baseline_manifest",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    {
+      "name": "pretransition_snapshot",
+      "path": "docs/control/baselines/walksafe-artifact-pretransition-snapshot-20260722-r001.json",
+      "sha256": "1e1fe3ea0b23c8d8d9264bfeac7ffb8750aa175bc9b8b17b569962dc466f54a7"
+    },
+    {
+      "name": "req_des_tst_trace_integration_report",
+      "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "sha256": "d74dcd2a5bd7e65c44f2ab9d1baedb20ac63efc413b5f00ccead6459543b1203"
+    },
+    {
+      "name": "req_des_tst_trace_integration_summary",
+      "path": "docs/deliverables/traceability/README.md",
+      "sha256": "30cb001009b499fe6a4c9c1222acdcd3ef78ce292c676bc44cf710eeef59a503"
+    },
+    {
+      "name": "requirements_rtm",
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "1d73d1e6e0a47ea3833df779c945397d799b14e9b26fdac4bb577197a660a7bd"
+    },
+    {
+      "name": "test_case_register",
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee"
+    },
+    {
+      "name": "test_residual_risk_register",
+      "path": "docs/deliverables/06-testing/registers/residual-risks.json",
+      "sha256": "120c858c9b04983c07c2dd066555da9387d4ca3be0892176fb08b2b39ce2c1c7"
+    }
+  ],
+  "draft_discovery": {
+    "manifest_bindings": [
+      {
+        "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+        "sha256": "84df883262004975b3272d66c2dc36fa732f2b802cda11cd94dc76f254264723",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_formal_aiml_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/design-draft-20260721-r001.json",
+        "sha256": "4f58349da209e4c6c23bd637b6e085530583dd5d58083ffc5a11d69cbc2e19a3",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_design_deliverables_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+        "sha256": "1702f3fb7d21446a14087cc4adf4b6eaec05872ef341c6d4b77084f365ea6f76",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/management-discovery-draft-20260721-r001.json",
+        "sha256": "78f694b85799439a2810b6edc659067021b813dbe05113a37336fa24ed47fea3",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+        "sha256": "5070e8359c7adf162be4cb9adaeaa4134cb49014c53ae2f677a20f6caf5c3776",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/requirements-draft-20260721-r001.json",
+        "sha256": "3c943657f84fd338723370a76a3594424ec61bec8a83cdb16fd6bb860de71586",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_requirements_draft_20260721.py"
+      },
+      {
+        "path": "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+        "sha256": "38ea6ba2d82ffe10efb6a09cb45d88b59ec55537ca7eb4b6349fc5407cc86534",
+        "lifecycle_status": "DRAFT",
+        "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+      }
+    ],
+    "file_bindings": [
+      {
+        "path": "docs/deliverables/01-management/project-charter.md",
+        "sha256": "0cb97e9ba61924485e2b27ad40c0e2dca4dddc3e9d88481c59eeac17f6f7190e",
+        "byte_length": 20452,
+        "explicit_artifact_type_codes": [
+          "MGT-01",
+          "MGT-02",
+          "MGT-03",
+          "MGT-04"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-01",
+          "MGT-02",
+          "MGT-03",
+          "MGT-04"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/project-control-registers.md",
+        "sha256": "174db8700dd42dee6a139724601d094185496cbd175b23caf5ce845631e5833d",
+        "byte_length": 16457,
+        "explicit_artifact_type_codes": [
+          "MGT-14",
+          "MGT-15",
+          "MGT-16",
+          "MGT-17",
+          "MGT-18"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-14",
+          "MGT-15",
+          "MGT-16",
+          "MGT-17",
+          "MGT-18"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/project-management-plan.md",
+        "sha256": "a1c6579e27fd07284902bce5c23ddab14539557b5320d0dd257da47b89857cb0",
+        "byte_length": 33187,
+        "explicit_artifact_type_codes": [
+          "MGT-05",
+          "MGT-06",
+          "MGT-07",
+          "MGT-08",
+          "MGT-09",
+          "MGT-10",
+          "MGT-11",
+          "MGT-12",
+          "MGT-13"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-05",
+          "MGT-06",
+          "MGT-07",
+          "MGT-08",
+          "MGT-09",
+          "MGT-10",
+          "MGT-11",
+          "MGT-12",
+          "MGT-13"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/actions.json",
+        "sha256": "fa85797f587cfeb275c1f896017de09abb5180682c35592b480e0ad1f8fbf80a",
+        "byte_length": 4028,
+        "explicit_artifact_type_codes": [
+          "MGT-18"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-18"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/change-requests.json",
+        "sha256": "64f69a0aee2e4817c682f09fd22948da77115ec9c4227d5943e195f67c4783a5",
+        "byte_length": 4534,
+        "explicit_artifact_type_codes": [
+          "MGT-16"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-16"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/dashboard.json",
+        "sha256": "46ed20166cc98bf3b0a3086d4ee6a8342b2c973bf0931256620fadaba59bc8bd",
+        "byte_length": 2415,
+        "explicit_artifact_type_codes": [
+          "MGT-17"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/decisions.json",
+        "sha256": "3992669f257e0a78e0c84214ec47cd62f5304877e3bdffc2e3efb88fb3a0d713",
+        "byte_length": 1846,
+        "explicit_artifact_type_codes": [
+          "MGT-15"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/raci.json",
+        "sha256": "6eda3f98f87736e899c8e478043680c293e3b90673c6d5f28625ad4fb7f5812a",
+        "byte_length": 3924,
+        "explicit_artifact_type_codes": [
+          "MGT-10"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-10"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/raid.json",
+        "sha256": "465d65f3c823c65938c8ee60bd91f9b07977906d2531e5ad4d2076c20f8552c7",
+        "byte_length": 15626,
+        "explicit_artifact_type_codes": [
+          "MGT-14"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-14"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/schedule.json",
+        "sha256": "87ac14b3b7781364518d580a59d30064b1733d42c753f1619adb33f275b2fe93",
+        "byte_length": 4119,
+        "explicit_artifact_type_codes": [
+          "MGT-07"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-07"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/stakeholders.json",
+        "sha256": "b503a85891ad3607d39d4103349f5bf622b8ebbe3514dc23d2ffcd01fdd31292",
+        "byte_length": 4504,
+        "explicit_artifact_type_codes": [
+          "MGT-09"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-09"
+        ]
+      },
+      {
+        "path": "docs/deliverables/01-management/registers/wbs.json",
+        "sha256": "5d1045a098da6ba9885ed0cfed1a17d5b689514f17c18cfc3e72e51840b00487",
+        "byte_length": 5219,
+        "explicit_artifact_type_codes": [
+          "MGT-06"
+        ],
+        "declared_artifact_type_codes": [
+          "MGT-06"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "sha256": "8bd0acb7210a58624da3ec9721b38e7ac8a31281f78a231f7ae18a2f22e5979f",
+        "byte_length": 35720,
+        "explicit_artifact_type_codes": [
+          "DSC-01",
+          "DSC-02",
+          "DSC-03",
+          "DSC-04",
+          "DSC-05",
+          "DSC-06",
+          "DSC-07",
+          "DSC-08",
+          "DSC-09"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-01",
+          "DSC-02",
+          "DSC-03",
+          "DSC-04",
+          "DSC-05",
+          "DSC-06",
+          "DSC-07",
+          "DSC-08",
+          "DSC-09"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/product-definition.md",
+        "sha256": "38a18a03d7522f55c8ec0ce67fd651157ec30d3c55ea6d736bcc6a35a4391af0",
+        "byte_length": 21494,
+        "explicit_artifact_type_codes": [
+          "DSC-10",
+          "DSC-11",
+          "DSC-12",
+          "DSC-13"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-10",
+          "DSC-11",
+          "DSC-12",
+          "DSC-13"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/product-registers.md",
+        "sha256": "46f59d6e0acf2a05badd1fb84ca703a3bdd0dde636355b205fb1072d7096f2d6",
+        "byte_length": 7603,
+        "explicit_artifact_type_codes": [
+          "DSC-14",
+          "DSC-15"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-14",
+          "DSC-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/registers/backlog.json",
+        "sha256": "9aa0833e7801865a67e5adff8b8cc7677b4ab09e7fb077e0caf79840204d1780",
+        "byte_length": 162782,
+        "explicit_artifact_type_codes": [
+          "DSC-14"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-14"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/registers/discovery-evidence.json",
+        "sha256": "a594cb582cb77c430a906c813b2935b8eb2dd20591bc89079d4ced3be09bc779",
+        "byte_length": 5131,
+        "explicit_artifact_type_codes": [
+          "DSC-01",
+          "DSC-02",
+          "DSC-03",
+          "DSC-04",
+          "DSC-05",
+          "DSC-06",
+          "DSC-07",
+          "DSC-08",
+          "DSC-09"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-01",
+          "DSC-02",
+          "DSC-03",
+          "DSC-04",
+          "DSC-05",
+          "DSC-06",
+          "DSC-07",
+          "DSC-08",
+          "DSC-09"
+        ]
+      },
+      {
+        "path": "docs/deliverables/02-discovery/registers/stage-decisions.json",
+        "sha256": "1a6af5c44908f8df3cf84c135211943462e40977f1640815344e4d6b2c7292a4",
+        "byte_length": 4300,
+        "explicit_artifact_type_codes": [
+          "DSC-15"
+        ],
+        "declared_artifact_type_codes": [
+          "DSC-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/03-requirements/acceptance-specification.md",
+        "sha256": "d91dee4bfb4a8da3826625de4aa60243182bb3e21a95c1e20540813248705198",
+        "byte_length": 370696,
+        "explicit_artifact_type_codes": [
+          "REQ-05",
+          "REQ-06"
+        ],
+        "declared_artifact_type_codes": [
+          "REQ-05",
+          "REQ-06"
+        ]
+      },
+      {
+        "path": "docs/deliverables/03-requirements/glossary.json",
+        "sha256": "635632c0d65cad9b64b80e5750f3d63db9e8a9b95e3e008bb220599f626c1404",
+        "byte_length": 15097,
+        "explicit_artifact_type_codes": [
+          "REQ-19"
+        ],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/03-requirements/requirement-change-log.json",
+        "sha256": "cfdc36336c93fcb29635219a6067dd0c5a81cc3d287758af3c08bf4e0b46fa6b",
+        "byte_length": 6502,
+        "explicit_artifact_type_codes": [
+          "REQ-18"
+        ],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/03-requirements/requirements-traceability.md",
+        "sha256": "ab250dd0b139822aa0d8acbfe0b599b394e48b59556b44048d13403e4c0a9822",
+        "byte_length": 31722,
+        "explicit_artifact_type_codes": [
+          "REQ-16",
+          "REQ-17",
+          "REQ-18",
+          "REQ-19"
+        ],
+        "declared_artifact_type_codes": [
+          "REQ-16",
+          "REQ-17",
+          "REQ-18",
+          "REQ-19"
+        ]
+      },
+      {
+        "path": "docs/deliverables/03-requirements/rtm.html",
+        "sha256": "353a8d43e7c8b02389764ea87ccede0fc1fdca33ee02212c1547207d0c3e200e",
+        "byte_length": 1511325,
+        "explicit_artifact_type_codes": [
+          "REQ-16"
+        ],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/03-requirements/rtm.json",
+        "sha256": "1d73d1e6e0a47ea3833df779c945397d799b14e9b26fdac4bb577197a660a7bd",
+        "byte_length": 1903186,
+        "explicit_artifact_type_codes": [
+          "REQ-16"
+        ],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/03-requirements/system-requirements.md",
+        "sha256": "efe0707df0cdbb63e6272602e52da76e00b20685fc83593a1504839f74481d6e",
+        "byte_length": 682747,
+        "explicit_artifact_type_codes": [
+          "REQ-01",
+          "REQ-02",
+          "REQ-03",
+          "REQ-04",
+          "REQ-07",
+          "REQ-08",
+          "REQ-09",
+          "REQ-10",
+          "REQ-11",
+          "REQ-12",
+          "REQ-13",
+          "REQ-14",
+          "REQ-15"
+        ],
+        "declared_artifact_type_codes": [
+          "REQ-01",
+          "REQ-02",
+          "REQ-03",
+          "REQ-04",
+          "REQ-07",
+          "REQ-08",
+          "REQ-09",
+          "REQ-10",
+          "REQ-11",
+          "REQ-12",
+          "REQ-13",
+          "REQ-14",
+          "REQ-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/04-design/design-traceability-register.json",
+        "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+        "byte_length": 459175,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DES-01",
+          "DES-02",
+          "DES-03",
+          "DES-04",
+          "DES-05",
+          "DES-06",
+          "DES-07",
+          "DES-08",
+          "DES-09",
+          "DES-10",
+          "DES-11",
+          "DES-12",
+          "DES-13",
+          "DES-14",
+          "DES-15",
+          "DES-16",
+          "DES-17",
+          "DES-18",
+          "DES-19",
+          "DES-20",
+          "DES-21",
+          "DES-22",
+          "DES-23",
+          "DES-24",
+          "DES-25",
+          "DES-26",
+          "DES-27"
+        ]
+      },
+      {
+        "path": "docs/deliverables/04-design/interface-and-data-design.md",
+        "sha256": "c35f6190f9488fcc4f7e8b653a37742a11ae463ba782c088dc3c7c85e0486686",
+        "byte_length": 64423,
+        "explicit_artifact_type_codes": [
+          "DES-09",
+          "DES-10",
+          "DES-11",
+          "DES-12",
+          "DES-13",
+          "DES-26"
+        ],
+        "declared_artifact_type_codes": [
+          "DES-09",
+          "DES-10",
+          "DES-11",
+          "DES-12",
+          "DES-13",
+          "DES-26"
+        ]
+      },
+      {
+        "path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "sha256": "acd97ac8c0c77dcb745812754f9d1e2dbd63e31c7f16aca0e214531146cf2362",
+        "byte_length": 78542,
+        "explicit_artifact_type_codes": [
+          "DES-19",
+          "DES-20",
+          "DES-21",
+          "DES-22",
+          "DES-23",
+          "DES-24",
+          "DES-25",
+          "DES-27"
+        ],
+        "declared_artifact_type_codes": [
+          "DES-19",
+          "DES-20",
+          "DES-21",
+          "DES-22",
+          "DES-23",
+          "DES-24",
+          "DES-25",
+          "DES-27"
+        ]
+      },
+      {
+        "path": "docs/deliverables/04-design/software-architecture.md",
+        "sha256": "91b5e2757f9a051e2532ecdddf86068d4a221a58cbf4b40613b750a8d8967f9d",
+        "byte_length": 126273,
+        "explicit_artifact_type_codes": [
+          "DES-01",
+          "DES-02",
+          "DES-03",
+          "DES-04",
+          "DES-05",
+          "DES-06",
+          "DES-07",
+          "DES-08"
+        ],
+        "declared_artifact_type_codes": [
+          "DES-01",
+          "DES-02",
+          "DES-03",
+          "DES-04",
+          "DES-05",
+          "DES-06",
+          "DES-07",
+          "DES-08"
+        ]
+      },
+      {
+        "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+        "sha256": "962b3b9471faac60a895f2056865a8e4b12cb354874e197928ba35aa964dbe06",
+        "byte_length": 50966,
+        "explicit_artifact_type_codes": [
+          "DES-14",
+          "DES-15",
+          "DES-16",
+          "DES-17",
+          "DES-18"
+        ],
+        "declared_artifact_type_codes": [
+          "DES-14",
+          "DES-15",
+          "DES-16",
+          "DES-17",
+          "DES-18"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/developer-guide.md",
+        "sha256": "3f47059f1491b679d02c149b12eb01061e30c96935dc65f3b964496d2715b8ee",
+        "byte_length": 10440,
+        "explicit_artifact_type_codes": [
+          "DEV-02",
+          "DEV-03",
+          "DEV-04",
+          "DEV-05",
+          "DEV-06",
+          "DEV-08"
+        ],
+        "declared_artifact_type_codes": [
+          "DEV-02",
+          "DEV-03",
+          "DEV-04",
+          "DEV-05",
+          "DEV-06",
+          "DEV-08"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+        "sha256": "7a4ef90d472af5d5bd308fa894c6acce33d804553c1ba1cdead57c68602aa61e",
+        "byte_length": 6221,
+        "explicit_artifact_type_codes": [
+          "DEV-01",
+          "DEV-07",
+          "DEV-09",
+          "DEV-10",
+          "DEV-11",
+          "DEV-12",
+          "DEV-13",
+          "DEV-14"
+        ],
+        "declared_artifact_type_codes": [
+          "DEV-01",
+          "DEV-07",
+          "DEV-09",
+          "DEV-10",
+          "DEV-11",
+          "DEV-12",
+          "DEV-13",
+          "DEV-14"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+        "sha256": "4d824ec239e73262348b6cca24dfe8b95809d9f3c137820089027c019be1863e",
+        "byte_length": 250897,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DEV-01",
+          "DEV-07",
+          "DEV-09",
+          "DEV-10",
+          "DEV-11",
+          "DEV-12",
+          "DEV-13",
+          "DEV-14"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+        "sha256": "2e61fb8ec3d8180592a691950eb51c3e63479ae86451c851b82323a1371e48d8",
+        "byte_length": 4952,
+        "explicit_artifact_type_codes": [
+          "DEV-15",
+          "DEV-16",
+          "DEV-17",
+          "DEV-18",
+          "DEV-19",
+          "DEV-20",
+          "DEV-21"
+        ],
+        "declared_artifact_type_codes": [
+          "DEV-15",
+          "DEV-16",
+          "DEV-17",
+          "DEV-18",
+          "DEV-19",
+          "DEV-20",
+          "DEV-21"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/licenses-and-notices.md",
+        "sha256": "156af771055c842080248a5b03e93611929fca7c2bb373477d022852b0cdffc3",
+        "byte_length": 3440,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DEV-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/module-register.json",
+        "sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+        "byte_length": 62222,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DEV-18"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+        "sha256": "eb37b2293f47009a228f7f405bcceb27b12a6825485581b026ac99a7c27c05bf",
+        "byte_length": 52836,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DEV-15",
+          "DEV-16",
+          "DEV-19",
+          "DEV-20"
+        ]
+      },
+      {
+        "path": "docs/deliverables/05-implementation/software-integration-report.md",
+        "sha256": "678925c5b7f15e069e08f339f168a1fefbf57525866c7b1d30093bc76b770d45",
+        "byte_length": 3108,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "DEV-21"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/acceptance-receipt.md",
+        "sha256": "24f10efec664ffdc9b8c00aefd6b3cf473d3c56ee001b3eb48d302178a8e0eed",
+        "byte_length": 2011,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-23"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/evidence/README.md",
+        "sha256": "dc5af632a88fde56218a6b105daecf6edef56b6929ed7618dcd480b2a9c2b610",
+        "byte_length": 2624,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-06",
+          "TST-07",
+          "TST-08",
+          "TST-09",
+          "TST-10",
+          "TST-11",
+          "TST-12",
+          "TST-13",
+          "TST-14",
+          "TST-15",
+          "TST-16",
+          "TST-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/evidence/evidence-register.json",
+        "sha256": "09c3014abd70ed808df4ea3837dc0012be03f6fe081de0767a2bdccefe076a59",
+        "byte_length": 5547,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-06",
+          "TST-07",
+          "TST-08",
+          "TST-09",
+          "TST-10",
+          "TST-11",
+          "TST-12",
+          "TST-13",
+          "TST-14",
+          "TST-15",
+          "TST-16",
+          "TST-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/registers/defects.json",
+        "sha256": "98974e06294675dc7ee659571d1d4b20e297a4593bd168b03837ae07a6215687",
+        "byte_length": 2453,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-18"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/registers/environments.json",
+        "sha256": "8d01ad85534e5f740ce5d89ecfadbc93a8bb58c13e3a06f15a4ed5e9deb51dc7",
+        "byte_length": 3503,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-03"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/registers/metrics.json",
+        "sha256": "7ea5ebaa38d29448646873dc4b48c559b14c5a2b9b274e82868505058f39c476",
+        "byte_length": 2591,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-19"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/registers/residual-risks.json",
+        "sha256": "120c858c9b04983c07c2dd066555da9387d4ca3be0892176fb08b2b39ce2c1c7",
+        "byte_length": 6529,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-21"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/registers/test-cases.json",
+        "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+        "byte_length": 2590342,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-05"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/release-readiness-decision.md",
+        "sha256": "402a5ff58f72e4053b80f06e712b001bc729d7faf318d39f036308177c30bbc3",
+        "byte_length": 2780,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-22"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/software-test-report.md",
+        "sha256": "3bf316ad9ae04df83804a42d821daf96ec327db05927d2e01d868da27b50d275",
+        "byte_length": 2868,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "TST-20"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/test-evidence.md",
+        "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+        "byte_length": 6636,
+        "explicit_artifact_type_codes": [
+          "TST-06",
+          "TST-07",
+          "TST-08",
+          "TST-09",
+          "TST-10",
+          "TST-11",
+          "TST-12",
+          "TST-13",
+          "TST-14",
+          "TST-15",
+          "TST-16",
+          "TST-17"
+        ],
+        "declared_artifact_type_codes": [
+          "TST-06",
+          "TST-07",
+          "TST-08",
+          "TST-09",
+          "TST-10",
+          "TST-11",
+          "TST-12",
+          "TST-13",
+          "TST-14",
+          "TST-15",
+          "TST-16",
+          "TST-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/test-plan.md",
+        "sha256": "2b84c874501a4e6b3b2b3a3d1ba18c405203d40432b60c7474a028a36fda9e23",
+        "byte_length": 8743,
+        "explicit_artifact_type_codes": [
+          "TST-01",
+          "TST-02",
+          "TST-03",
+          "TST-04",
+          "TST-05"
+        ],
+        "declared_artifact_type_codes": [
+          "TST-01",
+          "TST-02",
+          "TST-03",
+          "TST-04",
+          "TST-05"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/test-quality-report.md",
+        "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+        "byte_length": 3279,
+        "explicit_artifact_type_codes": [
+          "TST-18",
+          "TST-19",
+          "TST-20",
+          "TST-21",
+          "TST-22",
+          "TST-23"
+        ],
+        "declared_artifact_type_codes": [
+          "TST-18",
+          "TST-19",
+          "TST-20",
+          "TST-21",
+          "TST-22",
+          "TST-23"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/registers/security-exceptions.json",
+        "sha256": "5291c9082205da29fc138206dec3f846f9a6403d64620df2d454dafd3ba280f8",
+        "byte_length": 1172,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "SEC-16"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/registers/security-risks.json",
+        "sha256": "2a428d6aaee5eee214f36e6842ecc929df73379cd3398b7af3f4d24bc6a321cc",
+        "byte_length": 6226,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "SEC-03"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/registers/security-verification-evidence.json",
+        "sha256": "8fcc0962b79a74a8c8dedcd97ca0b3d3a3165df242052efda9bd5e61a39a491f",
+        "byte_length": 4431,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/07-security/registers/vulnerabilities.json",
+        "sha256": "abbea174ba2ce8f8513888a41b8376e64f3119919bd0ef504a3baecfb8167b69",
+        "byte_length": 1302,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "SEC-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "sha256": "4badcccfd1b4a991faed9e9bd0199b9fbe8c4c823d091afe208da91d013ca286",
+        "byte_length": 54184,
+        "explicit_artifact_type_codes": [
+          "SEC-01",
+          "SEC-02",
+          "SEC-03",
+          "SEC-04",
+          "SEC-05",
+          "SEC-06",
+          "SEC-07",
+          "SEC-08",
+          "SEC-09"
+        ],
+        "declared_artifact_type_codes": [
+          "SEC-01",
+          "SEC-02",
+          "SEC-03",
+          "SEC-04",
+          "SEC-05",
+          "SEC-06",
+          "SEC-07",
+          "SEC-08",
+          "SEC-09"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "sha256": "b15666d307b8409ad87e58bf8b8022bf23b33ed83e9361f3154844101160afee",
+        "byte_length": 25180,
+        "explicit_artifact_type_codes": [
+          "SEC-15",
+          "SEC-16",
+          "SEC-17",
+          "SEC-18",
+          "SEC-19"
+        ],
+        "declared_artifact_type_codes": [
+          "SEC-15",
+          "SEC-16",
+          "SEC-17",
+          "SEC-18",
+          "SEC-19"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/security-verification-evidence.md",
+        "sha256": "0b7cc90532f8a279416b0647e5fb154618d377689faf3a38052555ceef205a02",
+        "byte_length": 21114,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "sha256": "679790c632ea77fc2e0ed99f6b51e9d117334de8c1f972d40a980c691e677d86",
+        "byte_length": 39028,
+        "explicit_artifact_type_codes": [
+          "AIML-01",
+          "AIML-02",
+          "AIML-03",
+          "AIML-04",
+          "AIML-06",
+          "AIML-07"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-01",
+          "AIML-02",
+          "AIML-03",
+          "AIML-04",
+          "AIML-06",
+          "AIML-07"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+        "sha256": "26204b46f65288f98c456b5a225d8cf29092883fc521ec5a1b04c4e7a52efa61",
+        "byte_length": 22603,
+        "explicit_artifact_type_codes": [
+          "AIML-12",
+          "AIML-14",
+          "AIML-15",
+          "AIML-16"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-12",
+          "AIML-14",
+          "AIML-15",
+          "AIML-16"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "sha256": "6d3d92bb8b565241dd57556eee7f5a3817339026d036b11e656035028f79eaa4",
+        "byte_length": 28026,
+        "explicit_artifact_type_codes": [
+          "AIML-17"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-17"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/model-operations.md",
+        "sha256": "b9f8426a733c3498e00faf4b0f966641e3a75033b804d4b102fa3379a7e5f0e9",
+        "byte_length": 11410,
+        "explicit_artifact_type_codes": [
+          "AIML-24",
+          "AIML-25",
+          "AIML-26"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-24",
+          "AIML-25",
+          "AIML-26"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+        "sha256": "f0a18fa7758ebbeeb572225dbd67053909f5551c394970c7827515820f3f5f74",
+        "byte_length": 5834,
+        "explicit_artifact_type_codes": [
+          "AIML-03"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-03"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "sha256": "551b56166226c42551734f9cb8954b13ce9e8cb0ec93577f5d7d62ff91aeda42",
+        "byte_length": 2600,
+        "explicit_artifact_type_codes": [
+          "AIML-02",
+          "AIML-04"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-02",
+          "AIML-04"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+        "sha256": "51a1be7c6f400585d5fe885d1a81c01ff864a41ff01b4daf92f6e673767c2a61",
+        "byte_length": 13235,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+        "sha256": "733299a99043b75425a57cc8e2d11039068283c3c54753f7f1707f50edd13d08",
+        "byte_length": 2936,
+        "explicit_artifact_type_codes": [
+          "AIML-12"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-12"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/model-operations-register.json",
+        "sha256": "f10dfbb765aeb2d7d9b4df12058b2b43ce2149b12889ba0581f21b1c166bee2f",
+        "byte_length": 869,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "sha256": "64ad806ac26a9918c53003ee19af9bbfb52f63ee73dde06aa8bb1650a6423cbe",
+        "byte_length": 3178,
+        "explicit_artifact_type_codes": [
+          "AIML-14",
+          "AIML-16"
+        ],
+        "declared_artifact_type_codes": [
+          "AIML-14",
+          "AIML-16"
+        ]
+      },
+      {
+        "path": "docs/deliverables/09-release/delivery-and-handover.md",
+        "sha256": "c9085bf997ee52bea7a24739c9814a5a6eb5ba5e3128ec095dbfbf7c038c03e2",
+        "byte_length": 29592,
+        "explicit_artifact_type_codes": [
+          "REL-16",
+          "REL-17",
+          "REL-18",
+          "REL-19",
+          "REL-22"
+        ],
+        "declared_artifact_type_codes": [
+          "REL-16",
+          "REL-17",
+          "REL-18",
+          "REL-19",
+          "REL-22"
+        ]
+      },
+      {
+        "path": "docs/deliverables/09-release/deployment-evidence.md",
+        "sha256": "f8b3d461164ac730f9777a4e6f547db2d3d8082fcb70a352c00e47903e688706",
+        "byte_length": 23047,
+        "explicit_artifact_type_codes": [
+          "REL-11",
+          "REL-12",
+          "REL-15"
+        ],
+        "declared_artifact_type_codes": [
+          "REL-11",
+          "REL-12",
+          "REL-15"
+        ]
+      },
+      {
+        "path": "docs/deliverables/09-release/registers/release-control-register.json",
+        "sha256": "4cbc76dc79bd7c82ffa477b1cf663f1a9aae28db519bdbdbe6446e60b981a752",
+        "byte_length": 5937,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "REL-01",
+          "REL-02",
+          "REL-10"
+        ]
+      },
+      {
+        "path": "docs/deliverables/09-release/release-control.md",
+        "sha256": "c9f662eaae91499c49a75282a1577d71c94e071e84f486e7aeab469f6f573c3e",
+        "byte_length": 44240,
+        "explicit_artifact_type_codes": [
+          "REL-01",
+          "REL-02",
+          "REL-10"
+        ],
+        "declared_artifact_type_codes": [
+          "REL-01",
+          "REL-02",
+          "REL-10"
+        ]
+      },
+      {
+        "path": "docs/deliverables/09-release/templates/deployment-execution-template.json",
+        "sha256": "91b0d144c01ba716b7ffe6f2ca0a523b33ff14f10ea723dea82c0c8fab0abd00",
+        "byte_length": 1185,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/09-release/templates/external-acceptance-metadata-template.json",
+        "sha256": "eaa74a5f4357da1be0fc9583428e2754f2ef32d75518bb11d71bc7d207a5e9c4",
+        "byte_length": 975,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/09-release/templates/release-evidence-template.json",
+        "sha256": "90b23b11dd200d04ecba86e8e1dd862f2c85510b7fbbad3f79dc24e5c427d4ae",
+        "byte_length": 1253,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/10-operations/operations-control-registers.md",
+        "sha256": "66db78cbe89a9092c1729bdf3ab086924487be49c95b0bbdb03e3bc4e144dcea",
+        "byte_length": 45279,
+        "explicit_artifact_type_codes": [
+          "OPS-14",
+          "OPS-15",
+          "OPS-16",
+          "OPS-17",
+          "OPS-19",
+          "OPS-20",
+          "OPS-21",
+          "OPS-22",
+          "OPS-23",
+          "OPS-24"
+        ],
+        "declared_artifact_type_codes": [
+          "OPS-14",
+          "OPS-15",
+          "OPS-16",
+          "OPS-17",
+          "OPS-19",
+          "OPS-20",
+          "OPS-21",
+          "OPS-22",
+          "OPS-23",
+          "OPS-24"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/operator-guide.md",
+        "sha256": "9543be8a6543538aff906d6fe422b47f9708ca5b8daeeae207f9bbbb14a7a0c9",
+        "byte_length": 37989,
+        "explicit_artifact_type_codes": [
+          "OPS-01",
+          "OPS-02",
+          "OPS-03",
+          "OPS-04",
+          "OPS-05",
+          "OPS-08",
+          "OPS-09"
+        ],
+        "declared_artifact_type_codes": [
+          "OPS-01",
+          "OPS-02",
+          "OPS-03",
+          "OPS-04",
+          "OPS-05",
+          "OPS-08",
+          "OPS-09"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/recovery-plan.md",
+        "sha256": "81d4362c302220be5534fd5d1a90cb7873a1f77c4ad1309b45382dee1d19ebc5",
+        "byte_length": 17912,
+        "explicit_artifact_type_codes": [
+          "OPS-10",
+          "OPS-11",
+          "OPS-12",
+          "OPS-13"
+        ],
+        "declared_artifact_type_codes": [
+          "OPS-10",
+          "OPS-11",
+          "OPS-12",
+          "OPS-13"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+        "sha256": "87bc656f7644cbc0ac8eae4f9f2ee84a3176bfde4ea67f4631d258e1da2c2f72",
+        "byte_length": 9292,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "OPS-02",
+          "OPS-09",
+          "OPS-14",
+          "OPS-17",
+          "OPS-19",
+          "OPS-20",
+          "OPS-21",
+          "OPS-23",
+          "OPS-24"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/templates/incident-postmortem-template.json",
+        "sha256": "ff312f29024d9b5a3b74feca9c40ef7d2631a8be995e91f695a1cec9920884b8",
+        "byte_length": 985,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/10-operations/templates/recovery-exercise-template.json",
+        "sha256": "ca953257666b706137330df549f6be641df01fc3a90a69ba16307b63e9bc3f55",
+        "byte_length": 940,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/11-walksafe/field-test-safety-records.md",
+        "sha256": "52a4af81f402ab7e29bf0202ec52384035c5c8c82cd6da1b16790f2fb3abdfd0",
+        "byte_length": 7010,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/11-walksafe/registers/acceptance-evidence.json",
+        "sha256": "f46816aebdb17e257fefc09348343d548709fcd3cb5b3a1bcb640ec111117f0a",
+        "byte_length": 10934,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/11-walksafe/registers/field-test-external-record-index.json",
+        "sha256": "c6722c09d08ae3a41639ace8262216cf1308706a680042756a61fd02fc3b6925",
+        "byte_length": 1198,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+        "sha256": "c310a7a71480ebb8b402eeac5c00b6fda735f7724dba1c73c6b052775ed36b71",
+        "byte_length": 50254,
+        "explicit_artifact_type_codes": [
+          "WS-11"
+        ],
+        "declared_artifact_type_codes": [
+          "WS-11"
+        ]
+      },
+      {
+        "path": "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+        "sha256": "0ffdac40c84c066c45de7679c1f4ff58683ec5bd8fa692751a37fbdad30f4a50",
+        "byte_length": 55828,
+        "explicit_artifact_type_codes": [
+          "WS-01",
+          "WS-02",
+          "WS-03",
+          "WS-04",
+          "WS-05",
+          "WS-08",
+          "WS-18",
+          "WS-19",
+          "WS-22"
+        ],
+        "declared_artifact_type_codes": [
+          "WS-01",
+          "WS-02",
+          "WS-03",
+          "WS-04",
+          "WS-05",
+          "WS-08",
+          "WS-18",
+          "WS-19",
+          "WS-22"
+        ]
+      },
+      {
+        "path": "docs/deliverables/12-closure/closure-handover-register.md",
+        "sha256": "dade93beddf419cc05d75fc4cecfb899bcb81d33f66b33da74577ede0b35b7fa",
+        "byte_length": 24008,
+        "explicit_artifact_type_codes": [
+          "CLS-07",
+          "CLS-08",
+          "CLS-09",
+          "CLS-10"
+        ],
+        "declared_artifact_type_codes": [
+          "CLS-07",
+          "CLS-08",
+          "CLS-09",
+          "CLS-10"
+        ]
+      },
+      {
+        "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+        "sha256": "cebb995cfb22faac87a3b99e2cc7af50bd019a12c50642f0e1e13222e27148e2",
+        "byte_length": 17820,
+        "explicit_artifact_type_codes": [
+          "CLS-14",
+          "CLS-15",
+          "CLS-16"
+        ],
+        "declared_artifact_type_codes": [
+          "CLS-14",
+          "CLS-15",
+          "CLS-16"
+        ]
+      },
+      {
+        "path": "docs/deliverables/12-closure/project-closure.md",
+        "sha256": "71f3c81240bc8f392d5cd79b6c76ffa11b17e287b1bf40b994bb96d953982799",
+        "byte_length": 24406,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      },
+      {
+        "path": "docs/deliverables/12-closure/registers/closure-readiness-register.json",
+        "sha256": "9f4895539d22a584f880736fdf14a5847f6211fea27efae9f131f43284001d78",
+        "byte_length": 2392,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": [
+          "CLS-07",
+          "CLS-08",
+          "CLS-09",
+          "CLS-10"
+        ]
+      },
+      {
+        "path": "docs/deliverables/12-closure/templates/closure-execution-template.json",
+        "sha256": "9eaac8f3854e11e65d4aed3c13e3df3a5496c50ad869bbcb4969a4b8e78f74c9",
+        "byte_length": 1141,
+        "explicit_artifact_type_codes": [],
+        "declared_artifact_type_codes": []
+      }
+    ]
+  },
+  "authorization_boundary": {
+    "policy_content_approval_status": "APPROVED",
+    "policy_baseline_status": "BASELINED_1.0.1",
+    "formal_deliverables_0_to_6": "AUTHORIZED_TO_START",
+    "formal_deliverables_completed": false,
+    "full_257_type_registration_status": "ACTIVE_CONTROLLED_REGISTER",
+    "formal_deliverables_7_to_12": "DRAFTS_GENERATED_WITH_EXECUTION_BOUNDARY",
+    "control_bootstrap_status": "SUPERSEDED_BY_APPROVAL_APPLICATION",
+    "fp035_correction_candidate_status": "APPROVED_AS_EXACT_OVERLAY",
+    "fp035_correction_effective_now": true,
+    "content_readiness_audit_status": "HISTORICAL_APPROVAL_INPUT",
+    "content_approval_candidate_count": 0,
+    "approval_or_baseline_state_changed_by_this_generation": true,
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "policy_manifest_generation_status_at_establishment": "NOT_RUN",
+    "current_policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "artifact_approval_application_status": "COMMITTED_BY_RECEIPT",
+    "content_approval_applied_count": 129
+  },
+  "summary": {
+    "change_count": 12,
+    "approved_change_count": 1,
+    "last_change_id": "CHG-DOC-0012"
+  },
+  "changes": [
+    {
+      "change_id": "CHG-DOC-0001",
+      "date": "2026-07-22",
+      "change_type": "CONTROL_BOOTSTRAP_CREATED",
+      "title": "DOC-01~05 정식 초안 생성",
+      "reason": "승인된 정책 기준선을 바탕으로 0~6 산출물 작성을 시작하기 위한 통제 기반 마련",
+      "before_summary": "docs/deliverables/00-control 정본 초안과 0~6 통합 관리대장이 없었음",
+      "after_summary": "DOC-01~05 초안, 128개 관리대장과 사람용 README·HTML 보기를 생성함",
+      "affected_artifact_codes": [
+        "DOC-01",
+        "DOC-02",
+        "DOC-03",
+        "DOC-04",
+        "DOC-05"
+      ],
+      "affected_paths": [
+        "docs/deliverables/00-control/document-control-manual.md",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/deliverables/00-control/README.md",
+        "docs/deliverables/00-control/artifact-register.html"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0002",
+      "date": "2026-07-22",
+      "change_type": "PLATFORM_SCOPE_ALIGNED",
+      "title": "Android 주제품 정책과 TST-23 범위 정렬",
+      "reason": "승인 정책의 Android 사용자 앱·비공개 관리자 앱 주제품 및 Web/PWA 레거시 경계를 작성 계획에 반영",
+      "before_summary": "일부 유형 설명과 작성 계획이 Web/PWA 주제품·Android 연구 전제를 유지하고 단계 6에서 TST-23을 누락함",
+      "after_summary": "Android 사용자·관리자 앱 주제품 경계로 정렬하고 단계 6 범위를 TST-01~23으로 고침",
+      "affected_artifact_codes": [
+        "MGT-04",
+        "DSC-09",
+        "DSC-12",
+        "DSC-13",
+        "REQ-02",
+        "REQ-14",
+        "DES-03",
+        "DEV-04",
+        "TST-17",
+        "TST-23"
+      ],
+      "affected_paths": [
+        "docs/control/artifact-types.json",
+        "docs/control/documentation-authoring-preparation-plan.md",
+        "docs/control/README.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0003",
+      "date": "2026-07-22",
+      "change_type": "SCOPE_REGISTERED",
+      "title": "0~6 산출물 유형 128개 등록",
+      "reason": "필수 114개·조건부 14개와 21개 bundle coverage를 중복 없이 관리",
+      "before_summary": "0~6 유형의 실제 인스턴스 ID·상태·위치·책임·bundle coverage 원장이 없었음",
+      "after_summary": "128개 유형을 각 1회 등록하고 필수 114개·조건부 14개·21개 bundle을 기록함",
+      "affected_artifact_codes": [
+        "DOC-01",
+        "DOC-02",
+        "DOC-03",
+        "DOC-04",
+        "DOC-05",
+        "MGT-01",
+        "MGT-02",
+        "MGT-03",
+        "MGT-04",
+        "MGT-05",
+        "MGT-06",
+        "MGT-07",
+        "MGT-08",
+        "MGT-09",
+        "MGT-10",
+        "MGT-11",
+        "MGT-12",
+        "MGT-13",
+        "MGT-14",
+        "MGT-15",
+        "MGT-16",
+        "MGT-17",
+        "MGT-18",
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-04",
+        "DSC-05",
+        "DSC-06",
+        "DSC-07",
+        "DSC-08",
+        "DSC-09",
+        "DSC-10",
+        "DSC-11",
+        "DSC-12",
+        "DSC-13",
+        "DSC-14",
+        "DSC-15",
+        "REQ-01",
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-08",
+        "REQ-09",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15",
+        "REQ-16",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-04",
+        "DES-05",
+        "DES-06",
+        "DES-07",
+        "DES-08",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-14",
+        "DES-15",
+        "DES-16",
+        "DES-17",
+        "DES-18",
+        "DES-19",
+        "DES-20",
+        "DES-21",
+        "DES-22",
+        "DES-23",
+        "DES-24",
+        "DES-25",
+        "DES-26",
+        "DES-27",
+        "DEV-01",
+        "DEV-02",
+        "DEV-03",
+        "DEV-04",
+        "DEV-05",
+        "DEV-06",
+        "DEV-07",
+        "DEV-08",
+        "DEV-09",
+        "DEV-10",
+        "DEV-11",
+        "DEV-12",
+        "DEV-13",
+        "DEV-14",
+        "DEV-15",
+        "DEV-16",
+        "DEV-17",
+        "DEV-18",
+        "DEV-19",
+        "DEV-20",
+        "DEV-21",
+        "TST-01",
+        "TST-02",
+        "TST-03",
+        "TST-04",
+        "TST-05",
+        "TST-06",
+        "TST-07",
+        "TST-08",
+        "TST-09",
+        "TST-10",
+        "TST-11",
+        "TST-12",
+        "TST-13",
+        "TST-14",
+        "TST-15",
+        "TST-16",
+        "TST-17",
+        "TST-18",
+        "TST-19",
+        "TST-20",
+        "TST-21",
+        "TST-22",
+        "TST-23"
+      ],
+      "affected_paths": [
+        "docs/deliverables/00-control/artifact-register.json"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0004",
+      "date": "2026-07-22",
+      "change_type": "DRAFT_DISCOVERY_SYNCHRONIZED",
+      "title": "후행 1~6 정식 초안 재스캔",
+      "reason": "후속 생성된 정식 Draft가 관리대장에 계속 Planned로 남지 않도록 실제 정본 경로·anchor·hash와 검토 상태를 동기화",
+      "before_summary": "후속 산출물 파일이 생겨도 0~6 bootstrap 최초 등록 상태인 Planned가 유지될 수 있었음",
+      "after_summary": "현재 존재하고 구조를 확인한 MGT~TST 정식 초안 100개 유형을 Draft/In Review로 연결함",
+      "affected_artifact_codes": [
+        "MGT-01",
+        "MGT-02",
+        "MGT-03",
+        "MGT-04",
+        "MGT-05",
+        "MGT-06",
+        "MGT-07",
+        "MGT-08",
+        "MGT-09",
+        "MGT-10",
+        "MGT-11",
+        "MGT-12",
+        "MGT-13",
+        "MGT-14",
+        "MGT-15",
+        "MGT-16",
+        "MGT-17",
+        "MGT-18",
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-05",
+        "DSC-06",
+        "DSC-08",
+        "DSC-10",
+        "DSC-11",
+        "DSC-12",
+        "DSC-13",
+        "DSC-14",
+        "DSC-15",
+        "REQ-01",
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-08",
+        "REQ-09",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15",
+        "REQ-16",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-04",
+        "DES-05",
+        "DES-06",
+        "DES-07",
+        "DES-08",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-14",
+        "DES-15",
+        "DES-16",
+        "DES-17",
+        "DES-18",
+        "DES-19",
+        "DES-20",
+        "DES-21",
+        "DES-22",
+        "DES-23",
+        "DES-24",
+        "DES-25",
+        "DES-26",
+        "DES-27",
+        "DEV-01",
+        "DEV-02",
+        "DEV-03",
+        "DEV-04",
+        "DEV-05",
+        "DEV-06",
+        "DEV-07",
+        "DEV-08",
+        "DEV-09",
+        "DEV-10",
+        "DEV-11",
+        "DEV-12",
+        "DEV-13",
+        "DEV-14",
+        "DEV-15",
+        "DEV-18",
+        "TST-01",
+        "TST-02",
+        "TST-03",
+        "TST-04",
+        "TST-05",
+        "TST-18",
+        "TST-19",
+        "TST-21"
+      ],
+      "affected_paths": [
+        "docs/deliverables/01-management/project-charter.md",
+        "docs/deliverables/01-management/project-control-registers.md",
+        "docs/deliverables/01-management/project-management-plan.md",
+        "docs/deliverables/01-management/registers/actions.json",
+        "docs/deliverables/01-management/registers/change-requests.json",
+        "docs/deliverables/01-management/registers/dashboard.json",
+        "docs/deliverables/01-management/registers/decisions.json",
+        "docs/deliverables/01-management/registers/raci.json",
+        "docs/deliverables/01-management/registers/raid.json",
+        "docs/deliverables/01-management/registers/schedule.json",
+        "docs/deliverables/01-management/registers/stakeholders.json",
+        "docs/deliverables/01-management/registers/wbs.json",
+        "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "docs/deliverables/02-discovery/product-definition.md",
+        "docs/deliverables/02-discovery/product-registers.md",
+        "docs/deliverables/02-discovery/registers/backlog.json",
+        "docs/deliverables/02-discovery/registers/discovery-evidence.json",
+        "docs/deliverables/02-discovery/registers/stage-decisions.json",
+        "docs/deliverables/03-requirements/acceptance-specification.md",
+        "docs/deliverables/03-requirements/glossary.json",
+        "docs/deliverables/03-requirements/requirement-change-log.json",
+        "docs/deliverables/03-requirements/requirements-traceability.md",
+        "docs/deliverables/03-requirements/rtm.html",
+        "docs/deliverables/03-requirements/rtm.json",
+        "docs/deliverables/03-requirements/system-requirements.md",
+        "docs/deliverables/04-design/design-traceability-register.json",
+        "docs/deliverables/04-design/interface-and-data-design.md",
+        "docs/deliverables/04-design/security-and-operations-design.md",
+        "docs/deliverables/04-design/software-architecture.md",
+        "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+        "docs/deliverables/05-implementation/developer-guide.md",
+        "docs/deliverables/05-implementation/implementation-configuration.md",
+        "docs/deliverables/05-implementation/implementation-manifest.json",
+        "docs/deliverables/05-implementation/implementation-quality-record.md",
+        "docs/deliverables/05-implementation/licenses-and-notices.md",
+        "docs/deliverables/05-implementation/module-register.json",
+        "docs/deliverables/05-implementation/quality-evidence-register.json",
+        "docs/deliverables/05-implementation/software-integration-report.md",
+        "docs/deliverables/06-testing/acceptance-receipt.md",
+        "docs/deliverables/06-testing/evidence/README.md",
+        "docs/deliverables/06-testing/evidence/evidence-register.json",
+        "docs/deliverables/06-testing/registers/defects.json",
+        "docs/deliverables/06-testing/registers/environments.json",
+        "docs/deliverables/06-testing/registers/metrics.json",
+        "docs/deliverables/06-testing/registers/residual-risks.json",
+        "docs/deliverables/06-testing/registers/test-cases.json",
+        "docs/deliverables/06-testing/release-readiness-decision.md",
+        "docs/deliverables/06-testing/software-test-report.md",
+        "docs/deliverables/06-testing/test-evidence.md",
+        "docs/deliverables/06-testing/test-plan.md",
+        "docs/deliverables/06-testing/test-quality-report.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0005",
+      "date": "2026-07-22",
+      "change_type": "FORMAL_USER_SCOPE_WORDING_ALIGNED",
+      "title": "산출물 작성계약의 공식 사용자 범위 정렬",
+      "reason": "승인 정책 FP-001·FP-004에 따라 전맹·저시력 시각장애인을 같은 우선순위로 두고, 일반 접근성 고려가 공식 대상 확대처럼 읽히지 않게 고침",
+      "before_summary": "MGT-02·DSC-01은 보행약자 일반을, DSC-05·REQ-11은 청각·운동·인지 사용자를 공식 대상처럼 읽을 수 있었음",
+      "after_summary": "공식 대상은 같은 우선순위의 전맹·저시력 시각장애인으로 명시하고, 중복장애·일반 접근성은 보조 고려이며 범위 확대가 아님을 분리함",
+      "affected_artifact_codes": [
+        "MGT-02",
+        "DSC-01",
+        "DSC-05",
+        "REQ-11"
+      ],
+      "affected_paths": [
+        "docs/control/artifact-types.json"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [
+        "RQ-FP-001-001",
+        "RQ-FP-004-001"
+      ],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0006",
+      "date": "2026-07-22",
+      "change_type": "FINAL_INTEGRATION_AUDIT_CORRECTIONS",
+      "title": "0~6 통합 추적·가독성·상태표시 감사 보정",
+      "reason": "정책 의미를 바꾸지 않고 비전공자 검토 동선, 내부 필드명 노출, FP-035 차단 전파와 Draft 상태를 실제 통제 상태에 맞추기 위함",
+      "before_summary": "일부 문서가 내부 필드명·미설명 보안용어를 노출했고 FP-035 영향범위와 시험 사전차단 표시가 계층별로 달랐으며 DOC-01·05가 검토자 지정 없이 In Review였음",
+      "after_summary": "쉬운 본문·문서 바로가기·논리적 검토순서를 제공하고 FP-035를 16개 설계·2개 구현모듈·4개 시험에 연결했으며 공식 검토 전 상태를 Draft로 정렬함",
+      "affected_artifact_codes": [
+        "DOC-01",
+        "DOC-05",
+        "MGT-16",
+        "REQ-03",
+        "DES-13",
+        "DES-18",
+        "DES-19",
+        "DES-23",
+        "DES-25",
+        "DES-27",
+        "DEV-18",
+        "TST-01",
+        "TST-19",
+        "TST-20"
+      ],
+      "affected_paths": [
+        "docs/deliverables/README.md",
+        "docs/deliverables/00-control/artifact-register.html",
+        "docs/deliverables/01-management/registers/change-requests.json",
+        "docs/deliverables/03-requirements/system-requirements.md",
+        "docs/deliverables/04-design/interface-and-data-design.md",
+        "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+        "docs/deliverables/04-design/security-and-operations-design.md",
+        "docs/deliverables/05-implementation/module-register.json",
+        "docs/deliverables/06-testing/test-plan.md",
+        "docs/deliverables/06-testing/software-test-report.md",
+        "docs/deliverables/06-testing/registers/metrics.json",
+        "docs/deliverables/traceability/README.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [
+        "RQ-FP-030-001",
+        "RQ-FP-035-001"
+      ],
+      "affected_test_ids": [
+        "TC-FP-035-01",
+        "TC-FP-035-02",
+        "TC-FP-035-03",
+        "TC-FP-035-04"
+      ],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.1.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0007",
+      "date": "2026-07-22",
+      "change_type": "FULL_CATALOG_SCOPE_REGISTERED",
+      "title": "7~12 계획 129개를 포함한 257개 전체 관리대장 확장",
+      "reason": "사용자가 요청한 DOC-01~CLS-16 전체 작성·관리 계획을 실제 DOC-01에서 한 번씩 추적하기 위함",
+      "before_summary": "DOC~TST 0~6 유형 128개와 21개 bundle만 관리대장에 등록되어 있었음",
+      "after_summary": "기존 128개 Draft를 보존하고 SEC~CLS 129개를 Planned로 추가해 257개·40개 bundle을 등록함",
+      "affected_artifact_codes": [
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-04",
+        "SEC-05",
+        "SEC-06",
+        "SEC-07",
+        "SEC-08",
+        "SEC-09",
+        "SEC-10",
+        "SEC-11",
+        "SEC-12",
+        "SEC-13",
+        "SEC-14",
+        "SEC-15",
+        "SEC-16",
+        "SEC-17",
+        "SEC-18",
+        "SEC-19",
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04",
+        "AIML-05",
+        "AIML-06",
+        "AIML-07",
+        "AIML-08",
+        "AIML-09",
+        "AIML-10",
+        "AIML-11",
+        "AIML-12",
+        "AIML-13",
+        "AIML-14",
+        "AIML-15",
+        "AIML-16",
+        "AIML-17",
+        "AIML-18",
+        "AIML-19",
+        "AIML-20",
+        "AIML-21",
+        "AIML-22",
+        "AIML-23",
+        "AIML-24",
+        "AIML-25",
+        "AIML-26",
+        "REL-01",
+        "REL-02",
+        "REL-03",
+        "REL-04",
+        "REL-05",
+        "REL-06",
+        "REL-07",
+        "REL-08",
+        "REL-09",
+        "REL-10",
+        "REL-11",
+        "REL-12",
+        "REL-13",
+        "REL-14",
+        "REL-15",
+        "REL-16",
+        "REL-17",
+        "REL-18",
+        "REL-19",
+        "REL-20",
+        "REL-21",
+        "REL-22",
+        "OPS-01",
+        "OPS-02",
+        "OPS-03",
+        "OPS-04",
+        "OPS-05",
+        "OPS-06",
+        "OPS-07",
+        "OPS-08",
+        "OPS-09",
+        "OPS-10",
+        "OPS-11",
+        "OPS-12",
+        "OPS-13",
+        "OPS-14",
+        "OPS-15",
+        "OPS-16",
+        "OPS-17",
+        "OPS-18",
+        "OPS-19",
+        "OPS-20",
+        "OPS-21",
+        "OPS-22",
+        "OPS-23",
+        "OPS-24",
+        "WS-01",
+        "WS-02",
+        "WS-03",
+        "WS-04",
+        "WS-05",
+        "WS-06",
+        "WS-07",
+        "WS-08",
+        "WS-09",
+        "WS-10",
+        "WS-11",
+        "WS-12",
+        "WS-13",
+        "WS-14",
+        "WS-15",
+        "WS-16",
+        "WS-17",
+        "WS-18",
+        "WS-19",
+        "WS-20",
+        "WS-21",
+        "WS-22",
+        "CLS-01",
+        "CLS-02",
+        "CLS-03",
+        "CLS-04",
+        "CLS-05",
+        "CLS-06",
+        "CLS-07",
+        "CLS-08",
+        "CLS-09",
+        "CLS-10",
+        "CLS-11",
+        "CLS-12",
+        "CLS-13",
+        "CLS-14",
+        "CLS-15",
+        "CLS-16"
+      ],
+      "affected_paths": [
+        "docs/control/documentation-authoring-preparation-plan.md",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/00-control/artifact-register.html",
+        "docs/deliverables/00-control/README.md",
+        "docs/deliverables/README.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.2.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0008",
+      "date": "2026-07-22",
+      "change_type": "ANDROID_SCOPE_AND_MANAGEMENT_CONTRACT_ALIGNED",
+      "title": "Android 범위와 산출물별 관리계약 현행화",
+      "reason": "레거시 Web/PWA 전제가 새 계획으로 전파되는 것을 막고 각 산출물의 검토주기·변경·보존·대체 방식을 명시하기 위함",
+      "before_summary": "WS-16이 필수이고 WS-20이 Web/PWA E2E였으며 유형별 검토주기·변경/폐기 profile과 민감자료 저장규칙이 없었음",
+      "after_summary": "WS-16을 현재 비활성 조건부로 분리하고 WS-20을 Android 실휴대폰 E2E로 고쳤으며 257개 각 행에 관리·보존 profile과 승인 입력 trace를 추가함",
+      "affected_artifact_codes": [
+        "DSC-05",
+        "REQ-07",
+        "REQ-14",
+        "DEV-04",
+        "TST-03",
+        "TST-07",
+        "TST-09",
+        "TST-13",
+        "SEC-07",
+        "SEC-13",
+        "SEC-18",
+        "AIML-22",
+        "REL-01",
+        "REL-02",
+        "REL-15",
+        "OPS-01",
+        "OPS-02",
+        "OPS-04",
+        "OPS-17",
+        "OPS-19",
+        "OPS-23",
+        "WS-09",
+        "WS-10",
+        "WS-14",
+        "WS-16",
+        "WS-17",
+        "WS-20"
+      ],
+      "affected_paths": [
+        "docs/control/artifact-types.json",
+        "docs/control/documentation-authoring-preparation-plan.md",
+        "docs/deliverables/00-control/artifact-register.json"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [
+        "RQ-FP-028-001",
+        "RQ-FP-030-001",
+        "RQ-FP-034-001",
+        "RQ-FP-035-001",
+        "RQ-FP-050-001"
+      ],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.2.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0009",
+      "date": "2026-07-22",
+      "change_type": "FORMAL_7_TO_12_DRAFTS_AND_EXECUTION_BOUNDARY_MATERIALIZED",
+      "title": "SEC~CLS 7~12 정식 초안과 실행 증거 경계 작성",
+      "reason": "승인 정책 기준선과 사용자 작업 지시에 따라 7~12의 작성 가능한 계획·정책·절차를 만들고, 실제 실행·서명·통제 증거는 근거가 생길 때까지 Planned/NOT_RUN으로 분리하기 위함",
+      "before_summary": "SEC~CLS 129개 유형이 모두 Planned이고 예정 경로와 작성계약만 DOC-01에 등록되어 있었음",
+      "after_summary": "SEC~CLS 129개 중 작성 가능한 77개를 Draft로 연결하고 실행·서명·통제 증거 52개는 Planned/NOT_RUN으로 유지했으며 19개 문서 묶음의 장·정책·결정·gate·파일 지문을 구조 검증함",
+      "affected_artifact_codes": [
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-04",
+        "SEC-05",
+        "SEC-06",
+        "SEC-07",
+        "SEC-08",
+        "SEC-09",
+        "SEC-10",
+        "SEC-11",
+        "SEC-12",
+        "SEC-13",
+        "SEC-14",
+        "SEC-15",
+        "SEC-16",
+        "SEC-17",
+        "SEC-18",
+        "SEC-19",
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04",
+        "AIML-05",
+        "AIML-06",
+        "AIML-07",
+        "AIML-08",
+        "AIML-09",
+        "AIML-10",
+        "AIML-11",
+        "AIML-12",
+        "AIML-13",
+        "AIML-14",
+        "AIML-15",
+        "AIML-16",
+        "AIML-17",
+        "AIML-18",
+        "AIML-19",
+        "AIML-20",
+        "AIML-21",
+        "AIML-22",
+        "AIML-23",
+        "AIML-24",
+        "AIML-25",
+        "AIML-26",
+        "REL-01",
+        "REL-02",
+        "REL-03",
+        "REL-04",
+        "REL-05",
+        "REL-06",
+        "REL-07",
+        "REL-08",
+        "REL-09",
+        "REL-10",
+        "REL-11",
+        "REL-12",
+        "REL-13",
+        "REL-14",
+        "REL-15",
+        "REL-16",
+        "REL-17",
+        "REL-18",
+        "REL-19",
+        "REL-20",
+        "REL-21",
+        "REL-22",
+        "OPS-01",
+        "OPS-02",
+        "OPS-03",
+        "OPS-04",
+        "OPS-05",
+        "OPS-06",
+        "OPS-07",
+        "OPS-08",
+        "OPS-09",
+        "OPS-10",
+        "OPS-11",
+        "OPS-12",
+        "OPS-13",
+        "OPS-14",
+        "OPS-15",
+        "OPS-16",
+        "OPS-17",
+        "OPS-18",
+        "OPS-19",
+        "OPS-20",
+        "OPS-21",
+        "OPS-22",
+        "OPS-23",
+        "OPS-24",
+        "WS-01",
+        "WS-02",
+        "WS-03",
+        "WS-04",
+        "WS-05",
+        "WS-06",
+        "WS-07",
+        "WS-08",
+        "WS-09",
+        "WS-10",
+        "WS-11",
+        "WS-12",
+        "WS-13",
+        "WS-14",
+        "WS-15",
+        "WS-16",
+        "WS-17",
+        "WS-18",
+        "WS-19",
+        "WS-20",
+        "WS-21",
+        "WS-22",
+        "CLS-01",
+        "CLS-02",
+        "CLS-03",
+        "CLS-04",
+        "CLS-05",
+        "CLS-06",
+        "CLS-07",
+        "CLS-08",
+        "CLS-09",
+        "CLS-10",
+        "CLS-11",
+        "CLS-12",
+        "CLS-13",
+        "CLS-14",
+        "CLS-15",
+        "CLS-16"
+      ],
+      "affected_paths": [
+        "docs/deliverables/07-security/registers/security-exceptions.json",
+        "docs/deliverables/07-security/registers/security-risks.json",
+        "docs/deliverables/07-security/registers/security-verification-evidence.json",
+        "docs/deliverables/07-security/registers/vulnerabilities.json",
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "docs/deliverables/07-security/security-verification-evidence.md",
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/model-operations.md",
+        "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/model-operations-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "docs/deliverables/09-release/delivery-and-handover.md",
+        "docs/deliverables/09-release/deployment-evidence.md",
+        "docs/deliverables/09-release/registers/release-control-register.json",
+        "docs/deliverables/09-release/release-control.md",
+        "docs/deliverables/09-release/templates/deployment-execution-template.json",
+        "docs/deliverables/09-release/templates/external-acceptance-metadata-template.json",
+        "docs/deliverables/09-release/templates/release-evidence-template.json",
+        "docs/deliverables/10-operations/operations-control-registers.md",
+        "docs/deliverables/10-operations/operator-guide.md",
+        "docs/deliverables/10-operations/recovery-plan.md",
+        "docs/deliverables/10-operations/registers/operations-registers.json",
+        "docs/deliverables/10-operations/templates/incident-postmortem-template.json",
+        "docs/deliverables/10-operations/templates/recovery-exercise-template.json",
+        "docs/deliverables/11-walksafe/field-test-safety-records.md",
+        "docs/deliverables/11-walksafe/registers/acceptance-evidence.json",
+        "docs/deliverables/11-walksafe/registers/field-test-external-record-index.json",
+        "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+        "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+        "docs/deliverables/12-closure/closure-handover-register.md",
+        "docs/deliverables/12-closure/decommissioning-plan.md",
+        "docs/deliverables/12-closure/project-closure.md",
+        "docs/deliverables/12-closure/registers/closure-readiness-register.json",
+        "docs/deliverables/12-closure/templates/closure-execution-template.json",
+        "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+        "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+        "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+        "docs/deliverables/traceability/formal-7-12-integration-report-20260721-r001.json",
+        "docs/deliverables/traceability/formal-7-12-integration-summary.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.3.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0010",
+      "date": "2026-07-22",
+      "change_type": "CONTROL_AND_TRACE_INDEPENDENT_AUDIT_CORRECTIONS",
+      "title": "7~12 통제·추적 독립감사 보정",
+      "reason": "정책 의미를 바꾸지 않고 생성 의존성, FP-035 OPEN 전파, rollback 안전조건, 통제 문서 경로와 변경이력 범위를 실제 구조에 맞추기 위함",
+      "before_summary": "SEC/WS 생성기가 후행 DOC-01을 조회했고 FP-035 OPEN 참조가 일부 유형에만 표시됐으며 AIML-24·REL-15 rollback 문구와 AIML 디렉터리 표기, CHG-DOC-0004 범위가 불완전했음",
+      "after_summary": "SEC/WS bundle 검증을 상위 카탈로그 기준으로 바꾸고 FP-035 직접·간접 영향 행에 OPEN 이슈를 전파했으며 rollback을 DB 호환·새 자료 무손실 시험 조건으로 제한하고 통제 경로·역사 변경범위를 바로잡음",
+      "affected_artifact_codes": [
+        "AIML-01",
+        "AIML-03",
+        "AIML-04",
+        "AIML-22",
+        "AIML-24",
+        "DES-04",
+        "DES-13",
+        "DES-22",
+        "DES-24",
+        "DES-27",
+        "DOC-01",
+        "DOC-02",
+        "DOC-05",
+        "OPS-08",
+        "OPS-22",
+        "OPS-23",
+        "REL-15",
+        "REQ-08",
+        "REQ-10",
+        "REQ-12",
+        "REQ-13",
+        "SEC-05",
+        "SEC-06",
+        "TST-07",
+        "TST-09",
+        "TST-12",
+        "TST-16",
+        "WS-02",
+        "WS-06",
+        "WS-09"
+      ],
+      "affected_paths": [
+        "scripts/build_walksafe_control_bootstrap.py",
+        "scripts/build_walksafe_formal_sec_ws_20260721.py",
+        "scripts/build_walksafe_formal_aiml_20260721.py",
+        "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+        "scripts/build_walksafe_formal_trace_7_12_20260721.py",
+        "tests/test_walksafe_control_bootstrap.py",
+        "tests/test_walksafe_formal_sec_ws.py",
+        "tests/test_walksafe_formal_aiml.py",
+        "tests/test_walksafe_formal_rel_ops_cls.py",
+        "tests/test_walksafe_formal_trace_7_12.py",
+        "docs/deliverables/00-control/document-control-manual.md",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/deliverables/00-control/README.md",
+        "docs/deliverables/00-control/artifact-register.html",
+        "docs/deliverables/README.md",
+        "docs/deliverables/08-ai-ml-data/model-operations.md",
+        "docs/deliverables/09-release/deployment-evidence.md",
+        "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+        "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+        "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+        "docs/deliverables/traceability/formal-7-12-integration-report-20260721-r001.json",
+        "docs/deliverables/traceability/formal-7-12-integration-summary.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [
+        "RQ-FP-035-001"
+      ],
+      "affected_test_ids": [
+        "TC-FP-035-01",
+        "TC-FP-035-02",
+        "TC-FP-035-03",
+        "TC-FP-035-04"
+      ],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.3.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0011",
+      "date": "2026-07-22",
+      "change_type": "FULL_CONTENT_AUTHORING_AND_READINESS_REASSESSMENT",
+      "title": "257개 내용 보완·FP-035 정정 후보·기준선 준비도 재평가",
+      "reason": "기존 답변을 다시 묻지 않고 작성 가능한 산출물을 실제 WalkSafe 내용으로 보완하며, 미실행 증거는 완료로 꾸미지 않은 채 새 일괄 승인 후보를 준비하기 위함",
+      "before_summary": "이전 미승인 후보는 4개만 승인 적격으로 보고 121개를 작성 부족, 57개를 조건·외부값 대기로 분류했음",
+      "after_summary": "178개를 작성 가능 120개·증거/외부값 대기 53개·FP-035 정정 영향 5개로 재검증하고, 기존 통제 후보 4개와 합친 129개를 내용 승인 후보로, 53개와 Planned/NOT_RUN 75개를 미승인으로 분리함",
+      "affected_artifact_codes": [
+        "DOC-01",
+        "DOC-02",
+        "DOC-03",
+        "DOC-04",
+        "DOC-05",
+        "MGT-01",
+        "MGT-02",
+        "MGT-03",
+        "MGT-04",
+        "MGT-05",
+        "MGT-06",
+        "MGT-07",
+        "MGT-08",
+        "MGT-09",
+        "MGT-10",
+        "MGT-11",
+        "MGT-12",
+        "MGT-13",
+        "MGT-14",
+        "MGT-15",
+        "MGT-16",
+        "MGT-17",
+        "MGT-18",
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-04",
+        "DSC-05",
+        "DSC-06",
+        "DSC-07",
+        "DSC-08",
+        "DSC-09",
+        "DSC-10",
+        "DSC-11",
+        "DSC-12",
+        "DSC-13",
+        "DSC-14",
+        "DSC-15",
+        "REQ-01",
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-08",
+        "REQ-09",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15",
+        "REQ-16",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-04",
+        "DES-05",
+        "DES-06",
+        "DES-07",
+        "DES-08",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-14",
+        "DES-15",
+        "DES-16",
+        "DES-17",
+        "DES-18",
+        "DES-19",
+        "DES-20",
+        "DES-21",
+        "DES-22",
+        "DES-23",
+        "DES-24",
+        "DES-25",
+        "DES-26",
+        "DES-27",
+        "DEV-01",
+        "DEV-02",
+        "DEV-03",
+        "DEV-04",
+        "DEV-05",
+        "DEV-06",
+        "DEV-07",
+        "DEV-08",
+        "DEV-09",
+        "DEV-10",
+        "DEV-11",
+        "DEV-12",
+        "DEV-13",
+        "DEV-14",
+        "DEV-15",
+        "DEV-16",
+        "DEV-17",
+        "DEV-18",
+        "DEV-19",
+        "DEV-20",
+        "DEV-21",
+        "TST-01",
+        "TST-02",
+        "TST-03",
+        "TST-04",
+        "TST-05",
+        "TST-06",
+        "TST-07",
+        "TST-08",
+        "TST-09",
+        "TST-10",
+        "TST-11",
+        "TST-12",
+        "TST-13",
+        "TST-14",
+        "TST-15",
+        "TST-16",
+        "TST-17",
+        "TST-18",
+        "TST-19",
+        "TST-20",
+        "TST-21",
+        "TST-22",
+        "TST-23",
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-04",
+        "SEC-05",
+        "SEC-06",
+        "SEC-07",
+        "SEC-08",
+        "SEC-09",
+        "SEC-10",
+        "SEC-11",
+        "SEC-12",
+        "SEC-13",
+        "SEC-14",
+        "SEC-15",
+        "SEC-16",
+        "SEC-17",
+        "SEC-18",
+        "SEC-19",
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04",
+        "AIML-05",
+        "AIML-06",
+        "AIML-07",
+        "AIML-08",
+        "AIML-09",
+        "AIML-10",
+        "AIML-11",
+        "AIML-12",
+        "AIML-13",
+        "AIML-14",
+        "AIML-15",
+        "AIML-16",
+        "AIML-17",
+        "AIML-18",
+        "AIML-19",
+        "AIML-20",
+        "AIML-21",
+        "AIML-22",
+        "AIML-23",
+        "AIML-24",
+        "AIML-25",
+        "AIML-26",
+        "REL-01",
+        "REL-02",
+        "REL-03",
+        "REL-04",
+        "REL-05",
+        "REL-06",
+        "REL-07",
+        "REL-08",
+        "REL-09",
+        "REL-10",
+        "REL-11",
+        "REL-12",
+        "REL-13",
+        "REL-14",
+        "REL-15",
+        "REL-16",
+        "REL-17",
+        "REL-18",
+        "REL-19",
+        "REL-20",
+        "REL-21",
+        "REL-22",
+        "OPS-01",
+        "OPS-02",
+        "OPS-03",
+        "OPS-04",
+        "OPS-05",
+        "OPS-06",
+        "OPS-07",
+        "OPS-08",
+        "OPS-09",
+        "OPS-10",
+        "OPS-11",
+        "OPS-12",
+        "OPS-13",
+        "OPS-14",
+        "OPS-15",
+        "OPS-16",
+        "OPS-17",
+        "OPS-18",
+        "OPS-19",
+        "OPS-20",
+        "OPS-21",
+        "OPS-22",
+        "OPS-23",
+        "OPS-24",
+        "WS-01",
+        "WS-02",
+        "WS-03",
+        "WS-04",
+        "WS-05",
+        "WS-06",
+        "WS-07",
+        "WS-08",
+        "WS-09",
+        "WS-10",
+        "WS-11",
+        "WS-12",
+        "WS-13",
+        "WS-14",
+        "WS-15",
+        "WS-16",
+        "WS-17",
+        "WS-18",
+        "WS-19",
+        "WS-20",
+        "WS-21",
+        "WS-22",
+        "CLS-01",
+        "CLS-02",
+        "CLS-03",
+        "CLS-04",
+        "CLS-05",
+        "CLS-06",
+        "CLS-07",
+        "CLS-08",
+        "CLS-09",
+        "CLS-10",
+        "CLS-11",
+        "CLS-12",
+        "CLS-13",
+        "CLS-14",
+        "CLS-15",
+        "CLS-16"
+      ],
+      "affected_paths": [
+        "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "docs/control/audits/walksafe-artifact-content-readiness-audit-20260722-r001.json",
+        "docs/deliverables/00-control/document-control-manual.md",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/deliverables/00-control/artifact-register.html",
+        "docs/deliverables/README.md"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "lifecycle_status": "DRAFT",
+      "reviewer": null,
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [],
+      "affected_test_ids": [],
+      "review": {
+        "review_status": "PENDING",
+        "reviewer": null,
+        "approval_status": "NOT_APPROVED",
+        "approval_record": null
+      },
+      "application": {
+        "document_version": "0.4.0",
+        "source_commit": null,
+        "baseline_id": null
+      },
+      "rollback_or_supersedes": null
+    },
+    {
+      "change_id": "CHG-DOC-0012",
+      "date": "2026-07-22",
+      "change_type": "ARTIFACT_BASELINE_COMPOUND_APPROVAL_APPLIED",
+      "title": "정책 1.0.1과 129개 복합 승인단위 원자적 상태 전환",
+      "reason": "사용자가 새 후보의 정확한 승인문을 승인해 phase 0과 129개 산출물 disposition을 적용하기 위함",
+      "before_summary": "Draft 182개, Planned 75개, FP-035 정정 후보 미효력",
+      "after_summary": "Approved/Baselined 102개, Active 27개, Draft pending 53개, Planned/NOT_RUN 75개, 정책 1.0.1",
+      "affected_artifact_codes": [
+        "DOC-01",
+        "DOC-02",
+        "DOC-03",
+        "DOC-04",
+        "DOC-05",
+        "MGT-01",
+        "MGT-02",
+        "MGT-03",
+        "MGT-04",
+        "MGT-05",
+        "MGT-06",
+        "MGT-07",
+        "MGT-08",
+        "MGT-09",
+        "MGT-10",
+        "MGT-11",
+        "MGT-12",
+        "MGT-13",
+        "MGT-14",
+        "MGT-15",
+        "MGT-16",
+        "MGT-17",
+        "MGT-18",
+        "DSC-01",
+        "DSC-02",
+        "DSC-03",
+        "DSC-08",
+        "DSC-10",
+        "DSC-11",
+        "DSC-12",
+        "DSC-13",
+        "DSC-14",
+        "DSC-15",
+        "REQ-01",
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "REQ-07",
+        "REQ-08",
+        "REQ-09",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15",
+        "REQ-16",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19",
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-04",
+        "DES-06",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-14",
+        "DES-15",
+        "DES-16",
+        "DES-17",
+        "DES-18",
+        "DES-19",
+        "DES-20",
+        "DES-23",
+        "DES-25",
+        "DES-27",
+        "DEV-04",
+        "DEV-05",
+        "DEV-06",
+        "DEV-10",
+        "DEV-11",
+        "DEV-13",
+        "DEV-15",
+        "TST-01",
+        "TST-02",
+        "TST-03",
+        "TST-04",
+        "TST-05",
+        "TST-18",
+        "TST-19",
+        "TST-21",
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-06",
+        "SEC-07",
+        "SEC-08",
+        "SEC-09",
+        "SEC-15",
+        "SEC-16",
+        "SEC-17",
+        "SEC-18",
+        "SEC-19",
+        "AIML-04",
+        "AIML-07",
+        "AIML-17",
+        "AIML-24",
+        "AIML-26",
+        "REL-01",
+        "REL-02",
+        "REL-10",
+        "REL-11",
+        "REL-12",
+        "OPS-01",
+        "OPS-02",
+        "OPS-03",
+        "OPS-04",
+        "OPS-05",
+        "OPS-08",
+        "OPS-09",
+        "OPS-10",
+        "OPS-12",
+        "OPS-14",
+        "OPS-15",
+        "OPS-16",
+        "WS-01",
+        "WS-02",
+        "WS-03",
+        "WS-04",
+        "WS-05",
+        "WS-11",
+        "WS-19",
+        "WS-22"
+      ],
+      "affected_paths": [
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+        "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json"
+      ],
+      "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "lifecycle_status": "ACTIVE",
+      "reviewer": "김민호",
+      "approved_at": null,
+      "requested_by": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+      "affected_requirement_ids": [
+        "RQ-FP-035-001"
+      ],
+      "affected_test_ids": [
+        "TC-FP-035-01",
+        "TC-FP-035-02",
+        "TC-FP-035-03",
+        "TC-FP-035-04"
+      ],
+      "review": {
+        "review_status": "COMPLETE",
+        "reviewer": "김민호",
+        "approval_status": "APPROVED",
+        "approval_record": {
+          "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+          "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b"
+        }
+      },
+      "application": {
+        "application_id": "WS-ARTIFACT-BASELINE-APPLICATION-20260722-001",
+        "document_version": "1.0.1",
+        "source_commit": null,
+        "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "state_transition": {
+          "path": "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json",
+          "sha256": "0b6695b40ef54aa279671da60809dc3cacea9bc95f96b0620d45dc7e9aba5b48"
+        },
+        "effective_at": "2026-07-22T14:22:21+09:00",
+        "effective_only_with_commit_receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001"
+      },
+      "rollback_or_supersedes": {
+        "previous_candidate_preserved": "WS-ARTIFACT-BASELINE-CANDIDATE-20260721-001",
+        "policy_1_0_0_preserved_immutable": true
+      }
+    }
+  ],
+  "opening_snapshot": {
+    "snapshot_id": "ART-DOC-05-001-SNAPSHOT-001",
+    "approved_snapshot_version": "1.0.0",
+    "pretransition_file_sha256": "b25cbb5143e25fa0cb3c3a8ff2edf078099d3d98811c89b26b84f31607a4fbe1",
+    "snapshot_manifest": {
+      "path": "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json",
+      "sha256": "0b6695b40ef54aa279671da60809dc3cacea9bc95f96b0620d45dc7e9aba5b48"
+    }
+  },
+  "content_sha256": "cc7b5c9475eb456afda96bfad288b3d6cf34f2a42639b023baf917fbec0ca70a"
+}

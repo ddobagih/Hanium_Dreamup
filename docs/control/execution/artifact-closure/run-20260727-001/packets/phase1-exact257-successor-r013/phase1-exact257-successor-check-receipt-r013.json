@@ -1,0 +1,245 @@
+{
+  "checks": [
+    {
+      "check_id": "R013-CHECK-R012-IMMUTABLE-PACKET",
+      "expected": 3,
+      "observed": 3,
+      "status": "PASS"
+    },
+    {
+      "check_id": "R013-CHECK-EXACT257-ORDER",
+      "expected": {
+        "ordered": true,
+        "records": 257
+      },
+      "observed": {
+        "ordered": true,
+        "records": 257
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R013-CHECK-ROW-DELTA-ALLOWLIST",
+      "expected": {
+        "progress_only": 6,
+        "unchanged": 251
+      },
+      "observed": {
+        "progress_only": 6,
+        "unchanged": 251
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R013-CHECK-STATUS-CREDIT-DELTA",
+      "expected": {
+        "credit": 0,
+        "status": 0
+      },
+      "observed": {
+        "credit": 0,
+        "status": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R013-CHECK-FORMAL-DEVICE-EXTERNAL-DEPLOYMENT",
+      "expected": "NOT_RUN",
+      "observed": "NOT_RUN",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R013-CHECK-DEV18-ADMINAPP-PATH",
+      "expected": "apps/android/adminapp",
+      "observed": "apps/android/adminapp",
+      "status": "PASS"
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 7155,
+    "content_sha256": "388d24090aafc187494423d6b14044e413d226fd4e4bd2395f86fc048ea91838",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/phase1-exact257-successor-check-receipt-r013.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 7155,
+    "content_sha256": "388d24090aafc187494423d6b14044e413d226fd4e4bd2395f86fc048ea91838",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/phase1-exact257-successor-check-receipt-r013.json"
+  },
+  "output_bindings": [
+    {
+      "binding_id": "R013-OUT-001",
+      "byte_length": 2678662,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/phase1-exact257-successor-ledger-r013.json",
+      "sha256": "52fc3313e0704f7b2e3ec17d64d703ad0c1dc9a69755818583c0f13b1ad8719e",
+      "subject_role": "R013_FULL_EXACT257_LEDGER"
+    },
+    {
+      "binding_id": "R013-OUT-002",
+      "byte_length": 7436,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/evidence.json",
+      "sha256": "22559ee3299672f2997798999782438a72ebe2932d969ff7c7e6e4e9ece51649",
+      "subject_role": "R013_FP008_EXACT6_PROGRESS_EVIDENCE"
+    }
+  ],
+  "physical_output_contract": {
+    "add_only": true,
+    "checkpoint_or_daylog_publication": false,
+    "overwrite_allowed": false,
+    "paths": [
+      "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/phase1-exact257-successor-ledger-r013.json",
+      "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/evidence.json",
+      "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r013/phase1-exact257-successor-check-receipt-r013.json"
+    ]
+  },
+  "predecessor_packet_bindings": [
+    {
+      "binding_id": "R013-PRE-001",
+      "byte_length": 2658139,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/phase1-exact257-successor-ledger-r012.json",
+      "sha256": "526033bb5ad0abbc870d6c57ab20b7a0e7f2aee9f43a20baef55c8557aa40c94",
+      "subject_role": "R012_LEDGER"
+    },
+    {
+      "binding_id": "R013-PRE-002",
+      "byte_length": 10044,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/evidence.json",
+      "sha256": "19a014d0563e2ecacf8a3cb783b748a6b4cd87d9accd27f89890e90597aa63a1",
+      "subject_role": "R012_EVIDENCE"
+    },
+    {
+      "binding_id": "R013-PRE-003",
+      "byte_length": 11600,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/phase1-exact257-successor-check-receipt-r012.json",
+      "sha256": "1a7e0c5d54878d93dfb5e3cdb3740f775e9e451e7d01c771be0f10ac5a5ee53c",
+      "subject_role": "R012_RECEIPT"
+    }
+  ],
+  "prepared_on": "2026-08-09",
+  "receipt_id": "WS-PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-20260803-R013",
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.phase1-exact257-successor-check-receipt.v13",
+  "source_bindings": [
+    {
+      "binding_id": "R013-SRC-001",
+      "byte_length": 25263,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/implementation-record.json",
+      "sha256": "d5d7eca6873b5b5744c6ad8a0f55b41f0b4a94cb0aa109381a9b05c6b64aee9b",
+      "subject_role": "FP008_IMPLEMENTATION_RESULT"
+    },
+    {
+      "binding_id": "R013-SRC-002",
+      "byte_length": 12250,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/verification-result.json",
+      "sha256": "916e79d6b7a63e9c1648125a09e2a26cb6ffd7f6779887e10ad7c7ddd1b26fad",
+      "subject_role": "FP008_VERIFICATION_RESULT"
+    },
+    {
+      "binding_id": "R013-SRC-003",
+      "byte_length": 509405,
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260809-r024.json",
+      "sha256": "e9e95998875660663ad7d573cf193ad7b80de12fc64a1d5ecda1285ff71b38e0",
+      "subject_role": "GAP017_R024_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-004",
+      "byte_length": 120665,
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "ba4d4cc686471b068e052955112ce7a056eb66bb464d51713aadb8138668cf45",
+      "subject_role": "FP008_DLV-DOC-05_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-005",
+      "byte_length": 3822733,
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "7a5131837e135b55f9a8e510007d48f46a7b740583ffe6e51d00b3220be43a40",
+      "subject_role": "FP008_DLV-DOC-01_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-006",
+      "byte_length": 1984351,
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "eff6b14788626add6b774080674f18fc53cce81944330665a841db240a25ccf9",
+      "subject_role": "FP008_DLV-REQ-16_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-007",
+      "byte_length": 525929,
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "08df990c3c1b694cb49a1acf19317403d4e5952fc880e0493fa226b859931c6f",
+      "subject_role": "FP008_DLV-DES-06_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-008",
+      "byte_length": 327564,
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "sha256": "6d85730c82e1ee088cf73ad7bfe9f35e9cc4cda7fc5bc9555dd9db24875e9f64",
+      "subject_role": "FP008_DLV-DEV-01_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R013-SRC-009",
+      "byte_length": 129904,
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "bdbb190c64665f07afedbddcb3d31d41a5b140ebb9e466288b17445e3d4f3e08",
+      "subject_role": "FP008_DLV-DEV-18_PHYSICAL_SUCCESSOR"
+    }
+  ],
+  "status": "PASS",
+  "summary": {
+    "check_count": 6,
+    "credit_delta_count": 0,
+    "fail_count": 0,
+    "pass_count": 6,
+    "progress_binding_record_count": 6,
+    "record_count": 257,
+    "release_status": "NOT_ELIGIBLE",
+    "status_delta_count": 0,
+    "unchanged_record_count": 251,
+    "zero_credits": {
+      "acceptance_count": 0,
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "execution_count": 0,
+      "formal279_pass_count": 0,
+      "formal_evidence_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "verdict": "PASS_FOR_FP008_EXACT6_RECORD_PROGRESS_BINDING_WITH_ZERO_CREDIT_ONLY"
+}

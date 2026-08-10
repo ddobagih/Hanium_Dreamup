@@ -1,0 +1,50 @@
+{
+  "schema_version": "walksafe.management-decision-pointer.v1",
+  "metadata": {
+    "title": "WalkSafe 의사결정 기록",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-15"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "canonical_aligned_register": {
+    "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+    "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f",
+    "register_id": "WS-EFFECTIVE-DECISION-REGISTER-ALIGNED-20260721-001",
+    "register_version": "1.0.0",
+    "lifecycle_status": "IN_REVIEW",
+    "artifact_approval_status": "NOT_APPROVED",
+    "decision_count": 135,
+    "decision_feature_edge_count": 428
+  },
+  "copy_policy": "135개 결정을 복제하지 않고 승인 정책을 참조하는 정렬 원장을 정본 후보로 연결한다.",
+  "required_decision_fields": [
+    "결정 ID",
+    "질문·배경",
+    "선택한 결정",
+    "대안",
+    "근거",
+    "영향 산출물",
+    "결정권자",
+    "효력일",
+    "재검토 조건",
+    "대체 결정"
+  ],
+  "governance": {
+    "owner": "김민호",
+    "append_rule": "새 결정이나 정정은 새 ID·버전으로 추가하고 이전 결정은 superseded_by로 연결",
+    "review_cycle": "정책·범위·gate·외부조건 변경 때 즉시, 매 마일스톤 전 검토"
+  },
+  "approval_boundary": {
+    "formal_register_approved": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

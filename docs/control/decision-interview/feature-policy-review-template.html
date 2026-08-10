@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>WalkSafe 기능 정책 정리와 남은 결정</title>
+  <style>
+    :root {
+      --bg: #f3f6f5; --surface: #fff; --text: #16201f; --muted: #536260;
+      --line: #ccd6d3; --brand: #075f52; --brand-dark: #123f39; --soft: #e5f4ef;
+      --danger: #a51f2a; --danger-soft: #fff0f1; --warn: #765000; --warn-soft: #fff6dc;
+      --info: #19588d; --info-soft: #eaf4ff; --shadow: 0 5px 18px rgb(20 45 40 / 9%);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    button, select, input[type="search"], input[type="text"], input[type="number"] { min-height: 44px; }
+    button { cursor: pointer; touch-action: manipulation; }
+    a { color: var(--brand); overflow-wrap: anywhere; }
+    :focus-visible { outline: 3px solid #ffae00; outline-offset: 3px; }
+    .skip-link { position: fixed; z-index: 100; top: -5rem; left: 1rem; padding: .75rem 1rem; background: #111; color: #fff; }
+    .skip-link:focus { top: 1rem; }
+    .hero { padding: clamp(1.25rem, 4vw, 3rem); background: var(--brand-dark); color: #fff; }
+    .hero-inner, main { width: min(1180px, calc(100% - 2rem)); margin-inline: auto; }
+    .eyebrow { margin: 0 0 .35rem; color: #a5eadc; font-weight: 800; }
+    h1 { max-width: 28ch; margin: 0; font-size: clamp(1.9rem, 5vw, 3.2rem); line-height: 1.15; text-wrap: balance; }
+    h2 { margin: 0 0 .35rem; font-size: clamp(1.45rem, 3vw, 2rem); text-wrap: balance; }
+    h3 { margin: 0; line-height: 1.35; text-wrap: balance; }
+    h4 { margin: .9rem 0 .25rem; }
+    .lead { max-width: 84ch; margin: .8rem 0; color: #e1f2ee; }
+    .action-row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+    .button, .file-control label { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: .55rem .9rem; border: 1px solid currentColor; border-radius: .55rem; background: transparent; color: inherit; font-weight: 750; }
+    .button-primary { border-color: #fff; background: #fff; color: var(--brand-dark); }
+    .button-danger { color: #ffd4d7; }
+    .file-control { position: relative; display: inline-flex; }
+    .file-control input { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; opacity: 0; }
+    .file-control:focus-within label { outline: 3px solid #ffae00; outline-offset: 3px; }
+    main { padding-block: 1.25rem 5rem; }
+    section { margin-top: 2.3rem; scroll-margin-top: 1rem; }
+    .notice, .panel, .card, .metric { border: 1px solid var(--line); border-radius: .8rem; background: var(--surface); box-shadow: var(--shadow); }
+    .notice { margin-bottom: 1rem; padding: 1rem; border-left: .45rem solid var(--warn); }
+    .notice strong { display: block; }
+    .panel, .card { min-width: 0; padding: 1rem; overflow-wrap: anywhere; }
+    .section-intro { max-width: 88ch; color: var(--muted); }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-block: 1rem; }
+    .metric { padding: .85rem; }
+    .metric b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .6rem; padding: 0; list-style: none; counter-reset: step; }
+    .flow li { position: relative; min-width: 0; padding: .85rem; border: 1px solid var(--line); border-radius: .7rem; background: var(--surface); }
+    .flow li::before { counter-increment: step; content: counter(step); display: grid; width: 2rem; height: 2rem; place-items: center; margin-bottom: .45rem; border-radius: 999px; background: var(--brand); color: #fff; font-weight: 800; }
+    .flow b, .flow span { display: block; }
+    .flow span { margin-top: .25rem; color: var(--muted); font-size: .9rem; }
+    .plain-list, .step-list { margin: .35rem 0; padding-left: 1.3rem; }
+    .plain-list li, .step-list li { margin-block: .22rem; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: .35rem; margin-block: .5rem; }
+    .badge { display: inline-flex; min-height: 1.75rem; align-items: center; padding: .15rem .52rem; border-radius: 999px; background: #edf1f0; color: #304441; font-size: .78rem; font-weight: 800; }
+    .badge-confirmed, .badge-implemented { background: var(--soft); color: var(--brand); }
+    .badge-conditional, .badge-open, .badge-partial { background: var(--warn-soft); color: var(--warn); }
+    .badge-conflict, .badge-error, .badge-missing { background: var(--danger-soft); color: var(--danger); }
+    .badge-measure, .badge-proposal, .badge-expert { background: var(--info-soft); color: var(--info); }
+    .toolbar { display: grid; grid-template-columns: minmax(13rem, 1fr) repeat(2, minmax(11rem, auto)); gap: .55rem; margin-block: 1rem; }
+    .toolbar label { display: grid; gap: .2rem; font-size: .84rem; font-weight: 750; }
+    .toolbar input, .toolbar select { width: 100%; padding: .55rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--surface); color: var(--text); }
+    .result-summary { color: var(--muted); font-size: .9rem; }
+    details.group { margin-block: .85rem; }
+    details.group > summary { min-height: 48px; cursor: pointer; padding: .8rem 1rem; border-radius: .7rem; background: #e7efed; font-weight: 850; }
+    details.subdetails { margin-top: .75rem; border-top: 1px solid var(--line); padding-top: .65rem; }
+    details.subdetails > summary { min-height: 44px; cursor: pointer; font-weight: 800; }
+    .card-list { display: grid; gap: .8rem; margin-top: .8rem; }
+    .feature-card, .question-card, .trace-card { border-left: .35rem solid var(--line); content-visibility: auto; contain-intrinsic-size: auto 42rem; }
+    .feature-card.status-CONFLICTING, .question-card.has-error { border-left-color: var(--danger); }
+    .feature-card.status-CONDITIONAL, .feature-card.status-CONFIRMED-WITH-OPEN-DETAILS { border-left-color: #c98c13; }
+    .question-card.inactive { opacity: .72; background: #eef1f0; }
+    .card-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+    .card-id { margin: 0; color: var(--muted); font: 750 .8rem/1.3 ui-monospace, monospace; }
+    .plain-summary { font-size: 1.04rem; font-weight: 720; }
+    .implementation-note { padding: .65rem .75rem; border-left: .3rem solid var(--info); border-radius: .35rem; background: var(--info-soft); }
+    .columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .mini-panel { min-width: 0; padding: .75rem; border: 1px solid var(--line); border-radius: .6rem; background: #f8faf9; }
+    .mini-panel h4 { margin-top: 0; }
+    .empty { padding: 1rem; border: 1px dashed var(--line); border-radius: .6rem; color: var(--muted); }
+    .correction { margin-top: 1rem; padding: .85rem; border-radius: .65rem; background: #f4f8f7; }
+    .check-label { display: grid; grid-template-columns: auto 1fr; min-height: 44px; align-items: center; gap: .55rem; font-weight: 800; }
+    .check-label input { width: 1.3rem; height: 1.3rem; }
+    textarea, .answer-input { width: 100%; padding: .65rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--surface); color: var(--text); }
+    textarea { min-height: 7rem; resize: vertical; }
+    .field-label { display: block; margin-top: .75rem; font-weight: 800; }
+    .help { color: var(--muted); }
+    .error-box { margin-top: .55rem; padding: .65rem; border-radius: .45rem; background: var(--danger-soft); color: var(--danger); }
+    fieldset.option-list { display: grid; gap: .5rem; margin-block: .75rem; padding: 0; border: 0; min-width: 0; }
+    .option { display: grid; grid-template-columns: auto 1fr; min-height: 52px; gap: .6rem; padding: .7rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--surface); touch-action: manipulation; }
+    .option:hover { border-color: var(--brand); background: var(--soft); }
+    .option input { width: 1.2rem; height: 1.2rem; margin-top: .2rem; }
+    .option strong, .option span, .option small { display: block; }
+    .option small { margin-top: .12rem; color: var(--muted); }
+    .completion { padding: 1rem; border-radius: .7rem; background: var(--danger-soft); color: var(--danger); font-weight: 800; }
+    .completion.complete { background: var(--soft); color: var(--brand); }
+    .status-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; padding: 0; list-style: none; }
+    .status-steps li { padding: .9rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--surface); }
+    .status-steps b, .status-steps span { display: block; }
+    .queue-count { font-size: 1.4rem; }
+    .trace-meta { color: var(--muted); font-size: .88rem; }
+    .storage-warning { margin-top: 1rem; padding: .75rem; border-radius: .5rem; background: var(--danger-soft); color: var(--danger); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    body.high-contrast { --bg: #000; --surface: #000; --text: #fff; --muted: #e8e8e8; --line: #fff; --brand: #5fffd8; --brand-dark: #000; --soft: #06352b; --danger: #ff9ca4; --danger-soft: #3a0005; --warn: #ffd270; --warn-soft: #342500; --info: #acd7ff; --info-soft: #002c50; --shadow: none; }
+    body.high-contrast .hero { border-bottom: 2px solid #fff; }
+    body.high-contrast .mini-panel, body.high-contrast .correction, body.high-contrast details.group > summary { background: #080808; }
+    @media (max-width: 850px) {
+      .summary-grid, .grid { grid-template-columns: 1fr 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .hero-inner, main { width: min(100% - 1rem, 1180px); }
+      .summary-grid, .grid, .columns, .status-steps { grid-template-columns: minmax(0, 1fr); }
+      .action-row > *, .action-row .button, .file-control label { width: 100%; }
+      .card { padding: .8rem; }
+      .card-head { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+    @media print {
+      body { background: #fff; color: #000; font-size: 10pt; }
+      .hero { padding: 0; background: #fff; color: #000; }
+      .hero .lead, .eyebrow { color: #000; }
+      .action-row, .toolbar, .skip-link, .storage-warning, .correction { display: none !important; }
+      .hero-inner, main { width: 100%; }
+      .panel, .card, .metric { box-shadow: none; break-inside: avoid; content-visibility: visible; contain-intrinsic-size: none; }
+      details:not([open]) > :not(summary) { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">기존 답변은 승계하고, 틀린 해석과 남은 제품 결정만 확인</p>
+      <h1>WalkSafe 기능 정책 정리와 남은 결정</h1>
+      <p class="lead">지금까지 답한 내용을 기능별로 쉬운 말로 풀었습니다. 맞는 내용은 아무것도 하지 않아도 됩니다. 잘못 이해한 기능만 수정하고, 마지막의 짧아진 제품책임자 질문에 답하면 됩니다.</p>
+      <div class="action-row">
+        <button class="button button-primary" id="export-button" type="button">수정·답변 JSON 내보내기</button>
+        <span class="file-control"><label for="import-input">수정·답변 JSON 불러오기</label><input id="import-input" name="import_file" type="file" accept="application/json,.json"></span>
+        <button class="button" id="next-button" type="button">다음 미입력으로</button>
+        <button class="button" id="print-button" type="button">인쇄</button>
+        <button class="button" id="contrast-button" type="button" aria-pressed="false">고대비 켜기</button>
+        <button class="button button-danger" id="reset-button" type="button">입력 초기화</button>
+      </div>
+      <p class="storage-warning" id="storage-warning" role="alert" hidden></p>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <div class="notice" role="note">
+      <strong>이 문서가 하는 일</strong>
+      <span>현재 정책을 고치는 인터뷰 자료입니다. 답변을 마쳐도 앱 구현·시험·법률검토·출시가 자동으로 완료되는 것은 아닙니다.</span>
+    </div>
+    <div class="summary-grid" aria-label="기준선 요약">
+      <div class="metric"><span>승계한 원본 답변</span><b id="original-count">—</b></div>
+      <div class="metric"><span>승계한 Android 답변</span><b id="delta-count">—</b></div>
+      <div class="metric"><span>정리한 기능</span><b id="feature-count">—</b></div>
+      <div class="metric"><span>남은 사용자 질문</span><b id="owner-question-count">—</b></div>
+    </div>
+    <p class="completion" id="completion-banner" role="status"></p>
+    <p class="sr-only" id="live-region" aria-live="polite"></p>
+
+    <section aria-labelledby="flow-heading">
+      <h2 id="flow-heading">목표 서비스의 전체 흐름</h2>
+      <p class="section-intro">아래 순서가 기능별 설명을 읽는 기준입니다. 세부 예외는 각 기능 카드에 모두 남겨 두었습니다.</p>
+      <ol class="flow">
+        <li><b>첫 실행</b><span>설명·동의·권한을 확인하고 가입 또는 로그인합니다.</span></li>
+        <li><b>보행 준비</b><span>카메라·위치·음성을 점검한 뒤 카메라 중심 화면으로 들어갑니다.</span></li>
+        <li><b>길안내와 경고</b><span>TMAP은 큰 경로를, 단말 모델은 가까운 장애물과 점자블록을 안내합니다.</span></li>
+        <li><b>신고와 데이터</b><span>신고는 서버로 보내고, 학습용 활동데이터는 걷지 않을 때만 전송합니다.</span></li>
+        <li><b>장애와 종료</b><span>지속 장애는 유형을 알리고 안전하게 멈춘 뒤 확인된 절차로 복구합니다.</span></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="guide-heading">
+      <h2 id="guide-heading">읽을 때 알아둘 기준</h2>
+      <div class="grid" id="reading-guide"></div>
+      <details class="subdetails">
+        <summary>정책 상태와 구현 상태가 무엇을 뜻하는지 보기</summary>
+        <div class="grid" id="status-definitions"></div>
+      </details>
+      <details class="subdetails">
+        <summary>자주 나오는 기술 용어를 쉬운 말로 보기</summary>
+        <div class="grid">
+          <div class="mini-panel"><h3>온디바이스</h3><p>영상이나 음성을 서버로 보내지 않고 사용자 휴대폰 안에서 바로 처리하는 방식입니다.</p></div>
+          <div class="mini-panel"><h3>STT·TTS</h3><p>STT는 사람의 말을 글자·명령으로 알아듣는 기능이고, TTS는 글을 음성으로 읽어주는 기능입니다.</p></div>
+          <div class="mini-panel"><h3>TalkBack</h3><p>화면의 버튼과 글을 음성으로 읽고 손가락 동작으로 조작하게 돕는 Android 화면 읽기 기능입니다.</p></div>
+          <div class="mini-panel"><h3>queue</h3><p>지금 보내지 못한 신고나 데이터를 잃지 않도록 순서대로 잠시 보관하는 대기열입니다.</p></div>
+          <div class="mini-panel"><h3>hash·receipt</h3><p>파일이 온전히 도착했는지 확인하는 지문값과 서버의 수신 확인증입니다.</p></div>
+          <div class="mini-panel"><h3>gate·rollback</h3><p>gate는 다음 단계로 가기 전 반드시 통과할 조건, rollback은 문제가 생겼을 때 이전 정상 버전으로 되돌리는 절차입니다.</p></div>
+          <div class="mini-panel"><h3>confidence·stale</h3><p>confidence는 모델이 결과를 얼마나 믿는지 나타내는 값이고, stale은 시간이 지나 현재 상황에 쓰면 안 되는 오래된 결과입니다.</p></div>
+          <div class="mini-panel"><h3>frame·TTC</h3><p>frame은 카메라 영상 한 장, TTC는 지금 속도로 움직일 때 장애물과 부딪치기까지 남은 예상 시간입니다.</p></div>
+          <div class="mini-panel"><h3>chunk</h3><p>큰 영상·음성 데이터를 안전하게 저장하고 이어 보내기 위해 나눈 작은 데이터 조각입니다.</p></div>
+          <div class="mini-panel"><h3>IdP·MFA</h3><p>IdP는 로그인 신원을 확인하는 시스템이고, MFA는 비밀번호 외에 한 가지 이상을 더 확인하는 다중 인증입니다.</p></div>
+          <div class="mini-panel"><h3>gateway</h3><p>앱의 서버 요청을 한곳에서 받아 인증과 제한을 확인한 뒤 알맞은 서버 기능으로 보내는 공통 출입구입니다.</p></div>
+          <div class="mini-panel"><h3>RTO·RPO</h3><p>RTO는 장애 뒤 서비스를 다시 살리는 목표 시간, RPO는 복구할 때 허용할 수 있는 최대 데이터 손실 시간입니다.</p></div>
+          <div class="mini-panel"><h3>SEV·telemetry</h3><p>SEV는 장애 심각도 등급이고, telemetry는 앱과 서버 상태를 운영자가 확인하도록 보내는 성능·오류 기록입니다.</p></div>
+          <div class="mini-panel"><h3>cooldown·idempotency</h3><p>cooldown은 같은 신고를 잠시 다시 만들지 않는 대기시간이고, idempotency는 같은 요청을 여러 번 보내도 결과를 한 번만 만들게 하는 중복 방지 원칙입니다.</p></div>
+          <div class="mini-panel"><h3>reconciliation·redaction</h3><p>reconciliation은 서버 기록과 파일이 서로 맞는지 찾아 바로잡는 작업이고, redaction은 저장하거나 전달하기 전에 불필요한 민감정보를 가리는 처리입니다.</p></div>
+          <div class="mini-panel"><h3>rate limit</h3><p>짧은 시간에 너무 많은 요청이 몰릴 때 허용 횟수를 제한해 서버와 다른 사용자를 보호하는 기준입니다.</p></div>
+          <div class="mini-panel"><h3>sampling·drop</h3><p>sampling은 운영 기록 일부만 대표로 남기는 방식이고, drop은 중요도가 낮은 기록을 버려 안전 기능에 필요한 자원을 지키는 처리입니다.</p></div>
+          <div class="mini-panel"><h3>postmortem</h3><p>큰 장애가 끝난 뒤 원인, 영향, 대응, 재발 방지 할 일을 책임자와 함께 기록하는 사후분석입니다.</p></div>
+        </div>
+      </details>
+      <details class="subdetails">
+        <summary>어떤 답변을 우선해서 정리했는지 보기</summary>
+        <div class="card-list" id="authority-order"></div>
+      </details>
+    </section>
+
+    <section aria-labelledby="features-heading">
+      <h2 id="features-heading">기능별 현재 정책과 작동 방식</h2>
+      <p class="section-intro">54개 기능을 빠짐없이 정리했습니다. 맞으면 넘어가고, 잘못 이해한 내용에만 ‘이 기능 설명을 수정하겠습니다’를 선택해 정확한 내용을 적어주세요.</p>
+      <div class="toolbar" aria-label="기능 필터">
+        <label>기능 검색<input id="feature-search" name="feature_search" type="search" autocomplete="off" placeholder="예: 로그인, TMAP, 점자블록"></label>
+        <label>분야<select id="feature-area" name="feature_area"><option value="all">전체 분야</option></select></label>
+        <label>정책 상태<select id="feature-status" name="feature_status"><option value="all">전체 상태</option><option value="CONFIRMED_WITH_OPEN_DETAILS">큰 방향 확정·세부 미정</option><option value="CONDITIONAL">조건부</option><option value="CONFLICTING">충돌 있음</option><option value="CONFIRMED">확정</option><option value="UNRESOLVED">미정</option></select></label>
+      </div>
+      <p class="result-summary" id="feature-result"></p>
+      <div id="feature-groups"></div>
+    </section>
+
+    <section aria-labelledby="responsibility-heading">
+      <h2 id="responsibility-heading">남은 항목은 누가 어떻게 정하는가</h2>
+      <p class="section-intro">기존 144개 감사 질문을 그대로 다시 묻지 않았습니다. 제품책임자가 답할 것, 구현팀이 제안할 것, 실제로 재야 할 것, 전문가가 검토할 것, 자동 생성할 증거를 분리했습니다.</p>
+      <div class="summary-grid" id="queue-summary"></div>
+      <div id="queue-details"></div>
+    </section>
+
+    <section aria-labelledby="questions-heading">
+      <h2 id="questions-heading">제품책임자에게 남은 질문</h2>
+      <p class="section-intro">이미 확정된 내용과 기술 수치 질문을 제외한 10개 결정입니다. 추천안은 참고용이며 자동 선택되지 않습니다.</p>
+      <div class="toolbar" aria-label="제품책임자 질문 필터">
+        <label>질문 검색<input id="question-search" name="question_search" type="search" autocomplete="off" placeholder="질문·기능·ID 검색"></label>
+        <label>분야<select id="question-group" name="question_group"><option value="all">전체 분야</option></select></label>
+        <label>입력 상태<select id="question-status" name="question_status"><option value="all">전체</option><option value="unanswered">미답변</option><option value="answered">답변됨</option><option value="inactive">조건상 해당 없음</option></select></label>
+      </div>
+      <p class="result-summary" id="question-result"></p>
+      <div id="question-groups"></div>
+    </section>
+
+    <section aria-labelledby="trace-heading">
+      <h2 id="trace-heading">결정이 반영될 문서</h2>
+      <p class="section-intro">한 번 정한 결정은 여러 문서에 반복 질문하지 않고 연결해서 재사용합니다. 257개 산출물 유형 중 현재 기능이나 남은 질문에 연결된 항목을 확인할 수 있습니다.</p>
+      <div class="toolbar" aria-label="문서 추적 필터">
+        <label>문서 검색<input id="trace-search" name="trace_search" type="search" autocomplete="off" placeholder="예: REQ-03, 개인정보, 시험"></label>
+        <label>연결 상태<select id="trace-status" name="trace_status"><option value="linked">연결된 문서만</option><option value="all">257개 전체</option><option value="question">남은 질문 연결</option><option value="feature">기능 정책 연결</option></select></label>
+      </div>
+      <p class="result-summary" id="trace-result"></p>
+      <div class="card-list" id="trace-list"></div>
+    </section>
+
+    <section aria-labelledby="completion-heading">
+      <h2 id="completion-heading">‘완료’는 세 단계로 구분합니다</h2>
+      <ul class="status-steps" id="completion-states"></ul>
+    </section>
+  </main>
+
+  <script id="decision-interview-data" type="application/json">__WALKSAFE_DECISION_INTERVIEW_DATA__</script>
+  <script>
+    "use strict";
+    (() => {
+      const dataElement = document.getElementById("decision-interview-data");
+      const liveRegion = document.getElementById("live-region");
+      let report;
+      try { report = JSON.parse(dataElement.textContent); }
+      catch (error) {
+        document.getElementById("completion-banner").textContent = "기준선 데이터를 읽지 못했습니다: " + error.message;
+        return;
+      }
+
+      const policy = report.feature_policy;
+      const features = policy.features || [];
+      const featureById = new Map(features.map((item) => [item.id, item]));
+      const areas = policy.areas || [];
+      const questionnaire = report.owner_questionnaire;
+      const questions = questionnaire.questions || [];
+      const questionById = new Map(questions.map((item) => [item.id, item]));
+      const storageKey = "walksafe.decision-interview:" + report.binding.storage_binding_hash;
+      const maximumImportBytes = 5 * 1024 * 1024;
+      const state = {
+        answers: {}, notes: {}, featureCorrections: {}, correctionEnabled: {},
+        featureQuery: "", featureArea: "all", featureStatus: "all",
+        questionQuery: "", questionGroup: "all", questionStatus: "all",
+        traceQuery: "", traceStatus: "linked", contrast: false
+      };
+
+      function make(tag, options) {
+        const config = options || {};
+        const element = document.createElement(tag);
+        if (config.id) element.id = config.id;
+        if (config.className) element.className = config.className;
+        if (config.text !== undefined) element.textContent = config.text;
+        if (config.attrs) for (const [name, value] of Object.entries(config.attrs)) element.setAttribute(name, String(value));
+        return element;
+      }
+      function hasOwn(object, key) { return Object.prototype.hasOwnProperty.call(object, key); }
+      function appendList(parent, values, ordered) {
+        if (!values || !values.length) { parent.append(make("p", { className: "help", text: "해당 없음" })); return; }
+        const list = make(ordered ? "ol" : "ul", { className: ordered ? "step-list" : "plain-list" });
+        for (const value of values) list.append(make("li", { text: value }));
+        parent.append(list);
+      }
+      function announce(message) { liveRegion.textContent = ""; window.setTimeout(() => { liveRegion.textContent = message; }, 10); }
+      function showStorageWarning(message) { const box = document.getElementById("storage-warning"); box.textContent = message; box.hidden = !message; }
+      function statusLabel(status) {
+        return ({
+          CONFIRMED: "확정", CONFIRMED_WITH_OPEN_DETAILS: "큰 방향 확정·세부 미정",
+          CONDITIONAL: "조건부", CONFLICTING: "답변 충돌", UNRESOLVED: "미정",
+          IMPLEMENTED: "구현·증거 있음", PARTIALLY_IMPLEMENTED: "일부 구현",
+          IMPLEMENTED_UNVERIFIED: "구현됐으나 미검증", POLICY_ONLY: "정책만 있음",
+          NOT_IMPLEMENTED: "미구현", MEASURED_INSUFFICIENT: "측정 부족", UNKNOWN: "구현 여부 미확인"
+        })[status] || status;
+      }
+      function statusClass(status) {
+        if (["CONFIRMED", "IMPLEMENTED"].includes(status)) return "confirmed";
+        if (["CONDITIONAL", "CONFIRMED_WITH_OPEN_DETAILS", "PARTIALLY_IMPLEMENTED"].includes(status)) return "conditional";
+        if (["CONFLICTING", "UNRESOLVED", "NOT_IMPLEMENTED"].includes(status)) return "conflict";
+        if (["MEASURED_INSUFFICIENT", "IMPLEMENTED_UNVERIFIED"].includes(status)) return "measure";
+        return "open";
+      }
+      function badge(text, className) { return make("span", { className: "badge badge-" + className, text }); }
+
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(state));
+          showStorageWarning("");
+        } catch (error) { showStorageWarning("브라우저 자동 저장에 실패했습니다. JSON으로 따로 보관해주세요."); }
+      }
+      function loadState() {
+        let saved;
+        try { saved = JSON.parse(localStorage.getItem(storageKey) || "null"); }
+        catch (error) { showStorageWarning("이전 자동 저장값을 읽지 못해 새 상태로 시작합니다."); return; }
+        if (!saved || typeof saved !== "object") return;
+        for (const field of ["answers", "notes", "featureCorrections", "correctionEnabled"])
+          if (saved[field] && typeof saved[field] === "object" && !Array.isArray(saved[field])) state[field] = saved[field];
+        for (const field of ["featureQuery", "featureArea", "featureStatus", "questionQuery", "questionGroup", "questionStatus", "traceQuery", "traceStatus"])
+          if (typeof saved[field] === "string") state[field] = saved[field];
+        state.contrast = saved.contrast === true;
+      }
+      function isActive(question) {
+        if (!question.activation) return true;
+        const answer = state.answers[question.activation.question_id];
+        return question.activation.option_ids.includes(answer);
+      }
+      function activeQuestions() { return questions.filter(isActive); }
+      function completionIssues() {
+        const unanswered = activeQuestions().filter((item) => item.required && !hasOwn(state.answers, item.id));
+        const correctionErrors = features.filter((item) => state.correctionEnabled[item.id] && (state.featureCorrections[item.id] || "").trim().length < 10);
+        return { unanswered, correctionErrors };
+      }
+      function updateCompletion() {
+        const issues = completionIssues();
+        const active = activeQuestions();
+        const answered = active.filter((item) => hasOwn(state.answers, item.id)).length;
+        const banner = document.getElementById("completion-banner");
+        const complete = issues.unanswered.length === 0 && issues.correctionErrors.length === 0;
+        banner.classList.toggle("complete", complete);
+        banner.textContent = complete
+          ? "수정·질문 입력 완료: 문서 초안 검토를 시작할 수 있습니다. 아직 기준선 승인이나 출시 가능 상태는 아닙니다."
+          : `입력 중: 활성 질문 ${answered}/${active.length}, 미답변 ${issues.unanswered.length}, 수정 설명 부족 ${issues.correctionErrors.length}`;
+        return { ...issues, complete, active, answered };
+      }
+
+      function captureQuestionInteraction(questionId, input) {
+        const card = document.getElementById("question-" + questionId);
+        return {
+          questionId,
+          cardTop: card?.getBoundingClientRect().top,
+          scrollY: window.scrollY,
+          focusName: input.name,
+          focusValue: input.value,
+          openGroupIds: Array.from(document.querySelectorAll("#question-groups > details.group[open]"))
+            .map((group) => group.dataset.groupId)
+            .filter(Boolean)
+        };
+      }
+
+      function restoreQuestionInteraction(interaction) {
+        if (!interaction) return;
+        const openGroupIds = new Set(interaction.openGroupIds);
+        document.querySelectorAll("#question-groups > details.group").forEach((group) => {
+          if (openGroupIds.has(group.dataset.groupId)) group.open = true;
+        });
+        const card = document.getElementById("question-" + interaction.questionId);
+        const root = document.documentElement;
+        const previousScrollBehavior = root.style.scrollBehavior;
+        root.style.scrollBehavior = "auto";
+        if (card && Number.isFinite(interaction.cardTop)) {
+          window.scrollBy(0, card.getBoundingClientRect().top - interaction.cardTop);
+        } else {
+          window.scrollTo(0, interaction.scrollY);
+        }
+        root.style.scrollBehavior = previousScrollBehavior;
+        const input = Array.from(document.getElementsByName(interaction.focusName))
+          .find((item) => item.value === interaction.focusValue);
+        input?.focus({ preventScroll: true });
+      }
+
+      function renderHeader() {
+        const summary = report.source_summary;
+        document.getElementById("original-count").textContent = summary.original_answered + "/" + summary.original_total;
+        document.getElementById("delta-count").textContent = summary.delta_answered + "/" + summary.delta_total;
+        document.getElementById("feature-count").textContent = String(features.length);
+        document.getElementById("owner-question-count").textContent = String(questions.length);
+        const guide = document.getElementById("reading-guide");
+        policy.reading_guide.forEach((text, index) => {
+          const card = make("article", { className: "card" });
+          card.append(make("h3", { text: `기준 ${index + 1}` }), make("p", { text }));
+          guide.append(card);
+        });
+        const authority = document.getElementById("authority-order");
+        policy.authority_order.forEach((item) => {
+          const card = make("article", { className: "card" });
+          card.append(make("p", { className: "card-id", text: `우선순위 ${item.rank}` }), make("h3", { text: item.source }), make("p", { text: item.rule }));
+          authority.append(card);
+        });
+        const definitions = document.getElementById("status-definitions");
+        for (const [kind, values] of Object.entries(policy.status_definitions)) {
+          for (const [status, meaning] of Object.entries(values)) {
+            const card = make("article", { className: "mini-panel" });
+            card.append(make("p", { className: "card-id", text: kind === "policy" ? "정책 상태" : "구현 상태" }), make("h3", { text: statusLabel(status) }), make("p", { text: meaning }));
+            definitions.append(card);
+          }
+        }
+        const completion = document.getElementById("completion-states");
+        report.metadata.completion_states.forEach((item, index) => {
+          const entry = make("li");
+          entry.append(make("span", { className: "card-id", text: `${index + 1}단계 · ${item.id}` }), make("b", { text: item.label }), make("span", { text: item.meaning }));
+          completion.append(entry);
+        });
+      }
+
+      function makeInfoPanel(title, values, ordered) {
+        const panel = make("div", { className: "mini-panel" });
+        panel.append(make("h4", { text: title }));
+        appendList(panel, values, ordered);
+        return panel;
+      }
+      function makeFeatureCard(feature) {
+        const policyInfo = feature.policy;
+        const card = make("article", { className: "card feature-card status-" + policyInfo.overall_status.replaceAll("_", "-") });
+        card.id = "feature-" + feature.id;
+        const head = make("div", { className: "card-head" });
+        const titleBox = make("div");
+        titleBox.append(make("p", { className: "card-id", text: feature.id }), make("h3", { text: feature.name }));
+        const badges = make("div", { className: "badge-row" });
+        badges.append(badge(statusLabel(policyInfo.overall_status), statusClass(policyInfo.overall_status)), badge(statusLabel(feature.implementation.status), statusClass(feature.implementation.status)));
+        head.append(titleBox, badges);
+        card.append(head, make("p", { className: "plain-summary", text: feature.plain_summary }), make("p", { text: "사용자에게 필요한 이유: " + feature.user_purpose }), make("p", { className: "implementation-note", text: "현재 실제 구현 판단: " + feature.implementation.plain_status }));
+        const flow = make("div", { className: "columns" });
+        flow.append(makeInfoPanel("시작하려면", feature.start_conditions), makeInfoPanel("목표 작동 순서", feature.normal_flow, true));
+        card.append(flow);
+
+        const details = make("details", { className: "subdetails" });
+        details.append(make("summary", { text: "안내·권한·단말/서버·데이터·장애 상세 보기" }));
+        const detailColumns = make("div", { className: "columns" });
+        const guidance = make("div", { className: "mini-panel" });
+        guidance.append(make("h4", { text: "사용자에게 어떻게 알려주나" }));
+        appendList(guidance, feature.user_guidance.screen.map((item) => "화면: " + item).concat(feature.user_guidance.speech.map((item) => "음성: " + item), feature.user_guidance.vibration.map((item) => "진동: " + item)));
+        const permissions = make("div", { className: "mini-panel" });
+        permissions.append(make("h4", { text: "필요 권한" }));
+        appendList(permissions, feature.required_permissions.map((item) => `${item.name} (${item.requirement}): ${item.plain_reason}`));
+        const boundary = make("div", { className: "mini-panel" });
+        boundary.append(make("h4", { text: "어디에서 처리하나" }));
+        appendList(boundary, feature.execution_boundary.on_device.map((item) => "휴대폰: " + item).concat(feature.execution_boundary.server.map((item) => "WalkSafe 서버: " + item), feature.execution_boundary.external.map((item) => "외부 서비스: " + item)));
+        const data = make("div", { className: "mini-panel" });
+        data.append(make("h4", { text: "데이터 처리" }));
+        appendList(data, feature.data_handling.stored_on_device.map((item) => "휴대폰 저장: " + item).concat(feature.data_handling.sent_to_server.map((item) => "서버 전송: " + item), feature.data_handling.delete_from_device.map((item) => "휴대폰 삭제: " + item), feature.data_handling.server_retention.map((item) => "서버 보존: " + item)));
+        detailColumns.append(guidance, permissions, boundary, data, makeInfoPanel("장애가 나면", feature.failure_behavior));
+        details.append(detailColumns);
+        card.append(details);
+
+        const policyDetails = make("details", { className: "subdetails" });
+        policyDetails.append(make("summary", { text: "확정·조건부·충돌·미정 내용과 구현 상태 보기" }));
+        const policyColumns = make("div", { className: "columns" });
+        policyColumns.append(makeInfoPanel("확정된 내용", policyInfo.confirmed), makeInfoPanel("조건이 붙은 내용", policyInfo.conditional), makeInfoPanel("서로 충돌하는 내용", policyInfo.conflicts), makeInfoPanel("아직 정할 내용", policyInfo.unresolved));
+        const implementation = make("div", { className: "mini-panel" });
+        implementation.append(make("h4", { text: "현재 구현 판단" }), make("p", { text: feature.implementation.plain_status }));
+        appendList(implementation, feature.implementation.evidence_refs.map((item) => "근거 " + item));
+        policyColumns.append(implementation);
+        policyDetails.append(policyColumns);
+        card.append(policyDetails);
+
+        const trace = make("details", { className: "subdetails" });
+        trace.append(make("summary", { text: "근거와 반영 문서 ID 보기" }));
+        const traceColumns = make("div", { className: "columns" });
+        traceColumns.append(makeInfoPanel("답변·분석 근거", feature.source_refs), makeInfoPanel("반영할 산출물", feature.affected_deliverables));
+        trace.append(traceColumns);
+        card.append(trace);
+
+        const correction = make("div", { className: "correction" });
+        const toggleLabel = make("label", { className: "check-label" });
+        const toggle = make("input", { attrs: { type: "checkbox", name: "correct_" + feature.id } });
+        toggle.checked = state.correctionEnabled[feature.id] === true;
+        toggleLabel.append(toggle, make("span", { text: "이 기능 설명을 수정하겠습니다" }));
+        const field = make("div");
+        field.hidden = !toggle.checked;
+        const label = make("label", { className: "field-label", text: "정확한 정책이나 고칠 문장", attrs: { for: "correction-" + feature.id } });
+        const textarea = make("textarea", { id: "correction-" + feature.id, attrs: { name: "correction_" + feature.id, placeholder: "무엇이 다르고 어떻게 고쳐야 하는지 구체적으로 적어주세요.", minlength: "10" } });
+        textarea.value = state.featureCorrections[feature.id] || "";
+        const error = make("p", { id: "correction-error-" + feature.id, className: "error-box", text: "수정할 내용을 10자 이상 적어주세요." });
+        const invalid = toggle.checked && textarea.value.trim().length < 10;
+        error.hidden = !invalid;
+        textarea.setAttribute("aria-describedby", error.id);
+        textarea.setAttribute("aria-invalid", String(invalid));
+        toggle.addEventListener("change", () => {
+          state.correctionEnabled[feature.id] = toggle.checked;
+          if (!toggle.checked) { delete state.featureCorrections[feature.id]; textarea.value = ""; }
+          field.hidden = !toggle.checked;
+          saveState(); updateCompletion(); updateFeatureResult();
+          if (toggle.checked) document.getElementById("correction-" + feature.id)?.focus({ preventScroll: true });
+        });
+        textarea.addEventListener("input", () => {
+          if (textarea.value.trim()) state.featureCorrections[feature.id] = textarea.value;
+          else delete state.featureCorrections[feature.id];
+          const nowInvalid = textarea.value.trim().length < 10;
+          error.hidden = !nowInvalid; textarea.setAttribute("aria-invalid", String(nowInvalid));
+          saveState(); updateCompletion();
+        });
+        field.append(label, textarea, error);
+        correction.append(toggleLabel, field);
+        card.append(correction);
+        return card;
+      }
+
+      function updateFeatureResult(shown) {
+        const visible = Number.isInteger(shown) ? shown : document.querySelectorAll("#feature-groups .feature-card").length;
+        document.getElementById("feature-result").textContent = `전체 ${features.length}개 중 ${visible}개 표시 · 수정 표시 ${Object.values(state.correctionEnabled).filter(Boolean).length}개`;
+      }
+
+      function renderFeatures() {
+        const target = document.getElementById("feature-groups"); target.replaceChildren();
+        const query = state.featureQuery.trim().toLocaleLowerCase("ko");
+        let shown = 0;
+        areas.forEach((area, areaIndex) => {
+          if (state.featureArea !== "all" && area.id !== state.featureArea) return;
+          const matches = features.filter((feature) => feature.area_id === area.id).filter((feature) => {
+            if (state.featureStatus !== "all" && feature.policy.overall_status !== state.featureStatus) return false;
+            return !query || JSON.stringify(feature).toLocaleLowerCase("ko").includes(query);
+          });
+          if (!matches.length) return;
+          shown += matches.length;
+          const details = make("details", { className: "group" });
+          if (areaIndex === 0 || state.featureArea !== "all" || query || state.featureStatus !== "all") details.open = true;
+          details.append(make("summary", { text: `${area.title} · ${matches.length}개 — ${area.plain_scope}` }));
+          const list = make("div", { className: "card-list" });
+          matches.forEach((feature) => list.append(makeFeatureCard(feature)));
+          details.append(list); target.append(details);
+        });
+        if (!shown) target.append(make("p", { className: "empty", text: "조건에 맞는 기능이 없습니다." }));
+        updateFeatureResult(shown);
+      }
+
+      function renderQueues() {
+        const labels = new Map(report.responsibility.responsibility_types.map((item) => [item.id, item]));
+        const summary = document.getElementById("queue-summary");
+        const detailsTarget = document.getElementById("queue-details");
+        const order = ["owner_decision", "engineering_proposal", "measurement_gate", "expert_review", "generated_evidence", "already_confirmed"];
+        const classes = { owner_decision: "confirmed", engineering_proposal: "proposal", measurement_gate: "measure", expert_review: "expert", generated_evidence: "open", already_confirmed: "confirmed" };
+        order.forEach((key) => {
+          const info = labels.get(key); const items = report.queues[key] || [];
+          const card = make("article", { className: "metric" });
+          card.append(make("span", { text: info.label }), make("b", { className: "queue-count", text: String(items.length) }), make("small", { text: info.definition }));
+          summary.append(card);
+          const group = make("details", { className: "group" });
+          group.append(make("summary", { text: `${info.label} ${items.length}개` }));
+          const list = make("div", { className: "card-list" });
+          items.forEach((item) => {
+            const entry = make("article", { className: "card" });
+            const badges = make("div", { className: "badge-row" }); badges.append(badge(info.label, classes[key]));
+            entry.append(make("p", { className: "card-id", text: item.id }), make("h3", { text: item.title }), badges, make("p", { text: item.reason }), make("p", { className: "trace-meta", text: "원 감사 항목: " + item.source_ibq_ids.join(", ") }));
+            list.append(entry);
+          });
+          group.append(list); detailsTarget.append(group);
+        });
+      }
+
+      function makeQuestionCard(question, active) {
+        const answered = hasOwn(state.answers, question.id);
+        const hasError = active && question.required && !answered;
+        const card = make("article", { className: "card question-card" + (hasError ? " has-error" : "") + (!active ? " inactive" : ""), attrs: { tabindex: "-1" } });
+        card.id = "question-" + question.id;
+        const head = make("div", { className: "card-head" });
+        const box = make("div"); box.append(make("p", { className: "card-id", text: question.id + " · " + question.priority }), make("h3", { text: question.title }));
+        const badges = make("div", { className: "badge-row" });
+        badges.append(badge(active ? (answered ? "답변됨" : "미답변") : "조건상 해당 없음", active ? (answered ? "confirmed" : "error") : "open"));
+        head.append(box, badges); card.append(head, make("p", { className: "plain-summary", text: question.prompt }), make("p", { className: "help", text: question.explanation }));
+        const recommendation = make("div", { className: "mini-panel" });
+        recommendation.append(make("b", { text: "추천: " + question.recommendation.label }), make("p", { text: question.recommendation.reason })); card.append(recommendation);
+        if (!active) {
+          card.append(make("p", { className: "help", text: `앞 질문 ${question.activation.question_id}의 선택에 따라 현재는 답하지 않습니다.` }));
+          return card;
+        }
+        const errorId = "question-error-" + question.id;
+        if (question.answer_type === "single_choice" || question.answer_type === "multi_choice") {
+          const fieldset = make("fieldset", { className: "option-list", attrs: { "aria-describedby": errorId } });
+          fieldset.append(make("legend", { className: "sr-only", text: question.prompt }));
+          question.options.forEach((option) => {
+            const label = make("label", { className: "option" });
+            const input = make("input", { attrs: { type: question.answer_type === "single_choice" ? "radio" : "checkbox", name: "answer_" + question.id, value: option.id, "aria-describedby": errorId, "aria-invalid": String(hasError) } });
+            if (question.answer_type === "single_choice") input.checked = state.answers[question.id] === option.id;
+            else input.checked = Array.isArray(state.answers[question.id]) && state.answers[question.id].includes(option.id);
+            input.addEventListener("change", () => {
+              const interaction = captureQuestionInteraction(question.id, input);
+              if (question.answer_type === "single_choice") state.answers[question.id] = option.id;
+              else {
+                const values = new Set(Array.isArray(state.answers[question.id]) ? state.answers[question.id] : []);
+                input.checked ? values.add(option.id) : values.delete(option.id);
+                if (values.size) state.answers[question.id] = Array.from(values); else delete state.answers[question.id];
+              }
+              saveState(); renderQuestions(interaction);
+            });
+            const content = make("span");
+            content.append(make("strong", { text: option.label + (option.id === question.recommendation.option_id ? " · 추천" : "") }), make("span", { text: option.meaning }), make("small", { text: "영향: " + option.impact }));
+            label.append(input, content); fieldset.append(label);
+          });
+          card.append(fieldset);
+        }
+        const error = make("p", { id: errorId, className: "error-box", text: "이 질문의 답을 선택해주세요." }); error.hidden = !hasError; card.append(error);
+        const noteLabel = make("label", { className: "field-label", text: "수정 이유·예외 메모 (선택)", attrs: { for: "note-" + question.id } });
+        const note = make("textarea", { id: "note-" + question.id, attrs: { name: "note_" + question.id, placeholder: question.detail_prompt } }); note.value = state.notes[question.id] || "";
+        note.addEventListener("input", () => { if (note.value.trim()) state.notes[question.id] = note.value; else delete state.notes[question.id]; saveState(); });
+        card.append(noteLabel, note, make("p", { className: "trace-meta", text: `원 감사 항목 ${question.source_ibq_ids.join(", ")} · 반영 문서 ${question.affects.join(", ")} · 문서 묶음 ${question.document_bundles.join(", ")}` }));
+        return card;
+      }
+
+      function renderQuestions(interaction) {
+        const target = document.getElementById("question-groups"); target.replaceChildren();
+        const openGroupIds = new Set(interaction?.openGroupIds || []);
+        const query = state.questionQuery.trim().toLocaleLowerCase("ko"); let shown = 0;
+        questionnaire.groups.forEach((group, groupIndex) => {
+          if (state.questionGroup !== "all" && group.id !== state.questionGroup) return;
+          const matches = questions.filter((question) => question.group_id === group.id).filter((question) => {
+            const active = isActive(question); const answered = hasOwn(state.answers, question.id);
+            const status = !active ? "inactive" : answered ? "answered" : "unanswered";
+            if (state.questionStatus !== "all" && state.questionStatus !== status) return false;
+            return !query || JSON.stringify(question).toLocaleLowerCase("ko").includes(query);
+          });
+          if (!matches.length) return;
+          shown += matches.length;
+          const details = make("details", { className: "group" });
+          details.dataset.groupId = group.id;
+          if (openGroupIds.has(group.id) || groupIndex === 0 || state.questionGroup !== "all" || query || state.questionStatus !== "all") details.open = true;
+          const activeInGroup = matches.filter(isActive); const answeredInGroup = activeInGroup.filter((item) => hasOwn(state.answers, item.id));
+          details.append(make("summary", { text: `${group.title} · ${answeredInGroup.length}/${activeInGroup.length} 답변 — ${group.description}` }));
+          const list = make("div", { className: "card-list" }); matches.forEach((question) => list.append(makeQuestionCard(question, isActive(question))));
+          details.append(list); target.append(details);
+        });
+        if (!shown) target.append(make("p", { className: "empty", text: "조건에 맞는 질문이 없습니다." }));
+        const completion = updateCompletion();
+        document.getElementById("question-result").textContent = `전체 ${questions.length}개 중 ${shown}개 표시 · 활성 ${completion.active.length}개 · 답변 ${completion.answered}개 · 미답변 ${completion.unanswered.length}개`;
+        restoreQuestionInteraction(interaction);
+      }
+
+      function renderTrace() {
+        const target = document.getElementById("trace-list"); target.replaceChildren();
+        const query = state.traceQuery.trim().toLocaleLowerCase("ko");
+        const matches = report.artifact_trace.filter((item) => {
+          const linked = item.feature_ids.length || item.question_ids.length;
+          if (state.traceStatus === "linked" && !linked) return false;
+          if (state.traceStatus === "question" && !item.question_ids.length) return false;
+          if (state.traceStatus === "feature" && !item.feature_ids.length) return false;
+          return !query || JSON.stringify(item).toLocaleLowerCase("ko").includes(query);
+        });
+        matches.forEach((item) => {
+          const card = make("article", { className: "card trace-card" });
+          card.append(make("p", { className: "card-id", text: item.id + " · " + item.bundle_id }), make("h3", { text: item.title }));
+          const badges = make("div", { className: "badge-row" });
+          if (item.feature_ids.length) badges.append(badge(`기능 ${item.feature_ids.length}개`, "confirmed"));
+          if (item.question_ids.length) badges.append(badge(`남은 결정 ${item.question_ids.length}개`, "proposal"));
+          if (!item.feature_ids.length && !item.question_ids.length) badges.append(badge("자동생성·절차 근거 검토", "open"));
+          card.append(badges, make("p", { className: "trace-meta", text: `기능: ${item.feature_ids.join(", ") || "없음"} · 질문: ${item.question_ids.join(", ") || "없음"}` })); target.append(card);
+        });
+        if (!matches.length) target.append(make("p", { className: "empty", text: "조건에 맞는 문서가 없습니다." }));
+        document.getElementById("trace-result").textContent = `257개 산출물 유형 중 ${matches.length}개 표시`;
+      }
+
+      function validatedImport(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("JSON 최상위 형식이 올바르지 않습니다.");
+        if (value.schema_version !== "walksafe.owner-decision-review-answers.v1") throw new Error("다른 답변 형식입니다.");
+        if (value.storage_binding_hash !== report.binding.storage_binding_hash) throw new Error("현재 정책·질문 버전과 연결되지 않은 답변입니다.");
+        for (const field of ["answers", "notes", "feature_corrections", "correction_enabled"])
+          if (!value[field] || typeof value[field] !== "object" || Array.isArray(value[field])) throw new Error(`${field} 형식이 올바르지 않습니다.`);
+        const answers = {}; const notes = {}; const corrections = {}; const enabled = {};
+        for (const [id, answer] of Object.entries(value.answers)) {
+          const question = questionById.get(id); if (!question) throw new Error("알 수 없는 질문 ID: " + id);
+          const options = new Set(question.options.map((item) => item.id));
+          if (question.answer_type === "single_choice" && !options.has(answer)) throw new Error("알 수 없는 선택값: " + id);
+          answers[id] = answer;
+        }
+        for (const [id, note] of Object.entries(value.notes)) { if (!questionById.has(id) || typeof note !== "string") throw new Error("질문 메모 형식 오류: " + id); notes[id] = note; }
+        for (const [id, text] of Object.entries(value.feature_corrections)) { if (!featureById.has(id) || typeof text !== "string") throw new Error("기능 수정 형식 오류: " + id); corrections[id] = text; }
+        for (const [id, flag] of Object.entries(value.correction_enabled)) { if (!featureById.has(id) || typeof flag !== "boolean") throw new Error("기능 수정 표시 형식 오류: " + id); enabled[id] = flag; }
+        return { answers, notes, featureCorrections: corrections, correctionEnabled: enabled };
+      }
+      async function importAnswers(file) {
+        try {
+          if (file.size > maximumImportBytes) throw new Error("파일이 5MB 제한을 넘습니다.");
+          const imported = validatedImport(JSON.parse(await file.text()));
+          if (!window.confirm("현재 브라우저 입력을 가져온 파일의 내용으로 바꿀까요?")) { announce("불러오기를 취소했습니다."); return; }
+          state.answers = imported.answers; state.notes = imported.notes; state.featureCorrections = imported.featureCorrections; state.correctionEnabled = imported.correctionEnabled;
+          saveState(); renderFeatures(); renderQuestions(); announce("수정·답변을 불러왔습니다.");
+        } catch (error) { window.alert("불러올 수 없습니다: " + error.message); announce("답변 불러오기에 실패했습니다."); }
+      }
+      function exportAnswers() {
+        const completion = updateCompletion();
+        const payload = {
+          schema_version: "walksafe.owner-decision-review-answers.v1",
+          baseline_id: policy.baseline_id,
+          storage_binding_hash: report.binding.storage_binding_hash,
+          source_bindings: report.binding,
+          exported_at: new Date().toISOString(),
+          status: completion.complete ? "QUESTIONNAIRE_COMPLETE" : "DRAFT",
+          baseline_status: "NOT_APPROVED",
+          answers: state.answers,
+          notes: state.notes,
+          feature_corrections: state.featureCorrections,
+          correction_enabled: state.correctionEnabled,
+          unresolved_required: completion.unanswered.map((item) => item.id),
+          correction_errors: completion.correctionErrors.map((item) => item.id)
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+        const url = URL.createObjectURL(blob); const link = make("a", { attrs: { href: url, download: "walksafe-feature-policy-decisions-20260718-answers.json" } });
+        document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+        announce(completion.complete ? "완료 상태의 수정·답변 JSON을 만들었습니다." : "작성 중 상태의 수정·답변 JSON을 만들었습니다.");
+      }
+      function goToNextIssue() {
+        const issues = completionIssues();
+        let target = issues.correctionErrors.length ? document.getElementById("correction-" + issues.correctionErrors[0].id) : null;
+        if (!target && issues.unanswered.length) target = document.getElementById("question-" + issues.unanswered[0].id);
+        if (!target) { announce("현재 입력 오류가 없습니다."); document.getElementById("completion-banner").focus?.(); return; }
+        let details = target.closest("details"); while (details) { details.open = true; details = details.parentElement?.closest("details"); }
+        target.scrollIntoView({ block: "center", behavior: "smooth" }); target.focus?.(); announce("다음 미입력 항목으로 이동했습니다.");
+      }
+
+      function populateControls() {
+        const areaSelect = document.getElementById("feature-area"); areas.forEach((area) => areaSelect.append(make("option", { text: area.title, attrs: { value: area.id } })));
+        const groupSelect = document.getElementById("question-group"); questionnaire.groups.forEach((group) => groupSelect.append(make("option", { text: group.title, attrs: { value: group.id } })));
+        const controls = [
+          ["feature-search", "featureQuery", "input", renderFeatures], ["feature-area", "featureArea", "change", renderFeatures], ["feature-status", "featureStatus", "change", renderFeatures],
+          ["question-search", "questionQuery", "input", renderQuestions], ["question-group", "questionGroup", "change", renderQuestions], ["question-status", "questionStatus", "change", renderQuestions],
+          ["trace-search", "traceQuery", "input", renderTrace], ["trace-status", "traceStatus", "change", renderTrace]
+        ];
+        controls.forEach(([id, field, eventName, render]) => {
+          const element = document.getElementById(id); element.value = state[field];
+          element.addEventListener(eventName, (event) => { state[field] = event.target.value; saveState(); render(); });
+        });
+        document.getElementById("export-button").addEventListener("click", exportAnswers);
+        document.getElementById("import-input").addEventListener("change", (event) => { const file = event.target.files && event.target.files[0]; if (file) importAnswers(file); event.target.value = ""; });
+        document.getElementById("next-button").addEventListener("click", goToNextIssue);
+        document.getElementById("print-button").addEventListener("click", () => window.print());
+        const contrast = document.getElementById("contrast-button");
+        contrast.addEventListener("click", () => { state.contrast = !state.contrast; document.body.classList.toggle("high-contrast", state.contrast); contrast.setAttribute("aria-pressed", String(state.contrast)); contrast.textContent = state.contrast ? "고대비 끄기" : "고대비 켜기"; saveState(); });
+        document.getElementById("reset-button").addEventListener("click", () => {
+          if (!window.confirm("이 브라우저에 저장된 수정과 답변을 모두 지울까요?")) { announce("초기화를 취소했습니다."); return; }
+          state.answers = {}; state.notes = {}; state.featureCorrections = {}; state.correctionEnabled = {};
+          try { localStorage.removeItem(storageKey); } catch (error) { showStorageWarning("브라우저 저장값을 지우지 못했습니다."); }
+          renderFeatures(); renderQuestions(); announce("수정과 답변을 초기화했습니다.");
+        });
+      }
+
+      loadState();
+      document.body.classList.toggle("high-contrast", state.contrast);
+      document.getElementById("contrast-button").setAttribute("aria-pressed", String(state.contrast));
+      document.getElementById("contrast-button").textContent = state.contrast ? "고대비 끄기" : "고대비 켜기";
+      renderHeader(); populateControls(); renderFeatures(); renderQueues(); renderQuestions(); renderTrace(); updateCompletion();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,722 @@
+{
+  "schema_version": "walksafe.artifact-status-delta.v4",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W4-STATUS-DELTA-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "APPLIED_PARTIAL_WAVE_DELTA",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "a12922001ffa7054a792281f81105c1cdd913c9b0091dda6b9dcb4b5a7deb894"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+    "upstream_inputs": [
+      {
+        "role": "ENVIRONMENT_CURRENT_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+        "sha256": "f5a3dbe9b9d38e4ec49009d4ac123ab905ea857fd37f6c250d030f8bdcfae6fc",
+        "byte_count": 31014
+      },
+      {
+        "role": "ENVIRONMENT_CURRENT_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+        "sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+        "byte_count": 13932
+      },
+      {
+        "role": "EXTERNAL_ACTION_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+        "sha256": "fc8bde605b25eff7901a3953c174e01f80e27eb0ffe85feb7dcc69670341ba78",
+        "byte_count": 44950
+      },
+      {
+        "role": "EXTERNAL_ACTION_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+        "sha256": "a7bf63a1465737162fdb52b0a06e9175b7467d57f62aee14142b91648d01abc9",
+        "byte_count": 30868
+      },
+      {
+        "role": "INDEPENDENT_QA_REVIEW",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "sha256": "bef434a555913e4f280d7ef7fa253d85868a14fdf3dff7f7eccef8bdc087ae73",
+        "byte_count": 14637
+      },
+      {
+        "role": "SOURCE_FRESHNESS_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+        "sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4",
+        "byte_count": 11631
+      },
+      {
+        "role": "SOURCE_FRESHNESS_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+        "sha256": "7e6690bad75d3643c57c860aefc6bb928c962b28e3eaf0491c9cac2d968be0bf",
+        "byte_count": 3730
+      },
+      {
+        "role": "TEST_DATA_CURRENT_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+        "sha256": "e0e5b45267f9f98070b417b8e10bea43d43e7b27f20fe2378e5c63456d3bf965",
+        "byte_count": 104635
+      },
+      {
+        "role": "TEST_DATA_CURRENT_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.md",
+        "sha256": "716bc60a11fe1c285c8c06de7bb550ab103ccc664dc0d5517d53b5e6a7836909",
+        "byte_count": 9079
+      },
+      {
+        "role": "TEST_TRACE_CURRENT_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+        "byte_count": 123312
+      },
+      {
+        "role": "TESTING_CURRENT_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "sha256": "6aa20533a50fef0599c54c5bcae79eb2d3368a9355a2ee0c636eada84e80c6b4",
+        "byte_count": 87099
+      },
+      {
+        "role": "TESTING_CURRENT_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.md",
+        "sha256": "429c0bb8bf7176d44af5d22595c135b190bcb32314a18e33af013471004ad29c",
+        "byte_count": 26762
+      },
+      {
+        "role": "VALIDATION_PREDECESSOR_FAILED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+        "sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+        "byte_count": 1174
+      },
+      {
+        "role": "VALIDATION_PREDECESSOR_SUPERSEDED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+        "sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+        "byte_count": 3229
+      },
+      {
+        "role": "VALIDATION_CURRENT_AUTHORITY",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/execution-summary.json",
+        "sha256": "2a6c7e3e4fe6cc8fa06328b784a6b3c9b97fc38c1a65c8dd8cc9ccf8b1d772d4",
+        "byte_count": 11363
+      }
+    ],
+    "input_set_sha256": "7db1778d2e87e27aba6aa4e60f449e2c6d97321f8c8aa064536f91a56b011378",
+    "review_subject_set_sha256": "956a20d6a1b4b5dfc3efde9aaad88c26a7da4c545b93e10da7ecbb7d9e1ed0c2",
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC"
+  },
+  "scope": {
+    "wave_id": "W4",
+    "artifact_count": 13,
+    "exact_artifact_ids": [
+      "DLV-TST-01",
+      "DLV-TST-02",
+      "DLV-TST-03",
+      "DLV-TST-04",
+      "DLV-TST-05",
+      "DLV-TST-07",
+      "DLV-TST-09",
+      "DLV-TST-11",
+      "DLV-TST-14",
+      "DLV-TST-18",
+      "DLV-TST-19",
+      "DLV-TST-20",
+      "DLV-TST-21"
+    ]
+  },
+  "baseline_counts_before_w4": {
+    "OK": 107,
+    "INTERNAL_GAP": 73,
+    "EXTERNAL": 41,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "applied_delta": {
+    "OK": 2,
+    "INTERNAL_GAP": -2,
+    "EXTERNAL": 0,
+    "N_A_CANDIDATE": 0,
+    "TOTAL": 0
+  },
+  "counts_after_w4": {
+    "OK": 109,
+    "INTERNAL_GAP": 71,
+    "EXTERNAL": 41,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "transitions": [
+    {
+      "artifact_type_code": "DLV-TST-01",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "basis": "현행 전략과 전담 독립 QA 검토가 내부 artifact required action 범위에서 충족됨.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "ok_meaning": "DEDICATED_INTERNAL_INDEPENDENT_QA_PASS_NOT_FORMAL_QA_APPROVAL",
+      "formal_qa_approval_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-TST-02",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "승인 action 계약만 준비됐고 실제 release generation·formal 환경·권한 있는 승인이 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "W8"
+        ],
+        "reason": "승인 action 계약만 준비됐고 실제 release generation·formal 환경·권한 있는 승인이 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-03",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "환경·기기 matrix 계약만 준비됐고 formal instance와 승인된 지원기기 matrix가 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "W4_EXTERNAL"
+        ],
+        "reason": "환경·기기 matrix 계약만 준비됐고 formal instance와 승인된 지원기기 matrix가 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-04",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "basis": "controlled synthetic/pseudonymous data profile 9개와 formal279 assignment 317 edge가 정합하며 leakage·폐기 통제가 정의됨.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "ok_meaning": "CONTROLLED_DRAFT_DATA_PROFILE_AND_279_ASSIGNMENT_NOT_FORMAL_DATA_EXECUTION",
+      "formal_data_execution_claimed": false,
+      "data_profile_count": 9,
+      "assigned_formal_case_count": 279,
+      "assignment_edge_count": 317
+    },
+    {
+      "artifact_type_code": "DLV-TST-05",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "279×8 transitive projection이 비판별적이며 direct current-module edge가 아니고 explicit fixture link는 0임.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "W4_TRACE"
+        ],
+        "reason": "279×8 transitive projection이 비판별적이며 direct current-module edge가 아니고 explicit fixture link는 0임."
+      },
+      "mapping_quality": {
+        "transitive_projection": true,
+        "discriminative": false,
+        "direct_current_module_edge": false,
+        "explicit_fixture_link_count": 0
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-07",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "격리 통합시험의 formal evidence와 actual Android→Gateway→Backend→PostGIS cross-process 실행이 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "W4_INTERNAL",
+          "W8"
+        ],
+        "reason": "격리 통합시험의 formal evidence와 actual Android→Gateway→Backend→PostGIS cross-process 실행이 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-09",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "same-run supported-device full E2E 계약만 있고 actual device·live TMAP·full E2E 실행은 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "EXTERNAL_WAVE_E"
+        ],
+        "reason": "same-run supported-device full E2E 계약만 있고 actual device·live TMAP·full E2E 실행은 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-11",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "current release regression 실행과 failure triage evidence가 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "W8"
+        ],
+        "reason": "current release regression 실행과 failure triage evidence가 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-14",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "automated accessibility와 physical TalkBack AND 계약만 있고 두 branch 실행은 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "EXTERNAL_WAVE_E"
+        ],
+        "reason": "automated accessibility와 physical TalkBack AND 계약만 있고 두 branch 실행은 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-18",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "formal 실행 failure와 append-only defect instance가 아직 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "FORMAL_EXECUTION"
+        ],
+        "reason": "formal 실행 failure와 append-only defect instance가 아직 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-19",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "formal evidence 기반 coverage·quality metric이 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "PHASE5"
+        ],
+        "reason": "formal evidence 기반 coverage·quality metric이 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-20",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "동일 formal 기준선의 STR·defect·residual risk 승인 evidence가 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "PHASE5"
+        ],
+        "reason": "동일 formal 기준선의 STR·defect·residual risk 승인 evidence가 없음."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-21",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "실제 실행 뒤 권한 있는 risk acceptance·expiry·release impact 판정이 없음.",
+      "independent_review_status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+      "open_gap": {
+        "target": [
+          "PHASE5_AUTHORIZED_APPROVAL"
+        ],
+        "reason": "실제 실행 뒤 권한 있는 risk acceptance·expiry·release impact 판정이 없음."
+      }
+    }
+  ],
+  "classification_result": {
+    "OK": {
+      "count": 2,
+      "artifact_ids": [
+        "DLV-TST-01",
+        "DLV-TST-04"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 11,
+      "artifact_ids": [
+        "DLV-TST-02",
+        "DLV-TST-03",
+        "DLV-TST-05",
+        "DLV-TST-07",
+        "DLV-TST-09",
+        "DLV-TST-11",
+        "DLV-TST-14",
+        "DLV-TST-18",
+        "DLV-TST-19",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ]
+    }
+  },
+  "independent_review": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+    "sha256": "bef434a555913e4f280d7ef7fa253d85868a14fdf3dff7f7eccef8bdc087ae73",
+    "status": "GO_FOR_INTERNAL_ARTIFACT_DELTA",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "formal_qa_approval_claimed": false
+  },
+  "validation_lineage": {
+    "run001": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+      "sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+      "status": "FAIL_PRESERVED",
+      "authority": "APPEND_ONLY_PREDECESSOR_NOT_CURRENT"
+    },
+    "run002": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+      "sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+      "status": "SUPERSEDED_AS_FINAL_BY_RUN003",
+      "authority": "APPEND_ONLY_PREDECESSOR_NOT_CURRENT"
+    },
+    "run003": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/execution-summary.json",
+      "sha256": "2a6c7e3e4fe6cc8fa06328b784a6b3c9b97fc38c1a65c8dd8cc9ccf8b1d772d4",
+      "status": "ADOPTED_FINAL_INTERNAL_VALIDATION",
+      "result": "PASS",
+      "command_count": 5,
+      "passed_command_count": 5,
+      "subject_count": 7,
+      "subject_before_after_identical": true,
+      "formal_result_mutation_count": 0,
+      "authority": "CURRENT_VALIDATION_AUTHORITY"
+    }
+  },
+  "source_freshness_authority": {
+    "w3_historical_integrity": "NO_IMPACT",
+    "w3_historical_fixed": true,
+    "w4_current_authority": "W4_SOURCE_DRIFT_SUCCESSOR",
+    "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+    "sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4",
+    "code_source_sets": "NOT_RECHECKED",
+    "unchanged_code_source_claim_made": false
+  },
+  "authority_boundary": {
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "formal_qa_approval_claimed": false,
+    "formal_execution_claimed": false,
+    "release_completion_claimed": false,
+    "statement": "OK는 W4 내부 artifact required action 충족만 뜻하며 formal QA 승인·formal279 실행·기기·외부·release 완료가 아니다."
+  },
+  "accounting_invariants": {
+    "pre_total_exact_257": true,
+    "post_total_exact_257": true,
+    "ok_delta_exact_2": true,
+    "internal_gap_delta_exact_minus_2": true,
+    "external_unchanged": true,
+    "n_a_candidate_unchanged": true,
+    "out_of_scope_status_change_count": 0
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "formal_result_null_count": 279,
+    "formal_empty_evidence_ids_count": 279,
+    "actual_device_status": "NOT_RUN",
+    "physical_talkback_status": "NOT_RUN",
+    "live_tmap_status": "NOT_RUN",
+    "full_e2e_status": "NOT_RUN",
+    "performance_status": "NOT_RUN",
+    "security_validation_status": "PENDING",
+    "formal_qa_approval_status": "NOT_APPROVED_PENDING",
+    "release_gate_count": 5,
+    "release_gates_waived": false,
+    "release_gate_status": "NOT_RUN",
+    "signing_status": "NOT_ASSESSED",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "input_count": 15,
+    "input_set_sha256": "7db1778d2e87e27aba6aa4e60f449e2c6d97321f8c8aa064536f91a56b011378",
+    "review_subject_count": 14,
+    "review_subject_set_sha256": "956a20d6a1b4b5dfc3efde9aaad88c26a7da4c545b93e10da7ecbb7d9e1ed0c2",
+    "transition_count": 13,
+    "transition_unique_count": 13,
+    "changed_count": 2,
+    "retained_count": 11,
+    "common_fingerprint": "a12922001ffa7054a792281f81105c1cdd913c9b0091dda6b9dcb4b5a7deb894",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "a7a396bf3f60b47111a010786e68f49b6f4e44ab8addc407b0a76d120c0195e7"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "item_types": {
+          "byte_count": "integer",
+          "path": "string",
+          "sha256": "lowercase hexadecimal string length 64"
+        }
+      },
+      "preimage": [
+        {
+          "byte_count": 31014,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+          "sha256": "f5a3dbe9b9d38e4ec49009d4ac123ab905ea857fd37f6c250d030f8bdcfae6fc"
+        },
+        {
+          "byte_count": 13932,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+          "sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01"
+        },
+        {
+          "byte_count": 44950,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+          "sha256": "fc8bde605b25eff7901a3953c174e01f80e27eb0ffe85feb7dcc69670341ba78"
+        },
+        {
+          "byte_count": 30868,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+          "sha256": "a7bf63a1465737162fdb52b0a06e9175b7467d57f62aee14142b91648d01abc9"
+        },
+        {
+          "byte_count": 14637,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+          "sha256": "bef434a555913e4f280d7ef7fa253d85868a14fdf3dff7f7eccef8bdc087ae73"
+        },
+        {
+          "byte_count": 11631,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4"
+        },
+        {
+          "byte_count": 3730,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+          "sha256": "7e6690bad75d3643c57c860aefc6bb928c962b28e3eaf0491c9cac2d968be0bf"
+        },
+        {
+          "byte_count": 104635,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+          "sha256": "e0e5b45267f9f98070b417b8e10bea43d43e7b27f20fe2378e5c63456d3bf965"
+        },
+        {
+          "byte_count": 9079,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.md",
+          "sha256": "716bc60a11fe1c285c8c06de7bb550ab103ccc664dc0d5517d53b5e6a7836909"
+        },
+        {
+          "byte_count": 123312,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+          "sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893"
+        },
+        {
+          "byte_count": 87099,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+          "sha256": "6aa20533a50fef0599c54c5bcae79eb2d3368a9355a2ee0c636eada84e80c6b4"
+        },
+        {
+          "byte_count": 26762,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.md",
+          "sha256": "429c0bb8bf7176d44af5d22595c135b190bcb32314a18e33af013471004ad29c"
+        },
+        {
+          "byte_count": 1174,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901"
+        },
+        {
+          "byte_count": 3229,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+          "sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507"
+        },
+        {
+          "byte_count": 11363,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/execution-summary.json",
+          "sha256": "2a6c7e3e4fe6cc8fa06328b784a6b3c9b97fc38c1a65c8dd8cc9ccf8b1d772d4"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order; all current paths are ASCII",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "7db1778d2e87e27aba6aa4e60f449e2c6d97321f8c8aa064536f91a56b011378"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact W4 central state and authority object reproduced in preimage",
+      "basis_fields": [
+        "schema",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "review_subject_set_sha256",
+        "validation_authority",
+        "freshness",
+        "boundary"
+      ],
+      "preimage": {
+        "schema": "walksafe.w4-central-common.v1",
+        "exact": [
+          "DLV-TST-01",
+          "DLV-TST-02",
+          "DLV-TST-03",
+          "DLV-TST-04",
+          "DLV-TST-05",
+          "DLV-TST-07",
+          "DLV-TST-09",
+          "DLV-TST-11",
+          "DLV-TST-14",
+          "DLV-TST-18",
+          "DLV-TST-19",
+          "DLV-TST-20",
+          "DLV-TST-21"
+        ],
+        "OK": [
+          "DLV-TST-01",
+          "DLV-TST-04"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-TST-02",
+          "DLV-TST-03",
+          "DLV-TST-05",
+          "DLV-TST-07",
+          "DLV-TST-09",
+          "DLV-TST-11",
+          "DLV-TST-14",
+          "DLV-TST-18",
+          "DLV-TST-19",
+          "DLV-TST-20",
+          "DLV-TST-21"
+        ],
+        "pre": {
+          "OK": 107,
+          "INTERNAL_GAP": 73,
+          "EXTERNAL": 41,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 109,
+          "INTERNAL_GAP": 71,
+          "EXTERNAL": 41,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "7db1778d2e87e27aba6aa4e60f449e2c6d97321f8c8aa064536f91a56b011378",
+        "review_subject_set_sha256": "956a20d6a1b4b5dfc3efde9aaad88c26a7da4c545b93e10da7ecbb7d9e1ed0c2",
+        "validation_authority": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/execution-summary.json",
+          "sha256": "2a6c7e3e4fe6cc8fa06328b784a6b3c9b97fc38c1a65c8dd8cc9ccf8b1d772d4",
+          "status": "ADOPTED_FINAL_INTERNAL_VALIDATION",
+          "result": "PASS",
+          "command_count": 5,
+          "passed_command_count": 5,
+          "subject_count": 7,
+          "subject_before_after_identical": true,
+          "formal_result_mutation_count": 0,
+          "authority": "CURRENT_VALIDATION_AUTHORITY"
+        },
+        "freshness": {
+          "w3_historical_integrity": "NO_IMPACT",
+          "w3_historical_fixed": true,
+          "w4_current_authority": "W4_SOURCE_DRIFT_SUCCESSOR",
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4",
+          "code_source_sets": "NOT_RECHECKED",
+          "unchanged_code_source_claim_made": false
+        },
+        "boundary": {
+          "formal_test_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "formal_result_null_count": 279,
+          "formal_empty_evidence_ids_count": 279,
+          "actual_device_status": "NOT_RUN",
+          "physical_talkback_status": "NOT_RUN",
+          "live_tmap_status": "NOT_RUN",
+          "full_e2e_status": "NOT_RUN",
+          "performance_status": "NOT_RUN",
+          "security_validation_status": "PENDING",
+          "formal_qa_approval_status": "NOT_APPROVED_PENDING",
+          "release_gate_count": 5,
+          "release_gates_waived": false,
+          "release_gate_status": "NOT_RUN",
+          "signing_status": "NOT_ASSESSED",
+          "release_status": "NOT_ELIGIBLE"
+        }
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "exact_array": "preserve W4 exact13 order",
+        "OK_array": "preserve independent-review OK order",
+        "INTERNAL_GAP_array": "preserve W4 exact13 relative order",
+        "nested_arrays": "preserve source value order"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "artifact-status-delta raw SHA",
+        "validation-summary raw SHA",
+        "implementation-receipt raw SHA",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "a12922001ffa7054a792281f81105c1cdd913c9b0091dda6b9dcb4b5a7deb894"
+    }
+  }
+}

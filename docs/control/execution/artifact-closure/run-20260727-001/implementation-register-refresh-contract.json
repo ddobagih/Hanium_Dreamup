@@ -1,0 +1,211 @@
+{
+  "schema_version": "walksafe.implementation-register-refresh-contract.v1",
+  "metadata": {
+    "contract_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-CONTRACT-20260727-001",
+    "prepared_on": "2026-07-27",
+    "status": "READY_FOR_SINGLE_EXECUTION",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "objective": "Generate successor revisions of the implementation, module and quality-evidence registers from one exact source identity without modifying historical canonical/generated files.",
+  "immutability_boundary": {
+    "modify_existing_generated_files": false,
+    "modify_historical_registers": false,
+    "modify_historical_gap_analysis": false,
+    "output_mode": "CREATE_NEW_FILES_ONLY",
+    "promotion_mode": "SEPARATE_EXPLICIT_REVIEW_AND_APPROVAL"
+  },
+  "execution_identity": {
+    "refresh_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-20260727-001",
+    "single_writer_required": true,
+    "maximum_successful_execution_count": 1,
+    "rerun_after_success_allowed": false,
+    "rerun_with_same_refresh_id_allowed": false,
+    "failed_attempt_policy": "Do not overwrite partial outputs; allocate a new refresh ID and new output paths after recording the failed attempt."
+  },
+  "exact_inputs": [
+    {
+      "input_id": "POLICY_BASELINE",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "required_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "required_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1"
+    },
+    {
+      "input_id": "EXACT_SOURCE_SNAPSHOT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "required_source_commit": null,
+      "required_worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT",
+      "required_file_count": 2960,
+      "required_path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+      "required_content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade"
+    },
+    {
+      "input_id": "CURRENT_IMPLEMENTATION_BASELINE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+      "required_document_id": "WALKSAFE-CURRENT-IMPLEMENTATION-BASELINE-20260727-001",
+      "sha256_capture": "REQUIRED_BEFORE_EXECUTION"
+    },
+    {
+      "input_id": "W3_ENGINEERING_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "sha256_capture": "REQUIRED_BEFORE_EXECUTION",
+      "allowed_evidence_scope": "INTERNAL_EXACT_SOURCE_OR_EXACT_SUBJECT_ONLY"
+    },
+    {
+      "input_id": "W3_CURRENT_SOURCE_BINDING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/current-source-binding.json",
+      "sha256_capture": "REQUIRED_BEFORE_EXECUTION"
+    },
+    {
+      "input_id": "HISTORICAL_IMPLEMENTATION_MANIFEST",
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "use": "HISTORICAL_STRUCTURE_AND_TRACE_REFERENCE_ONLY",
+      "required_disposition": "HISTORICAL_STALE"
+    },
+    {
+      "input_id": "HISTORICAL_MODULE_REGISTER",
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "use": "HISTORICAL_STRUCTURE_AND_TRACE_REFERENCE_ONLY",
+      "required_disposition": "HISTORICAL_STALE"
+    },
+    {
+      "input_id": "HISTORICAL_QUALITY_EVIDENCE_REGISTER",
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "use": "HISTORICAL_STRUCTURE_AND_TRACE_REFERENCE_ONLY",
+      "required_disposition": "HISTORICAL_STALE"
+    },
+    {
+      "input_id": "HISTORICAL_GAP_ANALYSIS",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json",
+      "use": "HISTORICAL_FINDING_ID_REFERENCE_ONLY",
+      "required_disposition": "HISTORICAL_STALE"
+    }
+  ],
+  "exact_outputs": [
+    {
+      "output_id": "IMPLEMENTATION_MANIFEST_SUCCESSOR",
+      "path": "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+      "required_new_file": true,
+      "must_not_exist_before_execution": true
+    },
+    {
+      "output_id": "MODULE_REGISTER_SUCCESSOR",
+      "path": "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+      "required_new_file": true,
+      "must_not_exist_before_execution": true
+    },
+    {
+      "output_id": "QUALITY_EVIDENCE_REGISTER_SUCCESSOR",
+      "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+      "required_new_file": true,
+      "must_not_exist_before_execution": true
+    },
+    {
+      "output_id": "REFRESH_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+      "required_new_file": true,
+      "must_not_exist_before_execution": true
+    }
+  ],
+  "required_content": {
+    "implementation_manifest": [
+      "Bind policy PB-WALKSAFE-FEATURE-POLICY-1.0.1.",
+      "Bind the exact 2026-07-26 source snapshot identity.",
+      "Do not claim a clean commit.",
+      "Classify Web/PWA as LEGACY_REFERENCE_ONLY.",
+      "Keep release status NOT_ELIGIBLE."
+    ],
+    "module_register": [
+      "Inventory MOD-ANDROID-USER.",
+      "Inventory MOD-ANDROID-ADMIN as source present but operationally incomplete.",
+      "Inventory MOD-ANDROID-GATEWAY as an independent NOT_DEPLOYED service candidate.",
+      "Inventory backend, model, voice and legacy Web boundaries.",
+      "Record model deployment_eligible=false and release_eligible=false."
+    ],
+    "quality_evidence_register": [
+      "Separate PASS_REUSED_EXACT_SOURCE from PASS_CURRENT_SOURCE.",
+      "Record exact-subject backend and disposable PostGIS evidence without production expansion.",
+      "Record formal planned count 279, formal status NOT_RUN and formal PASS count 0.",
+      "Keep actual-device interactive, cross-process, reproducible rebuild, attestation and signing status uncompleted.",
+      "Do not convert candidate test source presence into PASS."
+    ],
+    "refresh_receipt": [
+      "Record all input SHA-256 values captured before generation.",
+      "Record every output SHA-256 and byte count.",
+      "Record validation check IDs and results.",
+      "Record execution start and completion timestamps.",
+      "Record the single refresh ID and confirm that no historical file was modified."
+    ]
+  },
+  "required_checks": [
+    {
+      "check_id": "CHK-INPUT-IDENTITY",
+      "assertion": "All exact input identities and required hashes match before generation."
+    },
+    {
+      "check_id": "CHK-NO-OVERWRITE",
+      "assertion": "No exact output path exists before execution and no historical input path is opened for writing."
+    },
+    {
+      "check_id": "CHK-DETERMINISTIC-JSON",
+      "assertion": "Each JSON output parses, uses UTF-8 with LF, has stable key ordering and is byte-identical across two in-memory generations from the same captured inputs."
+    },
+    {
+      "check_id": "CHK-POLICY-BINDING",
+      "assertion": "All successor registers bind only PB-WALKSAFE-FEATURE-POLICY-1.0.1."
+    },
+    {
+      "check_id": "CHK-SOURCE-BINDING",
+      "assertion": "All successor registers carry the required path-set and content-set hashes and source_commit=null."
+    },
+    {
+      "check_id": "CHK-MODULE-BOUNDARY",
+      "assertion": "The module register has distinct user Android, administrator Android and Android gateway units; Web is legacy-only."
+    },
+    {
+      "check_id": "CHK-MODEL-BOUNDARY",
+      "assertion": "No successor marks the candidate model deployment-eligible or release-eligible."
+    },
+    {
+      "check_id": "CHK-EVIDENCE-SEPARATION",
+      "assertion": "Reused exact-source PASS, current exact-subject PASS, candidate source presence and formal results are represented as four non-interchangeable categories."
+    },
+    {
+      "check_id": "CHK-FORMAL-ARITHMETIC",
+      "assertion": "planned_formal_test_count=279, formal_pass_count=0 and formal_not_run_count=279."
+    },
+    {
+      "check_id": "CHK-RELEASE-BOUNDARY",
+      "assertion": "Every successor register and receipt keeps release_status=NOT_ELIGIBLE and makes no approval claim."
+    },
+    {
+      "check_id": "CHK-HISTORICAL-STALE",
+      "assertion": "All three 2026-07-21 registers and the 2026-07-22 gap analysis are explicitly marked HISTORICAL_STALE references."
+    },
+    {
+      "check_id": "CHK-OUTPUT-INTEGRITY",
+      "assertion": "The receipt records byte count and SHA-256 for all three successor registers and itself excludes any self-referential receipt hash."
+    }
+  ],
+  "duplicate_execution_prevention": {
+    "preflight": [
+      "Reject if any exact output path exists.",
+      "Reject if a receipt with the refresh ID exists anywhere under the run directory.",
+      "Reject if an active execution marker for the refresh ID exists."
+    ],
+    "active_marker_path": "docs/control/execution/artifact-closure/run-20260727-001/.implementation-register-refresh-20260727-001.active",
+    "marker_creation": "CREATE_EXCLUSIVE",
+    "marker_removal": "REMOVE_ONLY_AFTER_ATOMIC_RECEIPT_CREATION_OR_RECORDED_FAILURE",
+    "output_write_mode": "TEMPORARY_FILE_THEN_ATOMIC_RENAME_WITH_NO_REPLACE",
+    "successful_receipt_is_terminal": true
+  },
+  "prohibited_expansions": [
+    "Do not treat internal or reused PASS as formal 279 PASS.",
+    "Do not treat source presence as implementation completion.",
+    "Do not treat the administrator security boundary as complete operational administration.",
+    "Do not treat a model loaded by development runtime as deployment approval.",
+    "Do not treat disposable PostGIS evidence as production migration or recovery evidence.",
+    "Do not treat license metadata inventory as legal approval.",
+    "Do not claim clean commit, reproducible build, attestation, signing, deployment or release."
+  ]
+}

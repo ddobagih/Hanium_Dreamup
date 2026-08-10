@@ -1,0 +1,957 @@
+{
+  "schema_version": "walksafe.phase1-ready-ai-authoring-evidence.v1",
+  "packet_id": "WS-PHASE1-READY-AI-AUTHORING-20260727-001",
+  "run_id": "run-20260727-001",
+  "captured_at": "2026-07-27T21:55:05+09:00",
+  "scope": {
+    "wave": "PHASE1_W2_READY_AI_10_AUTHORING",
+    "artifact_count": 10,
+    "canonical_write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_BOUNDARIES",
+    "validation_scope": "JSON_PARSE_COUNT_SET_HASH_CONSISTENCY_ONLY"
+  },
+  "policy_state": {
+    "current_effective_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "fp035_overlay_status": "APPROVED_EFFECTIVE_COMMITTED",
+    "effective_source_packet": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+      "bytes": 13658,
+      "sha256": "f96033881989c07b90cddbbe3756bbe0c61c6cf4fade4728aad322037d5d0699"
+    },
+    "policy_1_0_0_current_effective": false
+  },
+  "exact10": [
+    "DLV-AIML-06",
+    "DLV-AIML-07",
+    "DLV-AIML-08",
+    "DLV-AIML-11",
+    "DLV-AIML-12",
+    "DLV-AIML-13",
+    "DLV-AIML-15",
+    "DLV-AIML-16",
+    "DLV-AIML-17",
+    "DLV-AIML-23"
+  ],
+  "disposition_summary": {
+    "counts": {
+      "AUTHORED": 7,
+      "RUN_REQUIRED": 2,
+      "SCOPE_DEPENDENT": 1
+    },
+    "authored_means": "DRAFT_OR_STATIC_CONTRACT_PRESENT_NOT_COMPLETE_NOT_APPROVED_NOT_RELEASE_ELIGIBLE"
+  },
+  "artifact_records": [
+    {
+      "artifact_id": "DLV-AIML-06",
+      "canonical_alias": "AIML-06",
+      "title": "데이터 정제·제외 기준",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "DRAFT_CONTROL_CONTRACT_ONLY_NOT_APPROVED_OR_EXECUTED",
+      "authoring_evidence": [
+        "keep/fix/hold/drop decision taxonomy",
+        "sample_id + reason-code trace",
+        "source overwrite prohibited"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-03",
+          "AIML-05"
+        ],
+        "successor_artifacts": [
+          "AIML-07",
+          "AIML-09"
+        ],
+        "requirements": [],
+        "policies": [],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "NUMERIC_CLEANING_LIMITS_UNFROZEN",
+        "AIML-05_NOT_RUN",
+        "PRODUCT_OWNER_APPROVAL_NOT_OBTAINED"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-07",
+      "canonical_alias": "AIML-07",
+      "title": "13-class 라벨링 지침",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "DRAFT_GUIDELINE_ONLY_APPROVED_EXAMPLE_SET_MISSING",
+      "authoring_evidence": [
+        "candidate class inclusion/exclusion boundary",
+        "bbox and occlusion/truncation rules",
+        "ambiguous case hold rule"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-04",
+          "AIML-06"
+        ],
+        "successor_artifacts": [
+          "AIML-08"
+        ],
+        "requirements": [],
+        "policies": [
+          "FP-038"
+        ],
+        "decisions": [
+          "DEC-IBQ-122"
+        ],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "APPROVED_POSITIVE_NEGATIVE_EXAMPLE_SET_MISSING",
+        "PREDECESSOR_APPROVALS_OPEN",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-08",
+      "canonical_alias": "AIML-08",
+      "title": "라벨 품질 검사 결과",
+      "disposition": "RUN_REQUIRED",
+      "disposition_boundary": "EXECUTION_CONTRACT_AUTHORED_RESULT_NOT_RUN",
+      "authoring_evidence": [
+        "gold-set review contract",
+        "double-review and error-analysis contract"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-07"
+        ],
+        "successor_artifacts": [],
+        "requirements": [],
+        "policies": [],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "GOLD_SET_NOT_MATERIALIZED",
+        "SAMPLE_AND_SEED_UNFROZEN",
+        "ACCEPTANCE_THRESHOLD_UNFROZEN",
+        "DOUBLE_REVIEW_NOT_RUN",
+        "QUALITY_APPROVAL_NOT_OBTAINED"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-11",
+      "canonical_alias": "AIML-11",
+      "title": "학습 코드·설정·seed 계약",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "CANDIDATE_STATIC_CONTRACT_ONLY_TRAINING_NOT_RUN",
+      "authoring_evidence": [
+        "candidate training controls identified",
+        "required formal dataset/config/code/seed provenance fields defined"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-04",
+          "AIML-09",
+          "DES-07"
+        ],
+        "successor_artifacts": [
+          "AIML-12"
+        ],
+        "requirements": [],
+        "policies": [],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "TRAINING_SCOPE_ACTIVATION_NOT_APPROVED",
+        "DATASET_MANIFEST_SHA_UNBOUND",
+        "SPLIT_SHA_UNBOUND",
+        "FORMAL_CONFIG_SHA_UNBOUND",
+        "FORMAL_TRAINING_NOT_RUN"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-12",
+      "canonical_alias": "AIML-12",
+      "title": "실험 추적 등록부·append-only 계약",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "EMPTY_APPEND_ONLY_REGISTER_CONTRACT_FORMAL_EXPERIMENT_COUNT_ZERO",
+      "authoring_evidence": [
+        "formal experiment required-field schema",
+        "append-only execution record contract",
+        "candidate controls marked formal_evidence=false"
+      ],
+      "source_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+        "docs/deliverables/08-ai-ml-data/model-development.md"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-11"
+        ],
+        "successor_artifacts": [
+          "AIML-13",
+          "AIML-14"
+        ],
+        "requirements": [],
+        "policies": [],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "FORMAL_EXPERIMENT_ROWS_ZERO",
+        "DATASET_SPLIT_CONFIG_CODE_HASHES_UNBOUND",
+        "FORMAL_EXECUTION_NOT_RUN"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-13",
+      "canonical_alias": "AIML-13",
+      "title": "기준모델·비교실험 결과",
+      "disposition": "RUN_REQUIRED",
+      "disposition_boundary": "COMPARISON_PLAN_ONLY_NO_FORMAL_BASELINE_OR_WINNER",
+      "authoring_evidence": [
+        "comparison decision contract exists",
+        "candidate model/config inventory exists"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-12"
+        ],
+        "successor_artifacts": [
+          "AIML-14",
+          "AIML-15"
+        ],
+        "requirements": [],
+        "policies": [],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "FORMAL_BASELINE_RUN_MISSING",
+        "COMPARISON_RUN_COUNT_ZERO",
+        "WINNER_AND_IMPROVEMENT_UNDETERMINED"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-15",
+      "canonical_alias": "AIML-15",
+      "title": "후보 모델 카드",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "DRAFT_CANDIDATE_DISCLOSURE_ONLY_NOT_APPROVED_OR_DEPLOYMENT_ELIGIBLE",
+      "authoring_evidence": [
+        "purpose and prohibited-use boundary",
+        "candidate metrics disclosed as non-formal",
+        "PT/TFLite inventory and provenance boundary"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-02",
+          "AIML-13",
+          "AIML-14",
+          "AIML-16",
+          "AIML-18",
+          "AIML-20",
+          "AIML-23"
+        ],
+        "successor_artifacts": [
+          "AIML-25",
+          "WS-10"
+        ],
+        "requirements": [],
+        "policies": [
+          "FP-001",
+          "FP-021",
+          "FP-037",
+          "FP-039",
+          "FP-049"
+        ],
+        "decisions": [],
+        "gap_refs": [
+          "GAP-028",
+          "GAP-029",
+          "GAP-040",
+          "GAP-048"
+        ],
+        "gap_attribution": "PACKET_SET_LEVEL_NOT_DIRECT_ARTIFACT_MAPPING"
+      },
+      "remaining_gates": [
+        "FALLBACK_PROVENANCE_UNKNOWN",
+        "FORMAL_EVALUATION_NOT_RUN",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "PRODUCT_OWNER_APPROVAL_NOT_OBTAINED"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-16",
+      "canonical_alias": "AIML-16",
+      "title": "모델 파일·버전·해시 정적 등록",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "STATIC_INTEGRITY_BINDING_ONLY_NOT_PARITY_DEVICE_OR_RELEASE_EVIDENCE",
+      "authoring_evidence": [
+        "runtime config and class-map hash binding",
+        "unified PT/TFLite and fallback TFLite path/bytes/SHA inventory"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-14"
+        ],
+        "successor_artifacts": [
+          "AIML-15",
+          "AIML-17",
+          "AIML-18",
+          "AIML-21",
+          "AIML-24",
+          "REL-03",
+          "REL-06",
+          "WS-10"
+        ],
+        "requirements": [],
+        "policies": [
+          "FP-037",
+          "FP-039",
+          "FP-051"
+        ],
+        "decisions": [],
+        "gap_refs": [
+          "GAP-028",
+          "GAP-029",
+          "GAP-040",
+          "GAP-048"
+        ],
+        "gap_attribution": "PACKET_SET_LEVEL_NOT_DIRECT_ARTIFACT_MAPPING"
+      },
+      "remaining_gates": [
+        "PT_TFLITE_PARITY_NOT_RUN",
+        "ACTUAL_DEVICE_VALIDATION_NOT_RUN",
+        "FALLBACK_PROVENANCE_UNKNOWN",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-17",
+      "canonical_alias": "AIML-17",
+      "title": "모델 평가 프로토콜",
+      "disposition": "AUTHORED",
+      "disposition_boundary": "DRAFT_PROTOCOL_ONLY_FORMAL_EVALUATION_NOT_RUN",
+      "authoring_evidence": [
+        "metric and 13-class protocol",
+        "pre-freeze sequence",
+        "PT/TFLite and actual-device measurement procedure"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-02",
+          "AIML-09",
+          "AIML-16",
+          "REQ-06"
+        ],
+        "successor_artifacts": [
+          "AIML-18",
+          "AIML-20",
+          "AIML-21"
+        ],
+        "requirements": [
+          "REQ-06"
+        ],
+        "policies": [
+          "FP-009",
+          "FP-019",
+          "FP-020",
+          "FP-021",
+          "FP-024",
+          "FP-025",
+          "FP-038",
+          "FP-049",
+          "FP-050"
+        ],
+        "decisions": [],
+        "gap_refs": [
+          "GAP-028",
+          "GAP-029",
+          "GAP-040",
+          "GAP-048"
+        ],
+        "gap_attribution": "PACKET_SET_LEVEL_NOT_DIRECT_ARTIFACT_MAPPING"
+      },
+      "remaining_gates": [
+        "DATASET_AND_SPLIT_HASHES_UNBOUND",
+        "NUMERIC_ACCEPTANCE_AND_TFLITE_TOLERANCE_UNFROZEN",
+        "FORMAL_EVALUATION_NOT_RUN",
+        "INDEPENDENT_REVIEW_NOT_RUN",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-23",
+      "canonical_alias": "AIML-23",
+      "title": "추론 임계값 선정 근거",
+      "disposition": "SCOPE_DEPENDENT",
+      "disposition_boundary": "AIML_18_20_SCOPE_NOT_APPROVED_THEN_THRESHOLD_SWEEP_RUN_REQUIRED",
+      "authoring_evidence": [
+        "runtime candidate thresholds are statically present",
+        "selection criteria require confidence/IoU grid and class/distance FP/FN safety cost"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "output_paths": [
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "linked_refs": {
+        "predecessor_artifacts": [
+          "AIML-18",
+          "AIML-19",
+          "AIML-20"
+        ],
+        "successor_artifacts": [
+          "AIML-15",
+          "AIML-24",
+          "AIML-25"
+        ],
+        "requirements": [],
+        "policies": [
+          "FP-020",
+          "FP-021",
+          "FP-024",
+          "FP-031"
+        ],
+        "decisions": [],
+        "gap_refs": []
+      },
+      "remaining_gates": [
+        "AIML-18_SCOPE_APPROVAL_NOT_ESTABLISHED",
+        "AIML-20_SCOPE_APPROVAL_NOT_ESTABLISHED",
+        "INDEPENDENT_PRECISION_RECALL_CURVE_MISSING",
+        "THRESHOLD_SWEEP_NOT_RUN",
+        "NUMERIC_PASS_THRESHOLD_UNFROZEN",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+      ],
+      "post_scope_disposition": "RUN_REQUIRED",
+      "completion_claimed": false
+    }
+  ],
+  "source_bindings": [
+    {
+      "role": "CURRENT_AI_DATA_WORKFLOW_EVIDENCE",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+      "bytes": 9351,
+      "sha256": "73fe94a384b104c56f3d0b836683205e052ad2661556d3a5c0d49bbd6fcfa912",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "CURRENT_AI_MODEL_RUNTIME_EVIDENCE",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+      "bytes": 13658,
+      "sha256": "f96033881989c07b90cddbbe3756bbe0c61c6cf4fade4728aad322037d5d0699",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "CURRENT_DATA_AUTHORING_CANONICAL",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "CURRENT_MODEL_DEVELOPMENT_CANONICAL",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "bytes": 26320,
+      "sha256": "c944ffc2a179ff619f38cdd6f470e66d9411505a59a804ba7b1b5d51d4c18f5a",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "CURRENT_MODEL_EVALUATION_CANONICAL",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "bytes": 29227,
+      "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "CURRENT_DATASET_REGISTER",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "bytes": 36912,
+      "sha256": "c43ad6e6e14437d650560e9828838a860244384c5cf8cdf33bcdebae6c03a799",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "CURRENT_EXPERIMENT_REGISTER",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+      "bytes": 2936,
+      "sha256": "733299a99043b75425a57cc8e2d11039068283c3c54753f7f1707f50edd13d08",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "CURRENT_MODEL_REGISTER",
+      "capture_role": "AUTHORING_CURRENT_SOURCE",
+      "captured_at": "2026-07-27T21:55:05+09:00",
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "bytes": 22070,
+      "sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+      "parse_status": "PASS"
+    }
+  ],
+  "output_bindings": [
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+      "artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-08"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "bytes": 26320,
+      "sha256": "c944ffc2a179ff619f38cdd6f470e66d9411505a59a804ba7b1b5d51d4c18f5a",
+      "artifact_ids": [
+        "DLV-AIML-11",
+        "DLV-AIML-13",
+        "DLV-AIML-15",
+        "DLV-AIML-16"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "bytes": 29227,
+      "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd",
+      "artifact_ids": [
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "bytes": 36912,
+      "sha256": "c43ad6e6e14437d650560e9828838a860244384c5cf8cdf33bcdebae6c03a799",
+      "artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-08"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+      "bytes": 2936,
+      "sha256": "733299a99043b75425a57cc8e2d11039068283c3c54753f7f1707f50edd13d08",
+      "artifact_ids": [
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "bytes": 22070,
+      "sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ],
+      "write_disposition": "NO_OP_CURRENT_CONTENT_SUFFICIENT_FOR_DECLARED_AUTHORING_BOUNDARY"
+    }
+  ],
+  "authoring_contracts": {
+    "data_refinement": {
+      "decision_values": [
+        "keep",
+        "fix",
+        "hold",
+        "drop"
+      ],
+      "trace_key": "sample_id + reason_code",
+      "source_overwrite_allowed": false,
+      "numeric_quality_limits_status": "UNFROZEN"
+    },
+    "labeling": {
+      "schema": "13_CLASS_CANDIDATE",
+      "ambiguous_case_action": "hold",
+      "approved_positive_negative_example_set_status": "MISSING",
+      "label_quality_inspection_status": "NOT_RUN"
+    },
+    "metrics": {
+      "candidate_history_only": {
+        "precision": 0.62087,
+        "recall": 0.56716,
+        "map50": 0.55403,
+        "map50_95": 0.41651
+      },
+      "formal_evaluation_status": "NOT_RUN",
+      "acceptance_threshold_status": "UNFROZEN",
+      "pt_tflite_parity_status": "NOT_RUN",
+      "actual_device_status": "NOT_RUN"
+    },
+    "provenance": {
+      "dataset_source_completeness": "UNKNOWN",
+      "rights_review": "NOT_VERIFIED_0_OF_5",
+      "privacy_review": "NOT_VERIFIED_0_OF_5",
+      "materialized_dataset_manifest_sha256": null,
+      "split_manifest_sha256": null,
+      "formal_training_config_sha256": null,
+      "unified_model": "CANDIDATE_SOURCE_ARTIFACT_BOUND_NOT_APPROVED",
+      "custom_and_coco_fallbacks": "UNKNOWN_PROVENANCE"
+    },
+    "append_only": {
+      "formal_record_required_fields": [
+        "source_commit",
+        "dataset_manifest_sha256",
+        "split_sha256",
+        "config_sha256",
+        "code_sha256",
+        "seed",
+        "environment",
+        "executed_at",
+        "metrics",
+        "artifact_ids",
+        "conclusion_or_failure_reason"
+      ],
+      "execution_evidence_overwrite_allowed": false,
+      "approved_semantic_or_threshold_change_requires": [
+        "change_request",
+        "impact_analysis",
+        "new_version"
+      ],
+      "predecessor_disposition": [
+        "Superseded",
+        "Archived"
+      ],
+      "formal_experiment_count": 0
+    }
+  },
+  "hash_bindings": {
+    "dataset": {
+      "registry_file": {
+        "role": "CURRENT_DATASET_REGISTER",
+        "capture_role": "AUTHORING_CURRENT_SOURCE",
+        "captured_at": "2026-07-27T21:55:05+09:00",
+        "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "bytes": 36912,
+        "sha256": "c43ad6e6e14437d650560e9828838a860244384c5cf8cdf33bcdebae6c03a799",
+        "parse_status": "PASS"
+      },
+      "materialized_dataset_manifest_sha256": null,
+      "split_manifest_sha256": null,
+      "content_hash_status": "NOT_VERIFIED_NOT_MATERIALIZED"
+    },
+    "model_and_runtime": {
+      "runtime_config": {
+        "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "bytes": 5508,
+        "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+      },
+      "class_map": {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+        "bytes": 3567,
+        "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f"
+      },
+      "unified_pt": {
+        "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "bytes": 5411845,
+        "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+        "provenance": "CANDIDATE_SOURCE_ARTIFACT_BOUND_NOT_APPROVED"
+      },
+      "unified_tflite": {
+        "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "bytes": 9984493,
+        "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+      },
+      "custom_tflite": {
+        "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "bytes": 38460640,
+        "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+        "provenance": "UNKNOWN_PROVENANCE"
+      },
+      "coco_tflite": {
+        "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+        "bytes": 10343256,
+        "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+        "provenance": "UNKNOWN_PROVENANCE"
+      }
+    },
+    "formal_training_config": {
+      "sha256": null,
+      "status": "UNBOUND_NOT_RUN"
+    }
+  },
+  "remaining_gates": [
+    {
+      "gate_id": "GATE-CANONICAL-DLV-AIML-CROSSWALK",
+      "status": "OPEN_PACKET_LOCAL_CROSSWALK_ONLY",
+      "artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-08",
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-DATA-SOURCE-RIGHTS-PRIVACY",
+      "status": "NOT_VERIFIED",
+      "artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-08",
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-DATASET-MATERIALIZATION",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-08",
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-LABEL-QUALITY-INSPECTION",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-08"
+      ]
+    },
+    {
+      "gate_id": "GATE-CAPTURE-SEQUENCE-SPLIT-LEAKAGE",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-FORMAL-EXPERIMENT-AND-COMPARISON",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-12",
+        "DLV-AIML-13"
+      ]
+    },
+    {
+      "gate_id": "GATE-PT-TFLITE-PARITY",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-ACTUAL-DEVICE-MODEL-VALIDATION",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-FORMAL-MODEL-EVALUATION",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-FALLBACK-SOURCE-PROVENANCE",
+      "status": "UNKNOWN",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-16"
+      ]
+    },
+    {
+      "gate_id": "GATE-AIML-18-20-SCOPE",
+      "status": "NOT_APPROVED_NOT_INFERRED",
+      "artifact_ids": [
+        "DLV-AIML-15",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-THRESHOLD-SWEEP-AND-NUMERIC-FREEZE",
+      "status": "NOT_RUN_UNFROZEN",
+      "artifact_ids": [
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN_NOT_WAIVED",
+      "artifact_ids": [
+        "DLV-AIML-07",
+        "DLV-AIML-15",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    },
+    {
+      "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "artifact_ids": [
+        "DLV-AIML-16",
+        "DLV-AIML-17"
+      ]
+    }
+  ],
+  "prohibited_claims": {
+    "dataset_materialized": false,
+    "dataset_quality_inspected": false,
+    "rights_facts_established": false,
+    "privacy_facts_established": false,
+    "capture_sequence_leakage_closed": false,
+    "pt_tflite_parity_passed": false,
+    "model_run_completed": false,
+    "formal_evaluation_completed": false,
+    "actual_device_validation_completed": false,
+    "aiml_18_scope_approved": false,
+    "aiml_20_scope_approved": false,
+    "deployment_eligible": false
+  },
+  "manifests": {
+    "exact10_set_sha256": "729462ef744d440fd551990a31cb137cfb77c4a3da6bbbcd00785f43c8d86496",
+    "artifact_disposition_manifest_sha256": "1a263546c3032a7d6998db2478d855e1c417a54349e0cbd377df70357bae48e0",
+    "source_bindings_manifest_sha256": "84166bd3927ac8147ee6857040a22bd9f271fb1354bd69bbf582d05d65bfa723",
+    "output_bindings_manifest_sha256": "72db88987e231c2299f4b66d5ed27cf98ac23c80fbc67013ea18b7e0a06f678a",
+    "authoring_contracts_manifest_sha256": "08f352a0bfebc3d23a94c6430fa8aaf638830c0ce255190176a970b05b392b01",
+    "remaining_gates_manifest_sha256": "897f27464db385e6b3733a6a094634a8abc3e7133fca2536a52bba60d8aee001"
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8_JSON_SORT_KEYS_COMPACT_WITH_CONTENT_FINGERPRINT_ENVELOPE_OMITTED",
+    "sha256": "0bd7776cc8ef495ad20589e2a809b7a3456bc4c48fb08832c89594626241f901"
+  }
+}

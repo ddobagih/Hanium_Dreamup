@@ -1,0 +1,227 @@
+{
+  "schema_version": "walksafe.release_evidence.v1",
+  "release_id": "REPLACE_WITH_RELEASE_ID",
+  "operator": "REPLACE_WITH_HUMAN_OPERATOR",
+  "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+  "release_artifacts": {
+    "web_build": {
+      "manifest_path": "REPLACE_WITH_WEB_BUILD_MANIFEST_PATH",
+      "manifest_sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "build_root": "REPLACE_WITH_STANDALONE_BUILD_ROOT",
+      "archive_path": "REPLACE_WITH_STANDALONE_TAR_GZ_PATH",
+      "archive_sha256": "REPLACE_WITH_64_HEX_SHA256"
+    },
+    "android_apk": {
+      "path": "REPLACE_WITH_SIGNED_APK_PATH",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "signer_certificate_sha256": "REPLACE_WITH_64_HEX_CERTIFICATE_SHA256"
+    }
+  },
+  "checks": {
+    "pwa_mobile_install_update": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/pwa_mobile_install_update.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: phone, OS, browser, deployed URL",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["page_loaded", "install_prompt_accepted", "standalone_launched", "update_applied"],
+        "required_pass_criteria": ["installable", "standalone_launch", "updated_release_active"]
+      }
+    },
+    "voice_report_microphone_e2e": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/voice_report_microphone_e2e.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: phone, OS, browser, microphone, deployed URL",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["microphone_permission_granted", "command_spoken", "transcript_confirmed", "report_submitted", "report_verified"],
+        "required_pass_criteria": ["live_microphone_capture", "voice_intent_recognized", "report_persisted"]
+      }
+    },
+    "web_phone_outdoor_navigation": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/web_phone_outdoor_navigation.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: phone, OS, browser, deployed URL, privacy-safe route label, GPS accuracy, weather",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["geolocation_permission_granted", "route_requested", "navigation_started", "guidance_received", "destination_arrived"],
+        "required_pass_criteria": ["physical_outdoor_gps", "tmap_route_followed", "guidance_reached_destination"]
+      }
+    },
+    "web_non_metric_advisory_field": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/web_non_metric_advisory_field.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: physical phone, rear camera, browser, deployed HTTPS URL, active TMAP",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["rear_camera_started", "tmap_navigation_active", "distinct_frames_confirmed", "stabilization_completed", "low_directional_advisory_observed", "authority_boundaries_verified", "no_haptic_verified", "gate_loss_triggered", "tmap_only_fallback_observed"],
+        "required_pass_criteria": ["physical_rear_camera", "active_tmap_authoritative", "three_distinct_frames_and_700ms", "low_directional_advisory_only", "no_metric_distance_steps_report_or_route_change_authority", "no_haptic", "gate_loss_falls_back_to_tmap_only"]
+      }
+    },
+    "web_accessibility_tts_haptic": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/web_accessibility_tts_haptic.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: physical phone and deployed production URL",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["screen_reader_enabled", "tts_guidance_observed", "haptic_alert_observed", "risk_priority_observed", "unavailable_state_observed"],
+        "required_pass_criteria": ["screen_reader_access", "tts_delivery", "haptic_delivery", "risk_priority", "unavailable_state_announced"],
+        "device": "TODO: device and OS",
+        "browser": "TODO: browser and version",
+        "screen_reader": "TODO: screen reader and version",
+        "tts_verified": false,
+        "haptic_verified": false,
+        "risk_priority_verified": false,
+        "unavailable_state_verified": false
+      }
+    },
+    "institution_submission_acceptance": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: institution, channel, accepted field contract or receipt",
+      "details": {
+        "external_receipt_id": "TODO"
+      }
+    },
+    "account_rbac_configured": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO: deployment configuration audit receipt",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: production gateway deployment",
+      "details": {
+        "field_account_count": 0,
+        "admin_account_count": 0,
+        "internal_tokens_distinct": false,
+        "session_secret_configured": false
+      }
+    },
+    "backup_storage_protection": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO: encrypted backup storage access-policy evidence",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: production backup storage",
+      "details": {
+        "encrypted_at_rest": false,
+        "restricted_access": false,
+        "separate_failure_domain": false
+      }
+    },
+    "detector_runtime_live": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO: production detector runtime verification receipt",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: production deployment and configured artifact paths",
+      "details": {
+        "detect_v2_mode": "TODO: real",
+        "frontend_detector_mode": "TODO: server-v2",
+        "walking_route_provider": "tmap_pedestrian",
+        "tmap_poi_provider": "TODO: live",
+        "runtime_config_sha256": "TODO: 64-hex runtime config SHA-256",
+        "unified_model_sha256": "TODO: 64-hex unified model SHA-256",
+        "smoke_fixture_sha256": "TODO: 64-hex person fixture SHA-256",
+        "smoke_expected_class": "person",
+        "backend_source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT"
+      }
+    },
+    "tmap_live_route_smoke": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/tmap_live_route_smoke.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: live TMAP pedestrian endpoint and production deployment",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["request_sent", "response_received", "route_contract_checked"],
+        "required_pass_criteria": ["provider_success", "pedestrian_geometry_present", "guide_instructions_present"]
+      }
+    },
+    "android_device_bbox_depth_alignment": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: device, APK hash, ARCore support"
+    },
+    "android_device_tts_haptic": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "TODO",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of evidence_ref",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: device, APK hash, TalkBack/TTS settings"
+    },
+    "android_arcore_unsupported_camera_field": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/android_arcore_unsupported_camera_field.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: physical ARCore-unsupported phone, installed same-commit debug field APK, separately bound signed release APK, CameraX, fresh IMU, active TMAP",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "required_observations": ["apk_installed", "cold_start_completed", "arcore_unsupported_confirmed", "camerax_started", "fresh_imu_confirmed", "tmap_navigation_active", "continuity_15m_completed", "low_directional_advisory_observed", "tts_or_talkback_observed", "no_vibration_verified", "gate_loss_triggered", "tmap_only_fallback_observed"],
+        "required_pass_criteria": ["tested_bound_field_apk", "physical_arcore_unsupported_origin", "camerax_fresh_imu_active_tmap", "fifteen_minute_continuity", "low_directional_advisory_delivery", "tts_or_talkback_delivery", "no_vibration", "gate_loss_falls_back_to_tmap_only"],
+        "required_result_binding": {"field_apk_build_type": "debug", "physical_evidence_scope": "SAME_COMMIT_DEBUG_FIELD_APK", "release_apk_physically_executed": false, "sampling_contract": "AT_MOST_1HZ_MIN_60_OVER_15M_MAX_GAP_30S"},
+        "required_field_apk_artifact": {"path": "safe relative same-commit debug .apk path", "bytes": "exact positive integer", "sha256": "exact lowercase 64-hex SHA-256 distinct from signed release APK"},
+        "required_summary_artifact": {"path": "safe relative field_session_summary.json path", "bytes": "exact positive integer", "sha256": "exact lowercase 64-hex SHA-256"}
+      }
+    },
+    "android_signed_release_physical_smoke": {
+      "passed": false,
+      "observed_at": null,
+      "evidence_ref": "receipts/android_signed_release_physical_smoke.json",
+      "evidence_sha256": "TODO: 64-hex SHA-256 of the structured JSON receipt",
+      "source_commit": "REPLACE_WITH_FULL_40_HEX_GIT_COMMIT",
+      "release_artifacts_sha256": "REPLACE_WITH_PRECHECK_REPORTED_64_HEX_RELEASE_ARTIFACT_BINDING",
+      "environment": "TODO: physical ARCore hardware-unsupported phone running the exact signed release APK, CameraX fallback, detector, active TMAP",
+      "details": {
+        "receipt_schema_version": "walksafe.external-check-receipt.v1",
+        "full_profile_only": true,
+        "required_observations": ["signed_release_apk_installed", "installed_apk_hash_verified", "cold_start_completed", "arcore_hardware_unsupported_confirmed", "camerax_fallback_started", "detector_frame_observed", "tmap_navigation_active", "low_directional_advisory_observed", "tts_or_talkback_observed", "no_vibration_verified", "gate_loss_triggered", "tmap_only_fallback_observed"],
+        "required_pass_criteria": ["verified_signed_release_artifact", "physical_arcore_hardware_unsupported_device", "signed_release_cold_start", "camerax_detector_fallback_operational", "active_tmap_authoritative", "low_non_metric_advisory_only", "tts_or_talkback_delivery", "no_vibration", "gate_loss_falls_back_to_tmap_only"],
+        "required_result_binding": {"release_apk_build_type": "release", "release_apk_physically_executed": true, "arcore_unsupported_origin": "arcore_availability_unsupported", "arcore_availability_state": "UNSUPPORTED_DEVICE_NOT_CAPABLE"},
+        "required_hash_binding": "release_apk_sha256 and installed_apk_sha256 must both equal the gate-verified signed release APK SHA-256",
+        "required_authority": {"advisory_level": "low", "metric": false, "tmap_authoritative": true, "distance_authority": false, "step_authority": false, "route_change_authority": false, "reports_allowed": false, "vibration_observed": false, "fallback_after_gate_loss": "TMAP_ONLY"}
+      }
+    }
+  }
+}

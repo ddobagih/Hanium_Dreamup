@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-INTERNAL-REVIEW-20260724-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "status": "PASS",
+  "reviewer_id": "CODEX-NPC-PERMISSION-SEPARATE-REVIEW-20260724-001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "b626e05849a72ab93b8792c0fa9d791fa12d7ade81d22a4b71b226787afe2776",
+    "VERIFICATION_RESULT": "e27b3beaa0067a561e6670b8662b13bce68d966a485165b8c502353ade887a0a",
+    "SUCCESSOR_TRACE": "32e6705570f5c23fef331b37192255dfa9c5d52e646e433e6fb141ec708bad15"
+  },
+  "reviewed_at": "2026-07-24T13:50:00+09:00",
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "independent state ownership",
+      "bounded encrypted login restoration",
+      "feature-specific permission effects",
+      "app-independent rights entry"
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "external_rights_operation_remains_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

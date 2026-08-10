@@ -1,0 +1,131 @@
+{
+  "schema_version": "walksafe.canonical-binding-update-authorization-request.v1",
+  "request_id": "WS-V24-SEQ39-CANONICAL-BINDING-UPDATE-AUTHORIZATION-REQUEST-20260729-001",
+  "status": "AWAITING_USER_AUTHORIZATION",
+  "requested_at": "2026-07-29T03:09:16+09:00",
+  "event_contract": {
+    "sequence": 39,
+    "event_id": "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-MUTABLE-CANONICAL-REFRESH-20260729-001",
+    "event_type": "CANONICAL_BINDINGS_UPDATED",
+    "previous_event_sha256": "aca93931b1cd8dcc06508f4078a7983d729df43f6a6690fceb1b3e875090152f",
+    "source_checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "source_checkpoint_sha256": "e61d919b3995f364760007c43c7bc462f1fd64f401b30d2f1f7ceeda86ab7e72",
+    "source_checkpoint_byte_count": 1291260,
+    "focus_goal_id": "WS-GOAL-EPIC-03",
+    "from_status": "READY",
+    "to_status": "READY",
+    "status_changes": {}
+  },
+  "authorization_scope": {
+    "operation": "APPEND_ONLY_SEQ39_CANONICAL_BINDING_SHA256_REFRESH",
+    "changed_binding_count": 5,
+    "changed_binding_roles_are_exhaustive": true,
+    "exact_binding_updates": [
+      {
+        "role": "ARTIFACT_CHANGE_LOG",
+        "document_id": "ART-DOC-05-001",
+        "path": "docs/deliverables/00-control/artifact-change-log.json",
+        "before_sha256": "c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c",
+        "before_byte_count": 96734,
+        "after_sha256": "cea8b58fc5afa527614522481df56d69618c6fd1015c10b63d6cc8b6e0678c67",
+        "after_byte_count": 102892
+      },
+      {
+        "role": "ARTIFACT_REGISTER",
+        "document_id": "ART-DOC-01-001",
+        "path": "docs/deliverables/00-control/artifact-register.json",
+        "before_sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+        "before_byte_count": 3499550,
+        "after_sha256": "a0c993257c1b80211c2e8e4db5aa464708ac4aba9d47ed9b434eda277ee6547f",
+        "after_byte_count": 3803696
+      },
+      {
+        "role": "DESIGN_TRACEABILITY",
+        "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+        "path": "docs/deliverables/04-design/design-traceability-register.json",
+        "before_sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+        "before_byte_count": 459175,
+        "after_sha256": "18775a3f4d5d1faf0ae692b27888613c3d43f0b276d5a71dfbb08aad47c6b4ae",
+        "after_byte_count": 463652
+      },
+      {
+        "role": "MODULE_REGISTER",
+        "document_id": "DEV-18",
+        "path": "docs/deliverables/05-implementation/module-register.json",
+        "before_sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+        "before_byte_count": 62222,
+        "after_sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+        "after_byte_count": 62222
+      },
+      {
+        "role": "PLANNED_TEST_CASES",
+        "document_id": "TST-05",
+        "path": "docs/deliverables/06-testing/registers/test-cases.json",
+        "before_sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+        "before_byte_count": 2590342,
+        "after_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+        "after_byte_count": 2592818
+      }
+    ],
+    "exact_binding_updates_sha256": "31b18309818b1b8c869694d0532a5becfef59895b52aee4abdf67b9fa710b307",
+    "requirements_traceability_unchanged": {
+      "role": "REQUIREMENTS_TRACEABILITY",
+      "document_id": "WS-REQ-RTM-DRAFT-20260721-R001",
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "1d73d1e6e0a47ea3833df779c945397d799b14e9b26fdac4bb577197a660a7bd",
+      "byte_count": 1903186
+    },
+    "canonical_document_content_mutation_authorized": false,
+    "artifact_status_or_count_change_authorized": false,
+    "authorized_checkpoint_mutations_if_accepted": [
+      "APPEND_EXACT_SEQ39_EVENT",
+      "UPDATE_CHECKPOINT_SCHEMA_VERSION_TO_1.25.0",
+      "UPDATE_TOP_LEVEL_CANONICAL_BINDING_SHA256_FOR_EXACT_FIVE_ROLES",
+      "UPDATE_ARTIFACT_QUEUE_SOURCE_BINDING_SHA256_ONLY",
+      "PROJECT_SEQ39_RUNTIME_WITH_UNCHANGED_GOAL_STATUSES_AND_ARTIFACT_COUNTS",
+      "UPDATE_TRANSITION_HISTORY_ANCHOR",
+      "UPDATE_GOAL_EXECUTION_VALIDATION_CUTOFF_TO_SEQ39_OCCURRED_AT",
+      "UPDATE_WORKING_SNAPSHOT_HASHES"
+    ]
+  },
+  "authorization_scope_integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "json_path": "$.authorization_scope",
+    "sha256": "e46995d2bfb27949fd8a3c9574f6854355c0546d5ad1dd3821c3f912be477838"
+  },
+  "response_contract": {
+    "question_utf8": "`WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-MUTABLE-CANONICAL-REFRESH-20260729-001`에서 위 5개 before→after SHA-256을 WalkSafe v2.4 정본 binding으로만 갱신하는 것을 승인하시겠습니까? 이 승인은 파일 내용의 적합성, 시험 통과 또는 출시 승인을 뜻하지 않습니다. 답변: `승인합니다` 또는 `승인하지 않습니다`.",
+    "accepted_literal_utf8": "승인합니다",
+    "accepted_literal_sha256": "7db70ea6b639a9df50be4e6c370088e5cd21bcfa3a5caa07e608a81a7782efb8",
+    "rejected_literal_utf8": "승인하지 않습니다",
+    "rejected_literal_sha256": "551d0ee27c3b6b64a7ed49a871fb5d9f12628749f9ef41e42c96622f1f0b1843",
+    "canonicalization": "UTF-8_WITHOUT_TRAILING_NEWLINE",
+    "authorization_binding_rule": "AUTHORIZATION_MUST_BIND_REQUEST_PHYSICAL_SHA256_AND_EXACT_RESPONSE_SHA256"
+  },
+  "claim_boundary": {
+    "authorization_currently_granted": false,
+    "accepted_response_authorizes_only_exact_scope": true,
+    "file_content_suitability_approved": false,
+    "test_pass_approved_or_claimed": false,
+    "canonical_document_content_mutation_authorized": false,
+    "artifact_status_or_count_change_authorized": false,
+    "checkpoint_projection_is_mechanical_only": true,
+    "artifact_complete_count_before": 126,
+    "artifact_complete_count_after_if_accepted": 126,
+    "artifact_open_count_before": 131,
+    "artifact_open_count_after_if_accepted": 131,
+    "artifact_completion_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "intended_use": "EXACT_FIVE_CANONICAL_BINDING_SHA256_REFRESH_AUTHORIZATION_ONLY"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "excluded_json_path": "$.integrity",
+    "sha256": "d4e96da364419826ccc3f5e4de76d141fbabbe628bc241d90df70d07541cf137"
+  }
+}

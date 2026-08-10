@@ -1,0 +1,44 @@
+{
+  "schema_version": "walksafe.validation-receipt.v1",
+  "command_scope": "w3-light-available-checks",
+  "observed_at": "2026-07-27T14:56:00.219373+00:00",
+  "dependency_install_performed": false,
+  "supersedes_note": "Gateway attempt1 used a nonexistent planned path and is preserved separately; this receipt uses apps/android-gateway.",
+  "checks": [
+    {
+      "check": "w3-openapi-check",
+      "exit_code": 1,
+      "result": "BLOCKED_ENVIRONMENT",
+      "reason": "ModuleNotFoundError: fastapi; dependency installation intentionally not performed",
+      "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-openapi-check.log",
+      "log_sha256": "8baf0daf3abd924d6fa82c2255730de8393c781eab59df485bf034f56aed3693"
+    },
+    {
+      "check": "w3-web-lint",
+      "exit_code": 0,
+      "result": "PASS",
+      "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-web-lint.log",
+      "log_sha256": "148014f17481780d723175b71227cb35ac097ce1154b569669f5ef59de8637ab"
+    },
+    {
+      "check": "w3-web-typecheck",
+      "exit_code": 0,
+      "result": "PASS",
+      "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-web-typecheck.log",
+      "log_sha256": "75303bbd476b9f2e9236d99c2c852b3b0aa586607f5c4f563e58017bb482f2fe"
+    },
+    {
+      "check": "w3-gateway-typecheck",
+      "exit_code": 0,
+      "result": "PASS",
+      "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-gateway-typecheck.log",
+      "log_sha256": "d5d0638f1e783856ec81d08b289bd34c2f6b2eb795fb750977498948a02744bb"
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "pass": 3,
+    "fail": 0,
+    "blocked": 1
+  }
+}

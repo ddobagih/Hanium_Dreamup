@@ -1,0 +1,79 @@
+{
+  "schema_version": "walksafe.phase1-ready25-rel-check-receipt.v1",
+  "receipt_id": "WS-PHASE1-READY25-REL-CHECK-20260728-R002",
+  "prepared_on": "2026-07-28",
+  "status": "PASS",
+  "evidence_binding": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-rel-r002/evidence.json",
+    "sha256": "5410753f226f4a778bc3b3d629a9e74cb87e4335add618d1f20da36c0c5c9577",
+    "byte_length": 34239
+  },
+  "source_bindings": {
+    "r007_exact257_ledger": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+      "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9"
+    },
+    "user_scope_transition_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json",
+      "sha256": "7015c81effdaab52dc83168484a36bd7a4fbdee6f8a405ab819d691bfa7810ad"
+    },
+    "r010_successor_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json",
+      "sha256": "e878aa9915e549cfd06acaef7f150b75e0d6a0221d6c9978d6597d15c81c8056"
+    },
+    "r010_successor_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r010.json",
+      "sha256": "5e9300013d252932cc696585c8e2d99ddcd434d972647c32a57620e64f62d51a"
+    }
+  },
+  "checks": [
+    {
+      "check_id": "READY25-REL-EXACT3-IN-SCOPE-CONTENT-AUTHORED",
+      "status": "PASS",
+      "expected": [
+        3,
+        3
+      ],
+      "observed": [
+        3,
+        3
+      ]
+    },
+    {
+      "check_id": "READY25-REL-NO-CREDIT",
+      "status": "PASS",
+      "expected": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "observed": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "check_id": "READY25-REL-FIVE-GATES-NOT-RUN-NOT-WAIVED",
+      "status": "PASS",
+      "expected": 5,
+      "observed": 5
+    },
+    {
+      "check_id": "READY25-REL-NAMED-CANDIDATE-ABSENT",
+      "status": "PASS",
+      "expected": null,
+      "observed": null
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "e2091eb0d3b2d02cd840a62b6e99214994edc92f4f4d6e7debe2b1f4c04ddb8a"
+  }
+}

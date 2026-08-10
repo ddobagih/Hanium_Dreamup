@@ -1,0 +1,31 @@
+
+> walksafe-pwa@0.1.0 test
+> bash ../../scripts/check_frontend_policy_suite.sh
+
+admin report summary policy checks passed
+API client contract policy checks passed
+voice intent executor tests passed
+field telemetry policy checks passed
+motion projection and tactile route support policy checks passed
+absolute sensor heading policy checks passed
+PASS: absolute heading, logout sensor teardown, future motion and route-aligned tactile support are wired
+risk evaluator policy checks passed
+auto-report v2 policy checks passed
+PASS: motion ROI policy checks passed
+navigation destination policy checks passed
+navigation guidance, voice priority, and report export policy checks passed
+PASS: automatic reroute keeps the live provider request behind safety gates
+checked: explicit startNavigation and automatic reroute are the only route request blocks
+checked: GPS accuracy/jump, in-flight, cooldown, and session max-count guards are present
+checked: stop, destination changes, and arrival invalidate stale route responses
+pwa status policy checks passed
+pwa release version policy checks passed
+offline report queue policy checks passed
+PASS: PWA install/update/offline shell policy checks passed
+risk evaluator policy checks passed
+auto-report v2 policy checks passed
+route progress policy checks passed
+settings privacy checks passed
+PASS: settings privacy local-only checks passed
+step length policy checks passed
+walksafe test log policy checks passed

@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP013-INTEGRATED-CONSENT-INTERNAL-REVIEW-20260725-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+  "status": "PASS",
+  "reviewer_id": "CODEX-FP013-INTEGRATED-CONSENT-SEPARATE-REVIEW-20260725-002",
+  "review_subject_sha256": "da0757ff468e96cc8d8e1e36484acec806a185a6b0ac3262e7b04bfa1f8f4d45",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "94e8e4aff7350f673051d8ca38df3459d6bb1cde57656bb323556fdf1c54d72f",
+    "VERIFICATION_RESULT": "cbe4c2c0bfce2956e76c7e798337f7e2168f47bf6d39b59adbc206317d44fe6b",
+    "SUCCESSOR_TRACE": "4d8f305abb8e775aeca0de72b9454799869e64e7d19f777ac2e5b5d8a0296e47"
+  },
+  "reviewed_at": "2026-07-25T16:41:08+09:00",
+  "attestation_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/review-attestation.json",
+    "sha256": "6c5ce8721ada8ec5f84ff155a94c27a9a6454fb7440ed48a2edb2dba1e75cd89"
+  },
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "Current per-item policy versions are enforced for storage, retrieval and report authorization.",
+      "Android opens the report socket on the captured active Network without default-network fallback.",
+      "Review subject, result hashes, command hashes and output hashes are bound and checked exactly.",
+      "Consent lock recovery and release verify PID, token, device and inode ownership.",
+      "Pre-login consent binds atomically to the authenticated field actor and requires reconsent for another actor.",
+      "Every report conservatively requires automatic-reporting consent because client purpose is not attestable.",
+      "Gateway test counts are parsed from the canonical log and unsupported Android count claims were removed.",
+      "All post-acquisition consent and network blocks release the report-attempt lease."
+    ],
+    "known_nonblocking_boundaries": [
+      "TC-FP-013-01 through TC-FP-013-05 and the planned 279 formal tests were not run.",
+      "Legal and privacy review and approved final consent copy were not run.",
+      "Actual users, guardians, TalkBack users, devices and production networks were not tested.",
+      "Production credentials and deployment were not run.",
+      "Five release gates remain not run and release remains not eligible.",
+      "Network transport is Android-observed rather than hardware-backed attestation."
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "legal_privacy_review_remains_not_run": true,
+    "actual_user_tests_remain_not_run": true,
+    "actual_guardian_tests_remain_not_run": true,
+    "actual_talkback_user_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "actual_network_tests_remain_not_run": true,
+    "production_deployment_remains_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

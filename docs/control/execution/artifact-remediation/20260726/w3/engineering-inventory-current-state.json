@@ -1,0 +1,886 @@
+{
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-ENGINEERING-INVENTORY-CURRENT-STATE-20260726-001",
+  "schema_version": "walksafe.artifact-remediation.engineering-inventory-current-state.v2",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "status": "CURRENT_STATE_SUPPLEMENT_REBOUND_TO_FINAL_EVIDENCE_003_READY_FOR_W3_REVIEW",
+  "scope": {
+    "wave_id": "W3",
+    "work_packet_id": "W3-DEV-INVENTORY",
+    "artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-07",
+      "DLV-DEV-14",
+      "DLV-DEV-18"
+    ],
+    "artifact_count": 4,
+    "source_identity": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT_NOT_GIT_COMMIT",
+    "binding_generation": "evidence-20260726-003+aux-005+integration-run-004"
+  },
+  "authority_boundary": {
+    "predecessor_baseline_preserved": true,
+    "approval_or_rebaseline_claimed": false,
+    "legacy_artifacts_modified": false,
+    "role": "ADD_ONLY_CURRENT_STATE_AND_RECOMMENDED_DISPOSITION_SUPPLEMENT",
+    "final_disposition_authority": "W3_INDEPENDENT_REVIEW_AND_ARTIFACT_STATUS_DELTA"
+  },
+  "common_subject_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), trailing LF",
+    "basis": {
+      "artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-07",
+        "DLV-DEV-14",
+        "DLV-DEV-18"
+      ],
+      "final_evidence_003_content_set_sha256": "faa5f06b34b6b111593c6357b70eabc0f477baf22a0a9ab2f6dcbbf71ee93b43",
+      "aux005_common_subject_fingerprint": "00781d4b26ca8d8b854d61af5d6684780e193e3d54c20d9c57a53ad19c7360d3",
+      "integration_run004_content_set_sha256": "acaec495901fc2c12c842d9b350d4578f81dd598687810a8b9756edd33e755a0",
+      "backend_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+      "source_snapshot_content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+      "source_path_sha256_set_sha256": "e0bf4cfafd2001d6e87df42b6e020496b82af5f4919a43593ce2384f1e7e0037"
+    },
+    "value": "b45b6076b211fbdad5343601761ea562f1a6854e36d497d1b7a0ea9cb8e6d783"
+  },
+  "artifact_coverage": {
+    "expected_artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-07",
+      "DLV-DEV-14",
+      "DLV-DEV-18"
+    ],
+    "expected_count": 4,
+    "actual_count": 4,
+    "unique_count": 4,
+    "exact_set_match": true,
+    "one_disposition_per_artifact": true,
+    "dispositions": [
+      {
+        "artifact_id": "DLV-DEV-01",
+        "predecessor_classification": "INTERNAL_GAP",
+        "disposition": "RESOLVED_BY_CURRENT_INTERNAL_EVIDENCE_PENDING_W3_REVIEW",
+        "recommended_current_classification": "OK",
+        "independent_reassessment": "REAFFIRMED",
+        "reason": "Final evidence-003 binds 2,960 stable files and the current backend subject; integration-run-004 passes current backend DB-free/PostGIS/migration/schema checks.",
+        "evidence_binding_ids": [
+          "W3-DEV-INV-SRC-003",
+          "W3-DEV-INV-SRC-007",
+          "W3-DEV-INV-SRC-010",
+          "W3-DEV-INV-SRC-014",
+          "W3-DEV-INV-SRC-015",
+          "W3-DEV-INV-SRC-016"
+        ],
+        "remaining_gap_ids": [
+          "W3-DEV-INVENTORY-GAP-001",
+          "W3-DEV-INVENTORY-GAP-005",
+          "W3-DEV-INVENTORY-GAP-006"
+        ]
+      },
+      {
+        "artifact_id": "DLV-DEV-07",
+        "predecessor_classification": "INTERNAL_GAP",
+        "disposition": "RESOLVED_BY_CURRENT_INTERNAL_EVIDENCE_PENDING_W3_REVIEW",
+        "recommended_current_classification": "OK",
+        "independent_reassessment": "REAFFIRMED",
+        "reason": "Final evidence-003 preserves five exact current lock sources and aux-005 passes official CycloneDX/SPDX schema validation on current SBOM bytes.",
+        "evidence_binding_ids": [
+          "W3-DEV-INV-SRC-006",
+          "W3-DEV-INV-SRC-008",
+          "W3-DEV-INV-SRC-009",
+          "W3-DEV-INV-SRC-011",
+          "W3-DEV-INV-SRC-012",
+          "W3-DEV-INV-SRC-013"
+        ],
+        "remaining_gap_ids": [
+          "W3-DEV-INVENTORY-GAP-001",
+          "W3-DEV-INVENTORY-GAP-003",
+          "W3-DEV-INVENTORY-GAP-006"
+        ]
+      },
+      {
+        "artifact_id": "DLV-DEV-14",
+        "predecessor_classification": "INTERNAL_GAP",
+        "disposition": "GAP_REMAINS",
+        "recommended_current_classification": "INTERNAL_GAP",
+        "independent_reassessment": "UNCHANGED",
+        "reason": "Final evidence-003 still inventories 279 canonical formal tests but has 0 explicit source-fixture links and 279 unassigned tests.",
+        "evidence_binding_ids": [
+          "W3-DEV-INV-SRC-004",
+          "W3-DEV-INV-SRC-010"
+        ],
+        "remaining_gap_ids": [
+          "W3-DEV-INVENTORY-GAP-001",
+          "W3-DEV-INVENTORY-GAP-002"
+        ]
+      },
+      {
+        "artifact_id": "DLV-DEV-18",
+        "predecessor_classification": "INTERNAL_GAP",
+        "disposition": "RESOLVED_BY_CURRENT_INTERNAL_EVIDENCE_PENDING_W3_REVIEW",
+        "recommended_current_classification": "OK",
+        "independent_reassessment": "REAFFIRMED",
+        "reason": "Final module inventory keeps five mutually exclusive modules and 365 files while replacing backend bytes with the exact current 79-file integration subject.",
+        "evidence_binding_ids": [
+          "W3-DEV-INV-SRC-007",
+          "W3-DEV-INV-SRC-014",
+          "W3-DEV-INV-SRC-015",
+          "W3-DEV-INV-SRC-016",
+          "W3-DEV-INV-SRC-017",
+          "W3-DEV-INV-SRC-019"
+        ],
+        "remaining_gap_ids": [
+          "W3-DEV-INVENTORY-GAP-001",
+          "W3-DEV-INVENTORY-GAP-004",
+          "W3-DEV-INVENTORY-GAP-005",
+          "W3-DEV-INVENTORY-GAP-006"
+        ]
+      }
+    ]
+  },
+  "historical_correction": {
+    "status": "HISTORICAL_ERROR_RETAINED_NOT_CURRENT_AUTHORITY",
+    "snapshot_date": "2026-07-21",
+    "wrong_module_path": "apps/android/admin",
+    "historical_zero_counts": {
+      "adminapp": 0,
+      "android-gateway": 0
+    },
+    "current_precedence": [
+      {
+        "component": "adminapp",
+        "actual_root": "apps/android/adminapp",
+        "source_file_count": 25
+      },
+      {
+        "component": "gateway",
+        "module_id": "android-gateway",
+        "actual_root": "apps/android-gateway",
+        "source_file_count": 26
+      }
+    ],
+    "rule": "Never reuse apps/android/admin or historical zero counts as current state."
+  },
+  "source_snapshot": {
+    "binding_id": "W3-DEV-INV-SRC-010",
+    "source_commit": null,
+    "source_identity_basis": "FILESYSTEM_TRAVERSAL_NOT_GIT",
+    "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT",
+    "file_count": 2960,
+    "stable_file_read_count": 2960,
+    "pre_post_path_stat_set_match": true,
+    "path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+    "content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+    "claim_boundary": {
+      "clean_commit_claimed": false,
+      "git_invoked": false,
+      "release_or_approval_claimed": false
+    }
+  },
+  "module_inventory": {
+    "binding_id": "W3-DEV-INV-SRC-007",
+    "ownership_rule": "EXACTLY_ONE_OWNER_WITH_EXPLICIT_MODEL_CONFIG_SUBTREE_EXCLUSIONS",
+    "module_count": 5,
+    "owned_source_file_count": 365,
+    "duplicate_ownership_count": 0,
+    "modules": [
+      {
+        "module_id": "app",
+        "component_scope": "user",
+        "actual_roots": [
+          "apps/android/app"
+        ],
+        "excluded_subtrees": [
+          "apps/android/app/src/main/assets/model-config",
+          "apps/android/app/src/main/assets/models"
+        ],
+        "source_file_count": 208,
+        "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782",
+        "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+        "logical_component": "app"
+      },
+      {
+        "module_id": "adminapp",
+        "component_scope": "admin",
+        "actual_roots": [
+          "apps/android/adminapp"
+        ],
+        "excluded_subtrees": [],
+        "source_file_count": 25,
+        "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f",
+        "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+        "logical_component": "adminapp"
+      },
+      {
+        "module_id": "android-gateway",
+        "component_scope": "gateway",
+        "actual_roots": [
+          "apps/android-gateway"
+        ],
+        "excluded_subtrees": [],
+        "source_file_count": 26,
+        "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3",
+        "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+        "logical_component": "gateway"
+      },
+      {
+        "module_id": "backend",
+        "component_scope": "backend",
+        "actual_roots": [
+          "backend"
+        ],
+        "excluded_subtrees": [],
+        "source_file_count": 79,
+        "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+        "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+        "logical_component": "backend"
+      },
+      {
+        "module_id": "model-config",
+        "component_scope": "model-config",
+        "actual_roots": [
+          "model",
+          "configs",
+          "apps/android/app/src/main/assets/model-config",
+          "apps/android/app/src/main/assets/models"
+        ],
+        "excluded_subtrees": [],
+        "source_file_count": 27,
+        "path_set_sha256": "7cf16a1a4139473c74bf396255fcd7c621996be1c4a4c5eca4e5f9cbe52b092a",
+        "content_set_sha256": "7da513c83ecda763fc14911a8301a1ac331dc8c71f1f1532e34155733e928e47",
+        "logical_component": "model-config"
+      }
+    ],
+    "current_backend_subject": {
+      "binding_id": "W3-DEV-INV-SRC-014",
+      "path_count": 79,
+      "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+      "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+      "content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712"
+    }
+  },
+  "dependency_lock_inventory": {
+    "binding_id": "W3-DEV-INV-SRC-006",
+    "lock_source_count": 5,
+    "dependency_count": 526,
+    "dependency_count_by_scope": {
+      "admin": 177,
+      "backend": 85,
+      "gateway": 3,
+      "user": 261
+    },
+    "lock_source_content_set_sha256": "bc12dee0a03467f43a1dc72d3e3a3c4e9dc9ac5f20713173557ab20ed16a8fff",
+    "unmatched_gradle_verification_component_count": 181,
+    "unmatched_interpretation": "RETAINED_OBSERVATION_NOT_CURRENT_DEPENDENCY_ABSENCE",
+    "lock_sources": [
+      {
+        "lock_id": "app-gradle",
+        "scope": "user",
+        "ecosystem": "gradle",
+        "path": "apps/android/app/gradle.lockfile",
+        "sha256": "9f62f9279f66c03e58ec07193f56fc6b30209906cc3fabc9db52756c037b3aae"
+      },
+      {
+        "lock_id": "adminapp-gradle",
+        "scope": "admin",
+        "ecosystem": "gradle",
+        "path": "apps/android/adminapp/gradle.lockfile",
+        "sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13"
+      },
+      {
+        "lock_id": "android-verification-metadata",
+        "scope": "user+admin",
+        "ecosystem": "gradle-verification",
+        "path": "apps/android/gradle/verification-metadata.xml",
+        "sha256": "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+      },
+      {
+        "lock_id": "android-gateway-package-lock",
+        "scope": "gateway",
+        "ecosystem": "npm",
+        "path": "apps/android-gateway/package-lock.json",
+        "sha256": "cf595d4b768ec3fb00ccd4223249cfd5b33c25b3940c864878d8dc0f04d075d1"
+      },
+      {
+        "lock_id": "backend-requirements-lock",
+        "scope": "backend",
+        "ecosystem": "python",
+        "path": "backend/requirements.lock",
+        "sha256": "69017e7df8862a09063ab6329535883c28335dd7202caae5d77a5f3dcbc01069"
+      }
+    ],
+    "sbom": {
+      "cyclonedx_1_6": {
+        "binding_id": "W3-DEV-INV-SRC-008",
+        "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce",
+        "official_schema_validation": "PASS"
+      },
+      "spdx_2_3": {
+        "binding_id": "W3-DEV-INV-SRC-009",
+        "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e",
+        "official_schema_validation": "PASS"
+      },
+      "validation_binding_id": "W3-DEV-INV-SRC-013"
+    }
+  },
+  "fixture_and_formal_inventory": {
+    "binding_id": "W3-DEV-INV-SRC-004",
+    "formal_test_register": {
+      "bytes": 2590342,
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee"
+    },
+    "formal_test_count": 279,
+    "formal_test_unique_count": 279,
+    "formal_test_id_set_sha256": "8ab0a039d0a6f9fcaad753bac08428da0f74ef27d40426ad4da49a28d5a0f167",
+    "formal_test_order_sha256": "681b6ad6c222aa73dfcf1bedb021279eca72342a108017688817e3afbfdfe395",
+    "formal_test_status": "NOT_RUN",
+    "formal_test_pass_claimed": false,
+    "fixture_count": 6,
+    "fixture_content_set_sha256": "b2c07e0e6979a3ed4279e73b1a41d961eee1be71f19af72077804c92d4d1bd96",
+    "fixtures": [
+      {
+        "fixture_id": "FIX-0148BD1AF2FF92BD",
+        "path": "contracts/fixtures/walking-route-v1.json",
+        "sha256": "8460df0e1e1532df1cd94127a4ba620e8acc20ef1a3db1aa4e78e6a5e18f0cb6"
+      },
+      {
+        "fixture_id": "FIX-4FF47380EDAC018B",
+        "path": "tests/fixtures/model_registry_dataset/image.fixture",
+        "sha256": "a3c5b3421985f7fca96326066859ce7a42d5799d0135956898c272b2ad56d2d5"
+      },
+      {
+        "fixture_id": "FIX-1B2B2C5E560F49C7",
+        "path": "tests/fixtures/model_registry_dataset/label.txt",
+        "sha256": "7ca2cb626dfd056f917570bf3180636d9f78b27519c30f85afe14c66fc8bc2a0"
+      },
+      {
+        "fixture_id": "FIX-51ABD8675275B293",
+        "path": "tests/fixtures/model_registry_dataset/manifest.csv",
+        "sha256": "d00d088234dc36aef16833a026e7e4f32fca1ac0d77ab0eb6276cbe30ea37441"
+      },
+      {
+        "fixture_id": "FIX-A377840F97CF1DFD",
+        "path": "tests/fixtures/model_registry_dataset/training-results.csv",
+        "sha256": "78f28752c649c207a8eaca2c999a75d92f6490fa3b62bbdf79a279eba8c00945"
+      },
+      {
+        "fixture_id": "FIX-3C8955DDD253A494",
+        "path": "tests/fixtures/navigation/tactile_route_policy_cases.json",
+        "sha256": "6b0f84db9f416da02fc27c514569a0f80efc420aeb955345f0a93a21ef4c3f59"
+      }
+    ],
+    "explicit_source_fixture_link_count": 0,
+    "unassigned_formal_test_count": 279,
+    "unresolved_declared_test_data_count": 0,
+    "all_fixture_assignments_complete": false,
+    "linkage_disposition": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+    "target_wave": "W4",
+    "no_assignment_invented": true
+  },
+  "current_execution_evidence": {
+    "final_evidence_20260726_003": {
+      "file_count": 8,
+      "path_set_sha256": "dfecd603b6d64f90b5e5e6b9a72e35d5504ee5eebc48d9fcad8536b37148d3bf",
+      "content_set_sha256": "faa5f06b34b6b111593c6357b70eabc0f477baf22a0a9ab2f6dcbbf71ee93b43",
+      "binding_ids": [
+        "W3-DEV-INV-SRC-003",
+        "W3-DEV-INV-SRC-004",
+        "W3-DEV-INV-SRC-005",
+        "W3-DEV-INV-SRC-006",
+        "W3-DEV-INV-SRC-007",
+        "W3-DEV-INV-SRC-008",
+        "W3-DEV-INV-SRC-009",
+        "W3-DEV-INV-SRC-010"
+      ],
+      "manifest_sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5",
+      "result": "INTERNAL_EVIDENCE_GENERATED_CURRENT_BACKEND_BOUND"
+    },
+    "aux_execution_20260726_005": {
+      "file_count": 3,
+      "path_set_sha256": "79cc1413c7fa3cbb3b7148acbfe79a885046f72bf4be8ff7c8fab9594f95a92f",
+      "content_set_sha256": "8cf1a13c7d60d2c5582a6109a571502af03c56bbc103ecf26802e85c20d90b83",
+      "binding_ids": [
+        "W3-DEV-INV-SRC-011",
+        "W3-DEV-INV-SRC-012",
+        "W3-DEV-INV-SRC-013"
+      ],
+      "common_subject_fingerprint": "00781d4b26ca8d8b854d61af5d6684780e193e3d54c20d9c57a53ad19c7360d3",
+      "overall_status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+      "reused_results": {
+        "app_lint": "PASS_REUSED_EXACT_SOURCE",
+        "admin_lint": "PASS_REUSED_EXACT_SOURCE",
+        "gateway_typecheck": "PASS_REUSED_EXACT_SOURCE",
+        "backend_integration": "PASS_REUSED_EXACT_BACKEND_SUBJECT"
+      },
+      "license_metadata": {
+        "status": "PASS_METADATA_INVENTORY_NOT_LEGAL_APPROVAL",
+        "component_count": 531,
+        "known_count": 346,
+        "unknown_count": 185,
+        "exception_count": 13,
+        "legal_approval_claimed": false
+      },
+      "official_schema_validation": {
+        "cyclonedx_1_6": "PASS",
+        "spdx_2_3": "PASS",
+        "validator": {
+          "distribution": "jsonschema",
+          "runtime": "uv run --no-project --offline --with jsonschema==4.25.1",
+          "version": "4.25.1"
+        }
+      }
+    },
+    "integration_run_20260726_004": {
+      "file_count": 6,
+      "path_set_sha256": "cde8de42b44481b8fdabf8e4c5ce3ce2e7d1aa088303764520038dcd1648a1b4",
+      "content_set_sha256": "acaec495901fc2c12c842d9b350d4578f81dd598687810a8b9756edd33e755a0",
+      "binding_ids": [
+        "W3-DEV-INV-SRC-014",
+        "W3-DEV-INV-SRC-015",
+        "W3-DEV-INV-SRC-016",
+        "W3-DEV-INV-SRC-017",
+        "W3-DEV-INV-SRC-018",
+        "W3-DEV-INV-SRC-019"
+      ],
+      "current_backend_subject": {
+        "path_count": 79,
+        "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+        "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+        "raw_sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+      },
+      "internal_results": {
+        "alembic_upgrade_head": "PASS",
+        "cleanup": {
+          "container": "PASS",
+          "secret": "PASS"
+        },
+        "database_preflight": "PASS",
+        "db_free": {
+          "deselected": 1,
+          "passed": 33,
+          "status": "PASS"
+        },
+        "postgres_node_run_1": {
+          "passed": 1,
+          "status": "PASS"
+        },
+        "postgres_node_run_2": {
+          "passed": 1,
+          "status": "PASS"
+        },
+        "reconfirmation_cleanup_repeatability": "PASS",
+        "same_database_repeatability": "PASS",
+        "schema_parity": "PASS"
+      },
+      "local_validation_status": "PASS",
+      "local_validation_check_count": 17,
+      "command_receipt_count": 11,
+      "failed_command_count": 0,
+      "resolved_internal_gap_count": 4,
+      "remaining_external_gap_count": 3,
+      "claim_boundary": {
+        "actual_device_status": "NOT_RUN",
+        "artifact_approval_claimed": false,
+        "cross_process_android_gateway_backend": "NOT_RUN",
+        "formal_test_count": 279,
+        "formal_test_pass_claimed": false,
+        "formal_test_status": "NOT_RUN",
+        "production_status": "NOT_RUN",
+        "release_gate_count": 5,
+        "release_gate_status": "NOT_RUN",
+        "release_gates_waived": false,
+        "release_status": "NOT_ELIGIBLE",
+        "signing_status": "NOT_ASSESSED",
+        "tmap_integration_status": "NOT_RUN"
+      }
+    }
+  },
+  "verification_boundary": {
+    "signing_status": "NOT_ASSESSED",
+    "formal_test_program": {
+      "planned_count": 279,
+      "status_counts": {
+        "NOT_RUN": 279
+      },
+      "pass_claimed": false
+    },
+    "backend_internal_integration": {
+      "status": "PASS",
+      "db_free_passed": 33,
+      "postgres_node_passed": 2,
+      "schema_parity": "PASS",
+      "cleanup": {
+        "container": "PASS",
+        "secret": "PASS"
+      }
+    },
+    "cross_process_android_gateway_backend": "NOT_RUN",
+    "actual_device_network_tmap": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "release_gates": [
+      {
+        "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SERVER-CAPACITY-STATE-TO-PHONE",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-UNREDACTED-RAW-INDEPENDENT-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-CLOUD-STORAGE-COST-VALIDATION",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ],
+    "release_gate_count": 5,
+    "unwaived_gate_count": 5,
+    "release_status": "NOT_ELIGIBLE",
+    "approval_status": "NOT_CLAIMED"
+  },
+  "allowed_claims": [
+    "Exact four artifacts have one disposition each on final evidence-003.",
+    "DEV-01, DEV-07 and DEV-18 retain OK recommendations after current-source reassessment.",
+    "Final source/module/lock/build/fixture/SBOM and current backend integration evidence is exact path/SHA bound.",
+    "Integration-run-004 passes current backend DB-free, PostGIS, migration, schema parity and cleanup checks.",
+    "DEV-14 remains INTERNAL_GAP because explicit fixture links remain 0 of 279."
+  ],
+  "prohibited_claims": [
+    "Historical apps/android/admin or tracked-zero values are current.",
+    "Dirty snapshot is a clean or committed Git revision.",
+    "License metadata/schema validity is legal approval.",
+    "Backend internal integration PASS means Android/gateway cross-process or actual-device PASS.",
+    "Internal evidence is signed, formally complete, deployed or release eligible.",
+    "This supplement approves, rebaselines or mutates predecessors."
+  ],
+  "source_binding_summary": {
+    "source_count": 19,
+    "source_path_set_contract": "SHA256_UTF8_SORTED_PATHS_EACH_WITH_TRAILING_LF",
+    "source_path_set_sha256": "b4d535e9c91e95d7d6e08632bc1ea562620be3484bf0ff527143feb1a30af13a",
+    "source_path_sha256_set_contract": "SHA256_UTF8_SORTED_PATH_TAB_SHA256_EACH_WITH_TRAILING_LF",
+    "source_path_sha256_set_sha256": "e0bf4cfafd2001d6e87df42b6e020496b82af5f4919a43593ce2384f1e7e0037",
+    "all_paths_required": true,
+    "all_sha256_verified": true
+  },
+  "source_bindings": [
+    {
+      "binding_id": "W3-DEV-INV-SRC-001",
+      "role": "AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-002",
+      "role": "WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-003",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+      "sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-004",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/fixture-inventory.json",
+      "sha256": "be584ced83fad77cf859dbd5f3ec2e3c2ba8ba56c848d7a16afccdddbc6a1aa6"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-005",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/internal-build-provenance.json",
+      "sha256": "56b7ec0a352bdf590846bcda6ec69d7594a68989d1326917c43874ea016e0492"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-006",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+      "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-007",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "sha256": "5473ba952634f7c9596ce970d377c62bed78beba9be1a86b846d29ac78830fb1"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-008",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-009",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+      "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-010",
+      "role": "FINAL_EVIDENCE_003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-011",
+      "role": "AUX005_CURRENT_EXECUTION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+      "sha256": "94e4f9a1ca65840ca884397d5ca564385dbda791f256021cf344dd5c6362ee8f"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-012",
+      "role": "AUX005_CURRENT_EXECUTION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/license-review.json",
+      "sha256": "428b90d44a9f293d219c06921f1d7a9c829fbf87f5bb2c78a376259b8041f613"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-013",
+      "role": "AUX005_CURRENT_EXECUTION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/sbom-validation-result.json",
+      "sha256": "ed5048d91819a9e8f5b190f9b782a375e358cc3573b8bc8949135a18d9a1f57b"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-014",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-015",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-source-binding.json",
+      "sha256": "c44d64f3aa4ae825a81ff8e2925bf5bfaa36624826d82e35426fafab04c75e90"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-016",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-017",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-018",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.md",
+      "sha256": "48470e6ac71e7344b2653e132f55d9d381b6dbcf68fb76dfde0841c89fa1df49"
+    },
+    {
+      "binding_id": "W3-DEV-INV-SRC-019",
+      "role": "INTEGRATION_RUN004_CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+      "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d"
+    }
+  ],
+  "open_gaps": [
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-001",
+      "status": "OPEN",
+      "target_wave": "W3",
+      "item": "Rebound exact-four dispositions require W3 independent review and central delta integration.",
+      "owner_roles": [
+        "개발책임자",
+        "QA책임자",
+        "독립기술검토자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-07",
+        "DLV-DEV-14",
+        "DLV-DEV-18"
+      ],
+      "closure_condition": "Validate exact-four, all 19 current source hashes, zero orphan gaps and fingerprints; independent review has zero unresolved blocking/major findings and central delta records dispositions.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-002",
+      "status": "OPEN",
+      "target_wave": "W4",
+      "item": "All 279 canonical tests still lack explicit source-fixture assignments and remain NOT_RUN.",
+      "owner_roles": [
+        "QA책임자",
+        "테스트데이터책임자",
+        "개발책임자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-14"
+      ],
+      "closure_condition": "Record fixture or justified no-fixture disposition plus source/version/hash/expected result/privacy review for every test, then append-only formal executions without silent omission.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-003",
+      "status": "OPEN",
+      "target_wave": "W5",
+      "item": "Aux-005 still reports 185 of 531 SBOM components with unknown license metadata and no legal approval.",
+      "owner_roles": [
+        "보안책임자",
+        "법무·라이선스책임자",
+        "개발책임자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-07"
+      ],
+      "closure_condition": "Resolve or accept every unknown/exception under an approved license policy and record authorized legal disposition.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-004",
+      "status": "OPEN",
+      "target_wave": "W6",
+      "item": "Model-config ownership is inventoried, but quality, provenance and supported runtime evidence remain outside this inventory.",
+      "owner_roles": [
+        "AI·모델책임자",
+        "개발책임자",
+        "QA책임자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-18"
+      ],
+      "closure_condition": "Bind model/config/data/evaluation provenance and supported runtime while separating source ownership from quality/release eligibility.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-005",
+      "status": "OPEN_PARTIAL_INTERNAL_PASS",
+      "target_wave": "W7",
+      "item": "Integration-run-004 passes current backend DB-free/PostGIS checks, but Android→Gateway→Backend cross-process, actual-device, network and TMAP execution remain NOT_RUN.",
+      "owner_roles": [
+        "Android개발책임자",
+        "백엔드개발책임자",
+        "QA책임자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-18"
+      ],
+      "closure_condition": "Produce append-only cross-process and actual-device results for one controlled source candidate, retaining failures, network transitions and unsafe cases.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-INVENTORY-GAP-006",
+      "status": "OPEN",
+      "target_wave": "W9",
+      "item": "Signing is NOT_ASSESSED; five gates remain NOT_RUN/unwaived; release remains NOT_ELIGIBLE.",
+      "owner_roles": [
+        "제품책임자",
+        "출시책임자",
+        "보안책임자",
+        "안전책임자"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-07",
+        "DLV-DEV-18"
+      ],
+      "closure_condition": "Assess signing, close or validly waive each gate, complete final review and record explicit release decision.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json"
+      ]
+    }
+  ],
+  "gap_registry_summary": {
+    "gap_count": 6,
+    "unique_gap_count": 6,
+    "orphan_gap_count": 0,
+    "duplicate_gap_id_count": 0,
+    "allowed_target_waves": [
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W8",
+      "W9"
+    ],
+    "used_target_waves": [
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W9"
+    ]
+  },
+  "validation_invariants": {
+    "expected_artifact_count": 4,
+    "expected_artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-07",
+      "DLV-DEV-14",
+      "DLV-DEV-18"
+    ],
+    "expected_one_disposition_per_artifact": true,
+    "expected_source_binding_count": 19,
+    "expected_source_hash_mismatch_count": 0,
+    "expected_final_evidence_file_count": 8,
+    "expected_aux005_file_count": 3,
+    "expected_integration_run004_top_level_file_count": 6,
+    "expected_module_count": 5,
+    "expected_owned_source_file_count": 365,
+    "expected_duplicate_module_ownership_count": 0,
+    "expected_backend_subject_path_count": 79,
+    "expected_formal_test_count": 279,
+    "expected_explicit_fixture_link_count": 0,
+    "expected_unassigned_formal_test_count": 279,
+    "expected_formal_not_run_count": 279,
+    "expected_signing_status": "NOT_ASSESSED",
+    "expected_release_gate_count": 5,
+    "expected_unwaived_release_gate_count": 5,
+    "expected_release_status": "NOT_ELIGIBLE",
+    "expected_gap_orphan_count": 0,
+    "source_commit_must_equal": null
+  },
+  "integrity": {
+    "artifact_count": 4,
+    "artifact_unique_count": 4,
+    "artifact_id_set_sha256": "2d952c648d22e8ab4981fb73b787df0456bedd7f801c2e2ed8fc6b81e821d89a",
+    "source_binding_count": 19,
+    "source_path_sha256_set_sha256": "e0bf4cfafd2001d6e87df42b6e020496b82af5f4919a43593ce2384f1e7e0037",
+    "gap_count": 6,
+    "gap_unique_count": 6,
+    "gap_orphan_count": 0,
+    "content_fingerprint": {
+      "algorithm": "sha256",
+      "canonicalization": "UTF8_ENSURE_ASCII_FALSE_SORT_KEYS_COMPACT_SEPARATORS_TRAILING_LF",
+      "calculation_rule": "Set /integrity/content_fingerprint/value to null, serialize entire JSON with ensure_ascii=false, sort_keys=true, separators=(comma,colon), append LF, then SHA-256.",
+      "value": "b07754e31637ac104aaffc7b9caa92a7195989697631529dd682e225144c63e4"
+    }
+  }
+}

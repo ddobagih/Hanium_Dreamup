@@ -1,0 +1,281 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP047-USER-ADMIN-LOGIN-AUTHORIZATION-SEPARATION-IMPLEMENTATION-20260726-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-26T19:22:25+09:00",
+  "implementation_content_set_sha256": "322f38341785f847591276684d848bf864d0dafc4f3ad108a171197449e16cc7",
+  "changed_artifacts": [
+    {
+      "path": "apps/android-gateway/src/exclusive-file-lock.ts",
+      "before_sha256": null,
+      "after_sha256": "aa6a32375dc4d862b53bd6c874f9ff01c993de892c4273969fc0cf932a18848e",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/auth.ts",
+      "before_sha256": "a8cc9a6e6f7ee86bf1d33fb46e440fd11a07c2e502b6af9d7464ac63bb8e3d1d",
+      "after_sha256": "69da3ab915e7cb0a2ec22eb344cf97578d92b63591a0786e57d075926a451544",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/backend.ts",
+      "before_sha256": "858eeb9a72f97d0cf83359e9eeed64044b13b8605e1b2176f3755a1bebdcf3aa",
+      "after_sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "before_sha256": "ab4651dbcdac60bf0b60fdff7961eaa53f0330cf210b17272f7f02211de9b528",
+      "after_sha256": "3a6c1c6f84aeb855140c1dc8bdbb7fac624aac299231d7bccd34423078e7bc4a",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-long-session.ts",
+      "before_sha256": "eddf2668305564e306669871d22a814afe0b14555d3977509046d278157adb70",
+      "after_sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-walk-ledger.ts",
+      "before_sha256": "ca65cdc10bf904abe6524a7e4323df3d7798bd8af16a9f411514d4e50bf94338",
+      "after_sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-long-session.test.ts",
+      "before_sha256": "13bf854978e16ded94b5a9a1b7d0e7398b90cd5a8f346543ce71097ded3c80d6",
+      "after_sha256": "981d7a01031074f7f42c49c2efd4259e9e5af54eea73229d55af21f3a0f48b7c",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-walk-ledger.test.ts",
+      "before_sha256": "a3ed889943a27327c1118bb9d5f05149dfa52edf044eeda44b8cb3928e4c871c",
+      "after_sha256": "e07cd13f13560ab44506a75eeae1eed796c1f130eff44721a8399f2ebb43a570",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/exclusive-file-lock.test.ts",
+      "before_sha256": null,
+      "after_sha256": "9e44bacbd8114e62c7982694167623280c66f8d6446bb27beb9609d034c7ad96",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "before_sha256": "ff8fd1ff4f93b23f3873e25c86daae8059b82e3fc5c78cb72f22899f1c3217e4",
+      "after_sha256": "77df172ec22fc38919cf94ef413fba880f61a5765d4a14ca38bcd31cc37d2307",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/field_test_security.py",
+      "before_sha256": "13482ad1b5a3cdd810148f067637b103c92c1d091da6b836bef5745f7a5d29b3",
+      "after_sha256": "6e5eb3e1823d9aaeb07cd738dc9cdafb4995046a5dcea2036a0ce85fa3a2def7",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/services/admin_security.py",
+      "before_sha256": "55f1e3471fbca155d925fbf259703d9c6e9920675670a67362edc29bea13dda6",
+      "after_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/admin_security.py",
+      "before_sha256": "b60bcbd4897257758cf52d054288aea265ec3484f237d8de99bae9e78d29007f",
+      "after_sha256": "6ab25efeba7aebf244d98fd9675c9b8f23a32b08d61072a3f347fb5f84f8c274",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/reports.py",
+      "before_sha256": "6f23068e4656de642e2e42fd83b48db5cb37116bbb1d58fd561ec9c809b89691",
+      "after_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/models.py",
+      "before_sha256": "bbcbc679ecaeb498685f81d3290bda41fd838161f3d8f2e62fdced699cfc43e2",
+      "after_sha256": "b8278aeba6f2dc80920871fc0afaefddbc66296bbdeb6c7a6e0e189579f97b71",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/health.py",
+      "before_sha256": "c4dad04a1e54c72b18f82d01df6639029f7050d3bb94aa35e1ce2562291688ea",
+      "after_sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/alembic/versions/202607260001_admin_security_action_bound_audit.py",
+      "before_sha256": null,
+      "after_sha256": "2b050b47733f0bb7bf564734d48ed8d6da9615fc8150e83a5185b06ca51281f2",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/tests/test_admin_security.py",
+      "before_sha256": "d62f5183750bcf37e12de16b72fce8338a888cfe5e19f01ce0489c821cbf00f0",
+      "after_sha256": "d1d142846488e6458924afabf90bd0b78f35dbbc6b5abd3062467761f2bc74e8",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "contracts/walksafe.openapi.json",
+      "before_sha256": "798a3421781db46b081881cc91a2230f382456f7eaffa55cee6bfcd2f276c7ca",
+      "after_sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+      "before_sha256": "821a2bf4714b4797f745c2da11df1ff66f73f0e340553105f02b8805f6a5f4cf",
+      "after_sha256": "22b126d131d4b9229bdb7d71c03c408bfa323424520e6480fee0aba30b89f9ab",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+      "before_sha256": "2abf36bc1fa7dbb1eb9729cdc494df1bf38d676bb887ee1f5f7bb8db3ebeb563",
+      "after_sha256": "d77c737cf2a606db682fc8e9f40111742fb2c12f7096fb6bf5424356514e1ee8",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+      "before_sha256": "6094d8791ab0bfd5d315b5f4f7f08fb72a912b46021ed840faba508cdf2b9d7a",
+      "after_sha256": "610d4d3fa2cfeee0b3201817d344bca4970a6a88c10ff7204a453e3cfc7df8d5",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+      "before_sha256": "c334d2841e8239cf24214ec56c59449c893a84c517590bbd57923c202b784b87",
+      "after_sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+      "before_sha256": "87aa43cc406c96de01697be3f104d5a708dad06d281e94fbf36c6b7c6d34121f",
+      "after_sha256": "9bfb442063d7db01d5f9ec0834410ae68ff4896d183ea11937908cab241d6003",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "before_sha256": "101e39b178d1aef07e987e7cef8e6e0d0b105f76038ce3a21413fd075f0bf823",
+      "after_sha256": "c6d7e61b3c58c01ecf7848416e82c7e176c2ec31a0a95805773d26e25d9da040",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+      "before_sha256": "368fc34bffc734b740a9e6d1e6b7a97e15f949c05386b57f40915d19c3ac38c0",
+      "after_sha256": "d644fda5184b3d33c2393d44d22e746ff3820be0abb758119cde0f5cbabb7c85",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "8bf3077e736d30dff45052e8a5e1f2efc98d1900c907d29c854046dced8ca314",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "82c40d3890c14b387bec178c3f2b730516bef7390e216d6d000a9896f80ce7ad",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "before_sha256": "c6eae1d06d88d53957dcc2f2598270a7620fd7647e50e1089153a3496c71a71b",
+      "after_sha256": "4f75501a42118472b4f577f4dd8778de9df9bdf89d08320ba1ac4de9f232b42d",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "before_sha256": "187524c343ee019bb72340025483d3a4b77e5e946386237d3096371c61ed6996",
+      "after_sha256": "14b69da116a63a077d6026a7bdc25f5c99001b23087ef3df628c22ddc85abe50",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "before_sha256": "d1829bc1645a8fe2e3d2c6f4a746ab4b615de9d64fde006d79b169bf2436498f",
+      "after_sha256": "60736bb7b6a8c7e43273537b0bf344f8475ad83934589e5c51768170e5ade9d0",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "user and administrator entry points use separate application, audience and token authority boundaries",
+    "server-side role and ownership authorization rejects unregistered administrator method-route pairs by default",
+    "user device sessions support rotation, expiry, selective revocation, revoke-all and previous-proof replay rejection",
+    "administrator login requires password and TOTP before an administrator session is issued",
+    "high-risk administrator authorization is bound to session, action, method, route, nonce and expiry",
+    "high-risk middleware consumes and binds each nonce once in its own committed SessionLocal transaction before endpoint execution",
+    "the endpoint transaction separately revalidates control and session state and holds the protected-work lock through mutation/read, so endpoint failure cannot roll back or reuse the consumed nonce",
+    "administrator recovery freezes high-risk actions and has no shared-password bypass",
+    "authentication, authorization, step-up and revocation denials are persisted with actor, device, time and reason",
+    "the Android Gateway administrator v3 surface is absent and the legacy web administrator boundary remains disabled",
+    "gateway, backend and adminapp regressions cover default deny, replay, revocation, recovery and authority separation",
+    "the trace binds exact product-twenty-six and tooling-five scopes as one canonical exact-thirty-one content set"
+  ],
+  "remaining_implementation_boundaries": [
+    "TC-FP-047-01 through TC-FP-047-07 were not run",
+    "external PostGIS and reports integration was excluded from internal verification",
+    "external PostgreSQL concurrency verification was not performed",
+    "actual user, administrator and device scenarios were not tested",
+    "the single-administrator recovery drill was not run",
+    "external security, legal, privacy and accessibility reviews were not run",
+    "production credentials, networks and deployment were not used",
+    "the five release gates were not run or waived"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-047-01",
+      "TC-FP-047-02",
+      "TC-FP-047-03",
+      "TC-FP-047-04",
+      "TC-FP-047-05",
+      "TC-FP-047-06",
+      "TC-FP-047-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "external_postgis_integration_status": "NOT_RUN",
+    "external_reports_integration_status": "NOT_RUN",
+    "postgresql_concurrency_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_admin_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "single_admin_recovery_drill_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_accessibility_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

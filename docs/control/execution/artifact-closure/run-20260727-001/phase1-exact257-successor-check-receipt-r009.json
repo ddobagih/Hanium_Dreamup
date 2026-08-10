@@ -1,0 +1,383 @@
+{
+  "checks": [
+    {
+      "check_id": "R009-CHECK-R007-SUBJECT-BINDING-001",
+      "expected": {
+        "binding_id": "R009-SUBJECT-R007-LEDGER-PHYSICAL-001",
+        "byte_length": 2592915,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+        "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+        "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+      },
+      "observed": {
+        "binding_id": "R009-SUBJECT-R007-LEDGER-PHYSICAL-001",
+        "byte_length": 2592915,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+        "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+        "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-R008-EVIDENCE-BINDING-001",
+      "expected": {
+        "binding_id": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+        "byte_length": 23279,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json",
+        "sha256": "fbdfb6b30cd45dec562e80f687d93c2ebdf6582963a6cad72c0907bf8708b045",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_EVIDENCE"
+      },
+      "observed": {
+        "binding_id": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+        "byte_length": 23279,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json",
+        "sha256": "fbdfb6b30cd45dec562e80f687d93c2ebdf6582963a6cad72c0907bf8708b045",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_EVIDENCE"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-R008-RECEIPT-BINDING-001",
+      "expected": {
+        "binding_id": "R009-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+        "byte_length": 37591,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r008.json",
+        "sha256": "22896f621f5029ce66eeb1bf41c93495b758eea54390b098f8f31b13a145093f",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_RECEIPT"
+      },
+      "observed": {
+        "binding_id": "R009-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+        "byte_length": 37591,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r008.json",
+        "sha256": "22896f621f5029ce66eeb1bf41c93495b758eea54390b098f8f31b13a145093f",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_RECEIPT"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-RELEASE-GATE-COMPLETE-TUPLE-001",
+      "description": "Release gate expected and observed tuples match the immutable R007 subject.",
+      "expected": {
+        "named_candidate_count": 0,
+        "release_approval_count": 0,
+        "release_eligible_count": 0,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "observed": {
+        "named_candidate_count": 0,
+        "release_approval_count": 0,
+        "release_eligible_count": 0,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-RELEASE-OBSERVATION-BASIS-001",
+      "expected": {
+        "attestation_approval_count": 0,
+        "owner_approval_true_count": 0,
+        "record_count": 257,
+        "release_credit_true_count": 0,
+        "release_eligible_true_count": 0
+      },
+      "observed": {
+        "attestation_approval_count": 0,
+        "owner_approval_true_count": 0,
+        "record_count": 257,
+        "release_credit_true_count": 0,
+        "release_eligible_true_count": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-R008-COMPLETION-COVERAGE-INHERITANCE-001",
+      "expected": {
+        "path_count": 6,
+        "status": "PASS"
+      },
+      "observed": {
+        "path_count": 6,
+        "status": "PASS"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-COMPLETION-PATH-TOTALITY-001",
+      "expected": {
+        "boolean_count_each": 257,
+        "missing_null_non_boolean_each": 0,
+        "path_count": 6,
+        "row_count_each": 257
+      },
+      "observed": {
+        "boolean_count_each": 257,
+        "missing_null_non_boolean_each": 0,
+        "path_count": 6,
+        "row_count_each": 257
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-EXACT2-STATUS-EQUALITY-001",
+      "expected": {
+        "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "exact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ]
+      },
+      "observed": {
+        "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "exact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ]
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-CANONICAL-COUNTS-001",
+      "expected": {
+        "EXTERNAL": 49,
+        "INTERNAL_GAP": 48,
+        "N_A_CANDIDATE": 36,
+        "OK": 124
+      },
+      "observed": {
+        "EXTERNAL": 49,
+        "INTERNAL_GAP": 48,
+        "N_A_CANDIDATE": 36,
+        "OK": 124
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-QUEUE-ROUTES-001",
+      "expected": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "INTERNAL_READY": 62,
+        "INTERNAL_RUN_REQUIRED": 24,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14,
+        "REAL_EVENT_PENDING": 21,
+        "SCOPE_DECISION_PENDING": 0,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "observed": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "INTERNAL_READY": 62,
+        "INTERNAL_RUN_REQUIRED": 24,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14,
+        "REAL_EVENT_PENDING": 21,
+        "SCOPE_DECISION_PENDING": 0,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-CLOSURE-OPEN-COUNTS-001",
+      "expected": {
+        "current_scope_closure_delta_count": 2,
+        "open_artifact_count": 131
+      },
+      "observed": {
+        "current_scope_closure_delta_count": 2,
+        "open_artifact_count": 131
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-ZERO-CREDITS-001",
+      "expected": {
+        "actual_device_event_count": 0,
+        "attestation_approval_count": 0,
+        "formal279_pass_count": 0,
+        "in_scope_substantive_credit_count": 0,
+        "owner_approval_count": 0,
+        "real_event_count": 0,
+        "release_eligible_count": 0,
+        "verified_rights_or_external_fact_count": 0
+      },
+      "observed": {
+        "actual_device_event_count": 0,
+        "attestation_approval_count": 0,
+        "formal279_pass_count": 0,
+        "in_scope_substantive_credit_count": 0,
+        "owner_approval_count": 0,
+        "real_event_count": 0,
+        "release_eligible_count": 0,
+        "verified_rights_or_external_fact_count": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-R008-MINOR-CLOSURE-001",
+      "expected": {
+        "minor_id": "R008-MINOR-RELEASE-CHECK-EXPECTED-OBSERVED-SUMMARY-001",
+        "status": "CLOSED"
+      },
+      "observed": {
+        "minor_id": "R008-MINOR-RELEASE-CHECK-EXPECTED-OBSERVED-SUMMARY-001",
+        "status": "CLOSED"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-ADD-ONLY-NO-LEDGER-001",
+      "expected": {
+        "ledger_changed": false,
+        "ledger_replicated": false,
+        "r009_ledger_created": false
+      },
+      "observed": {
+        "ledger_changed": false,
+        "ledger_replicated": false,
+        "r009_ledger_created": false
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R009-CHECK-EVIDENCE-NONSELF-INTEGRITY-001",
+      "expected": {
+        "algorithm": "SHA-256",
+        "status": "PASS"
+      },
+      "observed": {
+        "algorithm": "SHA-256",
+        "content_sha256": "e557281064525986400c129defe69c240574e9ba84937cc8d1c3a82316f0480a",
+        "status": "PASS"
+      },
+      "status": "PASS"
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "9beb42d1f73ef818f982d51936cc120148aac60ea86d5cca36eeebf66a282556",
+    "encoding": "UTF-8",
+    "ensure_ascii": true,
+    "excluded_field": null,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 9817,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r009.json"
+  },
+  "output_bindings": [
+    {
+      "binding_id": "R009-OUTPUT-EVIDENCE-PHYSICAL-001",
+      "byte_length": 10248,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r009/evidence.json",
+      "sha256": "5c38512d3506fb09dcfa486682b261152d3fcb93ad086a950da4824f8dd1688a",
+      "subject_role": "R009_RELEASE_GATE_CORRECTION_EVIDENCE"
+    }
+  ],
+  "predecessor_bindings": [
+    {
+      "binding_id": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+      "byte_length": 23279,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json",
+      "sha256": "fbdfb6b30cd45dec562e80f687d93c2ebdf6582963a6cad72c0907bf8708b045",
+      "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_EVIDENCE"
+    },
+    {
+      "binding_id": "R009-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+      "byte_length": 37591,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r008.json",
+      "sha256": "22896f621f5029ce66eeb1bf41c93495b758eea54390b098f8f31b13a145093f",
+      "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_RECEIPT"
+    }
+  ],
+  "prepared_on": "2026-07-28T12:19:03+09:00",
+  "receipt_id": "PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-R009-001",
+  "receipt_self_integrity_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 9817,
+    "content_sha256": "9beb42d1f73ef818f982d51936cc120148aac60ea86d5cca36eeebf66a282556",
+    "encoding": "UTF-8",
+    "line_ending": "LF",
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r009.json"
+  },
+  "schema_version": "1.0.0",
+  "status": "PASS",
+  "subject_ledger_binding": {
+    "binding_id": "R009-SUBJECT-R007-LEDGER-PHYSICAL-001",
+    "byte_length": 2592915,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+    "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+    "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+  },
+  "summary": {
+    "canonical_exact2_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "check_count": 15,
+    "completion_boolean_path_count": 6,
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_closure_delta_count": 2,
+    "current_scope_false_count": 255,
+    "current_scope_rowwise_mismatch_count": 0,
+    "current_scope_true_count": 2,
+    "exact2": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "fail_count": 0,
+    "global_all_row_mismatch_count": 0,
+    "global_false_count": 257,
+    "global_true_count": 0,
+    "ledger_changed": false,
+    "ledger_replicated": false,
+    "legacy_true_count": 0,
+    "named_candidate_count": 0,
+    "open_artifact_count": 131,
+    "pass_count": 15,
+    "r008_minor_id": "R008-MINOR-RELEASE-CHECK-EXPECTED-OBSERVED-SUMMARY-001",
+    "r008_minor_status": "CLOSED",
+    "release_approval_count": 0,
+    "release_eligible_count": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "zero_credits": {
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "formal279_pass_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  }
+}

@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>WalkSafe 기능별 정책 종합보고서 — 설계 기준 검토본</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18201d;
+      --muted: #59635f;
+      --paper: #f5f7f5;
+      --surface: #ffffff;
+      --line: #d9dfdc;
+      --brand: #0a6250;
+      --brand-dark: #064a3c;
+      --brand-soft: #e5f4ef;
+      --blue-soft: #eaf2ff;
+      --amber: #8a4b00;
+      --amber-soft: #fff4df;
+      --red: #9d2c2c;
+      --red-soft: #fff0f0;
+      --shadow: 0 12px 32px rgba(19, 42, 34, .08);
+      --radius: 18px;
+      --top-offset: 78px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: auto; scroll-padding-top: 0; }
+    body {
+      margin: 0;
+      min-width: 280px;
+      overflow-x: clip;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    a { color: var(--brand-dark); text-underline-offset: .18em; }
+    button, input, select, textarea { font: inherit; }
+    button, select, input[type="search"], input[type="text"] { min-height: 44px; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: .65rem .9rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button:hover { border-color: var(--brand); background: var(--brand-soft); }
+    button.primary { border-color: var(--brand); background: var(--brand); color: white; }
+    button.primary:hover { background: var(--brand-dark); }
+    :focus-visible { outline: 3px solid #1276d2; outline-offset: 3px; }
+    [hidden] { display: none !important; }
+    .skip-link {
+      position: fixed;
+      z-index: 100;
+      top: .5rem;
+      left: .5rem;
+      transform: translateY(-160%);
+      background: #fff;
+      color: #000;
+      padding: .75rem 1rem;
+      border: 2px solid #000;
+    }
+    .skip-link:focus { transform: none; }
+    .topbar {
+      position: sticky;
+      z-index: 50;
+      top: 0;
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      min-height: 64px;
+      padding: .55rem max(1rem, env(safe-area-inset-left)) .55rem max(1rem, env(safe-area-inset-right));
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .97);
+      backdrop-filter: blur(10px);
+    }
+    .brand { margin-right: auto; color: var(--ink); text-decoration: none; font-weight: 900; }
+    .topnav { display: flex; gap: .4rem; }
+    .topnav a { padding: .55rem .65rem; border-radius: 9px; text-decoration: none; font-weight: 700; }
+    .topnav a:hover { background: var(--brand-soft); }
+    .toolbar { display: flex; gap: .4rem; }
+    .toolbar button { min-height: 40px; padding: .45rem .7rem; font-size: .9rem; }
+    main { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .hero {
+      margin: 2rem 0 1.5rem;
+      padding: clamp(1.5rem, 5vw, 3.5rem);
+      border-radius: 28px;
+      background: linear-gradient(135deg, #073e35, #0b725c);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+    .eyebrow { margin: 0 0 .35rem; color: inherit; font-size: .78rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .hero h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.7rem); line-height: 1.15; letter-spacing: -.04em; }
+    .hero .subtitle { margin: .35rem 0 1.2rem; font-size: 1.25rem; font-weight: 800; color: #cbf2e6; }
+    .status-line { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 1rem 0; padding: .85rem 1rem; border: 1px solid rgba(255,255,255,.35); border-radius: 12px; background: rgba(0,0,0,.18); }
+    .lead { max-width: 850px; font-size: 1.08rem; }
+    .document-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: .7rem; margin: 1.5rem 0 0; }
+    .document-meta div { padding: .8rem; border-radius: 12px; background: rgba(255,255,255,.12); }
+    .document-meta dt { font-size: .8rem; color: #cbf2e6; }
+    .document-meta dd { margin: .15rem 0 0; font-weight: 900; }
+    .report-section {
+      margin: 1.5rem 0;
+      padding: clamp(1.2rem, 3vw, 2rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      scroll-margin-top: var(--top-offset);
+    }
+    .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+    .section-heading h2, .section-heading h4 { margin: 0; line-height: 1.25; }
+    .section-heading .eyebrow { color: var(--brand); }
+    .section-heading > span { flex: none; border-radius: 999px; background: var(--brand-soft); color: var(--brand-dark); padding: .35rem .7rem; font-weight: 900; }
+    .review-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: .75rem; padding: 0; list-style: none; counter-reset: review-step; }
+    .review-steps li { counter-increment: review-step; min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 14px; }
+    .review-steps li::before { content: counter(review-step); display: grid; place-items: center; width: 2rem; height: 2rem; margin-bottom: .7rem; border-radius: 50%; background: var(--brand); color: white; font-weight: 900; }
+    .review-steps strong, .review-steps span { display: block; }
+    .review-steps span { margin-top: .35rem; color: var(--muted); font-size: .92rem; }
+    .system-flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: .65rem; padding: 0; list-style: none; }
+    .system-flow li { position: relative; padding: 1rem .85rem; border-radius: 14px; background: var(--brand-soft); }
+    .system-flow li > span { display: grid; place-items: center; width: 1.9rem; height: 1.9rem; border-radius: 50%; background: var(--brand); color: white; font-weight: 900; }
+    .system-flow strong { display: block; margin-top: .65rem; }
+    .system-flow p { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
+    .global-policy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; }
+    .global-policy-grid article { padding: 1.1rem; border: 1px solid var(--line); border-radius: 14px; scroll-margin-top: var(--top-offset); }
+    .global-policy-grid article.policy-change { border: 2px solid #d08c34; background: #fffaf0; }
+    .global-policy-grid h3 { margin: 0 0 .45rem; font-size: 1.05rem; }
+    .global-policy-grid p { margin: .4rem 0; }
+    .global-policy-grid small { color: var(--muted); }
+    .id-list { font-family: ui-monospace, monospace; font-size: .78rem; color: var(--muted); }
+    .shared-proposal-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; }
+    .shared-proposal-card { min-width: 0; padding: 1rem; border: 1px solid #b9d0c7; border-radius: 14px; background: #fbfdfc; scroll-margin-top: var(--top-offset); }
+    .shared-proposal-card h3 { margin: .15rem 0 .7rem; font-size: 1.08rem; }
+    .source-detail { margin-top: .7rem; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .source-detail summary { padding: .65rem; cursor: pointer; font-weight: 800; }
+    .warning-section { border-color: #e3bd79; background: #fffaf0; }
+    .change-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: .7rem; padding-left: 1.4rem; }
+    .change-list li { padding: .8rem 1rem; border-radius: 12px; background: white; }
+    .change-list p { margin: .3rem 0; }
+    .change-list small { color: var(--red); }
+    .review-progress { display: grid; grid-template-columns: repeat(5, 1fr); gap: .7rem; margin: 1rem 0; }
+    .review-progress div { padding: .85rem; border: 1px solid var(--line); border-radius: 12px; background: #f8faf9; }
+    .review-progress strong { font-size: 1.45rem; }
+    .review-progress span { display: block; color: var(--muted); font-size: .85rem; }
+    .filter-bar { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: .7rem; padding: .9rem; border-radius: 14px; background: #f0f4f2; }
+    .filter-bar label { font-size: .82rem; font-weight: 800; }
+    .filter-bar input, .filter-bar select, .reviewer-label input {
+      display: block;
+      width: 100%;
+      margin-top: .25rem;
+      border: 1px solid #aeb8b3;
+      border-radius: 10px;
+      background: white;
+      padding: .6rem .7rem;
+      color: var(--ink);
+    }
+    .filter-result { color: var(--muted); }
+    .area-index { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+    .area-index article { padding: 1rem; border: 1px solid var(--line); border-radius: 14px; }
+    .area-link { display: block; text-decoration: none; }
+    .area-link strong, .area-link span { display: block; }
+    .area-link span { margin-top: .25rem; color: var(--muted); font-size: .88rem; }
+    .area-index ul { margin: .65rem 0 0; padding-left: 1.15rem; font-size: .87rem; }
+    .area-index li + li { margin-top: .25rem; }
+    .area { margin: 2.2rem 0; scroll-margin-top: var(--top-offset); }
+    .area-header { margin-bottom: 1rem; padding: 1.4rem; border-left: 7px solid var(--brand); border-radius: 0 var(--radius) var(--radius) 0; background: #dfece7; }
+    .area-header .eyebrow { color: var(--brand-dark); }
+    .area-header h2 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+    .area-header p:last-child { margin-bottom: 0; }
+    .feature {
+      margin: 1rem 0 2rem;
+      padding: clamp(1rem, 3vw, 2rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      scroll-margin-top: var(--top-offset);
+    }
+    .feature-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .feature-header .eyebrow { color: var(--brand); }
+    .feature-header h3 { margin: 0; font-size: clamp(1.45rem, 4vw, 2.15rem); line-height: 1.25; }
+    .badge-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
+    .badge, .review-badge { border-radius: 999px; padding: .35rem .65rem; font-size: .78rem; font-weight: 900; }
+    .badge { background: var(--blue-soft); color: #234f82; }
+    .status-conflicting { background: var(--red-soft); color: var(--red); }
+    .review-badge { min-width: 140px; background: #eef0ef; color: var(--muted); text-align: center; white-space: nowrap; }
+    .review-badge.accept { background: var(--brand-soft); color: var(--brand-dark); }
+    .review-badge.revise { background: var(--amber-soft); color: var(--amber); }
+    .review-badge.hold { background: var(--red-soft); color: var(--red); }
+    .conclusion { margin: 1.2rem 0; padding: 1.15rem; border: 2px solid var(--brand); border-radius: 14px; background: var(--brand-soft); }
+    .conclusion span, .recommended-answer span { display: block; color: var(--brand-dark); font-size: .8rem; font-weight: 900; }
+    .conclusion p { margin: .35rem 0 0; font-size: 1.08rem; font-weight: 800; }
+    .conclusion-change { margin-top: .8rem; padding: .8rem; border-left: 5px solid var(--red); background: white; color: #6f1717; }
+    .conclusion-change p { font-size: .9rem; font-weight: 700; }
+    .intro-grid, .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+    .detail-grid.three { grid-template-columns: repeat(3, 1fr); }
+    .detail-grid.four { grid-template-columns: repeat(4, 1fr); }
+    .plain-panel, .detail-grid section { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 13px; background: #fbfcfb; }
+    .purpose-panel { margin: .8rem 0; }
+    .plain-panel h4, .detail-grid h4 { margin: 0 0 .4rem; }
+    .plain-panel p { margin: 0; }
+    ul { padding-left: 1.25rem; }
+    li + li { margin-top: .3rem; }
+    .empty-value { color: var(--muted); font-style: italic; }
+    .io-flow { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: .6rem; margin: .9rem 0; }
+    .io-flow > div { padding: 1rem; border-radius: 13px; background: #edf5ff; }
+    .io-flow h4 { margin: 0 0 .4rem; }
+    .flow-arrow { align-self: center; color: var(--brand); font-size: 1.6rem; font-weight: 900; }
+    details { scroll-margin-top: var(--top-offset); }
+    .policy-block, .trace-block { margin-top: .75rem; border: 1px solid var(--line); border-radius: 14px; background: white; }
+    .policy-block > summary, .trace-block > summary { min-height: 48px; padding: .8rem 1rem; cursor: pointer; font-weight: 900; }
+    .policy-block[open] > summary, .trace-block[open] > summary { border-bottom: 1px solid var(--line); background: #f2f6f4; border-radius: 14px 14px 0 0; }
+    .policy-block > :not(summary), .trace-block > :not(summary) { margin: .9rem; }
+    .danger-block { border-color: #e3bd79; }
+    .danger-block[open] > summary { background: var(--amber-soft); }
+    .current-source-block { border-color: #d7a453; background: #fffdf8; }
+    .current-source-block[open] > summary { background: var(--amber-soft); }
+    .current-source-warning { padding: .9rem; border-left: 5px solid var(--amber); background: var(--amber-soft); }
+    .current-source-warning p { margin: .25rem 0 0; }
+    .related-features { margin: .9rem; padding: .9rem; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
+    .related-features h4 { margin: 0 0 .4rem; }
+    .implementation { margin: .8rem; padding: 1rem; border-left: 5px solid #557487; background: #edf3f6; }
+    .implementation h4, .implementation p { margin: 0; }
+    .proposal-section { margin-top: 1rem; padding: 1rem; border-radius: 16px; background: #f0f6f3; }
+    .proposal-section .section-heading { margin: 0 0 .8rem; }
+    .proposal-card { padding: 1rem; border: 1px solid #bdd4ca; border-radius: 14px; background: white; scroll-margin-top: var(--top-offset); }
+    .proposal-card + .proposal-card { margin-top: .75rem; }
+    .shared-reference-section { margin-top: 1rem; padding: 1rem; border: 2px dashed #779c8d; border-radius: 16px; background: #f7fbf9; }
+    .shared-reference { padding: .9rem; border: 1px solid var(--line); border-radius: 12px; background: white; }
+    .shared-reference + .shared-reference { margin-top: .65rem; }
+    .shared-reference h4 { margin: .2rem 0; }
+    .shared-reference p { margin: .4rem 0; }
+    .change-chip { display: inline-block; margin-left: .35rem; padding: .15rem .45rem; border-radius: 999px; background: var(--red-soft); color: var(--red); font-family: inherit; }
+    .proposal-card h4 { margin: .1rem 0 .7rem; font-size: 1.12rem; }
+    .item-id { margin: 0; color: var(--brand); font-family: ui-monospace, monospace; font-size: .8rem; font-weight: 900; }
+    .recommended-answer { padding: .85rem; border-radius: 11px; background: var(--brand-soft); }
+    .recommended-answer p { margin: .25rem 0 0; font-weight: 750; }
+    .proposal-reasoning { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin: .75rem 0; }
+    .proposal-reasoning div { padding: .7rem; border: 1px solid var(--line); border-radius: 10px; }
+    .proposal-reasoning dt { font-size: .8rem; color: var(--muted); font-weight: 900; }
+    .proposal-reasoning dd { margin: .25rem 0 0; }
+    .change-warning { margin: .7rem 0; padding: .8rem; border-left: 5px solid var(--red); background: var(--red-soft); color: #6f1717; }
+    .change-warning p { margin: .25rem 0 0; }
+    .quote-policy { min-height: 40px; font-size: .85rem; }
+    .trace-block p { font-size: .85rem; font-family: ui-monospace, monospace; }
+    .decision-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: .7rem; }
+    .decision-card { padding: .85rem; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
+    .decision-card h4 { margin: .15rem 0 .4rem; }
+    .decision-card h5 { margin: .7rem 0 .2rem; font-size: .85rem; }
+    .decision-card p { font-family: inherit; }
+    .decision-badges { justify-content: flex-start; }
+    .review-box { margin-top: 1rem; padding: 1rem; border: 2px solid #95afa5; border-radius: 15px; }
+    .review-box legend { padding: 0 .4rem; font-weight: 900; }
+    .review-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: .65rem; }
+    .review-options label { display: flex; min-height: 72px; gap: .65rem; align-items: flex-start; padding: .8rem; border: 2px solid var(--line); border-radius: 12px; cursor: pointer; }
+    .review-options label:has(input:checked) { border: 2px solid var(--brand); background: var(--brand-soft); }
+    .review-options input { flex: none; width: 1.25rem; height: 1.25rem; margin-top: .2rem; accent-color: var(--brand); }
+    .review-options strong, .review-options small { display: block; }
+    .review-options small { margin-top: .25rem; color: var(--muted); }
+    .note-label { display: block; margin-top: .8rem; font-weight: 800; }
+    textarea { width: 100%; min-height: 96px; margin-top: .3rem; border: 1px solid #aeb8b3; border-radius: 10px; padding: .75rem; resize: vertical; }
+    .review-error { margin: .5rem 0 0; padding: .65rem; border-left: 4px solid var(--red); background: var(--red-soft); color: var(--red); font-weight: 800; }
+    .review-box.has-error { border-color: var(--red); }
+    .global-policy-grid .review-options, .shared-proposal-card .review-options { grid-template-columns: 1fr; }
+    .global-policy-grid .review-options label, .shared-proposal-card .review-options label { min-height: auto; }
+    .back-link { display: inline-block; margin-top: 1rem; }
+    .reviewer-label { display: block; max-width: 500px; font-weight: 800; }
+    .final-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin: 1rem 0; }
+    .completion-message { padding: 1rem; border-radius: 12px; background: #edf3f0; font-weight: 800; }
+    .storage-warning { position: fixed; z-index: 80; left: 50%; bottom: 1rem; width: min(560px, calc(100% - 2rem)); transform: translateX(-50%); padding: .9rem; border-radius: 12px; background: #261f12; color: white; box-shadow: var(--shadow); }
+    body.high-contrast { --ink: #000; --muted: #202020; --paper: #fff; --surface: #fff; --line: #000; --brand: #004d3d; --brand-dark: #003a2f; --brand-soft: #e4fff7; --blue-soft: #e5f0ff; }
+    body.high-contrast .feature, body.high-contrast .report-section { box-shadow: none; border-width: 2px; }
+    @media (max-width: 980px) {
+      .topnav { display: none; }
+      .review-steps { grid-template-columns: repeat(2, 1fr); }
+      .system-flow { grid-template-columns: repeat(3, 1fr); }
+      .global-policy-grid, .area-index { grid-template-columns: repeat(2, 1fr); }
+      .detail-grid.four { grid-template-columns: repeat(2, 1fr); }
+      .review-options { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      :root { --top-offset: 104px; }
+      body { word-break: normal; }
+      .topbar { align-items: flex-start; flex-wrap: wrap; }
+      .brand { width: 100%; }
+      .toolbar { width: 100%; overflow-x: auto; padding-bottom: .2rem; }
+      .toolbar button { flex: none; }
+      main { width: min(100% - 1rem, 1180px); }
+      .hero { margin-top: .7rem; border-radius: 20px; }
+      .document-meta, .review-progress { grid-template-columns: repeat(2, 1fr); }
+      .review-steps, .system-flow, .global-policy-grid, .shared-proposal-list, .change-list, .area-index,
+      .intro-grid, .detail-grid, .detail-grid.three, .detail-grid.four,
+      .proposal-reasoning, .filter-bar { grid-template-columns: 1fr; }
+      .decision-list { grid-template-columns: 1fr; }
+      .io-flow { grid-template-columns: 1fr; }
+      .flow-arrow { justify-self: center; transform: rotate(90deg); }
+      .feature-header { display: block; }
+      .badge-row { justify-content: flex-start; margin-top: .65rem; }
+      .feature, .report-section { border-radius: 14px; }
+      .proposal-section { padding: .65rem; }
+      .proposal-card { padding: .85rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+    @media print {
+      @page { size: A4; margin: 16mm 13mm 18mm; }
+      :root { --ink: #000; --muted: #333; --paper: #fff; --surface: #fff; --line: #888; }
+      body { font-size: 9pt; line-height: 1.45; background: white; }
+      .topbar, .filter-bar, .filter-result, .back-link, .quote-policy, .final-actions, .skip-link, .storage-warning,
+      .current-source-block, .trace-block, .shared-reference-section, .source-detail, .review-box,
+      #how-to-review, #service-flow, #change-recommendations, #feature-index, #final-review,
+      .proposal-reasoning { display: none !important; }
+      main { width: 100%; }
+      .hero { margin-top: 0; padding: 18mm 12mm; background: #fff; color: #000; border: 2px solid #000; box-shadow: none; }
+      .hero .subtitle, .document-meta dt { color: #222; }
+      .status-line, .document-meta div { background: #fff; border: 1px solid #777; }
+      .report-section, .feature { box-shadow: none; }
+      .area { break-before: page; }
+      .area:first-of-type { break-before: auto; }
+      .area-header { break-after: avoid; }
+      .feature-header, .conclusion, .proposal-card h4 { break-after: avoid; }
+      details > summary { display: none !important; }
+      details > :not(summary) { display: block !important; }
+      .feature[hidden], .area[hidden] { display: block !important; }
+      .global-policy-grid, .shared-proposal-list { display: block; }
+      .global-policy-grid article, .shared-proposal-card { margin-bottom: 8mm; break-inside: avoid; }
+      .feature { padding: 5mm; }
+      .proposal-section, .proposal-card { padding: 3mm; }
+      .policy-block > :not(summary) { margin: 2mm; padding: 0; }
+      .proposal-card + .proposal-card { margin-top: 3mm; }
+      .plain-panel, .detail-grid section, .io-flow > div, .recommended-answer { padding: 3mm; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 바로가기</a>
+  <header class="topbar">
+    <a class="brand" href="#top">WalkSafe 정책 종합보고서</a>
+    <nav class="topnav" aria-label="주요 장">
+      <a href="#how-to-review">검토 방법</a>
+      <a href="#global-policy">전체 정책</a>
+      <a href="#shared-policy">공통 세부</a>
+      <a href="#feature-index">54개 기능</a>
+      <a href="#final-review">결과 저장</a>
+    </nav>
+    <div class="toolbar" aria-label="보고서 도구">
+      <button type="button" id="expand-all">모두 펼치기</button>
+      <button type="button" id="collapse-all">모두 접기</button>
+      <button type="button" id="contrast-toggle" aria-pressed="false">고대비 켜기</button>
+    </div>
+  </header>
+
+  <main id="main">
+__STATIC_REPORT__
+  </main>
+
+  <p class="storage-warning" id="storage-warning" role="status" aria-live="polite" hidden>이 브라우저에서는 검토 내용을 자동 저장하지 못했습니다. 작업 중간에도 검토 결과 파일을 저장하세요.</p>
+  <input id="import-review-file" type="file" accept="application/json,.json" hidden>
+  <script id="report-data" type="application/json">__REPORT_DATA__</script>
+  <script>
+    (() => {
+      "use strict";
+      const report = JSON.parse(document.getElementById("report-data").textContent);
+      const featureIds = report.features.map((item) => item.id);
+      const globalPolicyIds = report.global_policies.map((item) => item.id);
+      const sharedPolicyIds = report.shared_decision_proposals.map((item) => item.proposal_id);
+      const policyIds = [...globalPolicyIds, ...sharedPolicyIds];
+      const reviewIds = [...policyIds, ...featureIds];
+      const reviewIdSet = new Set(reviewIds);
+      const binding = report.metadata.binding_sha256;
+      const storageKey = "walksafe:comprehensive-policy-review:" + binding;
+      const decisionLabels = report.review_contract.decisions;
+      const state = { reviewer: "", reviews: {}, contrast: false };
+
+      function safeObject(value) {
+        return value && typeof value === "object" && !Array.isArray(value);
+      }
+
+      function showStorageWarning() {
+        document.getElementById("storage-warning").hidden = false;
+      }
+
+      function loadState() {
+        try {
+          const stored = JSON.parse(localStorage.getItem(storageKey) || "null");
+          if (!safeObject(stored)) return;
+          if (typeof stored.reviewer === "string") state.reviewer = stored.reviewer;
+          if (typeof stored.contrast === "boolean") state.contrast = stored.contrast;
+          if (safeObject(stored.reviews)) {
+            for (const [reviewId, review] of Object.entries(stored.reviews)) {
+              if (!reviewIdSet.has(reviewId) || !safeObject(review)) continue;
+              if (!["", "accept", "revise", "hold"].includes(review.decision)) continue;
+              state.reviews[reviewId] = {
+                decision: review.decision,
+                note: typeof review.note === "string" ? review.note : ""
+              };
+            }
+          }
+        } catch (error) {
+          showStorageWarning();
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(state));
+        } catch (error) {
+          showStorageWarning();
+        }
+      }
+
+      function updateProgress() {
+        const featureDecisions = featureIds.map((id) => state.reviews[id]?.decision).filter(Boolean);
+        const policyDecisions = policyIds.map((id) => state.reviews[id]?.decision).filter(Boolean);
+        const decisions = reviewIds.map((id) => state.reviews[id]?.decision).filter(Boolean);
+        const correctionErrors = reviewIds.filter((id) => ["revise", "hold"].includes(state.reviews[id]?.decision) && !state.reviews[id].note.trim());
+        const counts = {
+          accept: decisions.filter((value) => value === "accept").length,
+          revise: decisions.filter((value) => value === "revise").length,
+          hold: decisions.filter((value) => value === "hold").length
+        };
+        document.getElementById("reviewed-count").textContent = String(featureDecisions.length);
+        document.getElementById("common-reviewed-count").textContent = String(policyDecisions.length);
+        document.getElementById("accept-count").textContent = String(counts.accept);
+        document.getElementById("revise-count").textContent = String(counts.revise);
+        document.getElementById("hold-count").textContent = String(counts.hold);
+        for (const featureId of featureIds) {
+          const badge = document.getElementById("badge-" + featureId.toLowerCase());
+          const decision = state.reviews[featureId]?.decision;
+          badge.className = "review-badge" + (decision ? " " + decision : "");
+          badge.textContent = decision ? decisionLabels[decision] : "검토 전";
+        }
+        for (const reviewId of reviewIds) {
+          const fieldset = document.querySelector(`[data-review-for="${reviewId}"]`);
+          const hasError = correctionErrors.includes(reviewId);
+          fieldset.classList.toggle("has-error", hasError);
+          document.getElementById("review-error-" + reviewId).hidden = !hasError;
+          fieldset.querySelector("textarea").setAttribute("aria-invalid", String(hasError));
+        }
+        const remaining = reviewIds.length - decisions.length;
+        const reviewerMissing = !state.reviewer.trim();
+        const reviewerInput = document.getElementById("reviewer-name");
+        reviewerInput.setAttribute("aria-invalid", String(!remaining && reviewerMissing));
+        document.getElementById("reviewer-error").hidden = Boolean(remaining || !reviewerMissing);
+        const message = document.getElementById("completion-message");
+        if (remaining) {
+          message.textContent = `기능 ${featureDecisions.length}/54개, 전체·공통 정책 ${policyDecisions.length}/${policyIds.length}개를 검토했습니다. 모두 합쳐 ${remaining}개가 남았습니다.`;
+        } else if (correctionErrors.length) {
+          message.textContent = `모든 정책을 검토했지만 수정 또는 보류 이유가 비어 있는 항목이 ${correctionErrors.length}개 있습니다.`;
+        } else if (reviewerMissing) {
+          message.textContent = "모든 정책을 검토했습니다. 검토자 이름 또는 역할을 적어야 완료 기록을 만들 수 있습니다.";
+        } else if (counts.hold || counts.revise) {
+          message.textContent = `모든 정책을 검토했습니다. 수정 ${counts.revise}개, 보류 ${counts.hold}개를 반영한 뒤 새 기준선을 확인해야 합니다.`;
+        } else {
+          message.textContent = "모든 기능·전체·공통 정책을 그대로 진행하도록 검토했습니다. 아직 자동 승인된 것은 아니며 별도 기준선 승인이 필요합니다.";
+        }
+      }
+
+      function restoreInputs() {
+        document.getElementById("reviewer-name").value = state.reviewer;
+        for (const reviewId of reviewIds) {
+          const review = state.reviews[reviewId];
+          if (!review) continue;
+          const radio = document.querySelector(`input[name="review-${reviewId}"][value="${review.decision}"]`);
+          if (radio) radio.checked = true;
+          const note = document.querySelector(`[data-note-for="${reviewId}"]`);
+          if (note) note.value = review.note;
+        }
+        document.body.classList.toggle("high-contrast", state.contrast);
+        const contrast = document.getElementById("contrast-toggle");
+        contrast.setAttribute("aria-pressed", String(state.contrast));
+        contrast.textContent = state.contrast ? "고대비 끄기" : "고대비 켜기";
+      }
+
+      function attachReviewEvents() {
+        document.querySelectorAll("[data-review-for]").forEach((fieldset) => {
+          const featureId = fieldset.dataset.reviewFor;
+          fieldset.querySelectorAll("input[type=radio]").forEach((radio) => {
+            radio.addEventListener("change", () => {
+              const note = document.querySelector(`[data-note-for="${featureId}"]`).value;
+              state.reviews[featureId] = { decision: radio.value, note };
+              saveState();
+              updateProgress();
+            });
+          });
+        });
+        document.querySelectorAll("[data-note-for]").forEach((textarea) => {
+          textarea.addEventListener("input", () => {
+            const featureId = textarea.dataset.noteFor;
+            const current = state.reviews[featureId];
+            if (current) current.note = textarea.value;
+            else state.reviews[featureId] = { decision: "", note: textarea.value };
+            saveState();
+            updateProgress();
+          });
+        });
+        document.querySelectorAll(".quote-policy").forEach((button) => {
+          button.addEventListener("click", () => {
+            const feature = button.closest("[data-feature-id]");
+            const featureId = feature.dataset.featureId;
+            const textarea = feature.querySelector(`[data-note-for="${featureId}"]`);
+            const prefix = button.dataset.policyId + ": ";
+            if (!textarea.value.includes(prefix)) {
+              textarea.value += (textarea.value.trim() ? "\n" : "") + prefix;
+              if (state.reviews[featureId]) state.reviews[featureId].note = textarea.value;
+              else state.reviews[featureId] = { decision: "", note: textarea.value };
+              saveState();
+              updateProgress();
+            }
+            textarea.focus();
+          });
+        });
+        document.getElementById("reviewer-name").addEventListener("input", (event) => {
+          state.reviewer = event.target.value;
+          saveState();
+          updateProgress();
+        });
+      }
+
+      function applyFilters() {
+        const query = document.getElementById("feature-search").value.trim().toLocaleLowerCase("ko");
+        const area = document.getElementById("area-filter").value;
+        const status = document.getElementById("status-filter").value;
+        let visible = 0;
+        document.querySelectorAll(".feature[data-feature-id]").forEach((feature) => {
+          const matches = (area === "all" || feature.dataset.areaId === area)
+            && (status === "all" || feature.dataset.policyStatus === status)
+            && (!query || feature.dataset.search.toLocaleLowerCase("ko").includes(query));
+          feature.hidden = !matches;
+          if (matches) visible += 1;
+        });
+        document.querySelectorAll("[data-area-section]").forEach((section) => {
+          section.hidden = !section.querySelector(".feature[data-feature-id]:not([hidden])");
+        });
+        document.getElementById("filter-result").textContent = `54개 기능 중 ${visible}개를 표시하고 있습니다.`;
+      }
+
+      function clearFilters() {
+        document.getElementById("feature-search").value = "";
+        document.getElementById("area-filter").value = "all";
+        document.getElementById("status-filter").value = "all";
+        applyFilters();
+      }
+
+      function validateImported(value) {
+        if (!safeObject(value)) throw new Error("파일 형식이 올바르지 않습니다.");
+        if (value.schema_version !== report.review_contract.schema_version) throw new Error("다른 검토 파일 형식입니다.");
+        if (value.report_binding_sha256 !== binding) throw new Error("현재 보고서와 연결되지 않은 검토 파일입니다.");
+        if (!safeObject(value.feature_reviews)) throw new Error("기능 검토 내용이 없습니다.");
+        if (!safeObject(value.global_policy_reviews)) throw new Error("전체 정책 검토 내용이 없습니다.");
+        if (!safeObject(value.shared_policy_reviews)) throw new Error("공통 정책 검토 내용이 없습니다.");
+        const reviews = {};
+        const groups = [
+          [value.feature_reviews, new Set(featureIds), "기능"],
+          [value.global_policy_reviews, new Set(globalPolicyIds), "전체 정책"],
+          [value.shared_policy_reviews, new Set(sharedPolicyIds), "공통 정책"]
+        ];
+        for (const [group, allowedIds, label] of groups) {
+          for (const [reviewId, review] of Object.entries(group)) {
+            if (!allowedIds.has(reviewId) || !safeObject(review)) throw new Error(`알 수 없는 ${label} 검토가 있습니다: ${reviewId}`);
+            if (!["", "accept", "revise", "hold"].includes(review.decision)) throw new Error("알 수 없는 검토 결과가 있습니다: " + reviewId);
+            if (typeof review.note !== "string") throw new Error("검토 메모 형식이 올바르지 않습니다: " + reviewId);
+            reviews[reviewId] = { decision: review.decision, note: review.note };
+          }
+        }
+        return { reviewer: typeof value.reviewer === "string" ? value.reviewer : "", reviews };
+      }
+
+      async function importReview(file) {
+        try {
+          if (file.size > 5 * 1024 * 1024) throw new Error("파일이 5MB보다 큽니다.");
+          const imported = validateImported(JSON.parse(await file.text()));
+          if (!window.confirm("현재 브라우저의 검토 내용을 선택한 파일로 바꿀까요?")) return;
+          state.reviewer = imported.reviewer;
+          state.reviews = imported.reviews;
+          document.querySelectorAll("[data-review-for] input[type=radio]").forEach((radio) => { radio.checked = false; });
+          document.querySelectorAll("[data-note-for]").forEach((textarea) => { textarea.value = ""; });
+          restoreInputs(); saveState(); updateProgress();
+        } catch (error) {
+          window.alert("불러올 수 없습니다: " + error.message);
+        }
+      }
+
+      function exportReview() {
+        const reviewed = reviewIds.filter((id) => state.reviews[id]?.decision);
+        const decisionWithoutReason = reviewIds.filter((id) => ["revise", "hold"].includes(state.reviews[id]?.decision) && !state.reviews[id].note.trim());
+        const selectedReviews = (ids) => Object.fromEntries(ids.filter((id) => state.reviews[id]?.decision || state.reviews[id]?.note).map((id) => [id, state.reviews[id]]));
+        const payload = {
+          schema_version: report.review_contract.schema_version,
+          report_id: report.metadata.report_id,
+          report_binding_sha256: binding,
+          exported_at: new Date().toISOString(),
+          status: reviewed.length === reviewIds.length && !decisionWithoutReason.length && state.reviewer.trim() ? "REVIEW_COMPLETE" : "DRAFT",
+          baseline_status: "NOT_APPROVED",
+          reviewer: state.reviewer,
+          summary: {
+            reviewed: reviewed.length,
+            reviewed_feature_count: featureIds.filter((id) => state.reviews[id]?.decision).length,
+            reviewed_global_policy_count: globalPolicyIds.filter((id) => state.reviews[id]?.decision).length,
+            reviewed_shared_policy_count: sharedPolicyIds.filter((id) => state.reviews[id]?.decision).length,
+            accepted: reviewed.filter((id) => state.reviews[id].decision === "accept").length,
+            revision_requested: reviewed.filter((id) => state.reviews[id].decision === "revise").length,
+            held: reviewed.filter((id) => state.reviews[id].decision === "hold").length,
+            unreviewed_feature_ids: featureIds.filter((id) => !state.reviews[id]?.decision),
+            unreviewed_global_policy_ids: globalPolicyIds.filter((id) => !state.reviews[id]?.decision),
+            unreviewed_shared_policy_ids: sharedPolicyIds.filter((id) => !state.reviews[id]?.decision),
+            missing_reason_review_ids: decisionWithoutReason,
+            missing_reason_feature_ids: decisionWithoutReason.filter((id) => featureIds.includes(id)),
+            missing_reviewer: !state.reviewer.trim()
+          },
+          global_policy_reviews: selectedReviews(globalPolicyIds),
+          shared_policy_reviews: selectedReviews(sharedPolicyIds),
+          feature_reviews: selectedReviews(featureIds)
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "walksafe-feature-policy-comprehensive-review-20260719-answers.json";
+        document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+      }
+
+      function attachTools() {
+        for (const id of ["feature-search", "area-filter", "status-filter"]) {
+          document.getElementById(id).addEventListener(id === "feature-search" ? "input" : "change", applyFilters);
+        }
+        document.getElementById("expand-all").addEventListener("click", () => {
+          document.querySelectorAll("details").forEach((item) => { item.open = true; });
+        });
+        document.getElementById("collapse-all").addEventListener("click", () => {
+          document.querySelectorAll("details").forEach((item) => { item.open = false; });
+        });
+        document.getElementById("contrast-toggle").addEventListener("click", () => {
+          state.contrast = !state.contrast; restoreInputs(); saveState();
+        });
+        document.getElementById("next-unreviewed").addEventListener("click", () => {
+          const next = reviewIds.find((id) => !state.reviews[id]?.decision || (["revise", "hold"].includes(state.reviews[id].decision) && !state.reviews[id].note.trim()));
+          clearFilters();
+          const target = document.getElementById((next || "final-review").toLowerCase());
+          target.scrollIntoView({ block: "start", behavior: "auto" });
+          target.querySelector?.("input, textarea, button")?.focus({ preventScroll: true });
+        });
+        document.addEventListener("click", (event) => {
+          const link = event.target.closest?.('a[href^="#fp-"]');
+          if (!link) return;
+          const target = document.getElementById(link.getAttribute("href").slice(1));
+          if (target?.hidden || target?.closest(".area")?.hidden) clearFilters();
+        });
+        document.getElementById("export-review").addEventListener("click", exportReview);
+        document.getElementById("print-report").addEventListener("click", () => window.print());
+        const importButton = document.createElement("button");
+        importButton.type = "button"; importButton.textContent = "저장한 결과 불러오기";
+        document.querySelector(".final-actions").insertBefore(importButton, document.getElementById("export-review"));
+        importButton.addEventListener("click", () => document.getElementById("import-review-file").click());
+        document.getElementById("import-review-file").addEventListener("change", (event) => {
+          const file = event.target.files && event.target.files[0];
+          if (file) importReview(file);
+          event.target.value = "";
+        });
+        let printOpen = [];
+        let printTextareaStyles = [];
+        window.addEventListener("beforeprint", () => {
+          printOpen = Array.from(document.querySelectorAll("details")).map((item) => item.open);
+          document.querySelectorAll("details").forEach((item) => { item.open = true; });
+          printTextareaStyles = Array.from(document.querySelectorAll("textarea")).map((item) => ({ height: item.style.height, overflow: item.style.overflow }));
+          document.querySelectorAll("textarea").forEach((item) => {
+            item.style.height = Math.max(item.scrollHeight, 96) + "px";
+            item.style.overflow = "visible";
+          });
+        });
+        window.addEventListener("afterprint", () => {
+          document.querySelectorAll("details").forEach((item, index) => { item.open = printOpen[index]; });
+          document.querySelectorAll("textarea").forEach((item, index) => {
+            item.style.height = printTextareaStyles[index]?.height || "";
+            item.style.overflow = printTextareaStyles[index]?.overflow || "";
+          });
+        });
+      }
+
+      loadState();
+      restoreInputs();
+      attachReviewEvents();
+      attachTools();
+      updateProgress();
+      applyFilters();
+      if (location.hash) {
+        const hashTarget = document.getElementById(location.hash.slice(1));
+        if (hashTarget) {
+          if (hashTarget.closest(".feature")?.hidden || hashTarget.closest(".area")?.hidden) clearFilters();
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            hashTarget.scrollIntoView({ block: "start", behavior: "auto" });
+          }));
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

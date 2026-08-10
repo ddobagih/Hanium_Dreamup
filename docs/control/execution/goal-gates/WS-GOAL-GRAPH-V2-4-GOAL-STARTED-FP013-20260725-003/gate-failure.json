@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-003",
+  "status": "FAILED",
+  "failed_check_id": "NODE_TOOLCHAIN_PRE",
+  "exit_code": 1,
+  "started_at": "2026-07-25T14:16:36+09:00",
+  "ended_at": "2026-07-25T14:16:36+09:00"
+}

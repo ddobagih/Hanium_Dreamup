@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP013-20260725-005",
+  "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+  "gate_purpose": "INITIAL_START",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005",
+  "target_goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+  "target_goal_content_sha256": "0c3ac09bb4541fa0a881995f49d701cc7dc0c520009b1b68f382e2a54030e217",
+  "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+  "source_activation_event_sha256": "900b5603bf1e5046b8e088ab59630a2e15a4980f5edd0d5e19c8d0fa33a521e8",
+  "check_command_contract_version": "2026-07-25.4",
+  "check_command_contract_sha256": "8c7e16f13a66398e5ba067cba0df9ba00258018f630256f6abc5b881b0467b7c",
+  "toolchain_lock_binding": {
+    "path": "configs/walksafe_node_toolchain_lock_20260715.json",
+    "file_sha256": "3b71481dee20943c6a7039315068809c6858c720bfc9df9133d43048b7b7b1a3"
+  },
+  "repository_snapshot": {
+    "snapshot_scope": "COMPLETE_GIT_VISIBLE_DIRTY_STATE_EXCLUDING_CHECKPOINT_AND_CURRENT_GATE_EVENT",
+    "gate_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005",
+    "head_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "object_format": "sha1",
+    "git_status_raw_sha256": "a8d9832479c9743535224cf49a26f5e2f5272f3617df82a08a1f5dc27e257de5",
+    "git_status_raw_byte_count": 75089,
+    "git_status_raw_record_count": 861,
+    "dirty_path_count": 861,
+    "path_set_sha256": "782c7a9d554f43c042d23a180b72db89a39b5c7f9e1a99853207394a8c0d81be",
+    "content_set_sha256": "c17228a140ed2debff19da08f35108f528f7846f17e7cf612c44c75258f082c4",
+    "index_state_sha256": "b3e7083e9a099a5967650820f1bb43879e9a76738bba157c6f210b9adedea5c5",
+    "checkpoint_base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "checkpoint_managed_path_count": 523,
+    "checkpoint_path_set_sha256": "8728184f40af320925d9fa956061827acd680eaf988eb7653b2ecb5a0d892807",
+    "checkpoint_content_set_sha256": "5a8dd42394f797e8af7a1d4506c8d37254c2de1738bf5d771210f01c98f2fe90",
+    "gate_repository_state_output_sha256": "9f7209b87d66ae96d7071aae57743971d738025948387ad9cc540d84cd0d37f6"
+  },
+  "execution_window": {
+    "started_at": "2026-07-25T14:19:26+09:00",
+    "ended_at": "2026-07-25T14:23:01+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "python3 -B scripts/check_walksafe_project_continuation_v2_4.py",
+      "executed_at": "2026-07-25T14:19:26+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/01-CONTINUATION.log",
+      "output_sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "command": "python3 -B scripts/check_walksafe_goal_graph_v2_4.py",
+      "executed_at": "2026-07-25T14:19:27+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/02-GOAL_GRAPH.log",
+      "output_sha256": "30e8153061f2c2fda56e124dd4138b6dac5c6c57bb16cc67f78ecad1bcb9a858"
+    },
+    {
+      "check_id": "BASELINE_MATERIALIZATION",
+      "command": "python3 -B scripts/materialize_walksafe_artifact_baseline_approval_20260722.py --check",
+      "executed_at": "2026-07-25T14:19:28+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/03-BASELINE_MATERIALIZATION.log",
+      "output_sha256": "dd8daffbad88b36c3575a38f5f7f4c4b4bf3ef6e62c6886ffefb5129c4687c00"
+    },
+    {
+      "check_id": "ANDROID_GATEWAY_BOUNDARY",
+      "command": "python3 -B scripts/check_walksafe_android_gateway_boundary_20260723.py --root .",
+      "executed_at": "2026-07-25T14:19:28+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/04-ANDROID_GATEWAY_BOUNDARY.log",
+      "output_sha256": "5fa3cf860762b5af0066fd8c074b9d90c332cd3236103dbc40c9b4857395c898"
+    },
+    {
+      "check_id": "NODE_TOOLCHAIN_PRE",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && WALKSAFE_NODE_ROOT=\"$(/usr/bin/dirname -- \"${WALKSAFE_NODE_BIN_DIR}\")\" && test \"${WALKSAFE_NODE_BIN_DIR}\" = \"${WALKSAFE_NODE_ROOT}/bin\" && python3 -I -S -B scripts/check_walksafe_node_toolchain_20260715.py --node-root \"${WALKSAFE_NODE_ROOT}\" --lock configs/walksafe_node_toolchain_lock_20260715.json",
+      "executed_at": "2026-07-25T14:19:29+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/05-NODE_TOOLCHAIN_PRE.log",
+      "output_sha256": "ccf47cdd429c328a176be4f83ef380b88a3aa1c01bc8594e66777ec4e5418767"
+    },
+    {
+      "check_id": "GATEWAY_TYPECHECK",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/android-gateway run typecheck",
+      "executed_at": "2026-07-25T14:19:29+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/06-GATEWAY_TYPECHECK.log",
+      "output_sha256": "d5d0638f1e783856ec81d08b289bd34c2f6b2eb795fb750977498948a02744bb"
+    },
+    {
+      "check_id": "GATEWAY_TEST",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/android-gateway test",
+      "executed_at": "2026-07-25T14:19:30+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/07-GATEWAY_TEST.log",
+      "output_sha256": "6e947a587a02f86407aea852a0b415511fd69cb663d0d0be89a6379fd3eae064"
+    },
+    {
+      "check_id": "GATEWAY_BUILD",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/android-gateway run build",
+      "executed_at": "2026-07-25T14:19:32+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/08-GATEWAY_BUILD.log",
+      "output_sha256": "441468028244a7696429546ce4af470dfb67761c077a0fe37418b59be1ac5b85"
+    },
+    {
+      "check_id": "WEB_TEST",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/web test",
+      "executed_at": "2026-07-25T14:19:33+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/09-WEB_TEST.log",
+      "output_sha256": "56c38414f45c768419a80ed3d171e4ff2dd16d9e812c4aa3526f4771f0ff6ea8"
+    },
+    {
+      "check_id": "WEB_LINT",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/web run lint",
+      "executed_at": "2026-07-25T14:19:45+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/10-WEB_LINT.log",
+      "output_sha256": "148014f17481780d723175b71227cb35ac097ce1154b569669f5ef59de8637ab"
+    },
+    {
+      "check_id": "WEB_TYPECHECK",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/web run typecheck",
+      "executed_at": "2026-07-25T14:19:50+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/11-WEB_TYPECHECK.log",
+      "output_sha256": "75303bbd476b9f2e9236d99c2c852b3b0aa586607f5c4f563e58017bb482f2fe"
+    },
+    {
+      "check_id": "WEB_BUILD",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && PATH=\"${WALKSAFE_NODE_BIN_DIR}:/usr/bin:/bin\" \"${WALKSAFE_NODE_BIN_DIR}/npm\" --prefix apps/web run build",
+      "executed_at": "2026-07-25T14:19:51+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/12-WEB_BUILD.log",
+      "output_sha256": "83749eee6775e323f6fb45c53a3fca450cb2da04ae50a2325ed3c17242f61eb0"
+    },
+    {
+      "check_id": "NODE_TOOLCHAIN_POST",
+      "command": ": \"${WALKSAFE_NODE_BIN_DIR:?required}\" && WALKSAFE_NODE_ROOT=\"$(/usr/bin/dirname -- \"${WALKSAFE_NODE_BIN_DIR}\")\" && test \"${WALKSAFE_NODE_BIN_DIR}\" = \"${WALKSAFE_NODE_ROOT}/bin\" && python3 -I -S -B scripts/check_walksafe_node_toolchain_20260715.py --node-root \"${WALKSAFE_NODE_ROOT}\" --lock configs/walksafe_node_toolchain_lock_20260715.json",
+      "executed_at": "2026-07-25T14:20:00+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/13-NODE_TOOLCHAIN_POST.log",
+      "output_sha256": "ccf47cdd429c328a176be4f83ef380b88a3aa1c01bc8594e66777ec4e5418767"
+    },
+    {
+      "check_id": "ANDROID_UNIT_ASSEMBLE_LINT",
+      "command": "(cd apps/android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon)",
+      "executed_at": "2026-07-25T14:20:01+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/14-ANDROID_UNIT_ASSEMBLE_LINT.log",
+      "output_sha256": "91c754c74411682e12ac6d52f491ff18680f14f8dbd0fdcbf922f79d35ed8636"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && PYTHON_BIN=\"${WALKSAFE_LOCKED_TEST_PYTHON}\" bash scripts/run_walksafe_test_layers_20260711.sh validate",
+      "executed_at": "2026-07-25T14:20:07+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/15-TEST_LAYER_REGISTRY_VALIDATE.log",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "check_id": "FIELD_AND_RELEASE_PYTEST",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && \"${WALKSAFE_LOCKED_TEST_PYTHON}\" -m pytest tests/test_android_field_session_summary.py tests/test_release_evidence_gate.py -q",
+      "executed_at": "2026-07-25T14:20:08+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/16-FIELD_AND_RELEASE_PYTEST.log",
+      "output_sha256": "53f66ed16f3573cae996d097a72e509b9376d8332374b450c2612ca2a9f66546"
+    },
+    {
+      "check_id": "GOAL_CONTROL_PYTEST",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && \"${WALKSAFE_LOCKED_TEST_PYTHON}\" -m pytest tests/test_walksafe_goal_graph_v2_4.py tests/test_walksafe_project_continuation_v2_4.py tests/test_walksafe_goal_graph_v2_3_history.py tests/test_walksafe_goal_graph_v2_2_history.py -q",
+      "executed_at": "2026-07-25T14:20:08+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/17-GOAL_CONTROL_PYTEST.log",
+      "output_sha256": "1a1facd5d7260d671bb68258d6868a9218bdf7c6abe5497d8554ab02b0bcf055"
+    },
+    {
+      "check_id": "CONTROL_AND_TRACE_PYTEST",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && \"${WALKSAFE_LOCKED_TEST_PYTHON}\" -m pytest tests/test_walksafe_epic01_phase_b_trace_20260722.py tests/test_walksafe_epic01_phase_c_trace_20260722.py tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py tests/test_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py tests/test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py tests/test_walksafe_epic02_trace_v2_2_history.py tests/test_walksafe_epic02_trace_v2_3_history.py tests/test_walksafe_android_gateway_boundary_20260723.py tests/test_walksafe_artifact_baseline_materialization_20260722.py --deselect=tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_generated_files_are_current_and_deterministic --deselect=tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_generated_files_are_current_and_deterministic --deselect=tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_generated_files_are_current_and_deterministic --deselect=tests/test_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py::WalkSafeEpic01PhaseFTraceTest::test_generated_files_are_current_and_deterministic --deselect=tests/test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py::WalkSafeEpic01PhaseGTraceTest::test_generated_files_are_current_and_deterministic --deselect=tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_generated_files_are_current_and_deterministic -q",
+      "executed_at": "2026-07-25T14:22:53+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/18-CONTROL_AND_TRACE_PYTEST.log",
+      "output_sha256": "637c13ce886202c48e78e1117831e0db0090c1b0f3d214a166278c51bca3a74f"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && python3 -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\"",
+      "executed_at": "2026-07-25T14:23:00+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-005/19-REPOSITORY_STATE.log",
+      "output_sha256": "9f7209b87d66ae96d7071aae57743971d738025948387ad9cc540d84cd0d37f6"
+    }
+  ],
+  "generated_at": "2026-07-25T14:23:01+09:00"
+}

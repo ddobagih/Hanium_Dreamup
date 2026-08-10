@@ -1,0 +1,67 @@
+{
+  "backend_subject": {
+    "content_fingerprint": "e608f182d179c8d59c2d012ad847a3c8251175cbabcb3fbc8c9462512cdd4720",
+    "subject_id": "backend",
+    "summary": {
+      "content_set_sha256": "de4853de5fde719b9ca3fbf8cc66a79279b384a98638cba1e7fae6791c8b0de2",
+      "path_count": 79,
+      "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a"
+    }
+  },
+  "document_id": "WALKSAFE-W3-DEV21-CURRENT-SOURCE-BINDING-20260726-003",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "a0b0e553014c2ab16fce0b8fddc619f7ec82b5feea27caab2989ef9cc10921ed"
+    }
+  },
+  "module_bindings": [
+    {
+      "component_scope": "user",
+      "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+      "module_id": "app",
+      "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782",
+      "predecessor_content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+      "predecessor_equal": true,
+      "source_file_count": 208
+    },
+    {
+      "component_scope": "admin",
+      "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "module_id": "adminapp",
+      "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f",
+      "predecessor_content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "predecessor_equal": true,
+      "source_file_count": 25
+    },
+    {
+      "component_scope": "gateway",
+      "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "module_id": "android-gateway",
+      "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3",
+      "predecessor_content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "predecessor_equal": true,
+      "source_file_count": 26
+    },
+    {
+      "component_scope": "backend",
+      "content_set_sha256": "de4853de5fde719b9ca3fbf8cc66a79279b384a98638cba1e7fae6791c8b0de2",
+      "module_id": "backend",
+      "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+      "predecessor_content_set_sha256": null,
+      "predecessor_equal": true,
+      "source_file_count": 79
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "reuse_decision": {
+    "adminapp": "REUSE_ALLOWED",
+    "android-gateway": "REUSE_ALLOWED",
+    "app": "REUSE_ALLOWED"
+  },
+  "schema_version": "walksafe.w3-dev21-current-source-binding.v1",
+  "snapshot_method": "W3_ENGINEERING_EVIDENCE_BUILDER_REPOSITORY_SNAPSHOT",
+  "source_commit": null,
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS"
+}

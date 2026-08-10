@@ -1,0 +1,305 @@
+{
+  "claim_semantics": "PROGRESS_OBSERVATION_ONLY_NO_CLOSURE_OR_PRODUCT_ACCEPTANCE_CREDIT",
+  "completion_boolean_boundary": {
+    "missing_or_non_boolean_count_each": 0,
+    "path_count": 6,
+    "paths": [
+      "/records/*/artifact_closure/completion_claimed",
+      "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+      "/records/*/artifact_closure/global_artifact_completion_claimed",
+      "/records/*/claim_boundary/artifact_completion_claimed",
+      "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+      "/records/*/claim_boundary/global_artifact_completion_claimed"
+    ],
+    "ready25_false_count_each": 25,
+    "ready25_row_count_each": 25,
+    "ready25_true_count_each": 0
+  },
+  "document_review_boundary": {
+    "approval_event_performed_by_r011": false,
+    "covered_artifact_count": 25,
+    "document_reviews_substitute_product_qa": false,
+    "independent_product_qa_acceptance_count": 0,
+    "independent_product_qa_reviewer": "UNASSIGNED",
+    "product_build_or_test_performed_by_r011": false,
+    "r011_independent_review_generated_by_builder": false,
+    "r011_independent_review_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-independent-review-r011.md",
+    "r011_independent_review_status_at_generation": "PENDING_SEPARATE_POST_MATERIALIZATION_REVIEW",
+    "source_document_review_file_count": 3,
+    "source_document_review_reported_findings_count": 0,
+    "source_review_independence_verified_by_r011": false,
+    "source_reviewer_identity_recorded_count": 0
+  },
+  "exact_set_fingerprints": {
+    "exact13_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 143,
+      "item_count": 13,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "20a267bf37e7626a33ffe2751a136c8d562ca61d606065ed3fe6ab97dade31a5"
+    },
+    "exact25_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 279,
+      "item_count": 25,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "c952cc7fc5d6c440444ab27e121b463a4db23fc1990b9bdbba38f6421baaf948"
+    },
+    "exact3_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 33,
+      "item_count": 3,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "cbf82d6ed916977579682552299668ca2e552a22a0c55284c2a7ffe564fb631e"
+    },
+    "exact9_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 103,
+      "item_count": 9,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "f9ad54b016fd88acd9902bedb5b72d069c40976f0c5bf406bfd72c9d7f563703"
+    }
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 10538,
+    "content_sha256": "605ff63bd34057291b6469476c43ef1e5724932af1ee4d47daa6bd6f6487f0c5",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r011/evidence.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 10538,
+    "content_sha256": "605ff63bd34057291b6469476c43ef1e5724932af1ee4d47daa6bd6f6487f0c5",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r011/evidence.json"
+  },
+  "packet_id": "WS-PHASE1-EXACT257-SUCCESSOR-EVIDENCE-20260729-R011",
+  "physical_output_contract": {
+    "add_only": true,
+    "atomic_publication_directory": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r011",
+    "encoding": "UTF-8",
+    "exactly_one_final_lf": true,
+    "existing_output_overwrite_allowed": false,
+    "publication_method": "STAGE_DIRECTORY_THEN_RENAMEAT2_NOREPLACE"
+  },
+  "prepared_on": "2026-07-29",
+  "preserved_invariants": {
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "closed_equivalent_count": 126,
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_n_a_count": 2,
+    "open_artifact_count": 131,
+    "release_status": "NOT_ELIGIBLE",
+    "zero_credits": {
+      "acceptance_count": 0,
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "execution_count": 0,
+      "formal279_pass_count": 0,
+      "formal_evidence_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "row_delta": {
+    "allowed_append_paths": [
+      "/records/*/progress_axes/content_authored/observations/-",
+      "/records/*/progress_axes/packet_materialization/-",
+      "/records/*/progress_axes/independent_review/-"
+    ],
+    "progress_totals_after": {
+      "content_authored_observations": 171,
+      "native_independent_review_axis_entries": 105,
+      "packet_materializations": 171
+    },
+    "progress_totals_before": {
+      "content_authored_observations": 146,
+      "native_independent_review_axis_entries": 80,
+      "packet_materializations": 146
+    },
+    "queue_or_closure_change_count": 0,
+    "ready25_progress_only_row_count": 25,
+    "record_count": 257,
+    "unchanged_r007_row_count": 232
+  },
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.phase1-exact257-successor-evidence.v11",
+  "source_bindings": [
+    {
+      "binding_id": "R011-SRC-001",
+      "byte_length": 2592915,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+      "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+      "subject_role": "R007_IMMUTABLE_EXACT257_PREDECESSOR"
+    },
+    {
+      "binding_id": "R011-SRC-002",
+      "byte_length": 10336,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json",
+      "sha256": "e878aa9915e549cfd06acaef7f150b75e0d6a0221d6c9978d6597d15c81c8056",
+      "subject_role": "R010_CURRENT_CHAIN_EVIDENCE"
+    },
+    {
+      "binding_id": "R011-SRC-003",
+      "byte_length": 16970,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r010.json",
+      "sha256": "5e9300013d252932cc696585c8e2d99ddcd434d972647c32a57620e64f62d51a",
+      "subject_role": "R010_CURRENT_CHAIN_RECEIPT"
+    },
+    {
+      "binding_id": "R011-SRC-004",
+      "byte_length": 5599,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-independent-review-r010.md",
+      "sha256": "9d724e59b4af2bb2e274d08482a6577ed1e4f42a2422b33f2714d8a6c29c183f",
+      "subject_role": "R010_CURRENT_CHAIN_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "R011-SRC-005",
+      "byte_length": 3803696,
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "a0c993257c1b80211c2e8e4db5aa464708ac4aba9d47ed9b434eda277ee6547f",
+      "subject_role": "CURRENT_DOC01_ARTIFACT_REGISTER"
+    },
+    {
+      "binding_id": "R011-SRC-006",
+      "byte_length": 102892,
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "cea8b58fc5afa527614522481df56d69618c6fd1015c10b63d6cc8b6e0678c67",
+      "subject_role": "CURRENT_DOC05_CHANGE_LOG"
+    },
+    {
+      "binding_id": "R011-SRC-007",
+      "byte_length": 168330,
+      "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+      "sha256": "7a7c099fd0fc8c793a694e82a14a267471f1685211282ec6abe21c2f41083643",
+      "subject_role": "CURRENT_REL_OPS_CLS_MANIFEST"
+    },
+    {
+      "binding_id": "R011-SRC-008",
+      "byte_length": 24980,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-ai-dev-sec-r002/evidence.json",
+      "sha256": "10867de47154f0add44755b8320ebb84e53732a18c841c55ca124117a2b321f2",
+      "subject_role": "READY25_EXACT9_R002_EVIDENCE"
+    },
+    {
+      "binding_id": "R011-SRC-009",
+      "byte_length": 5694,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-ai-dev-sec-r002/phase1-ready25-ai-dev-sec-check-receipt-r002.json",
+      "sha256": "0d01fe506ddb60e52621014aa15869ea1551969098ab10ac570976f145a0d626",
+      "subject_role": "READY25_EXACT9_R002_RECEIPT"
+    },
+    {
+      "binding_id": "R011-SRC-010",
+      "byte_length": 5793,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-ready25-ai-dev-sec-independent-review-r002.md",
+      "sha256": "0ae221044785c6d3443a6dd999865ada702493e5099062244e7c6b4e5f069bf1",
+      "subject_role": "READY25_EXACT9_R002_DOCUMENT_REVIEW"
+    },
+    {
+      "binding_id": "R011-SRC-011",
+      "byte_length": 42452,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-cls-ops-r003/evidence.json",
+      "sha256": "5d313ecfcbf26d0b42ff74998191c617ded483e4ff560f635caa03021ff43211",
+      "subject_role": "READY25_EXACT13_R003_EVIDENCE"
+    },
+    {
+      "binding_id": "R011-SRC-012",
+      "byte_length": 2613,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-cls-ops-r003/phase1-ready25-cls-ops-check-receipt-r003.json",
+      "sha256": "39c44e19157f970bd53afaec5872a36be66b0402f1cf2cdfa10ebfb21ba3b86d",
+      "subject_role": "READY25_EXACT13_R003_RECEIPT"
+    },
+    {
+      "binding_id": "R011-SRC-013",
+      "byte_length": 7448,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-ready25-cls-ops-independent-review-r003.md",
+      "sha256": "9f3e9a4d773c034f08156232a2e09f83220385106778261ecbaf0ee3a88d4690",
+      "subject_role": "READY25_EXACT13_R003_DOCUMENT_REVIEW"
+    },
+    {
+      "binding_id": "R011-SRC-014",
+      "byte_length": 34239,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-rel-r002/evidence.json",
+      "sha256": "5410753f226f4a778bc3b3d629a9e74cb87e4335add618d1f20da36c0c5c9577",
+      "subject_role": "READY25_EXACT3_R002_EVIDENCE"
+    },
+    {
+      "binding_id": "R011-SRC-015",
+      "byte_length": 2363,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-rel-r002/phase1-ready25-rel-check-receipt-r002.json",
+      "sha256": "a37ae6989cf013cd8e8cde99336cf272e289ea92285817b8782a27badd386b61",
+      "subject_role": "READY25_EXACT3_R002_RECEIPT"
+    },
+    {
+      "binding_id": "R011-SRC-016",
+      "byte_length": 5541,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-ready25-rel-independent-review-r002.md",
+      "sha256": "d9bd9ae5abca922ea96c9be316ddd04fec5dae3beb70f3ae78a5ea6ecb9e5376",
+      "subject_role": "READY25_EXACT3_R002_DOCUMENT_REVIEW"
+    }
+  ],
+  "subject_chain": {
+    "predecessor": {
+      "ledger_binding_id": "R011-SRC-001",
+      "r010_evidence_binding_id": "R011-SRC-002",
+      "r010_receipt_binding_id": "R011-SRC-003",
+      "r010_review_binding_id": "R011-SRC-004"
+    },
+    "r011_ledger": {
+      "binding_id": "R011-OUT-001",
+      "byte_length": 2637012,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r011/phase1-exact257-successor-ledger-r011.json",
+      "sha256": "7fc4bd6f2242b17de75faa040e42b4744c972a492f87ff4365caaeae53f93368",
+      "subject_role": "R011_FULL_EXACT257_LEDGER"
+    }
+  },
+  "verdict": "PASS_FOR_READY25_PROGRESS_APPLICATION_WITH_ZERO_CREDIT_BOUNDARY_ONLY"
+}

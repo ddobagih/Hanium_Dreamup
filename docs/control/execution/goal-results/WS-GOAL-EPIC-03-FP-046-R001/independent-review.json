@@ -1,0 +1,123 @@
+{
+  "attestation_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/review-attestation.json",
+    "sha256": "44be0b3456def010b8b74f25dd618f7ec323f80966d895b1f168c42d29693ad0"
+  },
+  "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-INTERNAL-REVIEW-20260810-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "minor_open": 0
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+  "review_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_personal_data_deletion_status": "NOT_RUN",
+    "actual_rights_request_status": "NOT_RUN",
+    "actual_user_or_guardian_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_independence_claimed": false,
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_processor_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_backup_restore_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-046-01",
+      "TC-FP-046-02",
+      "TC-FP-046-03",
+      "TC-FP-046-04",
+      "TC-FP-046-05"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP046_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY",
+    "separate_internal_review_pass": true
+  },
+  "review_subject_sha256": "c70410ba4d996bb8c2b8af38aa1c1f8659c3ab9e56f89e6db348f8a90218208f",
+  "reviewed_at": "2026-08-10T08:28:04+09:00",
+  "reviewed_consumer_bindings": [
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json",
+      "role": "GAP_R025",
+      "schema_version": "walksafe.implementation-gap-analysis.v1",
+      "sha256": "082a688ae32b068418d007111560802be3376deeee6cad526432a69b9d0321a1"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json",
+      "role": "BACKLOG_R025",
+      "schema_version": "walksafe.implementation-remediation-backlog.v1",
+      "sha256": "346fadca1cc9fea3f3d0a95a7f4beed061116d2d258080ed3105c50feeeaa5da"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "role": "ARTIFACT_CHANGE_LOG",
+      "schema_version": "walksafe.artifact-change-log.v1",
+      "sha256": "e25bc981af11837741161b55367253246e4e416816af9d2ba8a27ca8cee27437"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "role": "ARTIFACT_REGISTER",
+      "schema_version": "walksafe.artifact-register.v1",
+      "sha256": "14f7d25e6896e8c00c6a1b33986725130a81698fb1c91264b78f2bb534f9baf8"
+    },
+    {
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "role": "REQUIREMENTS_TRACEABILITY",
+      "schema_version": "walksafe.requirements-traceability-draft.v1",
+      "sha256": "4086aecbc86ceb2f3d726e7458a289eddb0d5cbe0ce50f7cf6495985b6d9f13e"
+    },
+    {
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "role": "DESIGN_TRACEABILITY",
+      "schema_version": "walksafe.design-traceability-register.v1",
+      "sha256": "7e53957c45ee607dcaf5a43d39abb4faea229eaeaa5fe3c4c291a86d29d878f3"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "role": "IMPLEMENTATION_MANIFEST",
+      "schema_version": "walksafe.implementation-manifest.v1",
+      "sha256": "2f168b185fc15fcccbd99c3daa37300f08f6581e79374f854876d18608f64d79"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "role": "MODULE_REGISTER",
+      "schema_version": "walksafe.dev-module-register.v1",
+      "sha256": "4e4dbdddff0b90ed6b80f866b7952f1093bd2fa4db1dab07a0b78d91572af070"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/phase1-exact257-successor-ledger-r014.json",
+      "role": "EXACT257_R014_LEDGER",
+      "schema_version": "walksafe.phase1-exact257-successor-ledger.v14",
+      "sha256": "275e0f193f367b409c9498d44ed229736cad15f952cc3e7dd8c69d4f3d78ad5d"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/evidence.json",
+      "role": "EXACT257_R014_EVIDENCE",
+      "schema_version": "walksafe.phase1-exact257-successor-evidence.v14",
+      "sha256": "047d2f06203a9438c666da37c8c9f57827018fde08b5a7efcedc673fc4c7217f"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/phase1-exact257-successor-check-receipt-r014.json",
+      "role": "EXACT257_R014_CHECK_RECEIPT",
+      "schema_version": "walksafe.phase1-exact257-successor-check-receipt.v14",
+      "sha256": "5d0988a25d418cf1a801fbec47a3452255c8ab4065b18bd1ac80fbdbf91963bc"
+    }
+  ],
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6",
+    "SUCCESSOR_TRACE": "971244da8be15d8e2fb388716bb459a15dcd4bec3442a093767fcd9d96441f78",
+    "VERIFICATION_RESULT": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+  },
+  "reviewer_id": "WS-FP046-INDEPENDENT-REVIEWER-001",
+  "reviewer_task": "/root/fp046_independent_review",
+  "schema_version": "1.0",
+  "status": "PASS"
+}

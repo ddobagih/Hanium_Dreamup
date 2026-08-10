@@ -1,0 +1,485 @@
+{
+  "schema_version": "walksafe.data-model-source-current-state.v1",
+  "snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "scope": "HANIUM_SUBMISSION_AND_DEMO",
+  "covered_artifact_type_codes": [
+    "DLV-AIML-01",
+    "DLV-AIML-02",
+    "DLV-AIML-03"
+  ],
+  "method": {
+    "mode": "SELECTED_REPOSITORY_METADATA_INSPECTION",
+    "dataset_materialization": "NOT_RUN",
+    "training": "NOT_RUN",
+    "build": "NOT_RUN",
+    "test": "NOT_RUN",
+    "full_dataset_hash_audit": "NOT_RUN",
+    "hash_scope": "28 selected metadata/artifact inputs including one candidate PT weight",
+    "unknown_value_rule": "Facts not supported by inspected repository evidence remain UNKNOWN or NOT_VERIFIED.",
+    "missing_path_check": "DETERMINISTIC_NEAREST_PARENT_DIRECT_ENTRY_INVENTORY"
+  },
+  "summary": {
+    "declared_current_dataset_source_names": [
+      "COCO 2017",
+      "AIHub 186",
+      "AIHub 513",
+      "AIHub 189 Surface",
+      "AIHub 572 approved e_scooter_obstruction subset",
+      "AIHub 189 manually approved e_scooter_obstruction subset"
+    ],
+    "current_materialized_dataset_manifest_exists": false,
+    "current_data_yaml_exists": false,
+    "current_source_usage_document_exists": false,
+    "current_dataset_source_contract_exists": false,
+    "historic_curation_manifests_exist": true,
+    "candidate_model_weight_exists": true,
+    "rights_verified_source_count": 0,
+    "privacy_reviewed_source_count": 0,
+    "direct_collection_or_consent_fact": "UNKNOWN",
+    "declared_source_entry_count": 6,
+    "declared_unique_dataset_provider_pair_count": 5,
+    "unique_dataset_provider_pair_definition": "Count normalized (provider, dataset identity) pairs; the AIHub 189 Surface and AIHub 189 manual e-scooter entries share one dataset/provider pair.",
+    "missing_referenced_path_count": 5
+  },
+  "current_dataset": {
+    "dataset_reference": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627",
+    "status": "DECLARED_CANDIDATE_NOT_REPRODUCIBLE_FROM_CURRENT_REPOSITORY",
+    "declared_counts_not_recomputed": {
+      "class_count": 13,
+      "train_images": 167759,
+      "validation_images": 28747,
+      "independent_test_images": 0,
+      "materialized_images": 196506,
+      "bounding_boxes": 607814
+    },
+    "declared_counts_source": "data_sources/README.md",
+    "class_order_source": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+    "manifest": {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv",
+      "exists": false,
+      "declared_sha256": "5ea9796589e02fcb64b82af564400df081731d7b2136e9a654422df56fdb94f6",
+      "verified_sha256": null,
+      "content_hash_status": "NOT_VERIFIED"
+    },
+    "data_yaml": {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "exists": false
+    },
+    "split_status": "NOT_VERIFIED",
+    "sequence_leakage_status": "NOT_VERIFIED",
+    "rights_status": "NOT_VERIFIED",
+    "privacy_status": "NOT_VERIFIED",
+    "training_or_release_eligible": false
+  },
+  "declared_current_sources": [
+    {
+      "source_key": "COCO-2017",
+      "name": "COCO 2017",
+      "provider": "UNKNOWN_IN_REPOSITORY",
+      "source_url": "UNKNOWN_IN_REPOSITORY",
+      "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+      "declaration_path": "data_sources/README.md",
+      "license_declaration": "NOT_VERIFIED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "privacy_status": "NOT_VERIFIED",
+      "consent_applicability": "UNDETERMINED",
+      "consent_verification_status": "NOT_VERIFIED"
+    },
+    {
+      "source_key": "AIHUB-186",
+      "name": "AIHub 186",
+      "provider": "AIHub",
+      "source_url": "UNKNOWN_IN_REPOSITORY",
+      "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+      "declaration_path": "data_sources/README.md",
+      "license_declaration": "NOT_VERIFIED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "NOT_VERIFIED"
+    },
+    {
+      "source_key": "AIHUB-513",
+      "name": "보행 안전을 위한 도로 시설물 데이터",
+      "provider": "AIHub",
+      "source_url": "https://www.aihub.or.kr/aihubdata/data/view.do?aihubDataSe=data&currMenu=115&dataSetSn=513&topMenu=100",
+      "inclusion_status": "DECLARED_INCLUDED_WITH_HISTORIC_DERIVED_MANIFESTS",
+      "declaration_paths": [
+        "data_sources/README.md",
+        "data_sources/manifests/korean_dataset_candidates.md",
+        "data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+        "ai_tasks/walksafe_v3_relabel_20260521/image_manifest.csv"
+      ],
+      "license_declaration": "DOWNLOAD_APPROVAL_OR_API_NEEDED_LICENSE_TEXT_NOT_CAPTURED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "CONTACT_SHEET_NO_OBVIOUS_FACE_OR_PLATE_SOURCE_LEVEL_AUDIT_NOT_RUN"
+    },
+    {
+      "source_key": "AIHUB-189-SURFACE",
+      "name": "인도(人道) 보행 영상 Surface subset",
+      "provider": "AIHub",
+      "source_url": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=189",
+      "inclusion_status": "DECLARED_INCLUDED_NOT_REPRODUCED",
+      "declaration_paths": [
+        "data_sources/README.md",
+        "model/README.md",
+        "data_sources/manifests/korean_dataset_candidates.md"
+      ],
+      "license_declaration": "DOWNLOAD_APPROVAL_OR_API_NEEDED_LICENSE_TEXT_NOT_CAPTURED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "NOT_VERIFIED"
+    },
+    {
+      "source_key": "AIHUB-572-E-SCOOTER",
+      "name": "이륜자동차 안전 위험 시설물 approved e_scooter_obstruction subset",
+      "provider": "AIHub",
+      "source_url": "UNKNOWN_IN_REPOSITORY",
+      "declared_image_count": 16005,
+      "inclusion_status": "DECLARED_HUMAN_APPROVED_LABEL_SUBSET_NOT_REPRODUCED",
+      "declaration_paths": [
+        "data_sources/README.md",
+        "model/README.md"
+      ],
+      "license_declaration": "NOT_VERIFIED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "NOT_VERIFIED",
+      "boundary": "Human label approval is not evidence of source rights or participant consent."
+    },
+    {
+      "source_key": "AIHUB-189-E-SCOOTER-MANUAL",
+      "name": "AIHub 189 manually approved e_scooter_obstruction subset",
+      "provider": "AIHub",
+      "source_url": "https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=189",
+      "declared_image_count": 7,
+      "inclusion_status": "DECLARED_HUMAN_APPROVED_LABEL_SUBSET_NOT_REPRODUCED",
+      "declaration_paths": [
+        "data_sources/README.md",
+        "model/README.md"
+      ],
+      "license_declaration": "NOT_VERIFIED",
+      "training_permission": "NOT_VERIFIED",
+      "redistribution_permission": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "NOT_VERIFIED",
+      "boundary": "Manual relabel approval is not evidence of source rights or participant consent."
+    }
+  ],
+  "historic_or_non_current_candidates": [
+    {
+      "source": "LibreYOLO/road-traffic",
+      "role": "walksafe_v1 bicycle smoke/pretrain candidate",
+      "current_13_class_input": false,
+      "exact_url": "UNKNOWN_IN_REPOSITORY",
+      "license": "NOT_VERIFIED"
+    },
+    {
+      "source": "Libre-YOLO/street-work",
+      "role": "walksafe_v1 construction cone smoke/pretrain candidate",
+      "current_13_class_input": false,
+      "exact_url": "UNKNOWN_IN_REPOSITORY",
+      "license": "NOT_VERIFIED"
+    },
+    {
+      "source": "jaygala24/pothole-detection",
+      "role": "walksafe_v1 pothole smoke/pretrain candidate",
+      "current_13_class_input": false,
+      "exact_url": "UNKNOWN_IN_REPOSITORY",
+      "license": "NOT_VERIFIED"
+    },
+    {
+      "source": "AIHub 159 first-person walking video",
+      "role": "planned candidate",
+      "current_13_class_input": false,
+      "source_url": "https://www.aihub.or.kr/aihubdata/data/view.do?aihubDataSe=&currMenu=115&dataSetSn=159&topMenu=100",
+      "repository_evidence": "2026-05-19 manifest states files were not found",
+      "license": "NOT_VERIFIED"
+    },
+    {
+      "source": "directly captured Korean walking data",
+      "role": "planned candidate",
+      "current_13_class_input": "UNKNOWN_NOT_DECLARED_INCLUDED",
+      "manifest": "NOT_IDENTIFIED_IN_SELECTED_METADATA",
+      "consent": "UNKNOWN",
+      "privacy": "UNKNOWN"
+    }
+  ],
+  "ai_task_current_state": {
+    "walksafe_v3_relabel_20260521": {
+      "unique_sanitized_images": 20,
+      "review_rows": 32,
+      "source_dataset_path_family": "/home/ddobagi/Code/hanium-dreamup/datasets/walksafe_kr_v2",
+      "source_name_in_paths": "AIHub 513 tactile",
+      "status": "RELABEL_PACKAGE_EXISTS",
+      "rights_status": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN",
+      "privacy_status": "SANITIZED_COPY_DECLARED_SOURCE_LEVEL_AUDIT_NOT_VERIFIED"
+    },
+    "walksafe_tactile_damage_area_review_20260522": {
+      "review_rows": 120,
+      "ai_suggestion_status": "NON_FINAL_REQUIRES_HUMAN_CONFIRMATION",
+      "decision_apply_status": "PENDING_DECISIONS",
+      "built_dataset": false,
+      "materialized_manifest": null,
+      "rights_status": "NOT_VERIFIED",
+      "consent_status": "UNKNOWN"
+    }
+  },
+  "model_current_state": {
+    "primary_candidate": {
+      "model_id": "walksafe-13cls-yolo26n-img768-epoch270-20260708",
+      "stage": "CANDIDATE",
+      "source_artifact": {
+        "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "exists": true,
+        "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+        "byte_length": 5411845,
+        "format": "pytorch"
+      },
+      "dataset_manifest_status": "MISSING_NOT_VERIFIED",
+      "base_or_pretrained_model_source": "YOLO26n_COCO_PRETRAINED_DECLARED_EXACT_ORIGIN_AND_LICENSE_NOT_VERIFIED",
+      "candidate_metrics_status": "DECLARED_NOT_RECOMPUTED_NOT_FORMAL_EVALUATION",
+      "deployment_eligible": false
+    },
+    "android_export_reference": {
+      "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "declared_sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+      "declared_byte_length": 9984493,
+      "review_status": "DECLARED_BY_MODEL_REGISTER_NOT_REHASHED_IN_THIS_REVIEW",
+      "deployment_eligible": false
+    },
+    "legacy_runtime_models": [
+      {
+        "model_id": "custom_tactile",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "release_status": "NOT_ELIGIBLE"
+      },
+      {
+        "model_id": "coco_general",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "release_status": "NOT_ELIGIBLE"
+      }
+    ]
+  },
+  "missing_referenced_paths": [
+    {
+      "path": "reports/walksafe_best_eval_20260708/training_reference_index_20260708.md",
+      "exists": false,
+      "inventory_record_id": "MISSING-PATH-001"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_aihub_source_usage_20260628.md",
+      "exists": false,
+      "inventory_record_id": "MISSING-PATH-002"
+    },
+    {
+      "path": "docs/model-data/walksafe_13class_dataset_source_contract_20260619.md",
+      "exists": false,
+      "inventory_record_id": "MISSING-PATH-003"
+    },
+    {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "exists": false,
+      "inventory_record_id": "MISSING-PATH-004"
+    },
+    {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv",
+      "exists": false,
+      "inventory_record_id": "MISSING-PATH-005"
+    }
+  ],
+  "artifact_assessment": [
+    {
+      "artifact_type_code": "DLV-AIML-01",
+      "current_state": "INTERNAL_CURRENT_STATE_AUTHORED",
+      "remaining_boundary": "Actual acquisition, rights, direct collection, consent and privacy facts remain EVIDENCE_FACT_REQUEST or NOT_VERIFIED."
+    },
+    {
+      "artifact_type_code": "DLV-AIML-02",
+      "current_state": "CURRENT_STATE_ATTESTABLE_WITH_BLOCKERS",
+      "remaining_boundary": "The current dataset name, declared composition and class order are known, but the materialized manifest, content hashes, split verification and independent test are missing."
+    },
+    {
+      "artifact_type_code": "DLV-AIML-03",
+      "current_state": "SOURCE_INVENTORY_AUTHORED_RIGHTS_NOT_VERIFIED",
+      "remaining_boundary": "Provider and some URLs are known; exact acquisition records, license terms, training/redistribution permission and consent/privacy records are not verified."
+    }
+  ],
+  "evidence_inputs": [
+    {
+      "path": "data_sources/README.md",
+      "byte_length": 3046,
+      "sha256": "6daa5aa0d76e6565917128d490242a468195f171f70326513f244d42c0b1aabf"
+    },
+    {
+      "path": "data_sources/manifests/korean_dataset_candidates.md",
+      "byte_length": 6020,
+      "sha256": "29ee8575deee9c4b9c09fd46cafe6a1c06d99a77a214873e6464d9aca6e71cd3"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_v1_sources.md",
+      "byte_length": 1482,
+      "sha256": "fcaac487301c80171aec6b83dd0d4c2444edb2ca8162297041d06c58d117684b"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_policy_2026-05-19.md",
+      "byte_length": 1785,
+      "sha256": "c99edb678230629e3d133692f284d19768809c987ef667acbde3928476bfe270"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_summary_2026-05-19.json",
+      "byte_length": 1102,
+      "sha256": "1b995efe15563e6587a43ccf89b2b36a251d5d9ecad6415decd959c1dc51c744"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_curation_summary_2026-05-18.json",
+      "byte_length": 1799,
+      "sha256": "0e33db42651f91f77fade76fb2cc63b0110be44b6c95781f02a43c544979efc7"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+      "byte_length": 27823,
+      "sha256": "e2fa27a0fcdee5e9ddad5402d8b3b52a78034a2772b3c6a4018354ef9f723b46"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_2026-05-19.csv",
+      "byte_length": 47179,
+      "sha256": "6ac7cb425577d977afaaf67a0cc97ad97bb32479012620fdcb3ea289b6eaa690"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv",
+      "byte_length": 13312,
+      "sha256": "9e0ebfc596f3e75812b738786e7e611d57d8a81248e83c7dea4ea39b71de7cfa"
+    },
+    {
+      "path": "ai_tasks/README.md",
+      "byte_length": 1054,
+      "sha256": "6ae5890b33aae17417ccf32ecfe1670db0d0448a411943303ef4a34b6b84e27c"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/README.md",
+      "byte_length": 1538,
+      "sha256": "aa8886a383cc7595fdf4fdc76cefa381366c32cf95860db7731281de21e3c995"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/image_manifest.csv",
+      "byte_length": 11679,
+      "sha256": "94c46820ae33e9c5662e316301973d5ba7f1c63ef6cfe2fb246c1a1cda3903dc"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/relabel_queue.csv",
+      "byte_length": 33208,
+      "sha256": "f924aee969cda8ecfeb8ca7213bf45adbaac1c1314c5193ab1fed0fdcffd9c6a"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/classes.txt",
+      "byte_length": 24,
+      "sha256": "2033cad2bc10f27f9a45b89e2ebff52eef440259c11dc53065d9cf4c281f17f0"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/README.md",
+      "byte_length": 2396,
+      "sha256": "c49ff3cec86fadadeca2add8036e20e1434f75e7adf619b38a962ddf7b781497"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json",
+      "byte_length": 1968,
+      "sha256": "b72383d5b23e30d61d1a4e93751595717ba9a779f5c234a24055e25ee3ea5dde"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_apply_summary_2026-05-22.json",
+      "byte_length": 1847,
+      "sha256": "670d333dc94aa17d0e31c53c54eb6802e63921375abd93980be189c9b49edd1b"
+    },
+    {
+      "path": "ai_tasks/walksafe_two_model_runtime_20260522/README.md",
+      "byte_length": 2532,
+      "sha256": "2dda69f3e8946a706f5313c1511ff1e9f74c079b882feaa88e34f5c8cdcbaab7"
+    },
+    {
+      "path": "model/README.md",
+      "byte_length": 7627,
+      "sha256": "f8c30578f42811987e3f6e51c1ef230760d7a41f301412be5154a1faa6d87ce6"
+    },
+    {
+      "path": "model/artifacts/README.md",
+      "byte_length": 1327,
+      "sha256": "c5fa9b10c22a7a77ecb24a44a1749af1e920dfdfae192be15bd1ea6b246de9fa"
+    },
+    {
+      "path": "model/registry/walksafe-model-registry.json",
+      "byte_length": 2293,
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a"
+    },
+    {
+      "path": "model/deployments/local-deployment.json",
+      "byte_length": 1348,
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    {
+      "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+      "byte_length": 5411845,
+      "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "byte_length": 39378,
+      "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "byte_length": 23552,
+      "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+      "byte_length": 5834,
+      "sha256": "f0a18fa7758ebbeeb572225dbd67053909f5551c394970c7827515820f3f5f74"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "byte_length": 26684,
+      "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "byte_length": 12663,
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+    }
+  ],
+  "remaining_evidence_fact_requests": [
+    {
+      "id": "EFR-DATA-SOURCE-COMPLETENESS",
+      "request_kind": "EVIDENCE_FACT_REQUEST",
+      "request": "Is the declared current training-source list complete: COCO 2017 and AIHub 186/513/189/572, with no directly captured or user-provided images? If not, identify each additional source and whether it entered train or validation.",
+      "acceptable_absence_response": true
+    },
+    {
+      "id": "EFR-RIGHTS-CONSENT-EVIDENCE",
+      "request_kind": "EVIDENCE_FACT_REQUEST",
+      "request": "For each source actually used, provide the acquisition date/account or evidence ID, exact official URL/terms or license record, and any consent/privacy record for directly captured or user-provided data; stating that no such record exists is acceptable.",
+      "acceptable_absence_response": true
+    },
+    {
+      "id": "EFR-BASE-MODEL-PROVENANCE",
+      "request_kind": "EVIDENCE_FACT_REQUEST",
+      "request": "Identify the exact YOLO26n pretrained/base weight origin, version, download URL and license used to start the 13-class training, or confirm that this information is unavailable.",
+      "acceptable_absence_response": true
+    }
+  ],
+  "missing_path_inventory_binding": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-missing-path-inventory.json",
+    "byte_length": 15880,
+    "sha256": "5c6a2a1554d106336996e9b0d50c7744f79aac65ea76ca93a27b2c6d68a0356c",
+    "filesystem_state_sha256": "f828481a8950ace025b1fb8d54ae9e1f3f2594a7fd8095190426582cf1f968ea",
+    "content_fingerprint_sha256": "1d3e37be9b53e276fca12e7768fd272532fe3cacdb1f32a82776c3a1e89eb22d",
+    "checked_at": "2026-07-27T19:08:16+09:00"
+  }
+}

@@ -1,0 +1,403 @@
+{
+  "schema_version": "walksafe.formal-dev-test-draft-manifest.v1",
+  "metadata": {
+    "title": "WalkSafe DEV·TST 정식 산출물 Draft manifest",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "DEV-01",
+      "DEV-02",
+      "DEV-03",
+      "DEV-04",
+      "DEV-05",
+      "DEV-06",
+      "DEV-07",
+      "DEV-08",
+      "DEV-09",
+      "DEV-10",
+      "DEV-11",
+      "DEV-12",
+      "DEV-13",
+      "DEV-14",
+      "DEV-15",
+      "DEV-16",
+      "DEV-17",
+      "DEV-18",
+      "DEV-19",
+      "DEV-20",
+      "DEV-21",
+      "TST-01",
+      "TST-02",
+      "TST-03",
+      "TST-04",
+      "TST-05",
+      "TST-06",
+      "TST-07",
+      "TST-08",
+      "TST-09",
+      "TST-10",
+      "TST-11",
+      "TST-12",
+      "TST-13",
+      "TST-14",
+      "TST-15",
+      "TST-16",
+      "TST-17",
+      "TST-18",
+      "TST-19",
+      "TST-20",
+      "TST-21",
+      "TST-22",
+      "TST-23"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py",
+    "manifest_id": "WS-FORMAL-DEV-TST-DRAFT-20260721-001",
+    "controlled_revision": 1
+  },
+  "source_bindings": {
+    "policy": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    "policy_approval_record": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    "policy_baseline_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    "artifact_catalog": {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    "aligned_decision_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    "approved_project_answers": {
+      "path": "docs/control/questionnaire/source-records/walksafe-project-decisions-20260717-answers.json",
+      "sha256": "6e132df56ab5004be1130fdcb31e48be30cc5e3536747d90367253302817df24"
+    },
+    "fp035_correction_candidate": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "policy_approval_validator_source": {
+      "path": "scripts/build_walksafe_feature_policy_baseline_approval_20260721.py",
+      "sha256": "116a8a1d948e81389ca9679b0473ee39e3d5519727a7ecc58fa65f8688e09b7d"
+    },
+    "decision_alignment_validator_source": {
+      "path": "scripts/build_walksafe_effective_decision_register_alignment_20260721.py",
+      "sha256": "400e3217bd38aca3e7ac045f12fdd5b74718262a12e8ec20ea72d9b84eb58255"
+    },
+    "design_trace_mapping_source": {
+      "path": "scripts/build_walksafe_design_deliverables_20260721.py",
+      "sha256": "5ae37460731976da8ca7935269ff9f645b033a348a3cad4eb4b40a1d2e70e339"
+    },
+    "generator": {
+      "path": "scripts/build_walksafe_formal_dev_test_20260721.py",
+      "sha256": "34a23f2ace70d9820d16c39fc21e6c395fd970411286e878d510677e8c0915fe"
+    }
+  },
+  "source_binding_sha256": "8b7a30dc434a14692e6960320cbc8efad047bc7bce42b572685ba67f301c187b",
+  "coverage": {
+    "DEV": {
+      "expected": 21,
+      "covered": 21
+    },
+    "TST": {
+      "expected": 23,
+      "covered": 23
+    },
+    "duplicate_artifact_type_ids": [],
+    "missing_artifact_type_ids": []
+  },
+  "approved_project_facts_applied": {
+    "target_stage": "PRODUCTION_AFTER_REQUIRED_GATES",
+    "current_release_stage": "CONTROLLED_DEMO_THEN_BETA",
+    "controlled_demo_date": "2026-07-26",
+    "fixed_budget_krw": null,
+    "platform": "ANDROID_USER_AND_SEPARATE_ADMIN_APPS",
+    "object_class_candidate": "UNIFIED_13",
+    "deployment_model": "MANAGED_CLOUD_STAGING_FIRST",
+    "operations_owner": "PROJECT_OWNER_SINGLE_ADMIN",
+    "support_window": "BUSINESS_HOURS",
+    "beta_slo_policy": "NO_NUMERIC_SLO_UNTIL_MEASURED",
+    "source_path": "docs/control/questionnaire/source-records/walksafe-project-decisions-20260717-answers.json"
+  },
+  "fp035_policy_normalization": {
+    "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+    "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+    "owner_clarification_required": false,
+    "normalized_policy": {
+      "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+      "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+      "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+    },
+    "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+    "correction_candidate_binding": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "correction_candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+    "correction_candidate_approval_status": "NOT_APPROVED",
+    "correction_candidate_effective_status": "NOT_EFFECTIVE",
+    "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+    "approval_blockers": [
+      "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+      "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+    ],
+    "mobile_network_branch_implementation_and_test_readiness": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+    "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+    "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+    "policy_effect_claimed": false,
+    "related_test_case_count": 4,
+    "related_test_status": "NOT_RUN",
+    "approval_boundary": "사용자 정규화 지시는 포착했으나 새 산출물 묶음 승인 전이다. 같은 정책 선택을 다시 묻지 않는다."
+  },
+  "generated_files": [
+    {
+      "path": "docs/deliverables/05-implementation/developer-guide.md",
+      "sha256": "3f47059f1491b679d02c149b12eb01061e30c96935dc65f3b964496d2715b8ee",
+      "byte_length": 10440,
+      "artifact_type_ids": [
+        "DEV-02",
+        "DEV-03",
+        "DEV-04",
+        "DEV-05",
+        "DEV-06",
+        "DEV-08"
+      ]
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595",
+      "byte_length": 6221,
+      "artifact_type_ids": [
+        "DEV-01",
+        "DEV-07",
+        "DEV-09",
+        "DEV-10",
+        "DEV-11",
+        "DEV-12",
+        "DEV-13",
+        "DEV-14"
+      ]
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+      "byte_length": 248944,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+      "sha256": "2e61fb8ec3d8180592a691950eb51c3e63479ae86451c851b82323a1371e48d8",
+      "byte_length": 4952,
+      "artifact_type_ids": [
+        "DEV-15",
+        "DEV-16",
+        "DEV-17",
+        "DEV-18",
+        "DEV-19",
+        "DEV-20",
+        "DEV-21"
+      ]
+    },
+    {
+      "path": "docs/deliverables/05-implementation/licenses-and-notices.md",
+      "sha256": "156af771055c842080248a5b03e93611929fca7c2bb373477d022852b0cdffc3",
+      "byte_length": 3440,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+      "byte_length": 62222,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "sha256": "cca58df18d82bb0e8c404309867ac1cbc454ba655d04182ecf6631be61304e65",
+      "byte_length": 52836,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/05-implementation/software-integration-report.md",
+      "sha256": "678925c5b7f15e069e08f339f168a1fefbf57525866c7b1d30093bc76b770d45",
+      "byte_length": 3108,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/acceptance-receipt.md",
+      "sha256": "24f10efec664ffdc9b8c00aefd6b3cf473d3c56ee001b3eb48d302178a8e0eed",
+      "byte_length": 2011,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/evidence/README.md",
+      "sha256": "dc5af632a88fde56218a6b105daecf6edef56b6929ed7618dcd480b2a9c2b610",
+      "byte_length": 2624,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/evidence/evidence-register.json",
+      "sha256": "09c3014abd70ed808df4ea3837dc0012be03f6fe081de0767a2bdccefe076a59",
+      "byte_length": 5547,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/defects.json",
+      "sha256": "98974e06294675dc7ee659571d1d4b20e297a4593bd168b03837ae07a6215687",
+      "byte_length": 2453,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/environments.json",
+      "sha256": "8d01ad85534e5f740ce5d89ecfadbc93a8bb58c13e3a06f15a4ed5e9deb51dc7",
+      "byte_length": 3503,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/metrics.json",
+      "sha256": "7ea5ebaa38d29448646873dc4b48c559b14c5a2b9b274e82868505058f39c476",
+      "byte_length": 2591,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/residual-risks.json",
+      "sha256": "120c858c9b04983c07c2dd066555da9387d4ca3be0892176fb08b2b39ce2c1c7",
+      "byte_length": 6529,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+      "byte_length": 2590342,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/release-readiness-decision.md",
+      "sha256": "402a5ff58f72e4053b80f06e712b001bc729d7faf318d39f036308177c30bbc3",
+      "byte_length": 2780,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/software-test-report.md",
+      "sha256": "3bf316ad9ae04df83804a42d821daf96ec327db05927d2e01d868da27b50d275",
+      "byte_length": 2868,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/06-testing/test-evidence.md",
+      "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+      "byte_length": 6636,
+      "artifact_type_ids": [
+        "TST-06",
+        "TST-07",
+        "TST-08",
+        "TST-09",
+        "TST-10",
+        "TST-11",
+        "TST-12",
+        "TST-13",
+        "TST-14",
+        "TST-15",
+        "TST-16",
+        "TST-17"
+      ]
+    },
+    {
+      "path": "docs/deliverables/06-testing/test-plan.md",
+      "sha256": "2b84c874501a4e6b3b2b3a3d1ba18c405203d40432b60c7474a028a36fda9e23",
+      "byte_length": 8743,
+      "artifact_type_ids": [
+        "TST-01",
+        "TST-02",
+        "TST-03",
+        "TST-04",
+        "TST-05"
+      ]
+    },
+    {
+      "path": "docs/deliverables/06-testing/test-quality-report.md",
+      "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+      "byte_length": 3279,
+      "artifact_type_ids": [
+        "TST-18",
+        "TST-19",
+        "TST-20",
+        "TST-21",
+        "TST-22",
+        "TST-23"
+      ]
+    }
+  ],
+  "test_case_count": 279,
+  "formal_test_execution_count": 0,
+  "trace_integration_boundary": {
+    "requirement_and_acceptance_id_format_reserved": true,
+    "stable_requirement_and_design_links_declared": true,
+    "req_des_existence_validation_status": "SEE_EXTERNAL_POST_GENERATION_REPORT",
+    "req_des_hash_source_binding_added": false,
+    "post_generation_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+    "reason": "REQ가 이 시험계획을 downstream 입력으로 결속하므로 ID·상대경로만 선언한다. 실제 RTM·DES 지문과 역참조는 모든 upstream 생성 뒤 별도 leaf report에 기록해 순환을 막는다."
+  },
+  "append_only_execution_boundary": {
+    "generated_template_paths_are_live_execution_records": false,
+    "execution_instance_path": "docs/deliverables/06-testing/evidence/executions/<run-id>.json",
+    "defect_instance_path": "docs/deliverables/06-testing/registers/defect-instances/<defect-id>.json",
+    "generator_overwrites_instance_paths": false
+  },
+  "reproducibility_boundary": {
+    "current_workspace_check": "SUPPORTED_BY_GENERATOR_CHECK",
+    "git_commit_only_reconstruction": "NOT_YET_CLAIMED",
+    "required_before_approval": "generator·통제 입력·생성물을 commit/tag 또는 보존 archive로 함께 결속한다."
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "authorization_boundary": {
+    "policy_baseline_status": "BASELINED",
+    "formal_deliverable_lifecycle_status": "DRAFT",
+    "formal_deliverables_approved": false,
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "manifest_content_sha256": "5649dbc62be532bed31ed24918c929eeb7156dc6d80afae0da97b24298a0de59"
+}

@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-22",
+  "status": "pending_decisions",
+  "source_dataset": "datasets/walksafe_kr_tactile_3class_20260521",
+  "target_dataset": "datasets/walksafe_kr_tactile_3class_v2_reviewed_20260522",
+  "decision_csv": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
+  "rows": 120,
+  "validation_status_counts": {
+    "pending": 120
+  },
+  "decision_counts": {
+    "blank": 120
+  },
+  "applied_rows": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_applied_2026-05-22.csv",
+  "blocked_rows": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_blocked_2026-05-22.csv",
+  "materialized_manifest": "",
+  "built_dataset": false,
+  "errors_preview": [
+    "tactile3-da-final-001: review_decision is blank",
+    "tactile3-da-final-002: review_decision is blank",
+    "tactile3-da-final-003: review_decision is blank",
+    "tactile3-da-final-004: review_decision is blank",
+    "tactile3-da-final-005: review_decision is blank",
+    "tactile3-da-final-006: review_decision is blank",
+    "tactile3-da-final-007: review_decision is blank",
+    "tactile3-da-final-008: review_decision is blank",
+    "tactile3-da-final-009: review_decision is blank",
+    "tactile3-da-final-010: review_decision is blank",
+    "tactile3-da-final-011: review_decision is blank",
+    "tactile3-da-final-012: review_decision is blank",
+    "tactile3-da-final-013: review_decision is blank",
+    "tactile3-da-final-014: review_decision is blank",
+    "tactile3-da-final-015: review_decision is blank",
+    "tactile3-da-final-016: review_decision is blank",
+    "tactile3-da-final-017: review_decision is blank",
+    "tactile3-da-final-018: review_decision is blank",
+    "tactile3-da-final-019: review_decision is blank",
+    "tactile3-da-final-020: review_decision is blank"
+  ]
+}

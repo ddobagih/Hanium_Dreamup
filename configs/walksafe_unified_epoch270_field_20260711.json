@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "primary_model": "unified_walksafe",
+  "fallback_model": null,
+  "models": {
+    "unified_walksafe": {
+      "source_model": "walksafe_unified_yolo26n_epoch270_sha256_a38857e999e1",
+      "artifact_sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+      "category": "unified",
+      "classes": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "traffic light",
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "crosswalk",
+        "curb_step",
+        "uneven_sidewalk",
+        "e_scooter_obstruction"
+      ],
+      "class_categories": {
+        "person": "vulnerable_road_user",
+        "bicycle": "vulnerable_road_user",
+        "car": "vehicle",
+        "motorcycle": "vehicle",
+        "bus": "vehicle",
+        "truck": "vehicle",
+        "traffic light": "traffic_signal",
+        "normal_tactile_block": "tactile_normal",
+        "damaged_tactile_block": "tactile_damage",
+        "crosswalk": "path_guidance",
+        "curb_step": "surface_hazard",
+        "uneven_sidewalk": "surface_hazard",
+        "e_scooter_obstruction": "obstruction"
+      },
+      "thresholds": {
+        "default": 0.2,
+        "person": 0.2,
+        "bicycle": 0.2,
+        "car": 0.2,
+        "motorcycle": 0.2,
+        "bus": 0.2,
+        "truck": 0.2,
+        "traffic light": 0.3,
+        "normal_tactile_block": 0.3,
+        "damaged_tactile_block": 0.3,
+        "crosswalk": 0.3,
+        "curb_step": 0.2,
+        "uneven_sidewalk": 0.15,
+        "e_scooter_obstruction": 0.35
+      }
+    }
+  }
+}

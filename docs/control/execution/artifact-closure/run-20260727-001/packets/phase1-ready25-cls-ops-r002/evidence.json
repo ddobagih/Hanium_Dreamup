@@ -1,0 +1,975 @@
+{
+  "schema_version": "walksafe.phase1-ready25-cls-ops-evidence.v1",
+  "packet_id": "WS-PHASE1-READY25-CLS-OPS-EVIDENCE-20260728-R002",
+  "prepared_on": "2026-07-28",
+  "predecessor_lineage": {
+    "r001_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-cls-ops/evidence.json",
+      "sha256": "04babe6a092f8a4f9a7bedb463f7d8dbd84691c328472d3911c9e08fbe8e322e",
+      "byte_length": 40225
+    },
+    "r001_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-cls-ops/phase1-ready25-cls-ops-check-receipt-r001.json",
+      "sha256": "05bdabf4c5f332207c98c10c27395cc02f8a12ad9e532ed8a2ff3aed7fc60b67",
+      "byte_length": 2576
+    }
+  },
+  "scope_decision": {
+    "decision": "IN_SCOPE",
+    "artifact_type_ids": [
+      "CLS-04",
+      "CLS-08",
+      "CLS-10",
+      "CLS-11",
+      "CLS-14",
+      "CLS-15",
+      "CLS-16",
+      "OPS-06",
+      "OPS-07",
+      "OPS-11",
+      "OPS-13",
+      "OPS-18",
+      "OPS-22"
+    ],
+    "user_scope_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json",
+      "sha256": "7015c81effdaab52dc83168484a36bd7a4fbdee6f8a405ab819d691bfa7810ad"
+    }
+  },
+  "r010_chain_binding": {
+    "semantics": "ADD_ONLY_READY25_SUCCESSOR_OVER_R010_WRAPPER_AND_R007_LEDGER_SUBJECT",
+    "r010_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json",
+      "sha256": "e878aa9915e549cfd06acaef7f150b75e0d6a0221d6c9978d6597d15c81c8056"
+    },
+    "r010_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r010.json",
+      "sha256": "5e9300013d252932cc696585c8e2d99ddcd434d972647c32a57620e64f62d51a"
+    }
+  },
+  "responsibility_boundary": {
+    "project_owner": "김민호",
+    "service_owner": "김민호",
+    "product_owner": "김민호",
+    "independent_qa_reviewer": null,
+    "independent_qa_status": "UNASSIGNED",
+    "self_review_credit_allowed": false
+  },
+  "artifact_contracts": [
+    {
+      "artifact_type_id": "CLS-04",
+      "catalog_artifact_id": "DLV-CLS-04",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_FINAL_KPI_MEASUREMENT_WINDOW_PENDING",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "KPI ID·정의·계산식·baseline source·target source를 같은 표에서 추적한다.",
+        "측정기간·표본·수집방법·분석 owner를 정하되 실제 측정값은 만들지 않는다.",
+        "최종 KPI window 종료 전 실측·효과·미달조치·승인을 NOT_RUN으로 유지한다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-04-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "AFTER_FINAL_KPI_WINDOW_BEFORE_PROJECT_CLOSURE",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-04-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "목표·KPI·계산식",
+          "baseline·target",
+          "실측값·기간·표본",
+          "차이·원인·신뢰도",
+          "사용자·사업 효과",
+          "미달 조치·승인"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 목표·KPI·계산식, baseline·target.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-08",
+      "catalog_artifact_id": "DLV-CLS-08",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_CLOSURE_RISK_ACCEPTANCE_NOT_TRIGGERED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "5개 gate와 FP-035를 포함한 잔여위험 source pointer와 record schema를 유지한다.",
+        "위험별 mitigation·monitoring·owner·due condition을 실제 source에서만 채운다.",
+        "acceptor identity·acceptance decision·receipt는 실제 종료 검토 전 비워 둔다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-08-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_PROJECT_CLOSURE_AND_EACH_RISK_ACCEPTANCE_REVIEW",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-08-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "위험 ID·시나리오",
+          "가능성·영향·노출",
+          "기존 통제·효과",
+          "잔여 등급",
+          "모니터링·비상조치",
+          "수용자·재검토일"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 위험 ID·시나리오, 가능성·영향·노출.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-10",
+      "catalog_artifact_id": "DLV-CLS-10",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_HANDOVER_RECIPIENT_UNRESOLVED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "자산·계정·권한·secret reference·backlog·risk·support 이관 checklist를 유지한다.",
+        "현재 운영 지속 branch를 보존하고 named recipient/operator는 unresolved로 둔다.",
+        "권한 test·회수·양측 확인·effective time·receipt는 실제 이관 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-10-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_OPERATIONAL_HANDOVER_EFFECTIVE_AT",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-10-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "handover_boundary": {
+        "current_branch": "OPERATIONS_CONTINUE",
+        "recipient": null,
+        "operator": null,
+        "handover_execution_status": "NOT_RUN"
+      },
+      "acceptance_contract": {
+        "required_contents": [
+          "자산·service owner",
+          "계정·역할·접근",
+          "credential 회전·전달 방식",
+          "runbook·지원·연락",
+          "권한 test·회수",
+          "양측 확인·일시"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 자산·service owner, 계정·역할·접근.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-11",
+      "catalog_artifact_id": "DLV-CLS-11",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_RETROSPECTIVE_NOT_HELD",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "회고 범위·입력 evidence·참여 역할·실시 조건과 action schema를 정한다.",
+        "의도 대비 실제 결과와 근본 원인은 실제 회고 참여자가 확인한 뒤에만 작성한다.",
+        "incident 0 경계를 postmortem 또는 성공 증거로 바꾸지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-11-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "AFTER_PHASE_OR_PROJECT_END_BEFORE_RETROSPECTIVE_ACCEPTANCE",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-11-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "의도·실제 결과",
+          "잘된 점·낭비·실패",
+          "문서·결정·검증 교훈",
+          "근본 원인·근거",
+          "유지·중단·시작 행동",
+          "owner·적용 확인"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 의도·실제 결과, 잘된 점·낭비·실패.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-14",
+      "catalog_artifact_id": "DLV-CLS-14",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_DATA_DISPOSITION_EVENT_NOT_TRIGGERED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "data class·storage location·잠정 retention/transfer/deletion branch schema를 유지한다.",
+        "법적 근거·최종 한국어 고지·operator·backup reconciliation을 blocker로 둔다.",
+        "실제 transfer/deletion과 receipt는 승인된 종료 branch 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-14-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_EACH_DATA_TRANSFER_OR_DELETION_AND_PROJECT_CLOSURE",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-14-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "데이터 inventory·분류",
+          "보존 근거·기간",
+          "이관 대상·형식·암호화",
+          "삭제·익명화·backup",
+          "사용자·기관 통지",
+          "검증·승인 기록",
+          "선행 승인된 CLS-16 폐기계획 ID와 데이터 보존·이관·삭제 실행 receipt"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 데이터 inventory·분류, 보존 근거·기간.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-15",
+      "catalog_artifact_id": "DLV-CLS-15",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_ASSET_DISPOSITION_EVENT_NOT_TRIGGERED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "secret 값을 제외한 asset ID·유형·controller·예정 action schema를 유지한다.",
+        "retain/transfer/rotate/revoke, 최소권한, 복구경계 검증 checklist를 둔다.",
+        "실제 rotation/revocation·비용 종료·receipt는 실행 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-15-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_EACH_ASSET_TRANSFER_ROTATION_OR_REVOCATION",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-15-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "자산·계정 inventory",
+          "유지·이관·폐기 판정",
+          "key·certificate 회전",
+          "서버·storage·DNS 종료",
+          "backup·로그 보존",
+          "검증·비용 종료",
+          "선행 승인된 CLS-16 폐기계획 ID와 계정·키·인프라 정리 실행 receipt"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 자산·계정 inventory, 유지·이관·폐기 판정.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "CLS-16",
+      "catalog_artifact_id": "DLV-CLS-16",
+      "applicability": "IN_SCOPE",
+      "activation_state": "NOT_TRIGGERED_OPERATIONS_CONTINUE_NO_SHUTDOWN_DECISION",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "현재 branch를 OPERATIONS_CONTINUE로 유지하고 shutdown decision은 없다고 명시한다.",
+        "미래 폐기는 고지·신규세션 차단·CLS-14·CLS-15·provider exit·최종검증 순서로 계획한다.",
+        "실제 shutdown authority·operator·execution·receipt는 승인 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-CLS-16-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_ANY_SHUTDOWN_OR_DECOMMISSION_AUTHORIZATION",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-CLS-16-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_PROJECT_CLOSURE",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "service_lifecycle_boundary": {
+        "current_branch": "OPERATIONS_CONTINUE",
+        "shutdown_decision": null,
+        "decommission_execution_status": "NOT_RUN"
+      },
+      "acceptance_contract": {
+        "required_contents": [
+          "종료 사유·범위·일정",
+          "사용자·이해관계자 고지",
+          "기능·신규가입 단계 종료",
+          "데이터 export·삭제",
+          "인프라·계정 철거",
+          "지원 종료·최종 검증",
+          "CLS-14 데이터 처리와 CLS-15 계정·키·인프라 정리 전에 승인할 폐기 순서·중단점·책임자"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 종료 사유·범위·일정, 사용자·이해관계자 고지.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-06",
+      "catalog_artifact_id": "DLV-OPS-06",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_OPERATING_ENVIRONMENT_AND_METRIC_SOURCE_PENDING",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "health·latency·error·DB·queue·storage·TMAP·STT·model·보안 panel schema를 정한다.",
+        "dashboard-as-code path·version·metric source·owner·time range checklist를 둔다.",
+        "live URL·snapshot·freshness·실측 metric은 운영 환경 준비 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-06-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_LIVE_OPERATIONS_READINESS_APPROVAL",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "대시보드 목적·대상",
+          "SLI·health·latency·error",
+          "DB·queue·storage",
+          "TMAP·STT·모델 의존성",
+          "보안·신고 운영",
+          "시간 범위·소유자",
+          "dashboard-as-code 위치·version과 generated live view·snapshot 링크"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 대시보드 목적·대상, SLI·health·latency·error.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-07",
+      "catalog_artifact_id": "DLV-OPS-07",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_ALERTING_ENVIRONMENT_AND_CHANNEL_PENDING",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "alert ID·신호·조건·severity·window·dedup·silence·runbook schema를 정한다.",
+        "notification 대상·채널·해제·사후검토를 배포 전 checklist로 둔다.",
+        "fire/clear/delivery 결과는 실제 alerting 환경 시험 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-07-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_LIVE_ALERTING_ENABLEMENT",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "alert ID·신호·조건",
+          "severity·지속·window",
+          "notification 대상·채널",
+          "dedup·silence",
+          "runbook·자동 조치",
+          "해제·사후 검토"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: alert ID·신호·조건, severity·지속·window.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-11",
+      "catalog_artifact_id": "DLV-OPS-11",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_RESTORE_EXERCISE_NOT_RUN",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "정본 복원 절차와 실행 결과를 분리하고 backup 선택·격리환경·검증 schema를 정한다.",
+        "object count·bytes·hash·DB reference·권한·RTO·RPO checklist를 둔다.",
+        "실제 backup ID/hash·복원 결과·결함·receipt는 시험 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-11-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_BACKUP_RESTORE_CAPABILITY_APPROVAL",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "시험 backup ID·hash",
+          "격리 환경·권한",
+          "복원 순서·명령",
+          "DB·파일·설정 검증",
+          "실측 RTO·RPO",
+          "결함·판정·다음 시험",
+          "정본 복원 절차 version과 generated 시험 결과·원자료 hash 링크"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 시험 backup ID·hash, 격리 환경·권한.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-13",
+      "catalog_artifact_id": "DLV-OPS-13",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_DR_DRILL_NOT_RUN",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "재해 시나리오·지휘·연락·권한·대체 infra·failover/failback 계획을 정한다.",
+        "훈련 시간·판정·gap·개선·재훈련 schema를 둔다.",
+        "실제 drill·전환·복귀·서명 결과는 훈련 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-13-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_DR_CAPABILITY_APPROVAL",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "재해 시나리오·범위",
+          "지휘·연락·권한",
+          "대체 인프라·데이터",
+          "전환·복귀 절차",
+          "훈련 시간·결과",
+          "gap·개선·재훈련",
+          "정본 재해복구 계획 version과 generated/external 훈련 결과·서명 링크"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 재해 시나리오·범위, 지휘·연락·권한.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-18",
+      "catalog_artifact_id": "DLV-OPS-18",
+      "applicability": "IN_SCOPE",
+      "activation_state": "NOT_TRIGGERED_INCIDENT_COUNT_0",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "OPS-17 incident 원장과 중대도·반복 trigger를 연결한 postmortem schema를 유지한다.",
+        "현재 incident count 0은 NOT_TRIGGERED이며 무장애 증거가 아니라고 명시한다.",
+        "실제 incident 없이 timeline·원인·action·postmortem receipt를 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-18-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "ONLY_AFTER_A_QUALIFYING_REAL_INCIDENT_ENDS",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "incident_boundary": {
+        "incident_count": 0,
+        "trigger_status": "NOT_TRIGGERED",
+        "zero_incidents_is_no_incident_evidence": false,
+        "postmortem_status": "NOT_RUN"
+      },
+      "acceptance_contract": {
+        "required_contents": [
+          "요약·영향·timeline",
+          "직접·기여 원인",
+          "잘된 점·어려운 점",
+          "탐지·대응 gap",
+          "Action·owner·기한",
+          "공유·완료 검증"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 요약·영향·timeline, 직접·기여 원인.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    },
+    {
+      "artifact_type_id": "OPS-22",
+      "catalog_artifact_id": "DLV-OPS-22",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_LIVE_RESOURCE_BILLING_AND_USAGE_PENDING",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "300 GiB+300 GiB·30,000원·70/85/95/100%를 실측이 아닌 planning assumption으로 구분한다.",
+        "자원·단가·청구 source·사용량·forecast·budget alert·비용배분 schema를 정한다.",
+        "실제 청구·사용·추세·비용 결과는 운영 source 확보 전 생성하지 않는다."
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-OPS-22-REAL-TRIGGER-OR-EVIDENCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "SERVICE_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_PAID_OR_CAPACITY_LIMITED_OPERATIONS_REVIEW",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_result_prohibited": true,
+      "acceptance_contract": {
+        "required_contents": [
+          "자원·단가·청구 source",
+          "현재 사용·추세",
+          "용량 한계·forecast",
+          "budget·alert",
+          "확장·최적화 선택",
+          "비용 배분·정기 검토"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 자원·단가·청구 source, 현재 사용·추세.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      }
+    }
+  ],
+  "generated_output_bindings": [
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "875a21af9277a8caf536520a7c530df5d4504830cc323fbcc5e2620e827f44f1",
+      "byte_length": 3568735
+    },
+    {
+      "path": "docs/deliverables/10-operations/operations-control-registers.md",
+      "sha256": "7aeed6f4e11a2d5ec843bd4e4a25393c8fab86ed6f0bb246ffab9ffe7836d3b2",
+      "byte_length": 59528
+    },
+    {
+      "path": "docs/deliverables/10-operations/operator-guide.md",
+      "sha256": "a223cc805f0b27bd82e8f3d94476886165f98a8f4d526824f3b0f08c3473092d",
+      "byte_length": 40118
+    },
+    {
+      "path": "docs/deliverables/10-operations/recovery-plan.md",
+      "sha256": "7b7cf6a02488bd7c90671895dd814e21c729fddd26fd27b321306b73b450982c",
+      "byte_length": 19976
+    },
+    {
+      "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+      "sha256": "0a951150201dbaa13e88c326f308fabc07486e018a8f7bdd38392c90438e9377",
+      "byte_length": 32049
+    },
+    {
+      "path": "docs/deliverables/12-closure/closure-handover-register.md",
+      "sha256": "eb5ba43c985d7ca155b930de2d0cc632ae5ee0e9f241350eb878ccd83607965d",
+      "byte_length": 37560
+    },
+    {
+      "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+      "sha256": "dbb9cc1d5a72208dc987d675518a07e39230b69f5c6cf1d67795efb1e7ed5c6a",
+      "byte_length": 37040
+    },
+    {
+      "path": "docs/deliverables/12-closure/project-closure.md",
+      "sha256": "9cf8874d776a12e158fa6202db3d101ad5f34a242472a5110b09959abb69f765",
+      "byte_length": 26867
+    },
+    {
+      "path": "docs/deliverables/12-closure/registers/closure-readiness-register.json",
+      "sha256": "7e7a24e48bb2a8616f266387b409d47505508d98d7fb08545b10cf1fd286aff7",
+      "byte_length": 35802
+    },
+    {
+      "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+      "sha256": "733e114df32eb54be090356530515d65d0894a19b61754bf661798718080c1e5",
+      "byte_length": 166165
+    }
+  ],
+  "summary": {
+    "exact_artifact_count": 13,
+    "in_scope_count": 13,
+    "content_authored_count": 13,
+    "accepted_count": 0,
+    "approval_count": 0,
+    "actual_event_count": 0,
+    "formal_evidence_count": 0,
+    "release_credit_count": 0
+  },
+  "claim_boundary": {
+    "actual_kpi_result_count": 0,
+    "risk_acceptance_count": 0,
+    "actual_handover_count": 0,
+    "actual_data_transfer_or_deletion_count": 0,
+    "actual_rotation_or_revocation_count": 0,
+    "shutdown_or_decommission_count": 0,
+    "live_dashboard_count": 0,
+    "actual_restore_test_count": 0,
+    "actual_dr_drill_count": 0,
+    "qualifying_incident_count": 0,
+    "postmortem_count": 0,
+    "actual_cost_result_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "c0ad672a4369b30949de44b7b461a0b2c0b53d20735d4ff59d23bd5f82e88cf9"
+  }
+}

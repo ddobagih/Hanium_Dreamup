@@ -1,0 +1,166 @@
+{
+  "checks": [
+    {
+      "check_id": "READY25-001",
+      "name": "EXACT9_SET",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-002",
+      "name": "PRIMARY_LOCATOR_AND_ANCHOR_CROSSWALK",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-003",
+      "name": "CONTENT_AUTHORED_TRUE9_ACCEPTED_ZERO",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-004",
+      "name": "SOURCE_PHYSICAL_HASH_BINDINGS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-005",
+      "name": "DEV_SUCCESSOR_ADD_ONLY_AND_EXACT_ARTIFACT_BINDINGS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-006",
+      "name": "DEV15_ZERO_EVENT_BOUNDARY_NOT_EVENT_COMPLETION",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-007",
+      "name": "DATA_MODEL_R002_ZERO_PROMOTION_BOUNDARY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-008",
+      "name": "FIVE_GATES_NOT_RUN_UNWAIVED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-009",
+      "name": "QA_UNASSIGNED_AND_APPROVAL_NOT_PERFORMED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-010",
+      "name": "ZERO_EXECUTION_FORMAL_RELEASE_AND_ARTIFACT_REGISTER_INTEGRATED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "READY25-011",
+      "name": "DOC01_DOC05_SELF_DIGEST_AND_EXACT9_APPLICATION",
+      "result": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "actual_result_synthesized": false,
+    "approval_claimed": false,
+    "artifact_register_modified": true,
+    "deployment_claimed": false,
+    "execution_claimed": false,
+    "formal_pass_claimed": false,
+    "release_eligible_claimed": false,
+    "rights_or_privacy_verified_claimed": false
+  },
+  "credit_summary": {
+    "content_accepted_count": 0,
+    "content_authored_true_count": 9,
+    "execution_credit_count": 0,
+    "formal_test_credit_count": 0,
+    "owner_approval_count": 0,
+    "real_event_credit_count": 0,
+    "release_credit_count": 0
+  },
+  "metadata": {
+    "check_mode": "DETERMINISTIC_DOCUMENT_AND_JSON_ONLY_NO_PRODUCT_TEST_OR_BUILD",
+    "checked_on": "2026-07-28",
+    "receipt_id": "PHASE1-READY25-AI-DEV-SEC-CHECK-20260728-R002",
+    "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+    "verdict": "PASS_FOR_CONTENT_AUTHORING_AND_REGISTER_APPLICATION_BOUNDARY_ONLY"
+  },
+  "output_bindings": [
+    {
+      "bytes": 35480,
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "sha256": "707695dce9b34b5b10a9db46ec30dd611f38e6ad8957d9f4cdf953a8e9d38733"
+    },
+    {
+      "bytes": 19149,
+      "path": "docs/deliverables/08-ai-ml-data/model-operations.md",
+      "sha256": "9fe0bc31c39e9baf35b111e2645c59cd2e13aba2bde0b2233e0d0d08630becca"
+    },
+    {
+      "bytes": 14026,
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "sha256": "159a6c7b781f050c4a6d0335cf0bbf531b72607adda66b94d563e00dad428078"
+    },
+    {
+      "bytes": 6607,
+      "path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+      "sha256": "c880892200f620f559f4b9f9278df092d1cbe1388ca2a4e90c286504a00d49fc"
+    },
+    {
+      "bytes": 36187,
+      "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+      "sha256": "980896f6b8a2801c4aae5f4955e4edf7b43ae79a912f5fec62eebaea1a587645"
+    },
+    {
+      "bytes": 12415,
+      "path": "docs/deliverables/05-implementation/implementation-manifest-20260728-r003.json",
+      "sha256": "3ef6ca6420afd43ccef546703951779b3d4da65d483eb0e5f1b594b18c0e3a61"
+    },
+    {
+      "bytes": 3952,
+      "path": "docs/deliverables/05-implementation/quality-evidence-register-20260728-r003.json",
+      "sha256": "0f4beffbc485f139f3919a6ca553851a73c38510598b922e4c986a055bf3e8ba"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "cea8b58fc5afa527614522481df56d69618c6fd1015c10b63d6cc8b6e0678c67",
+      "byte_length": 102892
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "a0c993257c1b80211c2e8e4db5aa464708ac4aba9d47ed9b434eda277ee6547f",
+      "byte_length": 3803696
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-ai-dev-sec-r002/evidence.json",
+      "sha256": "10867de47154f0add44755b8320ebb84e53732a18c841c55ca124117a2b321f2",
+      "byte_length": 24980
+    }
+  ],
+  "schema_version": "walksafe.phase1-ready25-ai-dev-sec-check-receipt.v2",
+  "subject": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-ai-dev-sec-r002/evidence.json",
+    "sha256": "10867de47154f0add44755b8320ebb84e53732a18c841c55ca124117a2b321f2",
+    "byte_length": 24980
+  },
+  "summary": {
+    "fail_count": 0,
+    "pass_count": 11
+  },
+  "predecessor_lineage": {
+    "r001_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-ai-dev-sec/evidence.json",
+      "sha256": "7c3045a4446ef86d14c42ee8230411590c2801a22fb498861f6cdd361a48962f",
+      "byte_length": 17740
+    },
+    "r001_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-ready25-ai-dev-sec-check-receipt-r001.json",
+      "sha256": "ceecad94da6a84b80143793b232ad556aa1460508cfd5abedc732c1df8799a7b",
+      "byte_length": 3706
+    }
+  },
+  "nonself_integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, recursively sorted keys, compact separators, one terminal LF",
+    "projection_bytes": 4360,
+    "scope": "ENTIRE_DOCUMENT_EXCLUDING_TOP_LEVEL_NONSELF_INTEGRITY",
+    "sha256": "ed8f3694efd75a6d04dcb46f55766aacd631da00a50638ffa618175f3ace6611"
+  }
+}

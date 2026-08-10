@@ -1,0 +1,12 @@
+[Unit]
+Description=Run WalkSafe report retention daily
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=30m
+AccuracySec=1m
+Unit=walksafe-report-retention.service
+
+[Install]
+WantedBy=timers.target

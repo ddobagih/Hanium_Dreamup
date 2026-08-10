@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-PLAN-OUTPUT-BINDINGS-20260729-R001",
+  "prepared_on": "2026-07-29",
+  "status": "DETACHED_PLAN_OUTPUT_BINDING",
+  "hash_algorithm": "SHA-256",
+  "record_count_semantics": "The number of primary logical records in the member; a Markdown or singleton contract has one record.",
+  "declared_output_path_count": 9,
+  "bound_member_count": 8,
+  "self_binding_excluded": true,
+  "self_binding_reason": "A detached receipt cannot include its own physical hash without a digest cycle.",
+  "members": [
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001.md",
+      "document_id": "WS-WALKSAFE-COMPLETION-PLAN-REBASELINE-20260729-R001",
+      "file_sha256": "ad4c6fcfeba68b586e066490656970b64b1f04d4978661c9901040fd3d3621e2",
+      "bytes": 18892,
+      "record_count": 1
+    },
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/plan-manifest.json",
+      "document_id": "WS-WALKSAFE-COMPLETION-PLAN-REBASELINE-20260729-R001",
+      "file_sha256": "43ec2fb64590aac4421e3bafa9178b9e7316a103f944c0f06df30be8dc5493f4",
+      "bytes": 14669,
+      "record_count": 1
+    },
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/planning-defect-register.json",
+      "document_id": "WS-PLANNING-DEFECT-REGISTER-20260729-R001",
+      "file_sha256": "55fd5f4d27b4ae84c6ea0a5187f5c2b88a1e634cad36593f5b76ae0cbc391f5c",
+      "bytes": 5592,
+      "record_count": 12
+    },
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/gap-reassessment-candidates.json",
+      "document_id": "WS-GAP-REASSESSMENT-CANDIDATES-20260729-R001",
+      "file_sha256": "695e8888900ef82ecb4c5eb5d7f92da8734aec55f4ea3b183668b490899d9f2d",
+      "bytes": 34765,
+      "record_count": 19
+    },
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/gap-evidence-bindings.json",
+      "document_id": "WS-GAP-EVIDENCE-BINDINGS-20260729-R001",
+      "file_sha256": "2520473f10232bf41bc41ba5b9e7441953a9d64f24285e3ec55d444cd2ee400a",
+      "bytes": 7362,
+      "record_count": 31
+    },
+    {
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/historical-replay-baseline-binding.json",
+      "document_id": "WS-HISTORICAL-REPLAY-BASELINE-BINDING-20260729-R001",
+      "file_sha256": "f3d142d8a1f837fdb603a95ae875c521229a4e5f281af88cccd0578ad4a08fe9",
+      "bytes": 1460,
+      "record_count": 1
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/remaining-work-execution-plan-r004-plan-only-successor.md",
+      "document_id": "WS-257-CLOSURE-PLAN-20260729-R004",
+      "file_sha256": "8e76ac5b22d8390ceb9d3fbcc2121a3b53f693a2f887588703392e60746da44b",
+      "bytes": 10784,
+      "record_count": 1,
+      "subject_count": 131
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/CONTINUATION-PLAN-HANDOFF-20260729-R002.md",
+      "document_id": "WS-CONTINUATION-PLAN-HANDOFF-20260729-R002",
+      "file_sha256": "0382bfee7c0fd0894416ec72eb03f872fc34155a72624a534a3fa13fc44996a3",
+      "bytes": 4374,
+      "record_count": 1
+    }
+  ],
+  "predecessor_members": [
+    {
+      "path": "plans/features/2026-07-26_artifact_completion_execution_plan.md",
+      "file_sha256": "3b0c75d5338116dd9026b3a70f4c6121041c8b1fc666a3b31df0c661dc042cf8",
+      "bytes": 10856
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/remaining-work-execution-plan.md",
+      "file_sha256": "0af0aa016a7952d1561c8ae97d2a46f8c9594f8c8b1e499710cbada9a568f873",
+      "bytes": 46814
+    }
+  ],
+  "credit": {
+    "execution": 0,
+    "acceptance": 0,
+    "approval": 0,
+    "actual_event": 0,
+    "artifact": 0,
+    "release": 0
+  }
+}

@@ -1,0 +1,56 @@
+WalkSafe v2.4 Goal graph check: FAIL
+- FP014 canonical completion package or seq20-23 tail differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 0 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 7 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 8 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 9 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 11 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 12 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 18 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-005-R001: implementation changed artifact 19 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 1 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 4 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 5 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 9 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-006-R001: implementation changed artifact 10 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 0 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 2 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 3 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 5 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 7 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 8 differs
+- frozen v2.3: WS-GOAL-EPIC-02-FP-010-R001: implementation changed artifact 10 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 0 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 5 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 7 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 8 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 9 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 11 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 14 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-018-R001: implementation changed artifact 16 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 3 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 4 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 5 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 6 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 7 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 8 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 9 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 10 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 11 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 12 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 14 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 15 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 16 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 17 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 18 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 20 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 21 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 22 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 23 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 25 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 26 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001: implementation changed artifact 27 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 2 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 5 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 6 differs
+- frozen v2.3: archived v2.2: WS-GOAL-EPIC-02-FP-004-R001: implementation changed artifact 8 differs

@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP013-INTEGRATED-CONSENT-IMPLEMENTATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-25T16:33:37+09:00",
+  "implementation_content_set_sha256": "0f47f11ae202e6dbae13c5ce5079eafca19a6009ca00bb88e57e75d4ddd1d3af",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "25e749d03fcff6cf5c00ae73b00d239c4b4d9c8f392f5d1e2fca2fbabad38133",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+      "after_sha256": "d4fed81cd6f7857088213bfeba9ce9b08f9519bf5540dd30df56f8344a01fd25",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "after_sha256": "5609f9b0cd912b0e00315b16dd27ddd32ee55dce9ee58e085cb754020aba1687",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+      "after_sha256": "fdd7890d7867b2e7a7045dcf22612a20a4c9a82d7b2dac0bc42f4b811ebf516a",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+      "after_sha256": "42b39a5c30cc82d7d1e5b2a641f9044c19e6c6f693c71ef20631fab34371ad7f",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "cf6d0cebc06e91fe335c33f95d35f54a64b9d9dd6ecd53c0bff908c994a82d9e",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt",
+      "after_sha256": "1e4d4b62a75926d09277cf7ad41c7c0fa5190b24b7e6384710944f7eea9c413d",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "after_sha256": "99cfd48ca29a8036d4b9b0e3cdb0290298114f1ae00fbe3e0172d2cb29ce15b6",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+      "after_sha256": "c9c5d3ed1326f4da58685ae4bf1d810206b9c265044702ac2750345c610e63b2",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "after_sha256": "0c820c70ec05f5ec39bc4b15d98f0f567955609a0d2622147faaf2868ddebb97",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicyTest.kt",
+      "after_sha256": "18519de754859083415a4cfc3aa855f73730e3f148e442eb9f73888507536ce9",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/README.md",
+      "after_sha256": "1156a12576f3534bc5b74b5e77f47ed3799e0e6add8fcad95ae8b375250c9c07",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/backend.ts",
+      "after_sha256": "858eeb9a72f97d0cf83359e9eeed64044b13b8605e1b2176f3755a1bebdcf3aa",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/integrated-consent.ts",
+      "after_sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "after_sha256": "7670b831fb364bf57fcc6f0207952e6913a97f0c89316a4064f55dbcdf9c90e8",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "after_sha256": "001654580bd92a7736691180ff19d1523437809378b944b0b91ef4bff4938d55",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/integrated-consent.test.ts",
+      "after_sha256": "b7917c951bbf8412510fc398de3f8746ffeb6e1f7b3d686d02a3ff53a641994d",
+      "change_kind": "ADDED"
+    }
+  ],
+  "implemented_controls": [
+    "four consent purposes are independently selected and versioned",
+    "the Gateway stores a hash-chained ledger with process and filesystem serialization",
+    "duplicate request ids are idempotent and stale receipts cannot authorize reports",
+    "persistent client revisions prevent delayed grants from reversing later withdrawals",
+    "a per-installation control secret authenticates pre-login consent reads and writes",
+    "Android grants no sensitive path until the server confirmation is parsed and current",
+    "raw report JPEG, debug frame and metadata creation or transfer fail closed",
+    "automatic reports require both raw-source and automatic-reporting consent",
+    "cellular transfer remains Wi-Fi-only until mobile-network consent is confirmed",
+    "training reuse is independently denied unless its current selection is confirmed",
+    "withdrawal cancels dependent calls without changing unrelated login or OS permissions",
+    "the first-run screen exposes all four choices, disclosure and save state to accessibility"
+  ],
+  "remaining_implementation_boundaries": [
+    "approved final legal and privacy wording remains unavailable",
+    "actual minors, guardians and TalkBack users were not tested",
+    "actual Android devices, production networks and production deployment were not run",
+    "retention deletion lifecycle and external training release approval remain separate",
+    "network transport is an Android observation rather than hardware-backed attestation",
+    "TC-FP-013-01 through TC-FP-013-05, the 279 formal tests and release gates were not run"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-013-01",
+      "TC-FP-013-02",
+      "TC-FP-013-03",
+      "TC-FP-013-04",
+      "TC-FP-013-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "legal_privacy_review_status": "NOT_RUN",
+    "approved_final_consent_copy_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_guardian_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

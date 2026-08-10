@@ -1,0 +1,6 @@
+WALKSAFE_FP008_COMMAND env WALKSAFE_TEST_DATABASE_URL='postgresql+psycopg://walksafe_test:walksafe_test_password@127.0.0.1:32768/walksafe_fp008_test' PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -p no:cacheprovider -q backend/tests/test_admin_device_proof.py backend/tests/test_fp008_postgres_integration.py::test_fp008_postgres_schema_device_key_and_single_use_proof
+WALKSAFE_FP008_STARTED_AT 2026-08-09T16:36:06+09:00
+..................................                                       [100%]
+34 passed in 1.08s
+WALKSAFE_FP008_EXIT_CODE 0
+WALKSAFE_FP008_ENDED_AT 2026-08-09T16:36:08+09:00

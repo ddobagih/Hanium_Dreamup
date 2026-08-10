@@ -1,0 +1,47 @@
+{
+  "schema_version": "walksafe.vulnerability-register.v1",
+  "metadata": {
+    "register_id": "WS-VULNERABILITY-REGISTER-001",
+    "title": "WalkSafe 취약점·조치 관리대장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "SEC-15"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "field_contract": {
+    "required": [
+      "finding_id",
+      "source_evidence_id",
+      "affected_generation",
+      "component",
+      "severity",
+      "impact",
+      "reproduction_ref",
+      "owner_role",
+      "due_date",
+      "status",
+      "remediation_ref",
+      "retest_evidence_id"
+    ],
+    "allowed_statuses": [
+      "OPEN",
+      "TRIAGED",
+      "IN_REMEDIATION",
+      "READY_FOR_RETEST",
+      "CLOSED",
+      "ACCEPTED_WITH_SEC_16"
+    ],
+    "closure_rule": "재검증 evidence 또는 승인된 SEC-16 예외 없이는 CLOSED 금지"
+  },
+  "findings": [],
+  "summary": {
+    "registered_finding_count": 0,
+    "meaning": "정식 scan·침투시험 결과가 아직 수입되지 않았으며 취약점 부재를 뜻하지 않음"
+  }
+}

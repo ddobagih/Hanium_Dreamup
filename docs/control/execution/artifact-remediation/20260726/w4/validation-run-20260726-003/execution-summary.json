@@ -1,0 +1,281 @@
+{
+  "schema_version": "walksafe.w4.validation-execution.v1",
+  "run_id": "W4-VALIDATION-20260726-003",
+  "append_only_predecessors": [
+    {
+      "run_id": "W4-VALIDATION-20260726-001",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+      "sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+      "status": "FAIL_PRESERVED"
+    },
+    {
+      "run_id": "W4-VALIDATION-20260726-002",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+      "sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+      "status": "PASS_SUPERSEDED_BY_COMPLETE_PROVENANCE_RUN003"
+    }
+  ],
+  "scope": "FORMAL_DRAFT_AND_TRACE_DETERMINISTIC_REGENERATION_STRUCTURE_ONLY",
+  "commands": [
+    {
+      "command_id": "formal-dev-test-generate",
+      "argv": [
+        "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "-B",
+        "scripts/build_walksafe_formal_dev_test_20260721.py"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "executable": {
+        "resolved_path": "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "version": "Python 3.14.6"
+      },
+      "environment_contract": {
+        "PYTHONDONTWRITEBYTECODE_EFFECTIVE": "-B",
+        "formal_credentials_used": false,
+        "device_used": false
+      },
+      "started_at": "2026-07-27T03:28:47+09:00",
+      "ended_at": "2026-07-27T03:28:47+09:00",
+      "duration_seconds": 0.562697,
+      "exit_code": 0,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-dev-test-generate.stdout.log",
+        "sha256": "edfc07941eb1c41f6cc0eb6832ca39f2caf001481009ea00365170d089b495e1",
+        "byte_length": 40
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-dev-test-generate.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      }
+    },
+    {
+      "command_id": "trace-integration-generate",
+      "argv": [
+        "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "-B",
+        "scripts/build_walksafe_trace_integration_report_20260721.py"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "executable": {
+        "resolved_path": "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "version": "Python 3.14.6"
+      },
+      "environment_contract": {
+        "PYTHONDONTWRITEBYTECODE_EFFECTIVE": "-B",
+        "formal_credentials_used": false,
+        "device_used": false
+      },
+      "started_at": "2026-07-27T03:28:47+09:00",
+      "ended_at": "2026-07-27T03:28:50+09:00",
+      "duration_seconds": 2.139426,
+      "exit_code": 0,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/trace-integration-generate.stdout.log",
+        "sha256": "08121f18665215f99174a491fba44c58b6ea99078a94d6cf9b884038451d3f3a",
+        "byte_length": 123
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/trace-integration-generate.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      }
+    },
+    {
+      "command_id": "formal-dev-test-check",
+      "argv": [
+        "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "-B",
+        "scripts/build_walksafe_formal_dev_test_20260721.py",
+        "--check"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "executable": {
+        "resolved_path": "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "version": "Python 3.14.6"
+      },
+      "environment_contract": {
+        "PYTHONDONTWRITEBYTECODE_EFFECTIVE": "-B",
+        "formal_credentials_used": false,
+        "device_used": false
+      },
+      "started_at": "2026-07-27T03:28:50+09:00",
+      "ended_at": "2026-07-27T03:28:50+09:00",
+      "duration_seconds": 0.554454,
+      "exit_code": 0,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-dev-test-check.stdout.log",
+        "sha256": "0e48eafd5a5326e5f315ceae759f06e25329a4abb61f94338168b5da9eb79128",
+        "byte_length": 39
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-dev-test-check.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      }
+    },
+    {
+      "command_id": "trace-integration-check",
+      "argv": [
+        "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "-B",
+        "scripts/build_walksafe_trace_integration_report_20260721.py",
+        "--check"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "executable": {
+        "resolved_path": "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "version": "Python 3.14.6"
+      },
+      "environment_contract": {
+        "PYTHONDONTWRITEBYTECODE_EFFECTIVE": "-B",
+        "formal_credentials_used": false,
+        "device_used": false
+      },
+      "started_at": "2026-07-27T03:28:50+09:00",
+      "ended_at": "2026-07-27T03:28:52+09:00",
+      "duration_seconds": 2.13109,
+      "exit_code": 0,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/trace-integration-check.stdout.log",
+        "sha256": "827758533d02f233cd083b384ec7b0d26ca3b901caa85e07b18246e70a32677c",
+        "byte_length": 122
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/trace-integration-check.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      }
+    },
+    {
+      "command_id": "formal-trace-unit-tests",
+      "argv": [
+        "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "-B",
+        "-m",
+        "unittest",
+        "tests.test_walksafe_formal_dev_test",
+        "tests.test_walksafe_trace_integration_report"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "executable": {
+        "resolved_path": "/home/linuxbrew/.linuxbrew/Cellar/python@3.14/3.14.6/bin/python3.14",
+        "version": "Python 3.14.6"
+      },
+      "environment_contract": {
+        "PYTHONDONTWRITEBYTECODE_EFFECTIVE": "-B",
+        "formal_credentials_used": false,
+        "device_used": false
+      },
+      "started_at": "2026-07-27T03:28:52+09:00",
+      "ended_at": "2026-07-27T03:29:06+09:00",
+      "duration_seconds": 13.588486,
+      "exit_code": 0,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-trace-unit-tests.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-003/formal-trace-unit-tests.stderr.log",
+        "sha256": "6c85028474cdf2e88d02b020e8376c9d2279233c7cb8cf44c6a1deee4a5b4a99",
+        "byte_length": 130
+      }
+    }
+  ],
+  "subject_before": {
+    "bindings": [
+      {
+        "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+        "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595",
+        "byte_length": 6221
+      },
+      {
+        "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+        "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+        "byte_length": 248944
+      },
+      {
+        "path": "docs/deliverables/05-implementation/module-register.json",
+        "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+        "byte_length": 62222
+      },
+      {
+        "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+        "sha256": "cca58df18d82bb0e8c404309867ac1cbc454ba655d04182ecf6631be61304e65",
+        "byte_length": 52836
+      },
+      {
+        "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+        "sha256": "6969dd85f8cd1270296380bc6a6669fe80f3cd2e832c06613aa1cff29debd1e9",
+        "byte_length": 15004
+      },
+      {
+        "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+        "sha256": "477faf31e04bbdc5fc7d4d795e58391e915165acae2e7f5961525cf80b743610",
+        "byte_length": 306664
+      },
+      {
+        "path": "docs/deliverables/traceability/README.md",
+        "sha256": "f6036c8d2601e338543aa2043976b3e2e5911440358eb51c4c807425135ebf1f",
+        "byte_length": 4453
+      }
+    ],
+    "set_sha256": "cb146cd5a80981213d117b1ac3c05bc9fc72536ab2c388710230a37b57b9bc2b"
+  },
+  "subject_after": {
+    "bindings": [
+      {
+        "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+        "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595",
+        "byte_length": 6221
+      },
+      {
+        "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+        "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+        "byte_length": 248944
+      },
+      {
+        "path": "docs/deliverables/05-implementation/module-register.json",
+        "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+        "byte_length": 62222
+      },
+      {
+        "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+        "sha256": "cca58df18d82bb0e8c404309867ac1cbc454ba655d04182ecf6631be61304e65",
+        "byte_length": 52836
+      },
+      {
+        "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+        "sha256": "6969dd85f8cd1270296380bc6a6669fe80f3cd2e832c06613aa1cff29debd1e9",
+        "byte_length": 15004
+      },
+      {
+        "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+        "sha256": "477faf31e04bbdc5fc7d4d795e58391e915165acae2e7f5961525cf80b743610",
+        "byte_length": 306664
+      },
+      {
+        "path": "docs/deliverables/traceability/README.md",
+        "sha256": "f6036c8d2601e338543aa2043976b3e2e5911440358eb51c4c807425135ebf1f",
+        "byte_length": 4453
+      }
+    ],
+    "set_sha256": "cb146cd5a80981213d117b1ac3c05bc9fc72536ab2c388710230a37b57b9bc2b"
+  },
+  "subject_byte_identical_before_after": true,
+  "result": "PASS",
+  "formal_execution": {
+    "total": 279,
+    "status": "NOT_RUN",
+    "pass_claimed": false,
+    "execution_instances": 0
+  },
+  "automated_results_do_not_change_formal_status": true,
+  "release_gates": {
+    "total": 5,
+    "waived": 0,
+    "status": "NOT_RUN"
+  },
+  "release_eligibility": "NOT_ELIGIBLE"
+}

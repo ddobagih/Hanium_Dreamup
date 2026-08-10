@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "record_id": "WS-GOAL-ACTIVE-SUPERSESSION-20260725-001",
+  "recorded_at": "2026-07-25T04:07:00+09:00",
+  "superseded_package": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
+    "plan_version": "2.3.0",
+    "activation_status": "ACTIVE",
+    "manifest_path": "docs/control/goals/walksafe-completion-graph-v2-3/static-plan-manifest-v2.3.0.json",
+    "manifest_sha256": "dfa615686b0223826497fae424c1f3c41538b271102879a9497a33b81f66329c",
+    "archived_checkpoint_path": "docs/control/goals/walksafe-completion-graph-v2-4/superseded-v2.3.0-active-checkpoint.json",
+    "archived_checkpoint_raw_sha256": "7f62b09941e614f11d9c21c84e5f63df2ff070b00c569550faf2de7807de67b6",
+    "transition_event_count": 17,
+    "transition_history_anchor_sha256": "bc71126a8a0b71a97ce4cc89a86e0ce1d89739453f719f8820dc882c74a101d6",
+    "supersession_record_path": "docs/control/goals/walksafe-completion-graph-v2-4/active-supersession-record-v2.3.0.json"
+  },
+  "successor_package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "successor_plan_version": "2.4.0",
+  "frozen_control_history": {
+    "builder_path": "scripts/build_walksafe_goal_graph_v2_3.py",
+    "builder_sha256": "dce38036c0fb397e03f9fef47a0b78c329fa68de398500e7e5e6bdc0b0ec3c8f",
+    "checker_path": "scripts/check_walksafe_goal_graph_v2_3.py",
+    "checker_sha256": "27dde08c2f7828fc138b9f502a31d604fde60c3957e33e87882ee9f05dbb87ac",
+    "continuation_checker_path": "scripts/check_walksafe_project_continuation_v2_3.py",
+    "continuation_checker_sha256": "1785a97c5fd0cc0182cb1a9f95616328c344aca777f2e86839980afbe7bdab3f",
+    "test_path": "tests/test_walksafe_goal_graph_v2_3.py",
+    "test_sha256": "a7e9762baf99ff41ee4ee3c5c7230d7d1f90d1d2b4e72fb0859d09d6eeabfe53",
+    "continuation_test_path": "tests/test_walksafe_project_continuation_v2_3.py",
+    "continuation_test_sha256": "f2de52ef345d62b955552054aecd5be5bd832b4085e0f7114181a5c78b37252e"
+  },
+  "superseded_package_set": {
+    "managed_path_count": 26,
+    "path_set_sha256": "74c04874df3766ca61cb7153eeecefe421a3d447ed3ddef2775e7538aa4a266b",
+    "content_set_sha256": "822189aade16518f68a4be68ce7086f0dcf54f4d83c85bf1c2bb08aa7a3458d0"
+  },
+  "active_state_projection_sha256": "16ed44e07bca092fd7d18de291711dbb3e8c90711589d5a0521c00c60f8dde23",
+  "status_by_goal_sha256": "0fbd63cc74ba0eb30141375bf729f247cd18b26382c990bdb3e63522166e65a1",
+  "completion_evidence_by_goal_sha256": "40e5d61284fed1d683e3dd60b397e1f8ffdb5ca1d9089cec79a387d2f5b27ed9",
+  "dynamic_goal_inventory_sha256": "f27117b150a8ae76b4fcd8978cadf514b9e9b6ed95e2b319266f867b8e837772",
+  "canonical_binding_snapshot_sha256": "09ba59e4f759375ce5dfafd2c286e9acb163340d6cb4d0d609e7aad73d98b6fe",
+  "imported_predecessor_goal_bindings_sha256": "3969213c250e677f4dead477616c279e485aadfe3be4c2014c83a8f1c69b08cc",
+  "reason": "활성 v2.3 seq17의 FP-011 READY runtime을 유지하면서 FP-005·FP-006·FP-010 완료 provenance를 훼손하지 않고 current-state checker/test/registry 계약으로 승계한다.",
+  "execution_effect": "V2_3_ACTIVE_HISTORY_RETAINED_BYTE_EXACT; V2_4_PREPARED_NOT_ACTIVATED; NO_FP011_PRODUCT_WORK_STARTED"
+}

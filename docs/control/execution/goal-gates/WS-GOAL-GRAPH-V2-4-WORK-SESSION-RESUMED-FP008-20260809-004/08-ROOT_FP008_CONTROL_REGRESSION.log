@@ -1,0 +1,787 @@
+EEEEEEEEEEEEEEEEE....................................................... [ 88%]
+.........                                                                [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_cli_exposes_preflight_only _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_coordinated_source_rebind_is_rejected_by_frozen_source_pin _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_exact_goal_inventory_dependency_and_canonical39 _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_exact_source_and_static_pins _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_goal_scoped_start_gate_contract_is_byte_and_semantic_bound _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_hardened_publisher_preflight_retains_the_exact_projection _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_only_exact_authorized_post_seq44_delta_is_accepted _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_projection_is_deterministic_and_live_checkpoint_is_unchanged _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_publisher_retained_cohort_rejects_named_byte_drift _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_queue_boundary_frontier_and_zero_credit_are_explicit _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_ready_content_self_reference_is_recomputed_and_cross_checked _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_ready_semantic_pin_rejects_unmodeled_checkpoint_mutations _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_seq45_and_seq46_are_exact_add_only_transition_pair _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_source_history_completion_and_verification_evidence_are_unchanged _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_tampered_goal_contract_fails_closed _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_tampered_r023_binding_fails_closed _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+_ ERROR at setup of WalkSafeFp008GoalSeq4546Test.test_tampered_source_tail_fails_closed _
+
+cls = <class 'test_walksafe_fp008_goal_seq45_46_20260803.WalkSafeFp008GoalSeq4546Test'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.checkpoint_path = ROOT / materialize.CHECKPOINT
+        cls.before_bytes = cls.checkpoint_path.read_bytes()
+        cls.before_stat = cls.checkpoint_path.stat()
+        live_sha256 = hashlib.sha256(cls.before_bytes).hexdigest()
+        if live_sha256 == materialize.SOURCE_CHECKPOINT_SHA256:
+            cls.source_mode = True
+            _, cls.source = materialize.load_exact_source(ROOT)
+            cls.projected, cls.seq45, cls.seq46 = materialize.preflight(ROOT)
+        else:
+            cls.source_mode = False
+            cls.source = None
+            successor = json.loads(cls.before_bytes)
+            history = successor.get("goal_execution", {}).get(
+                "transition_history",
+                [],
+            )
+            if len(history) == materialize.READY_SEQUENCE:
+                cls.projected = successor
+                materialize.require_ready_checkpoint(ROOT, cls.projected)
+            else:
+>               cls.projected = materialize.ready_checkpoint_from_exact_seq47_successor(
+                    ROOT,
+                    successor,
+                )
+
+tests/test_walksafe_fp008_goal_seq45_46_20260803.py:45: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:1302: in ready_checkpoint_from_exact_seq47_successor
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'recovered seq46 managed path boundary differs'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise ProjectionError(message)
+E           scripts.materialize_walksafe_fp008_goal_seq45_46_20260803.ProjectionError: recovered seq46 managed path boundary differs
+
+scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py:359: ProjectionError
+=========================== short test summary info ============================
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_cli_exposes_preflight_only
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_coordinated_source_rebind_is_rejected_by_frozen_source_pin
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_exact_goal_inventory_dependency_and_canonical39
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_exact_source_and_static_pins
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_goal_scoped_start_gate_contract_is_byte_and_semantic_bound
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_hardened_publisher_preflight_retains_the_exact_projection
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_only_exact_authorized_post_seq44_delta_is_accepted
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_projection_is_deterministic_and_live_checkpoint_is_unchanged
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_publisher_retained_cohort_rejects_named_byte_drift
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_queue_boundary_frontier_and_zero_credit_are_explicit
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_ready_content_self_reference_is_recomputed_and_cross_checked
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_ready_semantic_pin_rejects_unmodeled_checkpoint_mutations
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_seq45_and_seq46_are_exact_add_only_transition_pair
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_source_history_completion_and_verification_evidence_are_unchanged
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_tampered_goal_contract_fails_closed
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_tampered_r023_binding_fails_closed
+ERROR tests/test_walksafe_fp008_goal_seq45_46_20260803.py::WalkSafeFp008GoalSeq4546Test::test_tampered_source_tail_fails_closed
+64 passed, 17 errors in 4.20s

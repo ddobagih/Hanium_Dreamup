@@ -1,0 +1,323 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "overlay_id": "WS-EPIC-02-FP004-PRIORITY-USER-ACTIVE-LEDGER-OVERLAY-20260724-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-24",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-02 FP-004 우선 사용자 Active successor overlay"
+  },
+  "authority_boundary": {
+    "phase_g_overlay_preserved": true,
+    "events_derived_from_phase_g_predecessor_only": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_artifact_type": false,
+    "creates_new_product_policy": false,
+    "changes_lifecycle_or_approval_state": false,
+    "formal_test_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "epic_in_progress_claimed": true,
+    "epic_implementation_ready_claimed": false,
+    "epic_complete_claimed": false,
+    "release_status": "NOT_ELIGIBLE",
+    "priority_user_test_completion_claimed": false,
+    "guardian_verification_provider_completion_claimed": false
+  },
+  "source_bindings": [
+    {
+      "path": "docs/control/execution/walksafe-epic-02-npc-permission-session-active-ledger-overlay-20260724-r001.json",
+      "bytes": 15787,
+      "sha256": "272bfbee209424f584179fb62e015941d60f8b9d0ad805884e6b700092e53d26",
+      "name": "npc_overlay_predecessor"
+    },
+    {
+      "name": "fp004_priority_user_implementation",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/implementation-record.json",
+      "bytes": 3714,
+      "sha256": "202e9fa0cbf39e28c569e2129fff0e6037969ffa082095a65e5ad3a75bbd3b94"
+    },
+    {
+      "name": "fp004_priority_user_verification",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/verification-result.json",
+      "bytes": 2006,
+      "sha256": "f909470b507faff07fff6da0d2f9b734b8c8569894e07fc70f9d090ddb289b2e"
+    },
+    {
+      "name": "gap_r011",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260724-r011.json",
+      "bytes": 441696,
+      "sha256": "5488991735ab2ca6537520cd0a8cfa7f1e2a99e1936dca0f1aa6fab3b8b3a9d0"
+    },
+    {
+      "name": "backlog_r011",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r011.json",
+      "bytes": 59280,
+      "sha256": "27eb2c1a4a656a921cd3573f11e76d3b5656afa25f3707b60e5e455c906a523e"
+    }
+  ],
+  "application_rule": {
+    "effective_for_epic02_phase_a_trace": true,
+    "canonical_merge_required_for_next_doc01_snapshot": true,
+    "merge_method": "다음 범용 Active writer가 Phase G overlay와 이 overlay 지문을 검증한 뒤 관련 Active 원장의 새 revision에 한 번 반영한다.",
+    "duplicate_application_forbidden": true,
+    "failure_behavior": "binding이나 predecessor event가 다르면 병합하지 않고 새 overlay revision을 만든다."
+  },
+  "events": [
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-001",
+      "artifact_code": "DES-06",
+      "artifact_instance_id": "ART-DES-06-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-001",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-DES-06-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/04-design/software-architecture.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-002",
+      "artifact_code": "DEV-15",
+      "artifact_instance_id": "ART-DEV-15-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-002",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-DEV-15-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-003",
+      "artifact_code": "DOC-01",
+      "artifact_instance_id": "ART-DOC-01-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-003",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-01-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-register.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-004",
+      "artifact_code": "DOC-05",
+      "artifact_instance_id": "ART-DOC-05-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-004",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-05-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-change-log.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-005",
+      "artifact_code": "DSC-14",
+      "artifact_instance_id": "ART-DSC-14-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-005",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-DSC-14-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/02-discovery/product-registers.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-006",
+      "artifact_code": "REQ-16",
+      "artifact_instance_id": "ART-REQ-16-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-006",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-REQ-16-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/03-requirements/requirements-traceability.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-007",
+      "artifact_code": "SEC-03",
+      "artifact_instance_id": "ART-SEC-03-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-007",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-SEC-03-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-008",
+      "artifact_code": "TST-19",
+      "artifact_instance_id": "ART-TST-19-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-008",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-TST-19-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC02-FP004-PRIORITY-USER-ACTIVE-009",
+      "artifact_code": "TST-21",
+      "artifact_instance_id": "ART-TST-21-001",
+      "predecessor_event_id": "WS-EPIC02-NPC-PERMISSION-ACTIVE-009",
+      "predecessor_overlay_id": "WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001",
+      "predecessor_opening_snapshot_id": "ART-TST-21-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-004 온보딩·필수 사전연습 내부 구현·검증과 GAP-013 PARTIAL 재평가를 후속 Active 원장에 연결한다.",
+      "evidence_record_ids": [
+        "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+        "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-011",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011"
+      ]
+    }
+  ],
+  "draft_observations": [
+    {
+      "artifact_code": "DEV-18",
+      "lifecycle_status": "DRAFT",
+      "state_change": false,
+      "observation": "Phase E Gateway 모듈 관찰은 유지하며 이번 overlay도 DEV-18을 승격하지 않는다."
+    },
+    {
+      "artifact_code": "REL-17",
+      "lifecycle_status": "DRAFT",
+      "state_change": false,
+      "observation": "USER_GUIDE.md는 내부 후보이며 정식 사용자 설명서 승인 상태를 올리지 않는다."
+    },
+    {
+      "artifact_code": "REL-09",
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "state_change": false,
+      "observation": "RELEASE_DESCRIPTION.md는 미게시 내부 후보이며 REL-09 실행 상태를 올리지 않는다."
+    }
+  ],
+  "open_evidence_boundaries": {
+    "legacy_web_official_repository_technical_closure": "COMPLETE_WITHOUT_RUNTIME_ALLOWLIST_INTERNAL",
+    "legacy_runtime_allowlist_count": 0,
+    "independent_android_gateway_repository_extraction": "INTERNAL_COMPLETE",
+    "android_gateway_deployment_status": "NOT_RUN",
+    "actual_device_connectivity_status": "NOT_RUN",
+    "historical_external_url_decommission_status": "NOT_RUN",
+    "previously_installed_or_cached_pwa_deactivation_status": "NOT_RUN",
+    "approved_production_profile_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "purpose_surfaces_internal_alignment": "INTERNAL_IMPLEMENTATION_VERIFIED",
+    "rel17_user_guide_status": "DRAFT_NOT_APPROVED",
+    "rel09_release_description_status": "PLANNED_NOT_RUN_NOT_PUBLISHED",
+    "no_destination_hazard_conformance": "INTERNAL_IMPLEMENTATION_VERIFIED",
+    "actual_device_purpose_surface_status": "NOT_RUN",
+    "requirements_route_expression": "ACTIVE_INTERPRETATION_RECORDED_FORMAL_SUCCESSOR_OPEN",
+    "actual_device_no_destination_status": "NOT_RUN",
+    "fp017_walk_session_lifecycle": "INTERNAL_PARTIAL_IMPLEMENTATION_VERIFIED",
+    "actual_device_fp017_lifecycle_status": "NOT_RUN",
+    "fp018_walk_state_recovery": "INTERNAL_PARTIAL_IMPLEMENTATION_VERIFIED",
+    "actual_device_fp018_lifecycle_status": "NOT_RUN",
+    "npc_permission_session_lifecycle": "INTERNAL_PARTIAL_IMPLEMENTATION_VERIFIED",
+    "actual_device_npc_permission_session_status": "NOT_RUN",
+    "external_rights_operation_status": "NOT_RUN",
+    "fp004_priority_user": "INTERNAL_PARTIAL_IMPLEMENTATION_VERIFIED",
+    "fp004_priority_user_test_status": "NOT_RUN",
+    "actual_device_fp004_status": "NOT_RUN",
+    "guardian_verification_provider_status": "NOT_RUN",
+    "fp005_official_environment_crosswalk": "PLANNED_NEXT"
+  },
+  "formal_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "remaining_gate_ids": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-02",
+    "work_item_id": "EPIC-02-FP005-OFFICIAL-ENVIRONMENT-CROSSWALK",
+    "source_policy_id": "FP-005",
+    "gap_id": "GAP-014",
+    "status": "PLANNED_NEXT_WITHIN_EPIC",
+    "action": "밝고 건조한 일반 도심 보도 범위, 측정 가능한 환경 품질, 확인 불가 조건의 보수적 제한과 횡단보도 참고 고지를 Android 사전점검·안전정지에 연결한다."
+  },
+  "overlay_content_sha256": "89a8b9f137c67edf53c8403f543d93dbaaf0c6ede546b2ee7e6cef6d57264c92"
+}

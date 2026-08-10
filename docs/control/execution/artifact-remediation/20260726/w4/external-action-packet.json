@@ -1,0 +1,955 @@
+{
+  "schema_version": "walksafe.w4-external-action-packet.v2",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W4-EXTERNAL-ACTION-PACKET-20260727-002",
+  "wave_id": "W4",
+  "prepared_on": "2026-07-27",
+  "status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+  "environment_readiness_binding": {
+    "json_path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+    "json_file_sha256": "f5a3dbe9b9d38e4ec49009d4ac123ab905ea857fd37f6c250d030f8bdcfae6fc",
+    "json_content_fingerprint": "f64618bd4900e7224bec36604828a9f4c176730f759ef9eab355cc17f4c8f945",
+    "markdown_path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+    "markdown_file_sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+    "markdown_content_fingerprint": "cddef2cc06e35951fa278b06898af6ffff1ff7f2689fcd2de43ffda097750f7b"
+  },
+  "authority_boundary": {
+    "packet_executes_external_actions": false,
+    "packet_requests_approval": false,
+    "packet_changes_artifact_status": false,
+    "packet_changes_test_result": false,
+    "packet_changes_gate_or_release_status": false,
+    "interpretation": "This is an actionable handoff contract. Every action remains pending until internal readiness passes, the named owner supplies controlled inputs, execution evidence exists and the authorized reviewer decides."
+  },
+  "internal_readiness_gate": {
+    "current_status": "NOT_READY",
+    "required_precondition_count": 7,
+    "satisfied_precondition_count": 0,
+    "required_precondition_ids": [
+      "W4-INT-PRE-01",
+      "W4-INT-PRE-02",
+      "W4-INT-PRE-03",
+      "W4-INT-PRE-04",
+      "W4-INT-PRE-05",
+      "W4-INT-PRE-06",
+      "W4-INT-PRE-07"
+    ],
+    "handoff_rule": "Do not transition an action to WAITING_EXTERNAL until all seven internal preconditions pass and a bounded request is issued to the owner."
+  },
+  "local_internal_boundary": {
+    "status": "INTERNAL_GAP",
+    "allowed_work": [
+      "exact-279 fixture and external-action mapping",
+      "formal local environment instance provisioning and smoke evidence",
+      "immutable source/build/model/config/OpenAPI/DB binding",
+      "local unit, contract and regression execution on the bound candidate",
+      "isolated Gateway to Backend to PostGIS cross-process execution",
+      "append-only evidence and defect-link validation",
+      "accessibility-specific automated suites for both Android apps on the same current-source binding"
+    ],
+    "postgis_rule": "W3 fresh migration, schema parity, repeatability and cleanup PASS is an internal candidate only. It is not formal execution and does not prove Android to Gateway to Backend to PostGIS cross-process or production behavior."
+  },
+  "actions": [
+    {
+      "action_id": "W4-EXT-TST02-APPROVAL-000",
+      "sequence": 5,
+      "title": "Authorized test schedule, entry/exit and suspend/resume approval",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "LIGHT_HUMAN_APPROVAL",
+      "owner_role": "QA test authority",
+      "supporting_roles": [
+        "Product owner",
+        "Technical owner",
+        "Safety owner when a field scenario is included"
+      ],
+      "related_artifact_type_ids": [
+        "DLV-TST-02",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "versioned candidate test schedule and execution windows",
+        "entry and exit criteria with evidence references",
+        "suspend, abort, resume and restart criteria",
+        "named decision authority and escalation route",
+        "immutable subject and environment-readiness candidate"
+      ],
+      "ordered_procedure": [
+        "Review the immutable subject, case scope, environment readiness and unresolved dependencies.",
+        "Approve or reject the versioned schedule and bounded execution windows.",
+        "Approve entry and exit criteria for each execution tier.",
+        "Approve suspend, abort, resume and restart triggers and identify the decision authority.",
+        "Issue a signed, timestamped approval receipt bound to the schedule and criteria hashes."
+      ],
+      "stop_conditions": [
+        "Source, build, model, config, OpenAPI, DB or case scope changes after review.",
+        "A required environment or controlled test-data assignment is not ready.",
+        "Suspend/resume authority or escalation ownership is ambiguous.",
+        "A safety, privacy, credential or evidence-retention prerequisite is missing."
+      ],
+      "evidence_required": [
+        "signed schedule approval receipt",
+        "schedule file SHA-256 and execution-window version",
+        "entry/exit criteria matrix",
+        "suspend/abort/resume authority matrix and decision-log template",
+        "approver identity, role and timestamp"
+      ],
+      "acceptance_rule": "The authorized QA test authority signs the exact schedule, entry/exit criteria and suspend/resume contract for the bound candidate. No formal execution may start under this action before that receipt exists.",
+      "forbidden_substitutes": [
+        "AI approval",
+        "unsigned meeting note",
+        "calendar entry without criteria",
+        "execution before approval"
+      ],
+      "gate_contribution": []
+    },
+    {
+      "action_id": "W4-EXT-TST03-APPROVAL-000",
+      "sequence": 8,
+      "title": "Authorized logical-environment and supported-device-matrix approval",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "LIGHT_HUMAN_APPROVAL",
+      "owner_role": "QA environment authority",
+      "supporting_roles": [
+        "Android device owner",
+        "Backend owner",
+        "DB owner",
+        "Security and privacy owner"
+      ],
+      "related_artifact_type_ids": [
+        "DLV-TST-03",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "canonical six logical environments and their instance records",
+        "all 12 instance field groups and smoke evidence",
+        "supported manufacturer/model/Android/API/ARCore/depth matrix",
+        "network, test-data, secret-reference and retirement boundaries",
+        "reference-only exclusion for ENV-LEGACY-WEB"
+      ],
+      "ordered_procedure": [
+        "Verify that the canonical logical-environment set is exactly six and uniquely identified.",
+        "Review each local instance for all 12 field groups, smoke evidence and lifecycle dates.",
+        "Review each supported-device matrix cell and its Android/API/capability/network requirements.",
+        "Confirm ENV-LEGACY-WEB is reference-only and cannot substitute for Android evidence.",
+        "Approve, reject or return each instance and matrix revision with a signed decision receipt."
+      ],
+      "stop_conditions": [
+        "Any logical environment is missing, duplicated or silently added.",
+        "An instance has a null required binding, missing smoke evidence or expired lifecycle.",
+        "A supported-device cell lacks an owner, device source or capability criterion.",
+        "The matrix or environment facts drift after review."
+      ],
+      "evidence_required": [
+        "signed logical-environment approval receipt",
+        "per-instance approval decisions and smoke evidence references",
+        "supported-device matrix revision and SHA-256",
+        "rejected or deferred cell list with owner and next evidence",
+        "approver identity, role and timestamp"
+      ],
+      "acceptance_rule": "The authorized environment authority approves the exact six-environment model, every formal-ready local instance and every required supported-device matrix cell. Unapproved or unavailable cells remain pending and are never automatic N/A.",
+      "forbidden_substitutes": [
+        "environment document presence",
+        "device inventory without approval",
+        "emulator-only matrix",
+        "automatic N/A"
+      ],
+      "gate_contribution": []
+    },
+    {
+      "action_id": "W4-EXT-DEVICE-001",
+      "sequence": 10,
+      "title": "Physical Android baseline and compatibility execution",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_DEVICE",
+      "related_artifact_type_ids": [
+        "DLV-TST-03",
+        "DLV-TST-07",
+        "DLV-TST-09",
+        "DLV-TST-11",
+        "DLV-TST-14",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "physical user and administrator Android devices",
+        "authorized supported-device matrix cells",
+        "bound APK, model and configuration hashes",
+        "manufacturer/model, Android/API, ARCore/depth and network profile",
+        "device pseudonyms rather than serials"
+      ],
+      "evidence_required": [
+        "install and launch receipt per matrix cell",
+        "device capability and environment record",
+        "functional and compatibility step results",
+        "controlled screen/log/video evidence IDs and SHA-256",
+        "defect and retest linkage"
+      ],
+      "acceptance_rule": "Every required support-matrix cell executes the assigned cases on the bound physical-device build with no unexplained mismatch; missing cells remain NOT_RUN or BLOCKED and do not become N/A automatically.",
+      "forbidden_substitutes": [
+        "emulator-only result",
+        "legacy Web/PWA result",
+        "unbound debug result",
+        "device inventory without execution"
+      ],
+      "gate_contribution": [],
+      "owner_role": "Android device owner",
+      "supporting_roles": [
+        "QA owner"
+      ],
+      "ordered_procedure": [
+        "Verify the approved supported-device matrix and bound APK/model/config hashes.",
+        "Install and launch user and administrator apps on each required physical matrix cell.",
+        "Capture manufacturer/model, Android/API, capability, network and pseudonym bindings.",
+        "Execute assigned functional and compatibility steps without changing the subject.",
+        "Record controlled evidence, defects and same-cell retests."
+      ],
+      "stop_conditions": [
+        "A matrix cell, device capability or subject hash is unapproved or mismatched.",
+        "Install/launch fails before evidence correlation is established.",
+        "Device identity would expose a real serial or uncontrolled personal identifier.",
+        "A safety-critical or data-integrity failure requires suspension."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-A11Y-002",
+      "sequence": 20,
+      "title": "TalkBack and technical accessibility execution",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_DEVICE",
+      "related_artifact_type_ids": [
+        "DLV-TST-14",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "PASS receipts for accessibility-specific automated suites of both Android apps on the same current-source binding",
+        "bound physical device and APKs",
+        "TalkBack version and settings",
+        "locale, font scale, display size and orientation matrix",
+        "approved accessibility procedure and human reviewer"
+      ],
+      "evidence_required": [
+        "user-app accessibility automated-suite PASS receipt and source binding",
+        "administrator-app accessibility automated-suite PASS receipt and source binding",
+        "accessibility assertion-to-TST-14 candidate mapping with formal contribution zero",
+        "physical-device TalkBack node tree, focus and announcement trace",
+        "large-text reflow, touch-target and non-color cue observations",
+        "authorized human accessibility QA receipt and defect/retest links"
+      ],
+      "acceptance_rule": "Closure uses AND: both current-source Android accessibility-specific automated suites PASS, and the approved physical-device TalkBack matrix passes with an authorized human accessibility QA decision. Neither axis can substitute for the other.",
+      "forbidden_substitutes": [
+        "static semantics review only",
+        "emulator-only TalkBack",
+        "screenshot without focus or announcement evidence",
+        "document approval without execution"
+      ],
+      "gate_contribution": [],
+      "owner_role": "Accessibility QA authority",
+      "supporting_roles": [
+        "Android user-app owner",
+        "Android admin-app owner",
+        "Physical-device owner"
+      ],
+      "ordered_procedure": [
+        "Verify both Android apps have accessibility-specific automated-suite PASS receipts on the same current-source binding.",
+        "Verify the exact accessibility assertions selected for TST-14 and keep their formal contribution at zero.",
+        "Install the bound app build on the approved physical device and record TalkBack/display settings.",
+        "Execute node-tree, focus order, focus recovery, announcement, reflow, touch-target and alternative-feedback steps.",
+        "Have the authorized human accessibility QA reviewer compare observations with acceptance criteria.",
+        "Record defects and retest both the affected automated axis and physical TalkBack axis when implementation changes."
+      ],
+      "stop_conditions": [
+        "Either Android app lacks an accessibility-specific automated-suite PASS on the current source.",
+        "The physical APK or device binding differs from the approved subject or matrix.",
+        "TalkBack is disabled, changes version/settings mid-run, or focus/announcement capture is unavailable.",
+        "A critical focus trap, missing safety announcement or inaccessible recovery path is observed.",
+        "Human reviewer identity or controlled raw-evidence handling is missing."
+      ],
+      "dual_closure": {
+        "operator": "AND",
+        "automated_axis_required_status": "PASS_BOTH_ANDROID_APPS_CURRENT_SOURCE",
+        "physical_human_axis_required_status": "PASS_PHYSICAL_TALKBACK_AND_AUTHORIZED_HUMAN_QA",
+        "current_overall_status": "OPEN_BOTH_AXES_REQUIRED"
+      }
+    },
+    {
+      "action_id": "W4-EXT-TMAP-003",
+      "sequence": 30,
+      "title": "Single-session physical Android user to Gateway to Backend to PostGIS E2E with live TMAP",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_DEVICE_NETWORK",
+      "related_artifact_type_ids": [
+        "DLV-TST-07",
+        "DLV-TST-09",
+        "DLV-TST-11",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "one immutable manifest containing source commit, build/artifact, model, config, OpenAPI and DB migration bindings",
+        "one approved supported physical Android user device and environment instance",
+        "running Gateway, Backend and isolated PostGIS process identities",
+        "approved TMAP account, TMAP_APP_KEY secret-store reference, quota and live endpoints",
+        "controlled route/POI inputs and Wi-Fi/mobile/offline recovery profile",
+        "one allocated formal run_id and one correlated application session_id"
+      ],
+      "evidence_required": [
+        "single run_id and session_id correlation manifest",
+        "source/build/artifact/model/config/OpenAPI/DB binding manifest",
+        "physical device and environment-instance approval references",
+        "sanitized live TMAP request/response and timing receipts",
+        "Android to Gateway to Backend request/response trace",
+        "PostGIS migration-head and database assertion receipts",
+        "network transition, timeout, recovery and stop records",
+        "secret non-disclosure check and defect/retest linkage"
+      ],
+      "acceptance_rule": "One uninterrupted or formally resumed run/session on one supported physical Android user device proves live TMAP and the Android user to Gateway to Backend to PostGIS path under the same source/build/model/config/OpenAPI/DB bindings. Results from different runs, subjects or devices may not be stitched into PASS.",
+      "forbidden_substitutes": [
+        "mock or stub TMAP",
+        "loopback-only client",
+        "database-only W3 PASS",
+        "multiple runs stitched together",
+        "legacy Web/PWA"
+      ],
+      "gate_contribution": [],
+      "owner_role": "QA integration authority",
+      "supporting_roles": [
+        "Android device owner",
+        "Gateway owner",
+        "Backend owner",
+        "DB owner",
+        "TMAP credential owner"
+      ],
+      "ordered_procedure": [
+        "Verify every source/build/model/config/OpenAPI/DB hash and the approved environment instance before launch.",
+        "Install the bound Android user APK on the supported physical device and allocate one run_id and one session_id.",
+        "Start Gateway, Backend and isolated PostGIS, capture process identities and confirm migration head.",
+        "From the Android user app, perform the assigned login/consent/navigation preconditions within that session.",
+        "Execute live TMAP destination search and pedestrian routing through actual network transport.",
+        "Send the correlated Android request through Gateway and Backend and assert the expected PostGIS state in the same run.",
+        "Execute assigned network transition, timeout and recovery branches without changing the bound subject.",
+        "Stop processes safely, collect defects, and hash every device/network/process/DB evidence object under the same run/session."
+      ],
+      "stop_conditions": [
+        "Any source/build/model/config/OpenAPI/DB hash differs from the frozen manifest.",
+        "The physical device or environment is outside the approved matrix.",
+        "TMAP credential, quota, live endpoint or outbound network is unavailable.",
+        "Gateway, Backend, migration head or PostGIS health cannot be established.",
+        "run_id/session_id correlation is lost or evidence would require stitching another run.",
+        "A safety, privacy, raw-data or secret-handling boundary is violated."
+      ],
+      "single_run_binding": {
+        "required": true,
+        "binding_keys": [
+          "run_id",
+          "session_id",
+          "source_commit",
+          "build_id",
+          "artifact_sha256",
+          "model_sha256",
+          "config_sha256",
+          "openapi_sha256",
+          "db_migration",
+          "environment_instance_id",
+          "device_pseudonym"
+        ],
+        "cross_run_aggregation_allowed": false
+      }
+    },
+    {
+      "action_id": "W4-EXT-DEVICE-PERF-004",
+      "sequence": 40,
+      "title": "Supported-device performance, battery, thermal and queue measurement",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_DEVICE_MEASUREMENT",
+      "related_artifact_type_ids": [
+        "DLV-TST-12",
+        "DLV-TST-13",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "supported physical-device matrix",
+        "approved workload duration and measurement method",
+        "battery baseline and charging rule",
+        "ambient and starting thermal conditions",
+        "controlled queue payload and storage-space profiles"
+      ],
+      "evidence_required": [
+        "latency distribution and sample count",
+        "battery delta and duration",
+        "thermal state and throttling trace",
+        "CPU, memory and transient-storage measurements",
+        "queue byte count, item count and full-storage behavior",
+        "separate budget approval or revision receipt"
+      ],
+      "acceptance_rule": "Every supported-device measurement is reproducible on the bound candidate and the authorized owners separately approve or revise each provisional budget; measurements feed but do not automatically close the phone-queue gate.",
+      "forbidden_substitutes": [
+        "desktop benchmark",
+        "emulator timing",
+        "single undocumented observation",
+        "provisional budget treated as approved"
+      ],
+      "gate_contribution": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT"
+      ],
+      "owner_role": "Android performance owner",
+      "supporting_roles": [
+        "QA owner",
+        "Product owner"
+      ],
+      "ordered_procedure": [
+        "Approve the physical-device cells, workload, duration and measurement instruments.",
+        "Record battery, charging, ambient, thermal, storage and queue baselines.",
+        "Run the bound workload without another heavy process.",
+        "Collect latency, battery, thermal, CPU, memory, storage and queue measurements.",
+        "Repeat required samples and submit each provisional budget for approval or revision."
+      ],
+      "stop_conditions": [
+        "Device, workload or instrument differs from the approved method.",
+        "Charging, thermal or ambient state invalidates comparison.",
+        "Thermal or storage safety threshold is exceeded.",
+        "Another heavy workload starts or measurement evidence is incomplete."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-STAGING-005",
+      "sequence": 50,
+      "title": "Staging load, capacity-state and cloud-cost measurement",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_STAGING_LOAD",
+      "related_artifact_type_ids": [
+        "DLV-TST-12",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "owner_input": [
+        "approved staging account and topology",
+        "bounded load profile and stop thresholds",
+        "test-only identities and data",
+        "capacity-state configuration and observation window",
+        "cloud storage/request/restore billing access"
+      ],
+      "evidence_required": [
+        "throughput, latency and error distribution",
+        "CPU, memory, connection and storage utilization",
+        "capacity-state version, observation time, propagation latency and offline TTL behavior",
+        "saturation, recovery and data-integrity trace",
+        "billing export for storage, requests and restore",
+        "authorized budget and gate decisions"
+      ],
+      "acceptance_rule": "The declared staging shape sustains the approved profile within separately approved limits, capacity state reaches the client under the approved contract, and actual cost evidence supports an authorized decision for both affected gates.",
+      "forbidden_substitutes": [
+        "localhost-only benchmark",
+        "estimated cost without billing evidence",
+        "production load without approval",
+        "load run concurrent with another heavy lane"
+      ],
+      "gate_contribution": [
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-CLOUD-COST-MEASUREMENT"
+      ],
+      "owner_role": "Operations owner",
+      "supporting_roles": [
+        "Backend owner",
+        "QA owner",
+        "Cloud billing owner"
+      ],
+      "ordered_procedure": [
+        "Approve staging topology, identities, data, load profile and stop thresholds.",
+        "Record baseline capacity-state, resource and billing conditions.",
+        "Run the bounded load profile with one heavy lane.",
+        "Observe saturation, recovery, client capacity-state propagation and data integrity.",
+        "Export billing evidence and obtain separate budget and gate decisions."
+      ],
+      "stop_conditions": [
+        "Target is production or topology is outside approved staging.",
+        "Error, saturation, data-integrity or cost stop threshold is exceeded.",
+        "Client capacity-state correlation or billing attribution is lost.",
+        "Another heavy load or security execution starts."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-RAW-REVIEW-006",
+      "sequence": 60,
+      "title": "Independent raw-collection release review",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "LIGHT_HUMAN_REVIEW",
+      "related_artifact_type_ids": [
+        "DLV-TST-21",
+        "DLV-TST-22"
+      ],
+      "owner_input": [
+        "current raw-collection scope",
+        "notice, consent and rights procedures",
+        "retention, access and deletion controls",
+        "release candidate behavior and evidence references"
+      ],
+      "evidence_required": [
+        "independent review record",
+        "finding and required-change list",
+        "product reapproval when scope or procedure changes",
+        "authorized gate decision"
+      ],
+      "acceptance_rule": "An independent reviewer evaluates the actual release behavior and the authorized owners record closure or required changes; a template or self-review does not close the gate.",
+      "forbidden_substitutes": [
+        "AI approval",
+        "document presence",
+        "developer self-review"
+      ],
+      "gate_contribution": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "owner_role": "Independent privacy reviewer",
+      "supporting_roles": [
+        "Privacy owner",
+        "Product owner"
+      ],
+      "ordered_procedure": [
+        "Freeze the actual raw-collection behavior and notice/consent/rights evidence.",
+        "Provide the controlled packet to an independent privacy reviewer.",
+        "Record findings and required product or procedure changes.",
+        "Re-review changed scope and obtain product reapproval when required.",
+        "Issue an authorized gate decision linked to the review record."
+      ],
+      "stop_conditions": [
+        "Reviewer independence or scope is not established.",
+        "Actual release behavior differs from the review subject.",
+        "Required notice, consent, rights, retention or deletion evidence is missing.",
+        "A required change has not been implemented and re-reviewed."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-ADMIN-RECOVERY-007",
+      "sequence": 70,
+      "title": "Single-administrator lost-device recovery drill",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "MODERATE_DEVICE_DRILL",
+      "related_artifact_type_ids": [
+        "DLV-TST-16",
+        "DLV-TST-17",
+        "DLV-TST-21",
+        "DLV-TST-22"
+      ],
+      "owner_input": [
+        "authorized administrator test identity",
+        "administrator device and independent recovery means",
+        "lost-device scenario and stop rules",
+        "session revocation and high-risk freeze procedure"
+      ],
+      "evidence_required": [
+        "recovery timeline",
+        "old-device session revocation proof",
+        "high-risk operation freeze and recovery assertions",
+        "audit record",
+        "defect/retest and authorized gate decision"
+      ],
+      "acceptance_rule": "The drill demonstrates recovery without the lost device, revokes its sessions, preserves the high-risk freeze contract and produces an authorized gate decision.",
+      "forbidden_substitutes": [
+        "tabletop document only",
+        "unit test only",
+        "recovery code existence without drill"
+      ],
+      "gate_contribution": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "owner_role": "Administrator owner",
+      "supporting_roles": [
+        "Security owner",
+        "Operations owner",
+        "QA owner"
+      ],
+      "ordered_procedure": [
+        "Approve the administrator test identity, device, recovery means and stop rules.",
+        "Establish the pre-loss session and high-risk-operation baseline.",
+        "Declare the device lost and execute recovery without using the lost device.",
+        "Verify old-session revocation, high-risk freeze and restored access.",
+        "Review audit evidence, defects and the authorized gate decision."
+      ],
+      "stop_conditions": [
+        "A real production identity or uncontrolled secret would be used.",
+        "Independent recovery means or audit capture is unavailable.",
+        "Old sessions remain active or high-risk operations bypass the freeze.",
+        "The scenario affects non-test users or data."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-SECURITY-008",
+      "sequence": 80,
+      "title": "Authorized security verification and active-scope penetration test",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "HEAVY_SECURITY",
+      "related_artifact_type_ids": [
+        "DLV-SEC-14",
+        "DLV-TST-20",
+        "DLV-TST-21",
+        "DLV-TST-22"
+      ],
+      "owner_input": [
+        "authorized SEC-14 applicability decision",
+        "approved scope and rules of engagement",
+        "isolated or staging target",
+        "test credentials and secret-store references",
+        "stop, notification and cleanup contacts"
+      ],
+      "evidence_required": [
+        "signed scope and tester identity",
+        "tool and manual-test manifest",
+        "finding severity and affected subject",
+        "remediation and retest evidence",
+        "residual-risk acceptance or signed N/A basis by authorized owners"
+      ],
+      "acceptance_rule": "If SEC-14 is active, the approved independent assessment is bound to the candidate and every release-blocking finding is remediated or formally accepted; if not applicable, an authorized signed N/A decision is required.",
+      "forbidden_substitutes": [
+        "unit/auth regression alone",
+        "unapproved scan",
+        "developer self-approval",
+        "automatic N/A"
+      ],
+      "gate_contribution": [],
+      "owner_role": "Security owner",
+      "supporting_roles": [
+        "Independent security tester",
+        "Operations owner",
+        "QA owner"
+      ],
+      "ordered_procedure": [
+        "Obtain the authorized SEC-14 applicability decision and signed rules of engagement.",
+        "Verify isolated/staging scope, credentials, contacts and cleanup plan.",
+        "Execute approved automated and manual assessment activities.",
+        "Triage findings against the bound candidate and remediate release blockers.",
+        "Retest and record residual-risk acceptance or signed N/A by authorized owners."
+      ],
+      "stop_conditions": [
+        "Scope, target, tester authorization or rules of engagement is missing.",
+        "A production-impact, data-loss or uncontrolled-secret risk appears.",
+        "A critical finding requires immediate containment.",
+        "The candidate changes before findings and retest are bound."
+      ]
+    },
+    {
+      "action_id": "W4-EXT-QA-009",
+      "sequence": 90,
+      "title": "Formal execution aggregation and QA approval",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "resource_class": "LIGHT_HUMAN_APPROVAL",
+      "related_artifact_type_ids": [
+        "DLV-TST-18",
+        "DLV-TST-19",
+        "DLV-TST-20",
+        "DLV-TST-21",
+        "DLV-TST-22",
+        "DLV-TST-23"
+      ],
+      "owner_input": [
+        "approved test plan and environment instances",
+        "immutable release-generation manifest",
+        "append-only formal execution records for the exact 279-case register",
+        "defect, metric, residual-risk and five-gate snapshots",
+        "external action results and applicability decisions"
+      ],
+      "evidence_required": [
+        "QA review receipt",
+        "exact-279 execution and applicability reconciliation",
+        "TST-20 result report",
+        "TST-21 open defect and residual-risk snapshot",
+        "explicit reviewer identities, decision and timestamp"
+      ],
+      "acceptance_rule": "Every exact case has an authorized applicability and truthful append-only disposition, mandatory release cases have no unexplained NOT_RUN or BLOCKED result, failures link defects and risks, and QA records an explicit decision. This action supplies inputs but does not itself sign TST-22 or TST-23.",
+      "forbidden_substitutes": [
+        "AI approval",
+        "generated report without run evidence",
+        "sum of historical internal suites",
+        "multiple unbound builds merged into one PASS"
+      ],
+      "gate_contribution": [],
+      "owner_role": "QA owner",
+      "supporting_roles": [
+        "Technical owner",
+        "Security and privacy owners",
+        "Product owner"
+      ],
+      "ordered_procedure": [
+        "Freeze the approved plan, environment instances and immutable release-generation manifest.",
+        "Reconcile the exact 279 IDs with append-only execution and applicability records.",
+        "Reconcile defects, metrics, residual risks, external actions and five gates.",
+        "Generate TST-20 and TST-21 revisions from the same evidence cutoff.",
+        "Have authorized QA and required reviewers record an explicit decision and timestamp."
+      ],
+      "stop_conditions": [
+        "Any exact case is missing, duplicated or bound to another subject.",
+        "A mandatory case has unexplained NOT_RUN/BLOCKED or an unlinked failure.",
+        "Evidence cutoff, defect snapshot, risk snapshot or gate state is inconsistent.",
+        "An external approval or reviewer identity is missing."
+      ]
+    }
+  ],
+  "conditional_field_extension": {
+    "status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+    "activation_rule": "Any controlled field or target-user scenario additionally requires WS-21 safety approval, participant consent, safety staff, stop/emergency rules and controlled raw-evidence handling before execution.",
+    "automatic_activation_or_n_a_allowed": false
+  },
+  "resource_serialization": {
+    "heavy_lane_limit": 1,
+    "heavy_action_order": [
+      "W4-EXT-DEVICE-001",
+      "W4-EXT-A11Y-002",
+      "W4-EXT-TMAP-003",
+      "W4-EXT-DEVICE-PERF-004",
+      "W4-EXT-STAGING-005",
+      "W4-EXT-ADMIN-RECOVERY-007",
+      "W4-EXT-SECURITY-008"
+    ],
+    "light_human_actions": [
+      "W4-EXT-TST02-APPROVAL-000",
+      "W4-EXT-TST03-APPROVAL-000",
+      "W4-EXT-RAW-REVIEW-006",
+      "W4-EXT-QA-009"
+    ],
+    "rules": [
+      "Run only one heavy action or local heavy step at a time.",
+      "Do not overlap Android Gradle, Node build, PostGIS, physical-device measurement, staging load or security execution.",
+      "Complete TST-02 schedule approval and TST-03 environment approval before any formal heavy execution.",
+      "Complete physical functional baseline before the TST-14 physical TalkBack axis, TST-09 live full E2E and device performance.",
+      "Run QA aggregation only after all available action evidence and unresolved blockers are frozen."
+    ]
+  },
+  "logout_guard": [
+    "Stop new action assignment before logout or shutdown.",
+    "Finish the current heavy action or retain it as an incomplete attempt without PASS.",
+    "Revoke temporary credentials, stop test traffic and clean controlled local resources when safe.",
+    "Record subject digest, active action, external owner, output controls and next step in the coordinator handoff.",
+    "After restart, mark receipt-less RUNNING work ABANDONED_BY_REBOOT and allocate a new attempt ID.",
+    "Do not convert partial device, network, load or security output into PASS."
+  ],
+  "claim_boundary": {
+    "formal_test_planned_count": 279,
+    "formal_test_execution_status": "NOT_RUN",
+    "formal_test_pass_count": 0,
+    "formal_test_pass_claimed": false,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_action_completed_count": 0,
+    "qa_approval_status": "NOT_APPROVED",
+    "tst22_status": "NOT_ELIGIBLE",
+    "tst23_status": "NOT_READY_FOR_ACCEPTANCE",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "external_action_count": 11,
+    "pending_external_action_count": 11,
+    "internal_precondition_count": 7,
+    "release_gate_count": 5,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "01d22d42e90b94ddac9d5826676334a66919da292c2919373d994b98fa016178"
+    },
+    "covered_exact13_count": 13,
+    "auxiliary_dependency_count": 8,
+    "review_finding_count": 7,
+    "review_finding_closed_count": 7
+  },
+  "revision_reason": "Close independent-review findings for TST-02/03/09/14, formal instance schema, scope separation, actionable procedures and acyclic pair/predecessor binding.",
+  "scope_boundary": {
+    "covered_exact13": [
+      "DLV-TST-01",
+      "DLV-TST-02",
+      "DLV-TST-03",
+      "DLV-TST-04",
+      "DLV-TST-05",
+      "DLV-TST-07",
+      "DLV-TST-09",
+      "DLV-TST-11",
+      "DLV-TST-14",
+      "DLV-TST-18",
+      "DLV-TST-19",
+      "DLV-TST-20",
+      "DLV-TST-21"
+    ],
+    "covered_exact13_count": 13,
+    "auxiliary_dependency_ids": [
+      "DLV-TST-12",
+      "DLV-TST-13",
+      "DLV-TST-16",
+      "DLV-TST-17",
+      "DLV-TST-22",
+      "DLV-TST-23",
+      "DLV-SEC-14",
+      "DLV-WS-21"
+    ],
+    "auxiliary_dependency_count": 8,
+    "sets_disjoint": true,
+    "auxiliary_dependencies_expand_w4_exact_scope": false,
+    "interpretation": "Auxiliary IDs are prerequisites, measurements or downstream approvals only; they are not W4 exact artifact coverage."
+  },
+  "tst14_dual_closure": {
+    "closure_operator": "AND",
+    "automated_current_source_axis": {
+      "required_status": "PASS_INTERNAL_CURRENT_SOURCE",
+      "current_status": "NOT_RUN_AS_ACCESSIBILITY_SPECIFIC_SUITE",
+      "required_apps": [
+        "ANDROID_USER_APP",
+        "ANDROID_ADMIN_APP"
+      ],
+      "generic_candidate_evidence": [
+        {
+          "suite_axis": "ANDROID_USER_JVM_INTERNAL",
+          "result": "PASS_INTERNAL",
+          "test_count": 728,
+          "receipt_sha256": "e4d0a386bdfc7863045f4b73b0c6175a1dfd183bcad16c33006f286845da5420",
+          "accessibility_specific_pass_claimed": false
+        },
+        {
+          "suite_axis": "ANDROID_ADMIN_JVM_INTERNAL",
+          "result": "PASS_INTERNAL",
+          "test_count": 38,
+          "receipt_sha256": "695de382418e5f9f25d55e29d9a0dd9e52c4d1f18d43c9dd44970654997e910b",
+          "accessibility_specific_pass_claimed": false
+        }
+      ],
+      "formal_result_contribution": 0,
+      "closure_rule": "Run and bind accessibility-specific automated suites for both apps; do not infer accessibility PASS from generic totals."
+    },
+    "physical_human_axis": {
+      "required_status": "PASS_PHYSICAL_TALKBACK_AND_HUMAN_QA",
+      "current_status": "NOT_RUN",
+      "required_evidence": [
+        "physical-device TalkBack tree",
+        "focus and announcement trace",
+        "reflow and touch observations",
+        "authorized accessibility QA receipt"
+      ]
+    },
+    "overall_current_status": "OPEN_BOTH_AXES_REQUIRED",
+    "formal_result_contribution": 0
+  },
+  "review_findings_closure_matrix": [
+    {
+      "finding_id": "W4-REVIEW-FINDING-01",
+      "requirement": "TST-02 governance approval and TST-03 environment/device-matrix approval actions",
+      "closure": "W4-EXT-TST02-APPROVAL-000 and W4-EXT-TST03-APPROVAL-000 define owner input, ordered procedure, stop conditions, evidence and acceptance.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-02",
+      "requirement": "TST-09 one-session full physical Android/live TMAP/PostGIS E2E",
+      "closure": "W4-EXT-TMAP-003 now requires one run/session and one source/build/model/config/OpenAPI/DB binding through Android user to Gateway to Backend to PostGIS.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-03",
+      "requirement": "TST-14 dual automated and physical/human closure",
+      "closure": "W4-INT-A11Y-006 and W4-EXT-A11Y-002 are joined by an AND closure; generic 728/38 suites are not inferred as accessibility-specific PASS.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-04",
+      "requirement": "Canonical environment instance 12-field-group model with per-environment arrays",
+      "closure": "All six logical environments carry empty instances arrays and the canonical contract covers source/build/model/config/OpenAPI/DB/device/network bindings.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-05",
+      "requirement": "Separate covered exact13 from auxiliary dependencies",
+      "closure": "scope_boundary records exact13 and a disjoint auxiliary ID set that cannot expand W4 coverage.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-06",
+      "requirement": "Every external action has owner_role, ordered procedure, stop conditions, evidence and acceptance",
+      "closure": "The external packet validator requires all five fields on every action and rejects empty lists or rules.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-07",
+      "requirement": "Exact predecessor and JSON/Markdown pair binding with an acyclic DAG",
+      "closure": "Each JSON binds exact predecessor and Markdown file SHA-256/content fingerprints in one direction; downstream receipts bind JSON raw SHA-256, avoiding self-hash cycles.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    }
+  ],
+  "external_predecessor_bindings": [
+    {
+      "binding_id": "PRED-W4-ENV-JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+      "file_sha256": "f5a3dbe9b9d38e4ec49009d4ac123ab905ea857fd37f6c250d030f8bdcfae6fc",
+      "content_fingerprint": "f64618bd4900e7224bec36604828a9f4c176730f759ef9eab355cc17f4c8f945",
+      "content_fingerprint_source": "DECLARED_CURRENT_JSON_CONTENT_FINGERPRINT",
+      "immutable_at_capture": true
+    },
+    {
+      "binding_id": "PRED-W4-ENV-MD",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+      "file_sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+      "content_fingerprint": "cddef2cc06e35951fa278b06898af6ffff1ff7f2689fcd2de43ffda097750f7b",
+      "content_fingerprint_source": "DECLARED_MARKDOWN_CONTENT_FINGERPRINT",
+      "immutable_at_capture": true
+    }
+  ],
+  "binding_dag": {
+    "graph_id": "W4-EXTERNAL-ACTION-BINDING-DAG-20260727-002",
+    "direction": "ENVIRONMENT_PAIR_OR_MARKDOWN_TO_EXTERNAL_ACTION_JSON",
+    "nodes": [
+      {
+        "node_id": "PRED-W4-ENV-JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "f5a3dbe9b9d38e4ec49009d4ac123ab905ea857fd37f6c250d030f8bdcfae6fc",
+        "content_fingerprint": "f64618bd4900e7224bec36604828a9f4c176730f759ef9eab355cc17f4c8f945"
+      },
+      {
+        "node_id": "PRED-W4-ENV-MD",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+        "content_fingerprint": "cddef2cc06e35951fa278b06898af6ffff1ff7f2689fcd2de43ffda097750f7b"
+      },
+      {
+        "node_id": "W4-EXT-MD",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+        "kind": "MARKDOWN_PROJECTION",
+        "file_sha256": "a7bf63a1465737162fdb52b0a06e9175b7467d57f62aee14142b91648d01abc9",
+        "content_fingerprint": "fb17874ba8ff9242c972b5a3be88926b8fbf1cd6c6e7c41cd187b1cdbf12c1e6"
+      },
+      {
+        "node_id": "W4-EXT-JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+        "kind": "CURRENT_JSON"
+      }
+    ],
+    "edges": [
+      {
+        "from": "PRED-W4-ENV-JSON",
+        "to": "W4-EXT-JSON"
+      },
+      {
+        "from": "PRED-W4-ENV-MD",
+        "to": "W4-EXT-JSON"
+      },
+      {
+        "from": "W4-EXT-MD",
+        "to": "W4-EXT-JSON"
+      }
+    ],
+    "cycle_count": 0,
+    "result": "PASS_ACYCLIC_BY_CONSTRUCTION",
+    "json_raw_sha256_binding_rule": "The central W4 implementation receipt binds the external-action JSON raw file SHA-256; self SHA-256 is not embedded in the same file."
+  },
+  "markdown_projection_binding": {
+    "binding_id": "W4-EXT-MD-PROJECTION",
+    "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+    "file_sha256": "a7bf63a1465737162fdb52b0a06e9175b7467d57f62aee14142b91648d01abc9",
+    "content_fingerprint": "fb17874ba8ff9242c972b5a3be88926b8fbf1cd6c6e7c41cd187b1cdbf12c1e6",
+    "content_fingerprint_canonicalization": "UTF-8 LF Markdown, declared Markdown content fingerprint value normalized to null, trailing LF",
+    "binding_direction": "MARKDOWN_TO_JSON"
+  }
+}

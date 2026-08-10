@@ -1,0 +1,278 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_authentication_status": "NOT_RUN",
+    "external_institution_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-008-01",
+      "TC-FP-008-02",
+      "TC-FP-008-03",
+      "TC-FP-008-04"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP008_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-VERIFICATION-20260803-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "implementation_content_set_sha256": "77a9ec5b6bebce7aa68088e74a7ffb68d5f3d4e2d70484cfc690ace0d1bccae0",
+  "internal_lane_count": 4,
+  "kind": "VERIFICATION_RESULT",
+  "lane_receipts": [
+    {
+      "lane_id": "BACKEND_ADMIN_DEVICE_PROOF_POSTGRES",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/backend-admin-device-proof.log",
+      "log_sha256": "d36674ae31a2b5b6560fa964a99f2c2a92bace0ad2b3ab2a296a58825ee0f898",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/evidence/backend-admin-device-proof-receipt.json",
+      "sha256": "58c5daf496a3e52dcf85b6cdd3fff5bf863ab0f6abbdf28a6e49ef5c3a34d64e"
+    },
+    {
+      "lane_id": "BACKEND_ADMIN_REVIEW_DELIVERY_POSTGRES",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/backend-admin-review-delivery.log",
+      "log_sha256": "6ef0753e2e178ee49edadd4273f439c039e13d765f4db054ad486de86d040649",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/evidence/backend-admin-review-delivery-receipt.json",
+      "sha256": "f20925d11e0a8402672efc78d2846eef4e603305ea0d68c7acf692a825074302"
+    },
+    {
+      "lane_id": "ANDROID_ADMINAPP_OFFLINE",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/android-adminapp-offline.log",
+      "log_sha256": "626b9e94120bdf8f58f27f7842fe062406c743ebb5a8c282c0f1a780616905e6",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/evidence/android-adminapp-offline-receipt.json",
+      "sha256": "0cd29621afed690a5ff6afbec8199f5acc3e2410b94eff703e0c89646e29a304"
+    },
+    {
+      "lane_id": "POLICY_ARTIFACT_CONTRACTS",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/policy-artifact-contracts.log",
+      "log_sha256": "eeeba797f2b746b51c81c3b5edac0167c1742dc5084e7f6a355d3f98d27ede6e",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/evidence/policy-artifact-contracts-receipt.json",
+      "sha256": "9c13ace8f23132ba7cfd2f25f9a6fdd88fd9f19d20bd868ce597c721f04f2888"
+    }
+  ],
+  "observed_at": "2026-08-09T16:39:26+09:00",
+  "schema_version": "walksafe.fp008-verification-result.v1",
+  "status": "PASS",
+  "verification_input_content_set_sha256": "1d4b02db1d5d4819740b338da3312798f131422e455a72ab978b7eeb602b420c",
+  "verification_input_manifest": [
+    {
+      "byte_length": 17896,
+      "path": "tests/test_walksafe_fp008_policy_contract_20260809.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "bdb8e4bea3240b59593dcb67991fec2b7bce4590c61eeba3285be97fac105e1f"
+    },
+    {
+      "byte_length": 46851,
+      "path": "backend/tests/test_admin_device_proof.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "46efee20bd4142c8dbe0e30d0d8e544236505bd6056e1b74acc7c5f5cc5dcbe9"
+    },
+    {
+      "byte_length": 39817,
+      "path": "backend/tests/test_admin_report_workflow.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "81f8390eb3f3107501bf87d4742dea0a6b60c15257dcd624f81642d39fbd2742"
+    },
+    {
+      "byte_length": 8318,
+      "path": "backend/tests/conftest.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "59e5079aed2f5a9d95147ef7b250750d74d98f77ba735a7b31ed448b5324ad8f"
+    },
+    {
+      "byte_length": 73956,
+      "path": "backend/tests/test_admin_security.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "3d3a42c5a383a60bf255293491223c45ff12727b1648e57b00e73c726027d2d8"
+    },
+    {
+      "byte_length": 14605,
+      "path": "backend/tests/test_fp008_postgres_integration.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "d08ed15d3471e945cfbffc8372208de1814e463bb1f5477bf0b4adf4d131759b"
+    },
+    {
+      "byte_length": 4628,
+      "path": "backend/tests/test_openapi_contract.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "b02bb87a6e79a6417fa8368ab430a4fd405240b9a40c143f03a45616081325a4"
+    },
+    {
+      "byte_length": 22352,
+      "path": "backend/tests/test_reports.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "32e6dcae3b0235f4cd202b3b94144fb0a5934f76226ec31f2e835652ffd6fdfe"
+    },
+    {
+      "byte_length": 62561,
+      "path": "backend/tests/test_reports_v2.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "c2c30e7421cefbe46fece0285026ee76a59fd71e2e07aa32901f948d2c08c8b7"
+    },
+    {
+      "byte_length": 37572,
+      "path": "backend/tests/test_field_test_security.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "dc5c605f6e323f4a4e190f4b91ed0c9f02d20c16f8177d1913c00764f8e73c73"
+    },
+    {
+      "byte_length": 356,
+      "path": "apps/android/settings.gradle.kts",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0"
+    },
+    {
+      "byte_length": 74,
+      "path": "apps/android/build.gradle.kts",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "20485875f2123b6dfa69bdb228a06890f440c46c5443bf68b936531fa2b0df28"
+    },
+    {
+      "byte_length": 8618,
+      "path": "apps/android/gradlew",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "fb68debc1b1acf8ec55dc0d5e5495e1dedd0bd6b61f304bee61613eeb2bd9b92"
+    },
+    {
+      "byte_length": 46175,
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.jar",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13"
+    },
+    {
+      "byte_length": 339,
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.properties",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "1e3d87ddfd70069f68afa0c9ddcaab26913c3baf3d809447b0362d2d49f57325"
+    },
+    {
+      "byte_length": 199913,
+      "path": "apps/android/gradle/verification-metadata.xml",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+    },
+    {
+      "byte_length": 4445,
+      "path": "apps/android/adminapp/build.gradle.kts",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "8c36f8af65ba6a291b2a6f9174a3572c61880d2f6b666f52230d81d426d3085e"
+    },
+    {
+      "byte_length": 40829,
+      "path": "apps/android/adminapp/gradle.lockfile",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13"
+    },
+    {
+      "byte_length": 4381,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncodingTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "264aefb9a9cb0ebd15329430383a32b390f04f4dd44dd7fd22f4e0443678dcb2"
+    },
+    {
+      "byte_length": 1943,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyDescriptorTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "fd3d2e67fe76f18367a63f8905beac9f1590fb62424fa99cb49ae2e8a319259e"
+    },
+    {
+      "byte_length": 8748,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProofTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "0bf98628d4eba4854fac92dc531b18189aa02ab2856f364b4fa923d13187b1f3"
+    },
+    {
+      "byte_length": 1325,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicyTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "4f8d0128e881bdef0b3480d3d38ff7164ba70470f3b98e5d4b1b20ddb2a13cd5"
+    },
+    {
+      "byte_length": 3720,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "d644fda5184b3d33c2393d44d22e746ff3820be0abb758119cde0f5cbabb7c85"
+    },
+    {
+      "byte_length": 6194,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationModelsTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "92973a01efa6523e4ce942dfef79b91a5388293e0b06ba9d1065bcfe23ce7302"
+    },
+    {
+      "byte_length": 18760,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClientTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "ddf3c7567cc489bc195c1ccab5b46e56ed4aec561834bff60c2ccdde890c5fa1"
+    },
+    {
+      "byte_length": 4042,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "3443252c3cb3397c37636eb57a1a365aeb649bd64675fe2613749d6186739851"
+    },
+    {
+      "byte_length": 5967,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "e5ff4be6ed5b4734e6e2dad02acb40cfaa1e6a8b6a04dd01bf8f00fd9f5395fc"
+    },
+    {
+      "byte_length": 22424,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "b1e6b21f7a793f54ee3a680b584d0341f42d998d77e439da5513fa438e6f88d2"
+    },
+    {
+      "byte_length": 23662,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "5632bf0e918f31d3a110dbff3fbed9c8a67faee78829ff8a59b4f556eab39a7c"
+    },
+    {
+      "byte_length": 1855,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJsonTest.java",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "401901e3f34e513af01bd280c8d395ec4be89804944036ef7ff7cd9d12e39ea9"
+    },
+    {
+      "byte_length": 35482,
+      "path": "tests/test_walksafe_fp008_admin_review_delivery_trace_20260803.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "53177e4332a467f249dae69d55d4ffc4ae44f76e49c3cfe5687d7dcb7a206a03"
+    },
+    {
+      "byte_length": 6664,
+      "path": "tests/test_walksafe_fp008_gap_backlog_r024_20260803.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "50367621a38c550076e9788a4d98910dc290a0a6f0620e1fdb4900887b97a5a8"
+    },
+    {
+      "byte_length": 22929,
+      "path": "tests/test_walksafe_fp008_artifact_trace_successor_20260803.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "a1e82751c2ae96f8a343dd65a0225b141cb97fc81261fdd6df7ca1f2fc4b7ebb"
+    },
+    {
+      "byte_length": 4698,
+      "path": "tests/test_walksafe_phase1_exact257_successor_r013_20260803.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "110be2b5cf2b2d5b1a9848f0fbde135ebb804618ff0f431d91e3bc41cdaa6396"
+    },
+    {
+      "byte_length": 6378,
+      "path": "tests/test_walksafe_fp008_strict_review_gate_20260803.py",
+      "role": "FP008_VERIFICATION_INPUT",
+      "sha256": "a8245567f8472a2bbfcb885b382113679bec65f262c22cfba885f61cac4753e1"
+    }
+  ],
+  "verification_result_content_sha256": "abd8409af4b709a443920848c0196155ae3c00a06014823b2105c47b0443060f"
+}

@@ -1,0 +1,1348 @@
+{
+  "artifact_dispositions": [
+    {
+      "artifact_type_code": "DLV-REL-15",
+      "audit_classification": "INTERNAL_GAP",
+      "audit_evidence_paths": [
+        "docs/deliverables/09-release/deployment-evidence.md"
+      ],
+      "audit_reason": "롤백 절차는 내부 완성 가능하지만 실행 결과는 아직 없다.",
+      "basis": "current rollback template is structured, but rollback result remains NOT_RUN.",
+      "current_disposition": "INTERNAL_GAP_RETAINED",
+      "external_boundary": "실제 rollback 결과는 배포 환경 필요",
+      "ok_candidate": false,
+      "priority": "P1",
+      "required_action": "현재 배포 구조에 맞는 trigger, 순서, 검증과 실패 안전을 구체화한다."
+    },
+    {
+      "artifact_type_code": "DLV-REL-16",
+      "audit_classification": "INTERNAL_GAP",
+      "audit_evidence_paths": [
+        "docs/deliverables/09-release/delivery-and-handover.md",
+        "deploy/README.md"
+      ],
+      "audit_reason": "현재 Android 및 gateway 구조로 설치 절차를 보완할 수 있다.",
+      "basis": "only unsigned/source-level material is bound; no signed artifact or installation execution exists.",
+      "current_disposition": "INTERNAL_GAP_RETAINED",
+      "external_boundary": "최종 명령과 값은 승인 배포후보에서 확정",
+      "ok_candidate": false,
+      "priority": "P1",
+      "required_action": "지원 구성, 사전조건, 설치, 검증과 제거 절차를 완성한다."
+    },
+    {
+      "artifact_type_code": "DLV-REL-17",
+      "audit_classification": "INTERNAL_GAP",
+      "audit_evidence_paths": [
+        "docs/deliverables/09-release/delivery-and-handover.md",
+        "apps/android/USER_GUIDE.md"
+      ],
+      "audit_reason": "현재 Android 사용자 흐름과 제한으로 사용자 설명서를 보완할 수 있다.",
+      "basis": "current guide and current REL17 section completely project the four choices, network states, privacy-operation boundaries, TMAP external boundary and W7 model3 register-only limitation; the OK candidate basis is current content completeness plus the bound current targeted-test PASS, not exclusive W8 change attribution or pre-W9 byte preservation.",
+      "current_disposition": "READY_FOR_INDEPENDENT_REVIEW_AS_OK_CANDIDATE",
+      "external_boundary": null,
+      "ok_candidate": true,
+      "priority": "P1",
+      "required_action": "권한, 안전 제한, 핵심 흐름과 오류 복구를 현재 코드에 맞춘다."
+    },
+    {
+      "artifact_type_code": "DLV-REL-19",
+      "audit_classification": "INTERNAL_GAP",
+      "audit_evidence_paths": [
+        "docs/deliverables/09-release/delivery-and-handover.md"
+      ],
+      "audit_reason": "현재 기능과 안전 제한으로 교육 및 시연 자료를 작성할 수 있다.",
+      "basis": "controlled material distinguishes build/mock/unverified behavior, but no demo or training session receipt exists.",
+      "current_disposition": "INTERNAL_GAP_RETAINED",
+      "external_boundary": "실제 교육/시연 결과는 참여자 필요",
+      "ok_candidate": false,
+      "priority": "P1",
+      "required_action": "실제 build와 mock, 미검증 기능을 명확히 분리한 자료를 완성한다."
+    },
+    {
+      "artifact_type_code": "DLV-REL-22",
+      "audit_classification": "INTERNAL_GAP",
+      "audit_evidence_paths": [
+        "docs/deliverables/09-release/delivery-and-handover.md"
+      ],
+      "audit_reason": "현재 dependency와 배포 대상에서 라이선스 고지를 생성할 수 있다.",
+      "basis": "license inventory has 346 known and 185 unknown classifications, while final release notices are absent.",
+      "current_disposition": "INTERNAL_GAP_RETAINED",
+      "external_boundary": null,
+      "ok_candidate": false,
+      "priority": "P1",
+      "required_action": "직접 및 전이 dependency, 라이선스 본문과 고지 의무를 결속한다."
+    }
+  ],
+  "attribution_lineage": {
+    "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+    "current_rel17_content_evidence": {
+      "binding_id": "SRC-CURRENT-REL17-SECTION",
+      "byte_length": 5321,
+      "path": "docs/deliverables/09-release/delivery-and-handover.md",
+      "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+    },
+    "exclusive_attribution_claim_count": 0,
+    "historical_pre_w9_byte_preservation_claimed": false,
+    "historical_pre_w9_digest_retained_count": 0,
+    "historical_pre_w9_digest_status": {
+      "builder": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "manifest": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "rel17_section": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "test": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED"
+    },
+    "successor_current_source_binding_ids": [
+      "SRC-W9-SHARED-REL-BUILDER",
+      "SRC-W9-SHARED-REL-MANIFEST",
+      "SRC-W9-SHARED-REL-TEST"
+    ],
+    "unsupported_preservation_claim_count": 0,
+    "w8_direct_authored_current_binding_ids": [
+      "SRC-W8-USER-GUIDE"
+    ]
+  },
+  "authoring_validation": [
+    {
+      "command": [
+        "python3",
+        "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+        "--check"
+      ],
+      "correction_task_reran_command": false,
+      "credited_as_formal_release_execution": false,
+      "evidence_classification": "BOUND_CURRENT_CONTENT_AND_TEST_EVIDENCE",
+      "exclusive_w8_change_credit": false,
+      "exit_code": 0,
+      "historical_pre_w9_byte_preservation_claimed": false,
+      "result": "PASS",
+      "scope": "current successor shared builder/output consistency; not W8-exclusive change or formal release proof",
+      "separate_receipt_path": null,
+      "subject_binding_ids": [
+        "SRC-W9-SHARED-REL-BUILDER",
+        "SRC-W8-USER-GUIDE",
+        "SRC-CURRENT-REL-HANDOVER",
+        "SRC-W9-SHARED-REL-MANIFEST",
+        "SRC-CURRENT-REL17-SECTION"
+      ],
+      "validation_id": "W8-BUILDER-CHECK"
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_walksafe_formal_rel_ops_cls.py"
+      ],
+      "correction_task_reran_command": false,
+      "credited_as_formal_release_execution": false,
+      "evidence_classification": "BOUND_CURRENT_CONTENT_AND_TEST_EVIDENCE",
+      "exclusive_w8_change_credit": false,
+      "exit_code": 0,
+      "historical_pre_w9_byte_preservation_claimed": false,
+      "passed_test_count": 1,
+      "result": "PASS",
+      "scope": "bound current targeted builder/output boundary test; not W8-exclusive change or formal release proof",
+      "separate_receipt_path": null,
+      "subject_binding_ids": [
+        "SRC-W9-SHARED-REL-BUILDER",
+        "SRC-W9-SHARED-REL-TEST",
+        "SRC-W8-USER-GUIDE",
+        "SRC-CURRENT-REL-HANDOVER",
+        "SRC-W9-SHARED-REL-MANIFEST",
+        "SRC-CURRENT-REL17-SECTION"
+      ],
+      "validation_id": "W8-TARGETED-TEST-001"
+    }
+  ],
+  "current_subject": {
+    "build_id": null,
+    "current_rel17_content_evidence_binding_id": "SRC-CURRENT-REL17-SECTION",
+    "exclusive_change_binding_ids": [],
+    "exclusive_change_count": 0,
+    "manifest_binding_id": "SRC-W9-SHARED-REL-MANIFEST",
+    "source_commit": null,
+    "subject_kind": "HASH_BOUND_CURRENT_DRAFT_SOURCES_AND_CURRENT_REL17_CONTENT_NOT_RELEASE_BUILD",
+    "successor_current_source_binding_ids": [
+      "SRC-W9-SHARED-REL-BUILDER",
+      "SRC-W9-SHARED-REL-MANIFEST",
+      "SRC-W9-SHARED-REL-TEST"
+    ],
+    "successor_current_source_count": 3,
+    "w8_direct_authored_current_binding_ids": [
+      "SRC-W8-USER-GUIDE"
+    ],
+    "w8_direct_authored_current_count": 1
+  },
+  "document_id": "WS-W8-RELEASE-READINESS-CURRENT-STATE-20260727-001",
+  "fingerprint_contracts": {
+    "input_set_fingerprint": {
+      "canonicalization": {
+        "algorithm": "SHA-256",
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "format": "JSON",
+        "object_key_order": "recursive lexicographic order from sort_keys=true",
+        "separators": [
+          ",",
+          ":"
+        ],
+        "trailing_newline": "exactly one LF byte (0x0A)",
+        "whitespace_outside_strings": "none"
+      },
+      "fingerprint": "d6f21a1cc13b62dfa79e8b650889759b5a3bbf5a7fc7699da79c3898be31615c",
+      "ordering": "binding_id ascending by UTF-8 byte order",
+      "payload": [
+        {
+          "binding_id": "SRC-CURRENT-REL-HANDOVER",
+          "byte_length": 31028,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/deliverables/09-release/delivery-and-handover.md",
+          "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c"
+        },
+        {
+          "binding_id": "SRC-CURRENT-REL17-SECTION",
+          "byte_length": 5321,
+          "byte_offset_end_exclusive": 11332,
+          "byte_offset_start": 6011,
+          "hash_scope": "RAW_CONTIGUOUS_UTF8_BYTES",
+          "path": "docs/deliverables/09-release/delivery-and-handover.md",
+          "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+        },
+        {
+          "binding_id": "SRC-W4-RECEIPT",
+          "byte_length": 19207,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+          "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+        },
+        {
+          "binding_id": "SRC-W5-RECEIPT",
+          "byte_length": 47592,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+          "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+        },
+        {
+          "binding_id": "SRC-W7-CURRENT",
+          "byte_length": 41414,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "binding_id": "SRC-W7-REREVIEW",
+          "byte_length": 3444,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+          "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8"
+        },
+        {
+          "binding_id": "SRC-W8-AUDIT",
+          "byte_length": 39673,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+          "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44"
+        },
+        {
+          "binding_id": "SRC-W8-USER-GUIDE",
+          "byte_length": 13833,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "apps/android/USER_GUIDE.md",
+          "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+        },
+        {
+          "binding_id": "SRC-W9-SHARED-REL-BUILDER",
+          "byte_length": 132367,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6"
+        },
+        {
+          "binding_id": "SRC-W9-SHARED-REL-MANIFEST",
+          "byte_length": 125261,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a"
+        },
+        {
+          "binding_id": "SRC-W9-SHARED-REL-TEST",
+          "byte_length": 28178,
+          "byte_offset_end_exclusive": null,
+          "byte_offset_start": null,
+          "hash_scope": "FULL_FILE_BYTES",
+          "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+          "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12"
+        }
+      ],
+      "record_fields": [
+        "binding_id",
+        "byte_length",
+        "byte_offset_end_exclusive",
+        "byte_offset_start",
+        "hash_scope",
+        "path",
+        "sha256"
+      ]
+    },
+    "semantic_projection_fingerprint": {
+      "array_order": {
+        "/artifact_dispositions": "scope.exact_artifact_ids declaration order",
+        "/attribution_lineage/successor_current_source_binding_ids": "lexicographic binding_id order",
+        "/attribution_lineage/w8_direct_authored_current_binding_ids": "lexicographic binding_id order",
+        "/authoring_validation": "authoring_validation declaration order",
+        "/release_readiness_controls/*/*": "preserve each selected source array declaration order recursively",
+        "/scope/exact_artifact_ids": "scope.exact_artifact_ids declaration order"
+      },
+      "canonicalization": {
+        "algorithm": "SHA-256",
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "format": "JSON",
+        "object_key_order": "recursive lexicographic order from sort_keys=true",
+        "separators": [
+          ",",
+          ":"
+        ],
+        "trailing_newline": "exactly one LF byte (0x0A)",
+        "whitespace_outside_strings": "none"
+      },
+      "field_selection": [
+        {
+          "payload_pointer": "/artifact_dispositions",
+          "selected_fields": [
+            "artifact_type_code",
+            "current_disposition",
+            "ok_candidate"
+          ],
+          "source_pointer": "/artifact_dispositions/*",
+          "type": "array<object>"
+        },
+        {
+          "payload_pointer": "/attribution_lineage",
+          "selected_fields": "entire object",
+          "source_pointer": "/attribution_lineage",
+          "type": "object"
+        },
+        {
+          "payload_pointer": "/authoring_validation",
+          "selected_fields": [
+            "evidence_classification",
+            "exclusive_w8_change_credit",
+            "result",
+            "validation_id"
+          ],
+          "source_pointer": "/authoring_validation/*",
+          "type": "array<object>"
+        },
+        {
+          "payload_pointer": "/document_id",
+          "selected_fields": "scalar",
+          "source_pointer": "/document_id",
+          "type": "string"
+        },
+        {
+          "payload_pointer": "/manifest_boundary",
+          "selected_fields": "entire object",
+          "source_pointer": "/manifest_boundary",
+          "type": "object"
+        },
+        {
+          "payload_pointer": "/release_readiness_controls",
+          "selected_fields": "entire object",
+          "source_pointer": "/release_readiness_controls",
+          "type": "object"
+        },
+        {
+          "payload_pointer": "/schema_version",
+          "selected_fields": "scalar",
+          "source_pointer": "/schema_version",
+          "type": "string"
+        },
+        {
+          "payload_pointer": "/scope",
+          "selected_fields": [
+            "artifact_count",
+            "central_transition_applied",
+            "exact_artifact_ids"
+          ],
+          "source_pointer": "/scope",
+          "type": "object"
+        },
+        {
+          "payload_pointer": "/status",
+          "selected_fields": "scalar",
+          "source_pointer": "/status",
+          "type": "string"
+        },
+        {
+          "payload_pointer": "/verification_boundary",
+          "selected_fields": "entire object",
+          "source_pointer": "/verification_boundary",
+          "type": "object"
+        },
+        {
+          "payload_pointer": "/wave_id",
+          "selected_fields": "scalar",
+          "source_pointer": "/wave_id",
+          "type": "string"
+        }
+      ],
+      "fingerprint": "0d457c61834098d327220d63b34df5df13248f21ca63153ec3ff8a1db85f0991",
+      "payload": {
+        "artifact_dispositions": [
+          {
+            "artifact_type_code": "DLV-REL-15",
+            "current_disposition": "INTERNAL_GAP_RETAINED",
+            "ok_candidate": false
+          },
+          {
+            "artifact_type_code": "DLV-REL-16",
+            "current_disposition": "INTERNAL_GAP_RETAINED",
+            "ok_candidate": false
+          },
+          {
+            "artifact_type_code": "DLV-REL-17",
+            "current_disposition": "READY_FOR_INDEPENDENT_REVIEW_AS_OK_CANDIDATE",
+            "ok_candidate": true
+          },
+          {
+            "artifact_type_code": "DLV-REL-19",
+            "current_disposition": "INTERNAL_GAP_RETAINED",
+            "ok_candidate": false
+          },
+          {
+            "artifact_type_code": "DLV-REL-22",
+            "current_disposition": "INTERNAL_GAP_RETAINED",
+            "ok_candidate": false
+          }
+        ],
+        "attribution_lineage": {
+          "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+          "current_rel17_content_evidence": {
+            "binding_id": "SRC-CURRENT-REL17-SECTION",
+            "byte_length": 5321,
+            "path": "docs/deliverables/09-release/delivery-and-handover.md",
+            "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+          },
+          "exclusive_attribution_claim_count": 0,
+          "historical_pre_w9_byte_preservation_claimed": false,
+          "historical_pre_w9_digest_retained_count": 0,
+          "historical_pre_w9_digest_status": {
+            "builder": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "manifest": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "rel17_section": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "test": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED"
+          },
+          "successor_current_source_binding_ids": [
+            "SRC-W9-SHARED-REL-BUILDER",
+            "SRC-W9-SHARED-REL-MANIFEST",
+            "SRC-W9-SHARED-REL-TEST"
+          ],
+          "unsupported_preservation_claim_count": 0,
+          "w8_direct_authored_current_binding_ids": [
+            "SRC-W8-USER-GUIDE"
+          ]
+        },
+        "authoring_validation": [
+          {
+            "evidence_classification": "BOUND_CURRENT_CONTENT_AND_TEST_EVIDENCE",
+            "exclusive_w8_change_credit": false,
+            "result": "PASS",
+            "validation_id": "W8-BUILDER-CHECK"
+          },
+          {
+            "evidence_classification": "BOUND_CURRENT_CONTENT_AND_TEST_EVIDENCE",
+            "exclusive_w8_change_credit": false,
+            "result": "PASS",
+            "validation_id": "W8-TARGETED-TEST-001"
+          }
+        ],
+        "document_id": "WS-W8-RELEASE-READINESS-CURRENT-STATE-20260727-001",
+        "manifest_boundary": {
+          "actual_execution_evidence_count": 0,
+          "approval_status": "NOT_APPROVED",
+          "claims": {
+            "closure_complete": false,
+            "deployment_complete": false,
+            "handover_complete": false,
+            "operations_complete": false,
+            "release_artifact_complete": false,
+            "risk_acceptance_complete": false
+          },
+          "closure_result_count": 0,
+          "execution_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+          "external_original_count": 0,
+          "lifecycle_status": "DRAFT",
+          "materialized_artifact_count": 39,
+          "planned_artifact_count": 23,
+          "release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "release_status": "NOT_ELIGIBLE"
+        },
+        "release_readiness_controls": {
+          "DLV-REL-15": {
+            "required_template_fields": [
+              "trigger",
+              "ordered steps",
+              "post-rollback verification",
+              "failure-safe action",
+              "owner/time/evidence"
+            ],
+            "rollback_execution_status": "NOT_RUN",
+            "rollback_result": null,
+            "rollback_template_status": "DRAFT_TEMPLATE_PRESENT",
+            "safe_boundary": "DB compatibility and losslessness must be proven for rollback; otherwise stop safely rather than force downgrade."
+          },
+          "DLV-REL-16": {
+            "approval_status": "NOT_APPROVED",
+            "artifact_state": "UNSIGNED_SOURCE_OR_BUILD_OUTPUT_ONLY",
+            "document_status": "DRAFT",
+            "excluded_client_scope": [
+              "Web/PWA"
+            ],
+            "installation_execution_status": "NOT_RUN",
+            "installation_receipt_count": 0,
+            "signed_artifact_count": 0,
+            "signed_artifact_ids": [],
+            "signing_assessment_status": "NOT_ASSESSED",
+            "signing_execution_status": "NOT_RUN",
+            "supported_client_scope": [
+              "Android user app",
+              "private Android admin app"
+            ]
+          },
+          "DLV-REL-17": {
+            "choice_independence": {
+              "android_permissions_independent": true,
+              "bundled_grant": false,
+              "login_independent": true,
+              "mutually_independent": true
+            },
+            "consent_choices": [
+              {
+                "choice_id": "RAW_SOURCE_COLLECTION",
+                "default": "OFF",
+                "independent": true,
+                "meaning": "신고 확인용 원본 이미지·위치·탐지자료 기기 수집"
+              },
+              {
+                "choice_id": "AUTOMATIC_REPORTING",
+                "default": "OFF",
+                "independent": true,
+                "meaning": "조건 통과 손상 점자블록 후보 자동신고 처리"
+              },
+              {
+                "choice_id": "MOBILE_NETWORK_TRANSFER",
+                "default": "OFF",
+                "independent": true,
+                "meaning": "정지 뒤 허용 자료 이동통신망 전송"
+              },
+              {
+                "choice_id": "TRAINING_REUSE",
+                "default": "OFF",
+                "independent": true,
+                "meaning": "신고 처리와 별도로 승인 자료 모델 연구·학습 재사용"
+              }
+            ],
+            "current_content_evidence": {
+              "binding_id": "SRC-CURRENT-REL17-SECTION",
+              "byte_length": 5321,
+              "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+              "exclusive_w8_change_attribution_claimed": false,
+              "historical_pre_w9_digest_status": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+              "path": "docs/deliverables/09-release/delivery-and-handover.md",
+              "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+            },
+            "document_state": {
+              "approval_status": "NOT_APPROVED",
+              "lifecycle_status": "DRAFT",
+              "release_status": "NOT_ELIGIBLE",
+              "specific_consent_schema_version_documented": false,
+              "title": "REL-17 사용자 설명서"
+            },
+            "model_register_boundary": {
+              "model_count": 3,
+              "models": [
+                {
+                  "approval_status": "NOT_APPROVED",
+                  "conversion_equivalence_status": "NOT_RUN",
+                  "deployment_eligible": false,
+                  "device_validation_status": "NOT_RUN",
+                  "evaluation_status": "NOT_RUN",
+                  "model_id": "unified_walksafe",
+                  "provenance": "CANDIDATE_SOURCE_BOUND"
+                },
+                {
+                  "approval_status": "NOT_APPROVED",
+                  "conversion_equivalence_status": "NOT_RUN",
+                  "deployment_eligible": false,
+                  "device_validation_status": "NOT_RUN",
+                  "evaluation_status": "NOT_RUN",
+                  "model_id": "custom_tactile",
+                  "provenance": "UNKNOWN_PROVENANCE"
+                },
+                {
+                  "approval_status": "NOT_APPROVED",
+                  "conversion_equivalence_status": "NOT_RUN",
+                  "deployment_eligible": false,
+                  "device_validation_status": "NOT_RUN",
+                  "evaluation_status": "NOT_RUN",
+                  "model_id": "coco_general",
+                  "provenance": "UNKNOWN_PROVENANCE"
+                }
+              ],
+              "register_only": true,
+              "release_inclusion_claimed": false,
+              "release_status": "NOT_ELIGIBLE",
+              "source": "W7 current state"
+            },
+            "network_states": [
+              {
+                "allowed_transport": "NONE",
+                "rule": "일반 활동원본은 보행 중 서버로 전송하지 않는다.",
+                "server_transfer": "DENIED",
+                "state": "WALKING"
+              },
+              {
+                "allowed_transport": "CELLULAR_OR_WIFI",
+                "rule": "MOBILE_NETWORK_TRANSFER를 명시적으로 선택한 사용자만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+                "server_transfer": "CONDITIONALLY_ALLOWED",
+                "state": "STOPPED_MOBILE_OPTED_IN"
+              },
+              {
+                "allowed_transport": "WIFI_ONLY",
+                "rule": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+                "server_transfer": "CONDITIONALLY_ALLOWED",
+                "state": "STOPPED_MOBILE_NOT_OPTED_IN"
+              }
+            ],
+            "privacy_operations": [
+              {
+                "execution_status": "NOT_RUN",
+                "legal_boundary": "최종 한국어 철회 문안과 효력 범위는 외부 법률 승인 전 NOT_APPROVED.",
+                "operation": "WITHDRAWAL",
+                "technical_behavior": "해당 선택의 새 수집·보고·전송·학습 재사용을 중단하고 대기 작업을 차단한다."
+              },
+              {
+                "execution_status": "NOT_RUN",
+                "legal_boundary": "보유기간, 예외와 실제 삭제 범위는 외부 법률 승인 전 NOT_APPROVED.",
+                "operation": "DELETION",
+                "technical_behavior": "동의 철회와 별도 요청이며 서버·backup 범위, 처리 결과와 증거가 필요하다."
+              },
+              {
+                "execution_status": "NOT_RUN",
+                "legal_boundary": "최종 한국어 재동의 문안과 법적 효과는 외부 법률 승인 전 NOT_APPROVED.",
+                "operation": "RECONSENT",
+                "technical_behavior": "새 동의 version과 시각을 기록하며 과거 처리를 소급 승인하거나 진행 중 삭제를 취소하지 않는다."
+              }
+            ],
+            "retention_boundary": {
+              "approved_legal_retention_period": null,
+              "claim": "180일은 기술·운영 draft 목표일이며 승인된 법적 보유기간이 아니다.",
+              "technical_draft_target_days": 180
+            },
+            "tmap_boundary": {
+              "boundary_kind": "EXTERNAL_THIRD_PARTY_PROCESSING",
+              "contract_and_legal_status": "NOT_APPROVED",
+              "data": [
+                "목적지",
+                "정확 위치"
+              ],
+              "live_status": "NOT_RUN",
+              "provider": "TMAP",
+              "unresolved": [
+                "제공/위탁 구분",
+                "국외이전",
+                "계약 역할",
+                "최종 고지·동의"
+              ]
+            }
+          },
+          "DLV-REL-19": {
+            "approval_status": "NOT_APPROVED",
+            "controlled_demo_execution_status": "NOT_RUN",
+            "document_status": "DRAFT",
+            "material_boundary": "actual build, mock and unverified features are explicitly distinct",
+            "participant_receipt_count": 0,
+            "session_receipt_count": 0,
+            "training_or_demo_completion_claimed": false
+          },
+          "DLV-REL-22": {
+            "approval_status": "NOT_APPROVED",
+            "claim": "candidate inventory is not a final notice and must be regenerated from the actual release dependency/artifact set.",
+            "document_status": "DRAFT",
+            "final_notice_file_count": 0,
+            "final_notice_status": "ABSENT",
+            "release_artifact_dependency_reconciliation_status": "NOT_RUN",
+            "sbom_license_counts": {
+              "known": 346,
+              "total": 531,
+              "unknown": 185
+            },
+            "unknown_requires_resolution": true
+          }
+        },
+        "schema_version": "walksafe.w8.release-readiness-current-state.v2",
+        "scope": {
+          "artifact_count": 5,
+          "central_transition_applied": false,
+          "exact_artifact_ids": [
+            "DLV-REL-15",
+            "DLV-REL-16",
+            "DLV-REL-17",
+            "DLV-REL-19",
+            "DLV-REL-22"
+          ]
+        },
+        "status": "CURRENT_INTERNAL_RELEASE_READINESS_BOUNDARY_CORRECTED_PENDING_INDEPENDENT_REREVIEW_AND_EXTERNAL_EXECUTION",
+        "verification_boundary": {
+          "actual_device_status": "NOT_RUN",
+          "build_id": null,
+          "controlled_demo_execution_status": "NOT_RUN",
+          "deployment_execution_status": "NOT_RUN",
+          "formal_evidence_count": 0,
+          "formal_executed_count": 0,
+          "formal_execution_status": "NOT_RUN",
+          "formal_pass_count": 0,
+          "formal_test_count": 279,
+          "installation_execution_status": "NOT_RUN",
+          "legal_approval_status": "NOT_APPROVED",
+          "live_tmap_status": "NOT_RUN",
+          "model_approval_status": "NOT_APPROVED",
+          "release_approval_status": "NOT_APPROVED",
+          "release_eligible_claimed": false,
+          "release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "release_status": "NOT_ELIGIBLE",
+          "rollback_execution_status": "NOT_RUN",
+          "signing_assessment_status": "NOT_ASSESSED",
+          "signing_execution_status": "NOT_RUN",
+          "source_commit": null
+        },
+        "wave_id": "W8"
+      },
+      "payload_type_contract": {
+        "arrays": "JSON arrays; order is normative as specified by array_order",
+        "booleans": "JSON true/false only; no string coercion",
+        "integers": "base-10 JSON integer numbers only; no string coercion",
+        "nulls": "JSON null only where encoded in payload",
+        "objects": "JSON objects; selected membership is exact and extra members are forbidden",
+        "strings": "UTF-8 JSON strings; no normalization or case coercion"
+      },
+      "projection_id": "W8_RELEASE_READINESS_SEMANTIC_PROJECTION_V2"
+    },
+    "source_fingerprint": {
+      "canonicalization": {
+        "algorithm": "SHA-256",
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "format": "JSON",
+        "object_key_order": "recursive lexicographic order from sort_keys=true",
+        "separators": [
+          ",",
+          ":"
+        ],
+        "trailing_newline": "exactly one LF byte (0x0A)",
+        "whitespace_outside_strings": "none"
+      },
+      "fingerprint": "fd913a725400b57f274865da0f0c54e60a1025ea8a7634a03aa87764789e5897",
+      "ordering": "source_bindings sorted by binding_id; attribution object canonical key order",
+      "payload": {
+        "attribution_lineage": {
+          "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+          "current_rel17_content_evidence": {
+            "binding_id": "SRC-CURRENT-REL17-SECTION",
+            "byte_length": 5321,
+            "path": "docs/deliverables/09-release/delivery-and-handover.md",
+            "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+          },
+          "exclusive_attribution_claim_count": 0,
+          "historical_pre_w9_byte_preservation_claimed": false,
+          "historical_pre_w9_digest_retained_count": 0,
+          "historical_pre_w9_digest_status": {
+            "builder": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "manifest": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "rel17_section": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "test": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED"
+          },
+          "successor_current_source_binding_ids": [
+            "SRC-W9-SHARED-REL-BUILDER",
+            "SRC-W9-SHARED-REL-MANIFEST",
+            "SRC-W9-SHARED-REL-TEST"
+          ],
+          "unsupported_preservation_claim_count": 0,
+          "w8_direct_authored_current_binding_ids": [
+            "SRC-W8-USER-GUIDE"
+          ]
+        },
+        "source_bindings": [
+          {
+            "attribution_class": "CURRENT_CONTENT_CONTAINER_NOT_CHANGE_ATTRIBUTION",
+            "binding_id": "SRC-CURRENT-REL-HANDOVER",
+            "byte_length": 31028,
+            "path": "docs/deliverables/09-release/delivery-and-handover.md",
+            "role": "current REL handover container; not exclusive W8 change evidence",
+            "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c"
+          },
+          {
+            "attribution_class": "CURRENT_REL17_CONTENT_EVIDENCE_NOT_CHANGE_ATTRIBUTION",
+            "binding_id": "SRC-CURRENT-REL17-SECTION",
+            "byte_length": 5321,
+            "byte_offset_end_exclusive": 11332,
+            "byte_offset_start": 6011,
+            "container_binding_id": "SRC-CURRENT-REL-HANDOVER",
+            "hash_scope": "RAW_CONTIGUOUS_UTF8_BYTES",
+            "path": "docs/deliverables/09-release/delivery-and-handover.md",
+            "role": "current REL17 content evidence; no historical or exclusive change attribution",
+            "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+          },
+          {
+            "attribution_class": "PREDECESSOR_RECEIPT_INPUT",
+            "binding_id": "SRC-W4-RECEIPT",
+            "byte_length": 19207,
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+            "role": "W4 terminal predecessor receipt",
+            "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+          },
+          {
+            "attribution_class": "PREDECESSOR_RECEIPT_INPUT",
+            "binding_id": "SRC-W5-RECEIPT",
+            "byte_length": 47592,
+            "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+            "role": "W5 terminal predecessor receipt",
+            "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+          },
+          {
+            "attribution_class": "PREDECESSOR_W7_INPUT",
+            "binding_id": "SRC-W7-CURRENT",
+            "byte_length": 41414,
+            "content_fingerprint": "55f5112644c0f8fe26cb1719c31f9242d70c629d602a9aa8531d256dfa177517",
+            "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+            "role": "latest W7 current-state predecessor",
+            "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+          },
+          {
+            "attribution_class": "PREDECESSOR_W7_INPUT",
+            "binding_id": "SRC-W7-REREVIEW",
+            "byte_length": 3444,
+            "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+            "role": "latest W7 independent rereview GO",
+            "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8"
+          },
+          {
+            "attribution_class": "AUDIT_BASELINE_INPUT",
+            "binding_id": "SRC-W8-AUDIT",
+            "byte_length": 39673,
+            "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+            "role": "exact5 audit baseline",
+            "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44"
+          },
+          {
+            "attribution_class": "W8_DIRECT_AUTHORED_CURRENT_SUBJECT",
+            "binding_id": "SRC-W8-USER-GUIDE",
+            "byte_length": 13833,
+            "path": "apps/android/USER_GUIDE.md",
+            "role": "REL17 current user guide; direct W8-authored current subject",
+            "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+          },
+          {
+            "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+            "binding_id": "SRC-W9-SHARED-REL-BUILDER",
+            "byte_length": 132367,
+            "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+            "role": "current REL/OPS/CLS deterministic builder; successor W9 shared source",
+            "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6"
+          },
+          {
+            "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+            "binding_id": "SRC-W9-SHARED-REL-MANIFEST",
+            "byte_length": 125261,
+            "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+            "role": "current REL/OPS/CLS draft manifest; successor W9 shared source",
+            "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a"
+          },
+          {
+            "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+            "binding_id": "SRC-W9-SHARED-REL-TEST",
+            "byte_length": 28178,
+            "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+            "role": "current targeted builder/output boundary test; successor W9 shared source",
+            "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12"
+          }
+        ]
+      }
+    }
+  },
+  "integrity": {
+    "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "full JSON with integrity.content_fingerprint.value=null under the document canonicalization rule",
+      "value": "c2b9f33958da5a8c2c83dafd7473c9ad0cb8982f243eee79f3ea247f3efacb45"
+    },
+    "input_set_fingerprint": "d6f21a1cc13b62dfa79e8b650889759b5a3bbf5a7fc7699da79c3898be31615c",
+    "semantic_projection_fingerprint": "0d457c61834098d327220d63b34df5df13248f21ca63153ec3ff8a1db85f0991",
+    "source_fingerprint": "fd913a725400b57f274865da0f0c54e60a1025ea8a7634a03aa87764789e5897"
+  },
+  "manifest_boundary": {
+    "actual_execution_evidence_count": 0,
+    "approval_status": "NOT_APPROVED",
+    "claims": {
+      "closure_complete": false,
+      "deployment_complete": false,
+      "handover_complete": false,
+      "operations_complete": false,
+      "release_artifact_complete": false,
+      "risk_acceptance_complete": false
+    },
+    "closure_result_count": 0,
+    "execution_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "external_original_count": 0,
+    "lifecycle_status": "DRAFT",
+    "materialized_artifact_count": 39,
+    "planned_artifact_count": 23,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "markdown_projection": {
+    "json_markdown_payload_parity": true,
+    "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+    "raw_markdown_sha256_in_json": "INTENTIONALLY_OMITTED_TO_AVOID_JSON_MARKDOWN_HASH_CYCLE",
+    "rendered_from_same_in_memory_model": true,
+    "semantic_projection_contract_id": "W8_RELEASE_READINESS_SEMANTIC_PROJECTION_V2",
+    "semantic_projection_fingerprint": "0d457c61834098d327220d63b34df5df13248f21ca63153ec3ff8a1db85f0991"
+  },
+  "predecessor_lineage": {
+    "W4": {
+      "binding_id": "SRC-W4-RECEIPT",
+      "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+    },
+    "W5": {
+      "binding_id": "SRC-W5-RECEIPT",
+      "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+    },
+    "W7": {
+      "candidate_count": 1,
+      "current_binding_id": "SRC-W7-CURRENT",
+      "current_content_fingerprint": "55f5112644c0f8fe26cb1719c31f9242d70c629d602a9aa8531d256dfa177517",
+      "exact_count": 8,
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "retained_gap_count": 7,
+      "review_binding_id": "SRC-W7-REREVIEW",
+      "review_status": "GO"
+    }
+  },
+  "prepared_on": "2026-07-27",
+  "release_readiness_controls": {
+    "DLV-REL-15": {
+      "required_template_fields": [
+        "trigger",
+        "ordered steps",
+        "post-rollback verification",
+        "failure-safe action",
+        "owner/time/evidence"
+      ],
+      "rollback_execution_status": "NOT_RUN",
+      "rollback_result": null,
+      "rollback_template_status": "DRAFT_TEMPLATE_PRESENT",
+      "safe_boundary": "DB compatibility and losslessness must be proven for rollback; otherwise stop safely rather than force downgrade."
+    },
+    "DLV-REL-16": {
+      "approval_status": "NOT_APPROVED",
+      "artifact_state": "UNSIGNED_SOURCE_OR_BUILD_OUTPUT_ONLY",
+      "document_status": "DRAFT",
+      "excluded_client_scope": [
+        "Web/PWA"
+      ],
+      "installation_execution_status": "NOT_RUN",
+      "installation_receipt_count": 0,
+      "signed_artifact_count": 0,
+      "signed_artifact_ids": [],
+      "signing_assessment_status": "NOT_ASSESSED",
+      "signing_execution_status": "NOT_RUN",
+      "supported_client_scope": [
+        "Android user app",
+        "private Android admin app"
+      ]
+    },
+    "DLV-REL-17": {
+      "choice_independence": {
+        "android_permissions_independent": true,
+        "bundled_grant": false,
+        "login_independent": true,
+        "mutually_independent": true
+      },
+      "consent_choices": [
+        {
+          "choice_id": "RAW_SOURCE_COLLECTION",
+          "default": "OFF",
+          "independent": true,
+          "meaning": "신고 확인용 원본 이미지·위치·탐지자료 기기 수집"
+        },
+        {
+          "choice_id": "AUTOMATIC_REPORTING",
+          "default": "OFF",
+          "independent": true,
+          "meaning": "조건 통과 손상 점자블록 후보 자동신고 처리"
+        },
+        {
+          "choice_id": "MOBILE_NETWORK_TRANSFER",
+          "default": "OFF",
+          "independent": true,
+          "meaning": "정지 뒤 허용 자료 이동통신망 전송"
+        },
+        {
+          "choice_id": "TRAINING_REUSE",
+          "default": "OFF",
+          "independent": true,
+          "meaning": "신고 처리와 별도로 승인 자료 모델 연구·학습 재사용"
+        }
+      ],
+      "current_content_evidence": {
+        "binding_id": "SRC-CURRENT-REL17-SECTION",
+        "byte_length": 5321,
+        "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+        "exclusive_w8_change_attribution_claimed": false,
+        "historical_pre_w9_digest_status": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+        "path": "docs/deliverables/09-release/delivery-and-handover.md",
+        "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+      },
+      "document_state": {
+        "approval_status": "NOT_APPROVED",
+        "lifecycle_status": "DRAFT",
+        "release_status": "NOT_ELIGIBLE",
+        "specific_consent_schema_version_documented": false,
+        "title": "REL-17 사용자 설명서"
+      },
+      "model_register_boundary": {
+        "model_count": 3,
+        "models": [
+          {
+            "approval_status": "NOT_APPROVED",
+            "conversion_equivalence_status": "NOT_RUN",
+            "deployment_eligible": false,
+            "device_validation_status": "NOT_RUN",
+            "evaluation_status": "NOT_RUN",
+            "model_id": "unified_walksafe",
+            "provenance": "CANDIDATE_SOURCE_BOUND"
+          },
+          {
+            "approval_status": "NOT_APPROVED",
+            "conversion_equivalence_status": "NOT_RUN",
+            "deployment_eligible": false,
+            "device_validation_status": "NOT_RUN",
+            "evaluation_status": "NOT_RUN",
+            "model_id": "custom_tactile",
+            "provenance": "UNKNOWN_PROVENANCE"
+          },
+          {
+            "approval_status": "NOT_APPROVED",
+            "conversion_equivalence_status": "NOT_RUN",
+            "deployment_eligible": false,
+            "device_validation_status": "NOT_RUN",
+            "evaluation_status": "NOT_RUN",
+            "model_id": "coco_general",
+            "provenance": "UNKNOWN_PROVENANCE"
+          }
+        ],
+        "register_only": true,
+        "release_inclusion_claimed": false,
+        "release_status": "NOT_ELIGIBLE",
+        "source": "W7 current state"
+      },
+      "network_states": [
+        {
+          "allowed_transport": "NONE",
+          "rule": "일반 활동원본은 보행 중 서버로 전송하지 않는다.",
+          "server_transfer": "DENIED",
+          "state": "WALKING"
+        },
+        {
+          "allowed_transport": "CELLULAR_OR_WIFI",
+          "rule": "MOBILE_NETWORK_TRANSFER를 명시적으로 선택한 사용자만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+          "server_transfer": "CONDITIONALLY_ALLOWED",
+          "state": "STOPPED_MOBILE_OPTED_IN"
+        },
+        {
+          "allowed_transport": "WIFI_ONLY",
+          "rule": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+          "server_transfer": "CONDITIONALLY_ALLOWED",
+          "state": "STOPPED_MOBILE_NOT_OPTED_IN"
+        }
+      ],
+      "privacy_operations": [
+        {
+          "execution_status": "NOT_RUN",
+          "legal_boundary": "최종 한국어 철회 문안과 효력 범위는 외부 법률 승인 전 NOT_APPROVED.",
+          "operation": "WITHDRAWAL",
+          "technical_behavior": "해당 선택의 새 수집·보고·전송·학습 재사용을 중단하고 대기 작업을 차단한다."
+        },
+        {
+          "execution_status": "NOT_RUN",
+          "legal_boundary": "보유기간, 예외와 실제 삭제 범위는 외부 법률 승인 전 NOT_APPROVED.",
+          "operation": "DELETION",
+          "technical_behavior": "동의 철회와 별도 요청이며 서버·backup 범위, 처리 결과와 증거가 필요하다."
+        },
+        {
+          "execution_status": "NOT_RUN",
+          "legal_boundary": "최종 한국어 재동의 문안과 법적 효과는 외부 법률 승인 전 NOT_APPROVED.",
+          "operation": "RECONSENT",
+          "technical_behavior": "새 동의 version과 시각을 기록하며 과거 처리를 소급 승인하거나 진행 중 삭제를 취소하지 않는다."
+        }
+      ],
+      "retention_boundary": {
+        "approved_legal_retention_period": null,
+        "claim": "180일은 기술·운영 draft 목표일이며 승인된 법적 보유기간이 아니다.",
+        "technical_draft_target_days": 180
+      },
+      "tmap_boundary": {
+        "boundary_kind": "EXTERNAL_THIRD_PARTY_PROCESSING",
+        "contract_and_legal_status": "NOT_APPROVED",
+        "data": [
+          "목적지",
+          "정확 위치"
+        ],
+        "live_status": "NOT_RUN",
+        "provider": "TMAP",
+        "unresolved": [
+          "제공/위탁 구분",
+          "국외이전",
+          "계약 역할",
+          "최종 고지·동의"
+        ]
+      }
+    },
+    "DLV-REL-19": {
+      "approval_status": "NOT_APPROVED",
+      "controlled_demo_execution_status": "NOT_RUN",
+      "document_status": "DRAFT",
+      "material_boundary": "actual build, mock and unverified features are explicitly distinct",
+      "participant_receipt_count": 0,
+      "session_receipt_count": 0,
+      "training_or_demo_completion_claimed": false
+    },
+    "DLV-REL-22": {
+      "approval_status": "NOT_APPROVED",
+      "claim": "candidate inventory is not a final notice and must be regenerated from the actual release dependency/artifact set.",
+      "document_status": "DRAFT",
+      "final_notice_file_count": 0,
+      "final_notice_status": "ABSENT",
+      "release_artifact_dependency_reconciliation_status": "NOT_RUN",
+      "sbom_license_counts": {
+        "known": 346,
+        "total": 531,
+        "unknown": 185
+      },
+      "unknown_requires_resolution": true
+    }
+  },
+  "review_correction": {
+    "corrected_major_findings": [
+      "M01",
+      "M02"
+    ],
+    "independent_review_path": "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+    "independent_review_preserved": true,
+    "rereview_required": true
+  },
+  "schema_version": "walksafe.w8.release-readiness-current-state.v2",
+  "scope": {
+    "artifact_count": 5,
+    "central_transition_applied": false,
+    "exact_artifact_ids": [
+      "DLV-REL-15",
+      "DLV-REL-16",
+      "DLV-REL-17",
+      "DLV-REL-19",
+      "DLV-REL-22"
+    ],
+    "review_document_created": true,
+    "review_status": "NO_GO_MAJOR_2_CORRECTION_APPLIED_PENDING_REREVIEW"
+  },
+  "self_validation": {
+    "check_count": 28,
+    "checks": {
+      "candidate1": true,
+      "candidate_basis_current_content_and_test": true,
+      "exact5": true,
+      "exclusive_attribution0": true,
+      "global_boundary": true,
+      "input_fingerprint_reproducible": true,
+      "internal_gap4": true,
+      "json_markdown_parity": true,
+      "manifest_zero_execution": true,
+      "projection_fingerprint_reproducible": true,
+      "rel15_not_run": true,
+      "rel16_unsigned_uninstalled": true,
+      "rel17_choice_exact4": true,
+      "rel17_current_section_bound": true,
+      "rel17_model3_register_only": true,
+      "rel17_network_exact3": true,
+      "rel17_privacy_ops_not_run": true,
+      "rel17_tmap_boundary": true,
+      "rel19_receipt_absent": true,
+      "rel22_counts_notices_absent": true,
+      "semantic_projection_exact_contract": true,
+      "semantic_replay_pass": true,
+      "shared3_current_hash_match3_of_3": true,
+      "source_binding_stale0": true,
+      "source_binding_unique": true,
+      "source_fingerprint_reproducible": true,
+      "unsupported_preservation_claim0": true,
+      "validation_pass2": true
+    },
+    "daylog_written": false,
+    "git_used": false,
+    "overall_status": "PASS",
+    "passed_count": 28,
+    "product_tests_run_by_this_authoring_task": false
+  },
+  "source_bindings": [
+    {
+      "attribution_class": "AUDIT_BASELINE_INPUT",
+      "binding_id": "SRC-W8-AUDIT",
+      "byte_length": 39673,
+      "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+      "role": "exact5 audit baseline",
+      "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44"
+    },
+    {
+      "attribution_class": "W8_DIRECT_AUTHORED_CURRENT_SUBJECT",
+      "binding_id": "SRC-W8-USER-GUIDE",
+      "byte_length": 13833,
+      "path": "apps/android/USER_GUIDE.md",
+      "role": "REL17 current user guide; direct W8-authored current subject",
+      "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+    },
+    {
+      "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+      "binding_id": "SRC-W9-SHARED-REL-BUILDER",
+      "byte_length": 132367,
+      "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+      "role": "current REL/OPS/CLS deterministic builder; successor W9 shared source",
+      "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6"
+    },
+    {
+      "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+      "binding_id": "SRC-W9-SHARED-REL-TEST",
+      "byte_length": 28178,
+      "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+      "role": "current targeted builder/output boundary test; successor W9 shared source",
+      "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12"
+    },
+    {
+      "attribution_class": "CURRENT_CONTENT_CONTAINER_NOT_CHANGE_ATTRIBUTION",
+      "binding_id": "SRC-CURRENT-REL-HANDOVER",
+      "byte_length": 31028,
+      "path": "docs/deliverables/09-release/delivery-and-handover.md",
+      "role": "current REL handover container; not exclusive W8 change evidence",
+      "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c"
+    },
+    {
+      "attribution_class": "CURRENT_REL17_CONTENT_EVIDENCE_NOT_CHANGE_ATTRIBUTION",
+      "binding_id": "SRC-CURRENT-REL17-SECTION",
+      "byte_length": 5321,
+      "byte_offset_end_exclusive": 11332,
+      "byte_offset_start": 6011,
+      "container_binding_id": "SRC-CURRENT-REL-HANDOVER",
+      "hash_scope": "RAW_CONTIGUOUS_UTF8_BYTES",
+      "path": "docs/deliverables/09-release/delivery-and-handover.md",
+      "role": "current REL17 content evidence; no historical or exclusive change attribution",
+      "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+    },
+    {
+      "attribution_class": "SUCCESSOR_CURRENT_SOURCE_W9_SHARED",
+      "binding_id": "SRC-W9-SHARED-REL-MANIFEST",
+      "byte_length": 125261,
+      "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+      "role": "current REL/OPS/CLS draft manifest; successor W9 shared source",
+      "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a"
+    },
+    {
+      "attribution_class": "PREDECESSOR_RECEIPT_INPUT",
+      "binding_id": "SRC-W4-RECEIPT",
+      "byte_length": 19207,
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "role": "W4 terminal predecessor receipt",
+      "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+    },
+    {
+      "attribution_class": "PREDECESSOR_RECEIPT_INPUT",
+      "binding_id": "SRC-W5-RECEIPT",
+      "byte_length": 47592,
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+      "role": "W5 terminal predecessor receipt",
+      "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+    },
+    {
+      "attribution_class": "PREDECESSOR_W7_INPUT",
+      "binding_id": "SRC-W7-CURRENT",
+      "byte_length": 41414,
+      "content_fingerprint": "55f5112644c0f8fe26cb1719c31f9242d70c629d602a9aa8531d256dfa177517",
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+      "role": "latest W7 current-state predecessor",
+      "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+    },
+    {
+      "attribution_class": "PREDECESSOR_W7_INPUT",
+      "binding_id": "SRC-W7-REREVIEW",
+      "byte_length": 3444,
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+      "role": "latest W7 independent rereview GO",
+      "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8"
+    }
+  ],
+  "status": "CURRENT_INTERNAL_RELEASE_READINESS_BOUNDARY_CORRECTED_PENDING_INDEPENDENT_REREVIEW_AND_EXTERNAL_EXECUTION",
+  "verification_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "build_id": null,
+    "controlled_demo_execution_status": "NOT_RUN",
+    "deployment_execution_status": "NOT_RUN",
+    "formal_evidence_count": 0,
+    "formal_executed_count": 0,
+    "formal_execution_status": "NOT_RUN",
+    "formal_pass_count": 0,
+    "formal_test_count": 279,
+    "installation_execution_status": "NOT_RUN",
+    "legal_approval_status": "NOT_APPROVED",
+    "live_tmap_status": "NOT_RUN",
+    "model_approval_status": "NOT_APPROVED",
+    "release_approval_status": "NOT_APPROVED",
+    "release_eligible_claimed": false,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "rollback_execution_status": "NOT_RUN",
+    "signing_assessment_status": "NOT_ASSESSED",
+    "signing_execution_status": "NOT_RUN",
+    "source_commit": null
+  },
+  "wave_id": "W8"
+}

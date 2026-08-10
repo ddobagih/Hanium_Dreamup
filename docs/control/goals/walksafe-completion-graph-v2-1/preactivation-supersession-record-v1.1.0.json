@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "record_id": "WS-GOAL-PREACTIVATION-SUPERSESSION-20260723-001",
+  "recorded_at": "2026-07-23T20:48:01+09:00",
+  "superseded_package": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-V1",
+    "plan_version": "1.1.0",
+    "activation_status": "READY_NOT_ACTIVATED",
+    "manifest_path": "docs/control/goals/walksafe-completion-v1/static-plan-manifest-v1.1.0.json",
+    "manifest_sha256": "e8a4d078c5be8429ec363b6135247504eb4411d356c08b645cd9feba534ff43e",
+    "initial_transition_event_sha256": "04bd265dbffba57f6ec9103b4bceeee8cc890a341ba71ca56fd501cb93d34438",
+    "content_set_sha256": "575cdd90cc5dbe04ee0a4c3e2d80e796affbff70a93afa4fb9fe7b332c148e51"
+  },
+  "successor_package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2",
+  "reason": "사용자의 A-B-C-D 예시는 Goal 연결 방식의 예시였으며 고정된 네 단계 요구가 아니었다. 미활성 v1.1의 선형 Phase 구조를 실제 산출물·정책·Gap 의존성 기반 동적 DAG로 교체한다.",
+  "execution_effect": "NO_PRODUCT_WORK_EXECUTED_BY_V1_OR_THIS_SUPERSESSION; NO_ACTIVATION_EVENT_RECORDED; V1_1_RETAINED_FOR_AUDIT_ONLY"
+}

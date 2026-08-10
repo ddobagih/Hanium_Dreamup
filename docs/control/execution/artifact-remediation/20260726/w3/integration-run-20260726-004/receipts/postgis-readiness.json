@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "postgis-readiness",
+    "<REDACTED_EPHEMERAL_ARGS>"
+  ],
+  "command_id": "postgis-readiness",
+  "cwd": ".",
+  "end": "2026-07-26T16:52:03.424801137Z",
+  "environment_constraints": {
+    "database_name": "walksafe_dev21_test_004",
+    "loopback_port": 32772,
+    "secret_redacted": true,
+    "single_use_database": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "7612bb6af6959489874444120073d70bdcad0564473a8e90d82faa319734f643"
+    }
+  },
+  "log_path": "logs/postgis-readiness.log",
+  "log_sha256": "8d27d89199ef6257f0b2eed1f8260f6dea08584a5167b36b0411d8aa0985f031",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 28332,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-dev21-command-receipt.v4",
+  "start": "2026-07-26T16:52:02.353487341Z",
+  "status": "PASS",
+  "subject_binding": {
+    "content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712",
+    "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c"
+  },
+  "time_log_path": "logs/postgis-readiness.time",
+  "time_log_sha256": "fac8104c34abad03ec7e4a3de7c937b85cee52269a1b5185109e9c341f096ad2",
+  "tool": {
+    "runtime": "docker"
+  }
+}

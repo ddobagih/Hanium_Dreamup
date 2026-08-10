@@ -1,0 +1,30 @@
+{
+  "schema_version": "walksafe.release-external-acceptance-metadata-template.v1",
+  "metadata": {
+    "title": "릴리스 외부 인수·승인 메타데이터 템플릿",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "template_only": true,
+  "is_live_external_record": false,
+  "target_artifact_type_ids": [
+    "REL-20",
+    "REL-21"
+  ],
+  "release_id": null,
+  "handover_scope": [],
+  "acceptor_role": null,
+  "acceptor_identity_reference": null,
+  "signed_at": null,
+  "controlled_storage_id": null,
+  "external_original_sha256": null,
+  "signature_status": "NOT_ISSUED",
+  "approval_status": "NOT_APPROVED"
+}

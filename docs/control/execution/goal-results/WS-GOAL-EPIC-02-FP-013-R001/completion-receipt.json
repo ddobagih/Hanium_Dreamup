@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP013-INTEGRATED-CONSENT-WORK-ITEM-COMPLETION-20260725-001",
+  "evidence_type": "WORK_ITEM_EXECUTION_RECEIPT",
+  "status": "ACCEPTED",
+  "result": "PASS",
+  "target_goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+  "target_goal_content_sha256": "0c3ac09bb4541fa0a881995f49d701cc7dc0c520009b1b68f382e2a54030e217",
+  "work_item_id": "EPIC-02-FP013-FIRST-RUN-INTEGRATED-CONSENT",
+  "source_policy_ids": [
+    "FP-013"
+  ],
+  "gap_ids": [
+    "GAP-022"
+  ],
+  "target_completion_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+  "execution_start_event_sha256": "da786e90dd386a711e9b21280fd2e8ce8b7aae17c0cf2180fdd6141aabd3bd9c",
+  "execution_session_event": {
+    "sequence": 9,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-008",
+    "event_type": "GOAL_STARTED",
+    "event_sha256": "da786e90dd386a711e9b21280fd2e8ce8b7aae17c0cf2180fdd6141aabd3bd9c"
+  },
+  "implementation_start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP013-20260725-008",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP013-20260725-008/implementation-start-gate-receipt.json",
+    "file_sha256": "4be7948fae41f216d93dbce24bbad1fb6ca01f6f074b7a99af0b49035777c902"
+  },
+  "execution_window": {
+    "started_at": "2026-07-25T14:36:39+09:00",
+    "ended_at": "2026-07-25T16:41:08+09:00"
+  },
+  "completed_at": "2026-07-25T16:41:08+09:00",
+  "executor": {
+    "id": "CODEX-FP013-INTEGRATED-CONSENT-IMPLEMENTER-20260725-001",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "authority": "GRAPH_V2_4_STANDING_EXECUTION_AUTHORITY"
+  },
+  "reviewer": {
+    "id": "CODEX-FP013-INTEGRATED-CONSENT-SEPARATE-REVIEW-20260725-002",
+    "role": "SEPARATE_INTERNAL_REVIEWER",
+    "authority": "INTERNAL_REPOSITORY_CONTROL",
+    "decision": "APPROVED",
+    "decided_at": "2026-07-25T16:41:08+09:00"
+  },
+  "reviewer_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/independent-review.json",
+    "sha256": "29677b28b44b26dbeeef0d630df9a36e37ef41e0ebc566f25ba4eb664b05b0c2"
+  },
+  "result_evidence": [
+    {
+      "kind": "IMPLEMENTATION_RECORD",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/implementation-record.json",
+      "sha256": "94e8e4aff7350f673051d8ca38df3459d6bb1cde57656bb323556fdf1c54d72f"
+    },
+    {
+      "kind": "VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/verification-result.json",
+      "sha256": "cbe4c2c0bfce2956e76c7e798337f7e2168f47bf6d39b59adbc206317d44fe6b"
+    },
+    {
+      "kind": "SUCCESSOR_TRACE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/successor-trace.json",
+      "sha256": "4d8f305abb8e775aeca0de72b9454799869e64e7d19f777ac2e5b5d8a0296e47"
+    }
+  ],
+  "completion_boundary": {
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "legal_privacy_review_status": "NOT_RUN",
+    "approved_final_consent_copy_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_guardian_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "generated_at": "2026-07-25T16:41:08+09:00"
+}

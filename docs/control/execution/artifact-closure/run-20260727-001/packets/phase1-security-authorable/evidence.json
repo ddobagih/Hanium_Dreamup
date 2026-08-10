@@ -1,0 +1,410 @@
+{
+  "schema_version": "walksafe.phase1-security-authorable-evidence.v1",
+  "packet_id": "WS-PHASE1-SECURITY-AUTHORABLE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "prepared_on_precision": "DAY_ONLY",
+  "evidence_class": "AUTHORABLE_CURRENT_STATE",
+  "scope": {
+    "artifact_type_codes": [
+      "DLV-SEC-04",
+      "DLV-SEC-05",
+      "DLV-SEC-06",
+      "DLV-SEC-17"
+    ],
+    "artifact_instance_ids": [
+      "ART-SEC-04-001",
+      "ART-SEC-05-001",
+      "ART-SEC-06-001",
+      "ART-SEC-17-001"
+    ],
+    "canonical_documents": [
+      {
+        "manifest_entry_id": "CT-SEC-PLAN",
+        "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "anchors": [
+          "sec-04",
+          "sec-05",
+          "sec-06"
+        ]
+      },
+      {
+        "manifest_entry_id": "CT-SEC-RESPONSE",
+        "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "anchors": [
+          "sec-17"
+        ]
+      }
+    ]
+  },
+  "effective_policy": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "composition": "PB-WALKSAFE-FEATURE-POLICY-1.0.0 historical component + approved exact FP-035 correction overlay",
+    "fp035_rule": "일반 활동원본은 보행 중 전송하지 않는다. 이동통신망 opt-in 사용자는 정지 뒤 허용된 이동통신망을 사용할 수 있고, 미선택 사용자는 Wi-Fi에서만 전송한다.",
+    "release_status": "NOT_ELIGIBLE",
+    "activation_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT",
+    "baseline_1_0_0_role": "HISTORICAL_COMPONENT_ONLY",
+    "fp035_pre_activation_candidate_role": "HISTORICAL_PRE_ACTIVATION_SNAPSHOT_ONLY"
+  },
+  "authoring_result": {
+    "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+    "review_id": "WS-SEC-INTERNAL-DESIGN-REVIEW-20260727-001",
+    "privacy_impact_assessment_id": "WS-PIA-20260727-001",
+    "notice_id": "WALKSAFE-PRIVACY-NOTICE-DRAFT-20260727.1",
+    "author": {
+      "name": "김민호",
+      "role": "CONTENT_AUTHOR"
+    },
+    "internal_review": {
+      "reviewer_name": "김민호",
+      "reviewer_role": "AUTHOR_SELF_REVIEW_ONLY",
+      "same_person_as_author": true,
+      "counts_as_independent_review": false,
+      "counts_as_content_acceptance": false,
+      "counts_as_approval": false
+    },
+    "independent_external_review_claimed": false,
+    "legal_opinion_claimed": false,
+    "content_acceptance_claimed": false,
+    "artifact_reapproval_claimed": false,
+    "historical_seal_modified": false
+  },
+  "source_evidence": [
+    {
+      "manifest_entry_id": "IS-ANDROID-MAIN",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "claim": "integrated consent, 목적별 동의, 계정 삭제 및 session 정책 연결 경로가 존재한다.",
+      "boundary": "실제 기기 E2E 통과를 주장하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-ANDROID-FEEDBACK",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+      "claim": "offline 한국어 TTS voice 선택과 실패 처리 경로가 존재한다.",
+      "boundary": "지원 기기 전체의 음성 가용성을 주장하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-BACKEND-FIELD-SECURITY",
+      "path": "backend/app/field_test_security.py",
+      "claim": "field/admin 경로 분리, bearer 인증과 actor rate limit 경로가 존재한다.",
+      "boundary": "실제 production 계정·secret·배포를 주장하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-BACKEND-MODELS",
+      "path": "backend/app/models.py",
+      "claim": "관리자 session token digest와 보안·조회·상태변경 audit 저장 모델이 존재한다.",
+      "boundary": "실제 운영 DB migration·보존·복구 완료를 주장하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-NGINX-GATEWAY",
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "claim": "TLS, HSTS, no-store와 제한 경로 ingress 예제가 존재한다.",
+      "boundary": "인증서·domain·nginx가 실제 적용됐다고 주장하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-SYSTEM-REQUIREMENTS",
+      "path": "docs/deliverables/03-requirements/system-requirements.md",
+      "claim": "보안·개인정보·가용성 요구와 검증 전제의 현재 authoring contract를 제공한다.",
+      "boundary": "요구사항 문서는 구현 적합성, 실기기 검증, 시험 통과 또는 출시 승인을 증명하지 않는다."
+    },
+    {
+      "manifest_entry_id": "IS-SECURITY-OPERATIONS-DESIGN",
+      "path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "claim": "보안·운영 설계와 데이터 흐름의 현재 authoring contract를 제공한다.",
+      "boundary": "설계 문서는 production 적용, 법률 승인, 시험 통과 또는 출시 승인을 증명하지 않는다."
+    }
+  ],
+  "artifact_completion_boundaries": [
+    {
+      "artifact_type_code": "DLV-SEC-04",
+      "artifact_instance_id": "ART-SEC-04-001",
+      "canonical_target_entry_id": "CT-SEC-PLAN",
+      "anchor": "sec-04",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "self_review_counts_as_acceptance": false,
+      "approval_complete": false
+    },
+    {
+      "artifact_type_code": "DLV-SEC-05",
+      "artifact_instance_id": "ART-SEC-05-001",
+      "canonical_target_entry_id": "CT-SEC-PLAN",
+      "anchor": "sec-05",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "self_review_counts_as_acceptance": false,
+      "approval_complete": false
+    },
+    {
+      "artifact_type_code": "DLV-SEC-06",
+      "artifact_instance_id": "ART-SEC-06-001",
+      "canonical_target_entry_id": "CT-SEC-PLAN",
+      "anchor": "sec-06",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "self_review_counts_as_acceptance": false,
+      "approval_complete": false
+    },
+    {
+      "artifact_type_code": "DLV-SEC-17",
+      "artifact_instance_id": "ART-SEC-17-001",
+      "canonical_target_entry_id": "CT-SEC-RESPONSE",
+      "anchor": "sec-17",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "self_review_counts_as_acceptance": false,
+      "approval_complete": false
+    }
+  ],
+  "content_acceptance_boundary": {
+    "required_scope_count": 14,
+    "required_artifact_type_codes": [
+      "DLV-DES-21",
+      "DLV-DSC-05",
+      "DLV-DSC-06",
+      "DLV-DSC-07",
+      "DLV-DSC-11",
+      "DLV-MGT-03",
+      "DLV-MGT-08",
+      "DLV-REQ-12",
+      "DLV-REQ-13",
+      "DLV-REQ-15",
+      "DLV-SEC-04",
+      "DLV-SEC-05",
+      "DLV-SEC-06",
+      "DLV-SEC-17"
+    ],
+    "receipt_id": null,
+    "receipt_status": "NOT_ISSUED",
+    "required_receipt_bindings_status": "OPEN",
+    "independent_reviewer_required": true,
+    "approval_role_required": true,
+    "finding_dispositions_required": true,
+    "predicate_results_required": true,
+    "exact_subject_hashes_required": true,
+    "final_approval_decision_bound": false,
+    "this_packet_is_final_approval_receipt": false
+  },
+  "internal_review_findings": [
+    {
+      "id": "SEC04-F-001",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks": "EXTERNAL_DEPLOYMENT",
+      "summary": "실제 domain, TLS 인증서, 운영 secret, cloud 계정 증거 없음"
+    },
+    {
+      "id": "SEC04-F-002",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "blocks": "RAW_COLLECTION_RELEASE",
+      "summary": "무가림 원본수집 독립 출시 검토 미실행"
+    },
+    {
+      "id": "SEC04-F-003",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "blocks": "QUEUE_AND_CAPACITY_INTEGRATION_APPROVAL",
+      "summary": "휴대전화 byte limit과 서버 capacity-state contract 미실측·미시험"
+    },
+    {
+      "id": "SEC04-F-004",
+      "severity": "MEDIUM",
+      "status": "OPEN",
+      "blocks": "REAL_USER_TEST",
+      "summary": "단일 관리자 휴대전화 분실 복구훈련 미실행"
+    }
+  ],
+  "privacy_impact_result": {
+    "status": "PROJECT_LEVEL_ASSESSMENT_AUTHORED",
+    "highest_residual_risk": "HIGH",
+    "residual_risk_accepted": false,
+    "raw_collection_allowed_for_release": false,
+    "rights_flow_required": true,
+    "provider_and_jurisdiction_finalized": false
+  },
+  "incident_current_state": {
+    "status": "NO_CONFIRMED_INCIDENT_RECORD_AT_AUTHORING_TIME",
+    "production_deployment_claimed": false,
+    "actual_incident_response_claimed": false,
+    "actual_notification_claimed": false,
+    "contact_channels_provisioned_claimed": false,
+    "drill_executed_claimed": false
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "completion_boundary": {
+    "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+    "artifact_boundary_count": 4,
+    "document_content_complete_for_submission": false,
+    "independent_content_review_complete": false,
+    "content_approval_complete": false,
+    "implementation_conformance_complete": false,
+    "security_test_complete": false,
+    "privacy_legal_compliance_complete": false,
+    "incident_drill_complete": false,
+    "production_approval_complete": false,
+    "release_eligible": false,
+    "legal_status": "OPEN_NOT_OBTAINED",
+    "production_status": "OPEN_NOT_APPROVED",
+    "device_validation_status": "OPEN_NOT_RUN",
+    "test_status": "OPEN_NOT_RUN",
+    "release_status": "OPEN_NOT_ELIGIBLE"
+  },
+  "immutable_output_manifest": {
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "hash_algorithm": "SHA-256",
+    "immutability": "CONTENT_ADDRESSED_CAPTURE",
+    "manifest_id": "WS-PHASE1-SECURITY-OUTPUT-MANIFEST-20260727-001",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subjects": [
+      {
+        "byte_length": 69161,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "subject_id": "CT-SEC-PLAN",
+        "subject_role": "CANONICAL_OUTPUT_TARGET"
+      },
+      {
+        "byte_length": 33912,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "sha256": "e12637797b00007cff56ba727bbd3c66fa176c177ed60f0299ba8d1e41e306fe",
+        "subject_id": "CT-SEC-RESPONSE",
+        "subject_role": "CANONICAL_OUTPUT_TARGET"
+      }
+    ],
+    "manifest_sha256": "f356cc064eda6377cf1254556dca733c7e19571b3c9a708ab146b3b10b5c89fb"
+  },
+  "immutable_source_manifest": {
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "hash_algorithm": "SHA-256",
+    "immutability": "CONTENT_ADDRESSED_CAPTURE",
+    "manifest_id": "WS-PHASE1-SECURITY-SOURCE-MANIFEST-20260727-001",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subjects": [
+      {
+        "byte_length": 42238,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+        "sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+        "subject_id": "IS-ANDROID-FEEDBACK",
+        "subject_role": "INSPECTED_IMPLEMENTATION_SOURCE"
+      },
+      {
+        "byte_length": 733366,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "sha256": "8ecffb0d6328fa7efa6a8f2f77b67f3e5e9ff8795a69a675a648b506a786beb6",
+        "subject_id": "IS-ANDROID-MAIN",
+        "subject_role": "INSPECTED_IMPLEMENTATION_SOURCE"
+      },
+      {
+        "byte_length": 20074,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "backend/app/field_test_security.py",
+        "sha256": "6e5eb3e1823d9aaeb07cd738dc9cdafb4995046a5dcea2036a0ce85fa3a2def7",
+        "subject_id": "IS-BACKEND-FIELD-SECURITY",
+        "subject_role": "INSPECTED_IMPLEMENTATION_SOURCE"
+      },
+      {
+        "byte_length": 15751,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "backend/app/models.py",
+        "sha256": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+        "subject_id": "IS-BACKEND-MODELS",
+        "subject_role": "INSPECTED_IMPLEMENTATION_SOURCE"
+      },
+      {
+        "byte_length": 3053,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "deploy/nginx/walksafe-android-gateway.conf.example",
+        "sha256": "a75eecac17b67eda8b05987c44e192765567552b95f90ba00194eb1393ae5fc4",
+        "subject_id": "IS-NGINX-GATEWAY",
+        "subject_role": "INSPECTED_IMPLEMENTATION_SOURCE"
+      },
+      {
+        "byte_length": 689364,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "subject_id": "IS-SYSTEM-REQUIREMENTS",
+        "subject_role": "INSPECTED_AUTHORING_CONTRACT_SOURCE"
+      },
+      {
+        "byte_length": 83400,
+        "capture_time": "2026-07-27T22:19:33+09:00",
+        "exact_path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "sha256": "e99b96971d411c7ce07c26679adc4eb229ab78d5a3f62ee50af7cc366b3970ac",
+        "subject_id": "IS-SECURITY-OPERATIONS-DESIGN",
+        "subject_role": "INSPECTED_AUTHORING_CONTRACT_SOURCE"
+      }
+    ],
+    "manifest_sha256": "fcebdea37b81b41477dbb97274cf47469676d5f1825dfd5231bb18852cfb3f44"
+  },
+  "materialized_at": "2026-07-27T22:19:33+09:00",
+  "packet_status": "CURRENT_CANONICAL_BYTES_REBOUND_PENDING_R007_CONTENT_REVIEW_AND_OWNER_APPROVAL",
+  "predecessor_packet_binding": {
+    "packet_id": "WS-PHASE0-SECURITY-AUTHORABLE-20260727-001",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase0-security-authorable/evidence.json",
+    "byte_length": 14682,
+    "file_sha256": "2fa8298ae3e9faeb99d81c59241ea4ce3515a4e5a808b3ba3e72ba3730e3b828",
+    "packet_content_fingerprint": "908b8eca3dbe659884e9e5a9a5d20e37381ea7b0c2711aedcf88c655b915a5e2",
+    "source_manifest_sha256": "4d562983d0202a457db4b268704ec2c17ac48f97bb06f0bd7a115587edbe9f8f",
+    "canonical_output_manifest_sha256": "160442402870d9f62b3df7fc6f3fe4af1d30d585f0d4ec6b1e74e00cf0751eac",
+    "role": "HISTORICAL_PREDECESSOR_ONLY"
+  },
+  "successor_reason": "REBIND_ALL_PREDECESSOR_SOURCE_AND_OUTPUT_ITEMS_TO_CURRENT_PHYSICAL_BYTES_WITHOUT_CANONICAL_EDIT_OR_STATE_PROMOTION",
+  "successor_control": {
+    "packet_kind": "SECURITY_AUTHORABLE_CURRENT_BYTE_SUCCESSOR",
+    "current_policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "policy_1_0_0_role": "HISTORICAL_COMPOSITION_ONLY",
+    "content_review_status": "PENDING_R007_INDEPENDENT_CONTENT_REVIEW",
+    "implementation_conformance": "NOT_ASSESSED",
+    "tests": "NOT_RUN",
+    "actual_execution_count": 0,
+    "owner_approval_status": "NOT_APPROVED",
+    "independent_content_approval_status": "NOT_APPROVED",
+    "legal_opinion": "NOT_OBTAINED",
+    "production_status": "NOT_RUN_NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "canonical_content_modified": false,
+    "state_promotion_performed": false,
+    "final_approval_receipt": false
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "input_projection": "entire evidence JSON excluding top-level packet_content_fingerprint",
+    "excluded_json_paths": [
+      "$.packet_content_fingerprint"
+    ],
+    "non_self_referential": true,
+    "canonical_byte_length": 13355,
+    "sha256": "f6546b2c4e925d280fb7968dd69f443b3d301e3ac511314afe0136b679518e87"
+  }
+}

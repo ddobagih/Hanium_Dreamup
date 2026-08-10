@@ -1,0 +1,750 @@
+{
+  "schema_version": "walksafe.artifact-remediation.dsc-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W1-DSC-CURRENT-STATE-20260726-001",
+  "version": "1.0.0",
+  "kind": "NON_DESTRUCTIVE_SUCCESSOR_SUPPLEMENT",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T19:22:39+09:00",
+  "lifecycle_status": "DRAFT_SUCCESSOR_SUPPLEMENT",
+  "scope": {
+    "wave": "W1",
+    "artifact_type_count": 4,
+    "artifact_type_ids": [
+      "DLV-DSC-03",
+      "DLV-DSC-07",
+      "DLV-DSC-09",
+      "DLV-DSC-14"
+    ]
+  },
+  "non_destructive_boundary": {
+    "legacy_canonical_documents_modified": false,
+    "legacy_builders_modified": false,
+    "legacy_registers_modified": false,
+    "artifact_state_or_approval_changed": false,
+    "checkpoint_modified": false,
+    "release_decision_changed": false,
+    "predecessor_references": [
+      "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "docs/deliverables/02-discovery/registers/discovery-evidence.json",
+      "docs/deliverables/02-discovery/product-registers.md",
+      "docs/deliverables/02-discovery/registers/backlog.json"
+    ],
+    "interpretation": "Later current-state evidence only; no overwrite, approval, baseline, lifecycle promotion or silent correction of predecessors."
+  },
+  "claim_boundary": {
+    "allowed": [
+      "Research plan structure is ready for internal review while execution remains NOT_RUN.",
+      "Competitor evidence-collection protocol is ready while results remain empty.",
+      "Twelve feature receipts accept only internal policy-conformance reassessment.",
+      "r021 reports 54 feature assessments and 68 total assessments.",
+      "Bound internal component evidence partially supports technical feasibility."
+    ],
+    "prohibited": [
+      "Research participants, sessions, interviews or findings exist.",
+      "Competitor products, functions, prices, accessibility, safety or superiority were verified.",
+      "One fixed candidate build completed the full camera-to-guidance-to-report flow.",
+      "Formal, actual-device, actual-user, field, production, external-integration or external-review verification passed.",
+      "Any feature is implemented and formally verified.",
+      "Release gates were completed or waived, or WalkSafe is release eligible."
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact_type_id": "DLV-DSC-03",
+      "display_code": "DSC-03",
+      "title": "사용자 조사계획",
+      "successor_status": "DRAFT_PLAN_READY_FOR_INTERNAL_REVIEW",
+      "approval_status_change_claimed": false,
+      "research_plan": {
+        "plan_id": "WS-DSC03-RESEARCH-PLAN-20260726-001",
+        "activation_status": "READY_FOR_INTERNAL_REVIEW",
+        "execution_status": "NOT_RUN",
+        "completion_claimed": false,
+        "owner": "김민호",
+        "required_review_assignments": [
+          {
+            "role": "접근성·안전책임자",
+            "assigned_person": null,
+            "status": "UNASSIGNED_REQUIRED_BEFORE_EXECUTION"
+          },
+          {
+            "role": "보안·개인정보책임자",
+            "assigned_person": null,
+            "status": "UNASSIGNED_REQUIRED_BEFORE_EXECUTION"
+          },
+          {
+            "role": "제품책임자",
+            "assigned_person": "김민호",
+            "status": "INTERNAL_OWNER_IDENTIFIED"
+          }
+        ],
+        "participant_plan": {
+          "planned_total": 6,
+          "planned_blind_minimum": 3,
+          "planned_low_vision_minimum": 3,
+          "smartphone_novice_representation_required": true,
+          "planning_values_are_not_actual_counts": true,
+          "actual_participant_count": 0,
+          "actual_interview_count": 0,
+          "actual_usability_session_count": 0
+        },
+        "research_questions": [
+          "위험·길안내 문장을 화면 확인 없이 이해하는가?",
+          "TalkBack·음성·진동으로 가입·동의·권한·오류·정지를 수행하는가?",
+          "장착 방식과 원본수집 설명을 이해하고 안전하게 중단하는가?",
+          "신고·피드백의 현재 상태와 다음 행동을 이해하는가?"
+        ],
+        "hypothesis_bindings": [
+          "HYP-001",
+          "HYP-002",
+          "HYP-003"
+        ],
+        "participant_criteria": {
+          "include": [
+            "만 14세 이상 한국어 Android 사용자 후보",
+            "전맹 또는 저시력 사용자 후보",
+            "접근 가능한 동의와 중단 절차를 이해한 후보"
+          ],
+          "exclude_or_defer": [
+            "보호자·법률 절차가 확정되지 않은 18세 미만 실제 가입",
+            "안전교육·핵심 정지 조작을 완료하지 못한 현장보행",
+            "동의 범위와 원자료 접근통제를 확인할 수 없는 세션"
+          ]
+        },
+        "phases": [
+          {
+            "phase_id": "DSC03-PHASE-1",
+            "environment": "INDOOR_OR_CLOSED_CONTROLLED_SPACE",
+            "execution_status": "NOT_RUN",
+            "tasks": [
+              "안내문 이해",
+              "TalkBack 가입·동의",
+              "음성명령",
+              "오류·정지",
+              "휴대전화 장착",
+              "원본수집 설명 이해"
+            ],
+            "preconditions": [
+              "계획 내부검토",
+              "접근 가능한 동의문",
+              "필수 검토자 배정",
+              "통제 장소",
+              "즉시중단 절차"
+            ]
+          },
+          {
+            "phase_id": "DSC03-PHASE-2",
+            "environment": "CONTROLLED_SIDEWALK_WITH_SAFETY_ESCORT",
+            "execution_status": "NOT_RUN",
+            "tasks": [
+              "통제 보도 단계 시험",
+              "오안내·지연·오류 즉시중단",
+              "안전요원 개입·복구 기록"
+            ],
+            "preconditions": [
+              "DSC03-PHASE-1 evidence accepted",
+              "WS-21 safety plan approved",
+              "participant consent obtained",
+              "safety escort assigned",
+              "GATE-SINGLE-ADMIN-RECOVERY-DRILL closed where applicable",
+              "linked safety gates approved"
+            ]
+          }
+        ],
+        "measurement_contract": {
+          "quantitative": [
+            "task_attempt_count",
+            "task_success_count",
+            "assistance_request_count",
+            "error_count",
+            "safety_stop_count",
+            "guidance_comprehension_result"
+          ],
+          "qualitative": [
+            "coded_observation",
+            "consented_participant_statement",
+            "counterexample",
+            "bias_or_limitation"
+          ],
+          "group_separation_required": [
+            "blind",
+            "low_vision"
+          ],
+          "threshold_status": "MUST_BE_APPROVED_BEFORE_EXECUTION"
+        },
+        "safety_privacy_contract": {
+          "informed_consent_required": true,
+          "immediate_stop_available": true,
+          "minimum_access_required": true,
+          "uncontrolled_unredacted_export_prohibited": true,
+          "minor_participation_without_protection_prohibited": true,
+          "solo_field_walk_before_gate_closure_prohibited": true
+        },
+        "stop_rules": [
+          "participant_requests_stop",
+          "safety_officer_identifies_harm",
+          "critical_stop_or_guidance_comprehension_fails",
+          "data_exceeds_consent_scope",
+          "environment_or_device_leaves_approved_conditions"
+        ],
+        "schedule": {
+          "confirmed_date": null,
+          "confirmed_location": null,
+          "recruitment_status": "NOT_STARTED"
+        },
+        "result_output_contract": {
+          "target_artifact_type_id": "DLV-DSC-04",
+          "required_fields": [
+            "deidentified_participant_id",
+            "consent_scope_id",
+            "method_and_environment",
+            "task_observations",
+            "hypothesis_result",
+            "counterexamples",
+            "bias_and_limitations",
+            "requirement_and_backlog_decisions"
+          ],
+          "current_result_row_count": 0
+        }
+      },
+      "allowed_claims": [
+        "Plan structure is ready for internal review; actual research counts remain zero."
+      ],
+      "prohibited_claims": [
+        "Research approval, recruitment, consent collection, sessions, interviews or findings were completed."
+      ],
+      "applicability": {
+        "decision_id": "WS-DSC03-APPLICABILITY-DECISION-20260726-001",
+        "status": "ACTIVE",
+        "decision_date": "2026-07-26",
+        "plan_id": "WS-DSC03-RESEARCH-PLAN-20260726-001",
+        "responsible_role": "사용자연구책임자",
+        "responsible_owner": "김민호",
+        "source_binding_ids": [
+          "SRC-POLICY-BASELINE-1.0.1",
+          "SRC-DSC03-LEGACY-PLAN"
+        ],
+        "basis": [
+          "승인 정책의 전맹·저시력 우선 사용자와 화면 미확인 접근성 요구는 사용자·사용성 연구를 출시 전 수행할 필요를 만든다.",
+          "기존 DSC-03 계획은 사용자·사용성 연구가 출시 전 필요하므로 계획을 활성 Draft로 선언하고 김민호가 계획·모집·분석을 관리한다고 기록한다.",
+          "적용성 ACTIVE 결정은 연구 실행 또는 결과 완료를 뜻하지 않으며 실행 선행조건과 검토자 배정은 계속 남는다."
+        ],
+        "execution_status": "NOT_RUN",
+        "actual_participant_count": 0,
+        "actual_interview_count": 0,
+        "actual_usability_session_count": 0,
+        "formal_state_or_approval_change_claimed": false
+      }
+    },
+    {
+      "artifact_type_id": "DLV-DSC-07",
+      "display_code": "DSC-07",
+      "title": "경쟁·유사 서비스 조사",
+      "successor_status": "READY_TO_COLLECT_OFFICIAL_SOURCES",
+      "approval_status_change_claimed": false,
+      "competitor_research": {
+        "protocol_id": "WS-DSC07-COMPETITOR-RESEARCH-PROTOCOL-20260726-001",
+        "protocol_status": "READY_TO_COLLECT_OFFICIAL_SOURCES",
+        "execution_status": "NOT_RUN",
+        "completion_claimed": false,
+        "comparison_categories": [
+          "스마트폰 보행보조",
+          "지도·길안내",
+          "접근성 앱",
+          "시설 신고 서비스"
+        ],
+        "selection_criteria": [
+          "WalkSafe 핵심 사용자·과업과 비교 가능",
+          "공식 자료로 존재와 범위 확인 가능",
+          "안전·접근성·개인정보·운영 경계 비교 가능"
+        ],
+        "comparison_dimensions": [
+          "대상 사용자",
+          "플랫폼·지원환경",
+          "핵심 과업·기능",
+          "안전 고지·한계",
+          "오프라인",
+          "접근성",
+          "개인정보·데이터",
+          "신고 운영",
+          "가격",
+          "라이선스·재사용 위험"
+        ],
+        "source_contract": {
+          "allowed_source_types": [
+            "OFFICIAL_VENDOR_DOCUMENT",
+            "OFFICIAL_APP_STORE_LISTING",
+            "CONTROLLED_INSTALL_OBSERVATION"
+          ],
+          "required_fields": [
+            "product_id",
+            "product_name",
+            "source_type",
+            "source_url_or_controlled_evidence_path",
+            "document_title",
+            "retrieved_or_observed_at",
+            "product_or_app_version",
+            "claim",
+            "verification_status",
+            "reviewer"
+          ],
+          "official_document_and_install_observation_must_be_separate": true,
+          "unknown_values_must_remain_unknown": true
+        },
+        "comparison_rows": [],
+        "decision_impacts": [],
+        "result_count": 0,
+        "official_source_collection_status": "NOT_RUN",
+        "installation_test_status": "NOT_RUN"
+      },
+      "allowed_claims": [
+        "Evidence-collection protocol and empty schema are ready."
+      ],
+      "prohibited_claims": [
+        "Any product, function, price, accessibility, safety, license or superiority was researched or verified."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-DSC-09",
+      "display_code": "DSC-09",
+      "title": "PoC·기술 타당성 검증 결과",
+      "successor_status": "DRAFT_INTERNAL_COMPONENT_POC_PARTIAL",
+      "approval_status_change_claimed": false,
+      "poc": {
+        "poc_id": "WS-DSC09-INTERNAL-COMPONENT-POC-20260726-001",
+        "status": "DRAFT_INTERNAL_COMPONENT_POC_PARTIAL",
+        "completion_claimed": false,
+        "candidate_source_paths": [
+          "apps/android",
+          "apps/android/adminapp",
+          "apps/android-gateway",
+          "backend",
+          "model",
+          "voice"
+        ],
+        "internal_feature_receipt_count": 12,
+        "internal_feature_receipt_binding_ids": [
+          "SRC-FP004-COMPLETION",
+          "SRC-FP005-COMPLETION",
+          "SRC-FP006-COMPLETION",
+          "SRC-FP010-COMPLETION",
+          "SRC-FP011-COMPLETION",
+          "SRC-FP012-COMPLETION",
+          "SRC-FP013-COMPLETION",
+          "SRC-FP014-COMPLETION",
+          "SRC-FP015-COMPLETION",
+          "SRC-FP016-COMPLETION",
+          "SRC-FP018-COMPLETION",
+          "SRC-FP047-COMPLETION"
+        ],
+        "result_matrix": [
+          {
+            "question": "저장소 build·내부 자동검증 근거",
+            "status": "PASS_INTERNAL_EVIDENCE_BOUND",
+            "boundary": "Named internal scopes only."
+          },
+          {
+            "question": "가입·세션·권한·동의·관리자 권한분리",
+            "status": "PARTIAL_INTERNAL_EVIDENCE_ACCEPTED",
+            "boundary": "Twelve internal policy-conformance receipts; no feature completion."
+          },
+          {
+            "question": "카메라→추론→위험판정→오프라인 음성·진동 실기기 E2E",
+            "status": "NOT_RUN",
+            "boundary": "No actual-device result."
+          },
+          {
+            "question": "TMAP 경로·GPS·이탈·도착 실기기",
+            "status": "NOT_RUN",
+            "boundary": "No actual TMAP or device route result."
+          },
+          {
+            "question": "자동신고 대기열→외부 서버 receipt",
+            "status": "PARTIAL_INTERNAL_COMPONENTS_EXTERNAL_NOT_RUN",
+            "boundary": "External reports, PostGIS and PostgreSQL concurrency remain NOT_RUN."
+          },
+          {
+            "question": "하나의 고정 후보 build 전체 통합",
+            "status": "NOT_ESTABLISHED",
+            "boundary": "Receipts cover separate named scopes."
+          }
+        ],
+        "verification_boundary": {
+          "formal_test_status": "NOT_RUN",
+          "planned_formal_test_count": 279,
+          "planned_formal_test_not_run_count": 279,
+          "actual_device_status": "NOT_RUN",
+          "actual_user_status": "NOT_RUN",
+          "actual_admin_status": "NOT_RUN",
+          "actual_talkback_user_status": "NOT_RUN",
+          "field_test_status": "NOT_RUN",
+          "actual_camera_inference_guidance_e2e_status": "NOT_RUN",
+          "actual_tmap_route_status": "NOT_RUN",
+          "external_postgis_integration_status": "NOT_RUN",
+          "external_reports_integration_status": "NOT_RUN",
+          "postgresql_concurrency_status": "NOT_RUN",
+          "external_signup_provider_status": "NOT_RUN",
+          "external_sms_provider_status": "NOT_RUN",
+          "external_guardian_provider_status": "NOT_RUN",
+          "external_security_review_status": "NOT_RUN",
+          "external_legal_review_status": "NOT_RUN",
+          "external_privacy_review_status": "NOT_RUN",
+          "external_accessibility_review_status": "NOT_RUN",
+          "single_admin_recovery_drill_status": "NOT_RUN",
+          "production_deployment_status": "NOT_RUN",
+          "release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "release_status": "NOT_ELIGIBLE"
+        }
+      },
+      "allowed_claims": [
+        "Bound internal component evidence partially supports technical feasibility."
+      ],
+      "prohibited_claims": [
+        "PoC completion, safety proof, full-flow integration, formal/device/field/production verification or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-DSC-14",
+      "display_code": "DSC-14",
+      "title": "우선순위 Backlog",
+      "successor_status": "CURRENT_R021_BACKLOG_SUPPLEMENT",
+      "approval_status_change_claimed": false,
+      "backlog_current_state": {
+        "source_gap_report_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260726-021",
+        "source_remediation_backlog_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-021",
+        "source_policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "feature_scope": {
+          "feature_count": 54,
+          "feature_status_counts": {
+            "PARTIAL": 30,
+            "CONFLICTING": 14,
+            "MISSING": 6,
+            "EVIDENCE_MISSING": 4,
+            "IMPLEMENTED": 0
+          },
+          "feature_priority_counts": {
+            "P0": 44,
+            "P1": 10
+          },
+          "status_count_total": 54,
+          "priority_count_total": 54
+        },
+        "all_assessment_scope": {
+          "assessment_count": 68,
+          "status_counts": {
+            "BLOCKED": 5,
+            "CONFLICTING": 16,
+            "EVIDENCE_MISSING": 4,
+            "MISSING": 11,
+            "PARTIAL": 32,
+            "IMPLEMENTED": 0
+          },
+          "priority_counts": {
+            "P0": 58,
+            "P1": 10
+          },
+          "status_count_total": 68,
+          "priority_count_total": 68
+        },
+        "internal_feature_receipts": [
+          {
+            "feature_id": "FP-004",
+            "binding_id": "SRC-FP004-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-005",
+            "binding_id": "SRC-FP005-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-006",
+            "binding_id": "SRC-FP006-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-010",
+            "binding_id": "SRC-FP010-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-011",
+            "binding_id": "SRC-FP011-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-012",
+            "binding_id": "SRC-FP012-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-013",
+            "binding_id": "SRC-FP013-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-014",
+            "binding_id": "SRC-FP014-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-015",
+            "binding_id": "SRC-FP015-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-016",
+            "binding_id": "SRC-FP016-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-018",
+            "binding_id": "SRC-FP018-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          },
+          {
+            "feature_id": "FP-047",
+            "binding_id": "SRC-FP047-COMPLETION",
+            "receipt_status": "ACCEPTED",
+            "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+            "feature_completion_claimed": false
+          }
+        ],
+        "internally_accepted_feature_receipt_count": 12,
+        "completed_feature_count": 0,
+        "implemented_and_formally_verified_count": 0,
+        "planned_formal_test_count": 279,
+        "planned_formal_test_not_run_count": 279,
+        "remaining_gate_count": 5,
+        "release_gate_status": "NOT_RUN",
+        "release_gates_waived": false,
+        "release_status": "NOT_ELIGIBLE",
+        "next_single_action": {
+          "epic_id": "EPIC-03",
+          "source_policy_id": "FP-048",
+          "gap_id": "GAP-057",
+          "status": "PLANNED_NEXT",
+          "action": "휴대전화·서버 원본·데이터베이스·백업 암호화와 열쇠 분리·회전·감사를 구현하고 실제 배포 TLS·기기 및 독립 보안 검토를 수행한다."
+        },
+        "feature_rows_embedded": false,
+        "feature_row_authority": "SRC-GAP-R021",
+        "execution_sequence_authority": "SRC-REMEDIATION-R021"
+      },
+      "allowed_claims": [
+        "r021 has 54 feature rows with recorded counts; twelve named internal work-item receipts were accepted."
+      ],
+      "prohibited_claims": [
+        "Any feature is formally verified, completed for users/devices, production ready or release eligible."
+      ]
+    }
+  ],
+  "source_bindings": [
+    {
+      "binding_id": "SRC-POLICY-BASELINE-1.0.1",
+      "kind": "APPROVED_POLICY_BASELINE_MANIFEST",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "allowed_claim": "Policy baseline identity, version and scope.",
+      "prohibited_claim": "Implementation, verification, deployment or release completion."
+    },
+    {
+      "binding_id": "SRC-GAP-R021",
+      "kind": "IMPLEMENTATION_GAP_DIAGNOSTIC",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+      "allowed_claim": "r021 coverage, status, priority and boundaries.",
+      "prohibited_claim": "Approval, formal verification, production readiness or release eligibility."
+    },
+    {
+      "binding_id": "SRC-REMEDIATION-R021",
+      "kind": "IMPLEMENTATION_REMEDIATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+      "allowed_claim": "r021 sequence, epic mapping and next action.",
+      "prohibited_claim": "Approved delivery date, completed work or release authorization."
+    },
+    {
+      "binding_id": "SRC-FP004-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/completion-receipt.json",
+      "sha256": "1b5173eee6e8c673c4285da34a280b08d2f8c17dafd6283c0489d4d3d743c199",
+      "allowed_claim": "FP-004 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP005-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/completion-receipt.json",
+      "sha256": "2b2cefc069dee597e12ad26c51d9a2d78480a5050bb2eaaf1a29551fb2e422b8",
+      "allowed_claim": "FP-005 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP006-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-006-R001/completion-receipt.json",
+      "sha256": "0e44cdd19d80c9a9ca8867cbeb633cb5163bdddbf1cbcb512b082b655ecf347a",
+      "allowed_claim": "FP-006 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP010-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-010-R001/completion-receipt.json",
+      "sha256": "9726ec3f5a284f7d010508c901b7215fda00d5f57bff623bfd8c92e9ddb87a60",
+      "allowed_claim": "FP-010 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP011-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/completion-receipt.json",
+      "sha256": "b0823351940413c8b81bd9f410c806dc2da32081e05881f1187124c63465dcc3",
+      "allowed_claim": "FP-011 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP012-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/completion-receipt.json",
+      "sha256": "a8cde08850f9bb92fcee01e562922d1f9dfcaab483d6b2b20022adffee532af2",
+      "allowed_claim": "FP-012 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP013-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/completion-receipt.json",
+      "sha256": "de0a6f4a431bebb8b09ea9989ff1f880a84b5d1d426d33befde135d0d09fce0c",
+      "allowed_claim": "FP-013 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP014-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/completion-receipt.json",
+      "sha256": "9eff1f58ddafca0475ebd765bddbeb712c7748db32bcb88259ae8228a3361170",
+      "allowed_claim": "FP-014 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP015-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/completion-receipt.json",
+      "sha256": "aaef00a3c67dfd74202c01ed9d4eacb71e7efdd4d8bd688a795efca0f4d38e24",
+      "allowed_claim": "FP-015 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP016-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/completion-receipt.json",
+      "sha256": "389a586e23152a84efd6ec8e0b7d31b5379de6ce8cd886b62b8bed587cff5ecf",
+      "allowed_claim": "FP-016 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP018-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/completion-receipt.json",
+      "sha256": "75f12681d2e89703f4ed688a91e562665b785cb6494e2f206c5229af27310ee5",
+      "allowed_claim": "FP-018 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion; absent fields are not inferred."
+    },
+    {
+      "binding_id": "SRC-FP047-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+      "sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+      "allowed_claim": "FP-047 internal policy-conformance reassessment accepted.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP047-VERIFICATION",
+      "kind": "INTERNAL_VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/verification-result.json",
+      "sha256": "ca2c55dd73370c82f5e2919e77ad3476989d71aa56777f9f6459fed3348b40d5",
+      "allowed_claim": "Named FP-047 internal checks passed within their evidence boundary.",
+      "prohibited_claim": "External independence, formal testing, production deployment or release eligibility."
+    },
+    {
+      "binding_id": "SRC-FP047-INTERNAL-REVIEW",
+      "kind": "INTERNAL_REVIEW_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/independent-review.json",
+      "sha256": "077f119b7662b50d1820bedfd53d4c9ab187c6e9939d9d304411f8d32e7b9562",
+      "allowed_claim": "Separate internal review passed with zero blocking and major-open findings at review time.",
+      "prohibited_claim": "External independence, legal/privacy/accessibility approval, production or release completion."
+    },
+    {
+      "binding_id": "SRC-DSC03-LEGACY-PLAN",
+      "kind": "LEGACY_CANONICAL_PLAN_SOURCE",
+      "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "sha256": "8bd0acb7210a58624da3ec9721b38e7ac8a31281f78a231f7ae18a2f22e5979f",
+      "allowed_claim": "The existing DSC-03 plan declared research necessary before release, an active Draft plan, the user-research responsibility and Kim Minho as plan, recruitment and analysis manager.",
+      "prohibited_claim": "Research execution, approval, participant recruitment, consent collection, sessions, findings or formal lifecycle promotion."
+    }
+  ],
+  "validation_invariants": {
+    "artifact_type_count": 4,
+    "source_binding_count": 18,
+    "internal_feature_receipt_binding_count": 12,
+    "research_actual_participant_count": 0,
+    "research_actual_interview_count": 0,
+    "research_actual_usability_session_count": 0,
+    "competitor_result_count": 0,
+    "feature_count": 54,
+    "feature_status_count_total": 54,
+    "all_assessment_count": 68,
+    "all_assessment_status_count_total": 68,
+    "planned_formal_test_count": 279,
+    "planned_formal_test_not_run_count": 279,
+    "completed_feature_count": 0,
+    "implemented_and_formally_verified_count": 0,
+    "remaining_gate_count": 5,
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "dsc03_applicability_status": "ACTIVE",
+    "dsc03_applicability_decision_date": "2026-07-26",
+    "dsc03_plan_id": "WS-DSC03-RESEARCH-PLAN-20260726-001",
+    "dsc03_execution_status": "NOT_RUN"
+  },
+  "content_hash_contract": "SHA-256 over UTF-8 output of jq -S -c 'del(.record_content_sha256)' including its trailing LF.",
+  "record_content_sha256": "9c47698e4ad1ade9c0faf33cc6cddad5db5d36e70dcaca9a1bf7418a2925648b",
+  "current_state_pointer": {
+    "artifact_type_id": "DLV-DSC-03",
+    "status": "ACTIVE",
+    "canonical_path": "docs/control/execution/artifact-remediation/20260726/w1/dsc-current-state.json",
+    "read_precedence": "FOR_DLV_DSC_03_CURRENT_STATE_READ_THIS_ADD_ONLY_SUCCESSOR_BEFORE_LEGACY_PREDECESSORS",
+    "legacy_mutation_required": false,
+    "self_content_fingerprint": {
+      "field": "record_content_sha256",
+      "algorithm": "SHA-256",
+      "contract": "SHA-256 over UTF-8 output of jq -S -c del(record_content_sha256) including its trailing LF.",
+      "verification_rule": "Recompute under the declared contract and require exact equality with record_content_sha256."
+    }
+  }
+}

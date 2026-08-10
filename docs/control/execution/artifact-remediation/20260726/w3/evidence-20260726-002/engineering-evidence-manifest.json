@@ -1,0 +1,136 @@
+{
+  "claim_boundary": {
+    "approval_status": "NOT_CLAIMED",
+    "deployment_status": "NOT_RUN",
+    "dev19_completion_status": "BLOCKED_PENDING_OFFICIAL_STANDARD_SCHEMA_VALIDATOR_RESULTS",
+    "formal_test_status": "NOT_RUN",
+    "internal_build_evidence_only": true,
+    "release_status": "NOT_ELIGIBLE",
+    "result": "INTERNAL_EVIDENCE_GENERATED",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "covered_artifact_type_count": 17,
+  "covered_artifact_type_ids": [
+    "DLV-DEV-01",
+    "DLV-DEV-02",
+    "DLV-DEV-03",
+    "DLV-DEV-04",
+    "DLV-DEV-05",
+    "DLV-DEV-06",
+    "DLV-DEV-07",
+    "DLV-DEV-08",
+    "DLV-DEV-09",
+    "DLV-DEV-12",
+    "DLV-DEV-14",
+    "DLV-DEV-16",
+    "DLV-DEV-17",
+    "DLV-DEV-18",
+    "DLV-DEV-19",
+    "DLV-DEV-20",
+    "DLV-DEV-21"
+  ],
+  "document_id": "WALKSAFE-W3-ENGINEERING-EVIDENCE-MANIFEST-20260726",
+  "input_bindings": {
+    "fixture_content_set_sha256": "b2c07e0e6979a3ed4279e73b1a41d961eee1be71f19af72077804c92d4d1bd96",
+    "formal_test_id_set_sha256": "8ab0a039d0a6f9fcaad753bac08428da0f74ef27d40426ad4da49a28d5a0f167",
+    "lock_source_content_set_sha256": "bc12dee0a03467f43a1dc72d3e3a3c4e9dc9ac5f20713173557ab20ed16a8fff",
+    "module_content_sets": {
+      "adminapp": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "android-gateway": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "app": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+      "backend": "7b0ade319b3ec511e7813f018d88e7636f60ee51f69ac7fb721294bc4f62e492",
+      "model-config": "7da513c83ecda763fc14911a8301a1ac331dc8c71f1f1532e34155733e928e47"
+    },
+    "raw_command_receipt_sha256": "d1ee69b8983d4905d30229100bc2fa53226634fd80a4a124cdc33406b40182e6",
+    "source_content_set_sha256": "976ba4d9cec00fdc56891f06e8927c34d9686cbb460dc9b88f5ac678afba3bcf"
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "811bfd1a80d3221aaef13f1143d3ca3199d83a75fa816c855eceb3452913b795"
+    }
+  },
+  "outputs": [
+    {
+      "bytes": 68485,
+      "content_fingerprint": "db05b46a3f1d1070c86dd40f6264e047ba0c1d5ec1da1d4da33be6357a7f2dc9",
+      "path": "fixture-inventory.json",
+      "sha256": "be584ced83fad77cf859dbd5f3ec2e3c2ba8ba56c848d7a16afccdddbc6a1aa6"
+    },
+    {
+      "bytes": 126562,
+      "content_fingerprint": "7c1c0defb6b6c3ff6b90c653d36a1996421fb0361f3dc35f538234983118e30d",
+      "path": "internal-build-provenance.json",
+      "sha256": "cf827114332dc4a418d4d96916ea990d32baf25d8a6a284f17bc9462f9941c93"
+    },
+    {
+      "bytes": 576621,
+      "content_fingerprint": "23f0db6780ee75864aac625e395550de452cf7b1e29c9c7bee879cdec6ed41d1",
+      "path": "lock-inventory.json",
+      "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+    },
+    {
+      "bytes": 86869,
+      "content_fingerprint": "bccd9f3080c4ba485d9ca9ec0f676486526ae0e1e65638de0cc6f062a27a88b0",
+      "path": "module-inventory.json",
+      "sha256": "1a3527e327c0c5d6e82a30281c303d66fe40e30cd77e4a50c77c97bddff63254"
+    },
+    {
+      "bytes": 815731,
+      "content_fingerprint": null,
+      "integrity_binding": "MANIFEST_RAW_FILE_SHA256",
+      "path": "sbom.cyclonedx.json",
+      "sha256": "c152aaf20d30cde286ddbb68a5778005ae96d44681fe6e00d8923f3a1a991cd4"
+    },
+    {
+      "bytes": 907864,
+      "content_fingerprint": null,
+      "integrity_binding": "MANIFEST_RAW_FILE_SHA256",
+      "path": "sbom.spdx.json",
+      "sha256": "5214f86e9d55aa434852c43fddefbab345f6186b9a550799e3bfb9fbb40490d8"
+    },
+    {
+      "bytes": 605082,
+      "content_fingerprint": "8d0156eda0cdccae7ff3f6a467ac5d091fd8a8fd342d6f618f711897b7dcfca1",
+      "path": "source-snapshot.json",
+      "sha256": "10d641852af4b09dba8890477980f7725aae8e302252bba420762f998dccb807"
+    }
+  ],
+  "prepared_on": "2026-07-26",
+  "schema_version": "walksafe.w3-engineering-evidence.manifest.v1",
+  "source_commit": null,
+  "validation_summary": {
+    "component_scopes": [
+      "user",
+      "admin",
+      "gateway",
+      "backend",
+      "model-config"
+    ],
+    "formal_test_count": 279,
+    "formal_test_execution_status": "NOT_RUN",
+    "module_ownership_duplicate_count": 0,
+    "official_standard_schema_validation": {
+      "completion_allowed": false,
+      "current_run_contract_contains_required_evidence": false,
+      "local_validator_or_schema_available": false,
+      "required_artifact_type_id": "DLV-DEV-19",
+      "required_heavy_execution_evidence": [
+        "official-spdx-validator-result.json",
+        "official-spdx-validator.log",
+        "official-cyclonedx-validator-result.json",
+        "official-cyclonedx-validator.log"
+      ],
+      "status": "STANDARD_SCHEMA_VALIDATION_REQUIRED_NOT_RUN"
+    },
+    "raw_required_output_count": 6,
+    "sbom_formats": [
+      "SPDX-2.3",
+      "CycloneDX-1.6"
+    ],
+    "sbom_standard_validation": "BUILTIN_STRICT_STANDARD_ALLOWED_REQUIRED_STRUCTURE; LOCAL_SCHEMA_PACKAGES_NOT_AVAILABLE"
+  },
+  "wave_id": "W3",
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT"
+}

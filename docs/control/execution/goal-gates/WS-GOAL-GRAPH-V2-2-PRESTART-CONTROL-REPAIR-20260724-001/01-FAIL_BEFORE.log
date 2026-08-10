@@ -1,0 +1,710 @@
+F........................................F...F............F......F...... [ 24%]
+............................F...F..............................F........ [ 48%]
+...................F.......................F..........F................. [ 73%]
+........................................................................ [ 97%]
+......                                                                   [100%]
+=================================== FAILURES ===================================
+____ WalkSafeGoalGraphTest.test_activation_then_in_progress_focus_is_valid _____
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_activation_then_in_progress_focus_is_valid>
+
+    def test_activation_then_in_progress_focus_is_valid(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[514 chars]fer'] != []
+E       
+E       First list contains 8 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated',
+E       -  'Goal graph event 4: implementation start gate semantics/freshness differ']
+
+tests/test_walksafe_goal_graph.py:5144: AssertionError
+_ WalkSafeGoalGraphTest.test_completed_historical_goal_survives_new_current_backlog_binding _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_completed_historical_goal_survives_new_current_backlog_binding>
+
+    def test_completed_historical_goal_survives_new_current_backlog_binding(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            bindings = graph.canonical_binding_map(checkpoint)
+            old_binding = bindings["IMPLEMENTATION_BACKLOG"]
+            new_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-remediation-backlog-future-test.json"
+            )
+            new_path = root / new_relative
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / old_binding["path"], new_path)
+            for binding in checkpoint["canonical_bindings"]:
+                if binding["role"] == "IMPLEMENTATION_BACKLOG":
+                    binding["path"] = new_relative
+                    binding["file_sha256"] = graph.sha256_file(new_path)
+                    break
+            self.append_binding_update_event(
+                root,
+                checkpoint,
+                ["IMPLEMENTATION_BACKLOG"],
+                occurred_at="2026-07-24T19:49:00+09:00",
+                event_id="WS-GOAL-GRAPH-BACKLOG-UPDATED-TEST-001",
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[514 chars]fer'] != []
+E       
+E       First list contains 8 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated',
+E       -  'Goal graph event 4: implementation start gate semantics/freshness differ']
+
+tests/test_walksafe_goal_graph.py:6820: AssertionError
+_ WalkSafeGoalGraphTest.test_completed_workstream_reopens_without_rewriting_its_completion _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_completed_workstream_reopens_without_rewriting_its_completion>
+
+    def test_completed_workstream_reopens_without_rewriting_its_completion(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            self.refresh_integrity(root)
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_package(root, checkpoint)
+            state = checkpoint["goal_execution"]
+            bindings_before = next(
+                event["canonical_binding_snapshot_after"]
+                for event in reversed(state["transition_history"])
+                if "canonical_binding_snapshot_after" in event
+            )
+            gap_binding = graph.canonical_binding_map(checkpoint)[
+                "IMPLEMENTATION_GAP"
+            ]
+            gap_payload = graph.load_json(root / gap_binding["path"])
+            gap_payload = json.loads(json.dumps(gap_payload))
+            changed_row = next(
+                row
+                for row in gap_payload["assessments"]
+                if row["gap_id"] == "GAP-010"
+            )
+            changed_row["rationale"] += " 회귀 재평가가 필요하다."
+            carried = sorted(
+                row["gap_id"]
+                for row in gap_payload["assessments"]
+                if row["gap_id"] != "GAP-010"
+            )
+            gap_payload["reassessment_scope"] = {
+                "mode": "TEST_COMPLETED_WORKSTREAM_REOPEN",
+                "directly_reassessed_gap_ids": ["GAP-010"],
+                "impact_reviewed_gap_ids": [],
+                "reviewed_gap_ids": ["GAP-010"],
+                "carried_forward_gap_count": len(carried),
+                "carried_forward_gap_ids": carried,
+            }
+            gap_payload["metadata"]["report_id"] = "TEST-GAP-R009"
+            gap_payload["metadata"]["version"] = "0.9.0"
+            gap_payload["report_content_sha256"] = graph.canonical_json_sha256(
+                gap_payload,
+                omit={"report_content_sha256"},
+            )
+            gap_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-gap-analysis-test-r009.json"
+            )
+            gap_path = root / gap_relative
+            self.write_json(gap_path, gap_payload)
+            backlog_binding = graph.canonical_binding_map(checkpoint)[
+                "IMPLEMENTATION_BACKLOG"
+            ]
+            backlog_payload = graph.load_json(root / backlog_binding["path"])
+            backlog_payload = json.loads(json.dumps(backlog_payload))
+            backlog_payload["metadata"]["backlog_id"] = "TEST-BACKLOG-R009"
+            backlog_payload["metadata"]["version"] = "0.9.0"
+            backlog_payload["metadata"]["predecessor_backlog_id"] = (
+                backlog_binding["document_id"]
+            )
+            backlog_payload["source_predecessor"] = {
+                "path": backlog_binding["path"],
+                "file_sha256": backlog_binding["file_sha256"],
+                "preserved_unchanged": True,
+            }
+            backlog_payload["gap_report_content_sha256"] = gap_payload[
+                "report_content_sha256"
+            ]
+            backlog_payload["backlog_content_sha256"] = (
+                graph.canonical_json_sha256(
+                    backlog_payload,
+                    omit={"backlog_content_sha256"},
+                )
+            )
+            backlog_relative = (
+                "docs/control/audits/"
+                "walksafe-implementation-remediation-backlog-test-r009.json"
+            )
+            backlog_path = root / backlog_relative
+            self.write_json(backlog_path, backlog_payload)
+            for binding in checkpoint["canonical_bindings"]:
+                if binding["role"] == "IMPLEMENTATION_GAP":
+                    binding["path"] = gap_relative
+                    binding["document_id"] = "TEST-GAP-R009"
+                    binding["file_sha256"] = graph.sha256_file(gap_path)
+                elif binding["role"] == "IMPLEMENTATION_BACKLOG":
+                    binding["path"] = backlog_relative
+                    binding["document_id"] = "TEST-BACKLOG-R009"
+                    binding["file_sha256"] = graph.sha256_file(backlog_path)
+            bindings_after = graph.canonical_binding_snapshot(
+                graph.canonical_binding_map(checkpoint)
+            )
+            diff_errors, changed_subjects = (
+                graph.canonical_changed_subject_ids_by_role(
+                    root,
+                    changed_roles=[
+                        "IMPLEMENTATION_BACKLOG",
+                        "IMPLEMENTATION_GAP",
+                    ],
+                    bindings_before=bindings_before,
+                    bindings_after=bindings_after,
+                )
+            )
+            self.assertEqual(diff_errors, [])
+            self.assertEqual(
+                changed_subjects,
+                {
+                    "IMPLEMENTATION_BACKLOG": [],
+                    "IMPLEMENTATION_GAP": ["FP-001", "GAP-010"],
+                },
+            )
+    
+            epic_id = "WS-GOAL-EPIC-01"
+            previous_focus_id = state["focus_goal_id"]
+            previous_focus_path = root / state["focus_goal_path"]
+            state["status_by_goal"][epic_id] = "READY"
+            state["status_by_goal"]["WS-GOAL-EPIC-02"] = "PLANNED"
+            state["status_by_goal"][
+                "WS-GOAL-EPIC-02-FP-018-R001"
+            ] = "PLANNED"
+            state["status_by_goal"]["WS-GOAL-EPIC-03"] = "PLANNED"
+            state["completion_evidence_by_goal"].pop(epic_id)
+            manifest = graph.load_json(root / graph.MANIFEST_RELATIVE)
+            nodes = self.load_nodes(root, manifest, include_dynamic=True)
+            backlog = self.load_binding_json_from_root(
+                root,
+                checkpoint,
+                "IMPLEMENTATION_BACKLOG",
+            )
+            state["ready_frontier_goal_ids"] = graph.ready_frontier(
+                nodes,
+                state["status_by_goal"],
+                state["materialized_child_goal_ids_by_parent"],
+                state["blockers_by_goal"],
+                backlog,
+            )
+            state["focus_goal_id"] = state["ready_frontier_goal_ids"][0]
+            focus_node = nodes[state["focus_goal_id"]]
+            focus_relative = next(
+                relative
+                for relative in state["goal_document_paths"]
+                if graph.parse_goal(root / relative)[0]["goal_id"]
+                == state["focus_goal_id"]
+            )
+            state["focus_goal_path"] = focus_relative
+            state["focus_work_item_id"] = (
+                focus_node.get("work_item_id")
+                if focus_node.get("goal_kind") == "WORK_ITEM"
+                else ""
+            )
+            state["focus_source"] = (
+                focus_node.get("materialized_from_role")
+                if focus_node.get("goal_kind") == "WORK_ITEM"
+                else "WORKSTREAM_GRAPH"
+            )
+            focus_path = root / state["focus_goal_path"]
+            closure_goal_ids = [
+                "WS-GOAL-EPIC-01",
+                "WS-GOAL-EPIC-02",
+                "WS-GOAL-EPIC-02-FP-018-R001",
+                "WS-GOAL-EPIC-03",
+            ]
+            event = {
+                "sequence": len(state["transition_history"]) + 1,
+                "event_id": "WS-GOAL-GRAPH-CANONICAL-REOPEN-TEST-001",
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "changed_binding_roles": [
+                    "IMPLEMENTATION_BACKLOG",
+                    "IMPLEMENTATION_GAP",
+                ],
+                "changed_subject_ids_by_role": changed_subjects,
+                "impact_closure_goal_ids": closure_goal_ids,
+                "impact_disposition_by_goal": {
+                    epic_id: {
+                        "result": "REOPEN_CONTAINER",
+                        "target_status": "READY",
+                    },
+                    "WS-GOAL-EPIC-02": {
+                        "result": "REVALIDATION_REFRESH_REQUIRED",
+                        "target_status": "PLANNED",
+                    },
+                    "WS-GOAL-EPIC-02-FP-018-R001": {
+                        "result": "DEPENDENCY_INVALIDATED",
+                        "target_status": "PLANNED",
+                    },
+                    "WS-GOAL-EPIC-03": {
+                        "result": "REVALIDATION_REFRESH_REQUIRED",
+                        "target_status": "PLANNED",
+                    },
+                },
+                "reopened_completion_event_sha256_by_goal": {
+                    epic_id: state["transition_history"][0]["event_sha256"]
+                },
+                "canonical_binding_snapshot_after": bindings_after,
+                "occurred_on": "2026-07-24",
+                "occurred_at": "2026-07-24T19:42:00+09:00",
+                "previous_focus_goal_id": previous_focus_id,
+                "previous_focus_content_sha256": graph.sha256_file(
+                    previous_focus_path
+                ),
+                "focus_goal_id": state["focus_goal_id"],
+                "focus_goal_content_sha256": graph.sha256_file(focus_path),
+                "from_status": state["status_by_goal"][state["focus_goal_id"]],
+                "to_status": state["status_by_goal"][state["focus_goal_id"]],
+                "static_plan_manifest_sha256": state[
+                    "static_plan_manifest_sha256"
+                ],
+                "status_changes": {
+                    epic_id: "READY",
+                    "WS-GOAL-EPIC-02": "PLANNED",
+                    "WS-GOAL-EPIC-02-FP-018-R001": "PLANNED",
+                    "WS-GOAL-EPIC-03": "PLANNED",
+                },
+                "runtime_after": self.runtime_snapshot(root, checkpoint),
+                "blockers_after": json.loads(json.dumps(state["blockers_by_goal"])),
+                "blocker_resolution_ids_after": [],
+                "source_checkpoint_version": checkpoint["schema_version"],
+                "evidence_refs": [
+                    "IMPLEMENTATION_BACKLOG",
+                    "IMPLEMENTATION_GAP",
+                ],
+                "previous_event_sha256": state["transition_history"][-1][
+                    "event_sha256"
+                ],
+            }
+            event["event_sha256"] = graph.event_sha256(event)
+            state["transition_history"].append(event)
+            state["transition_history_anchor_sha256"] = event["event_sha256"]
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph,
+                "validate_canonical_update_authorization",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+>           self.assertEqual(errors, [])
+E           AssertionError: Lists differ: ['Goal graph event 2: package activation a[438 chars]ted'] != []
+E           
+E           First list contains 7 additional elements.
+E           First extra element 0:
+E           'Goal graph event 2: package activation authorization file differs'
+E           
+E           + []
+E           - ['Goal graph event 2: package activation authorization file differs',
+E           -  'Goal graph event 2: activation quick gate file differs',
+E           -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E           -  'trust anchor',
+E           -  'Goal graph event 2: package activation authorization semantics differ',
+E           -  'Goal graph event 2: package activation receipt semantics differ',
+E           -  'Goal graph event 2: package activation: check run list is missing',
+E           -  'Goal graph event 3: package activation is duplicated']
+
+tests/test_walksafe_goal_graph.py:2774: AssertionError
+_ WalkSafeGoalGraphTest.test_current_work_session_argument_binds_latest_gate_event _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_current_work_session_argument_binds_latest_gate_event>
+
+    def test_current_work_session_argument_binds_latest_gate_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                valid_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+                stale_errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id="STALE-WORK-SESSION",
+                )
+    
+>       self.assertEqual(valid_errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[514 chars]fer'] != []
+E       
+E       First list contains 8 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated',
+E       -  'Goal graph event 4: implementation start gate semantics/freshness differ']
+
+tests/test_walksafe_goal_graph.py:5851: AssertionError
+_ WalkSafeGoalGraphTest.test_dynamic_goal_materialization_does_not_rewrite_static_anchors _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_dynamic_goal_materialization_does_not_rewrite_static_anchors>
+
+    def test_dynamic_goal_materialization_does_not_rewrite_static_anchors(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            manifest_before = graph.sha256_file(root / graph.MANIFEST_RELATIVE)
+            initial_event_before = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(graph.sha256_file(root / graph.MANIFEST_RELATIVE), manifest_before)
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_event_before,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[438 chars]ted'] != []
+E       
+E       First list contains 7 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated']
+
+tests/test_walksafe_goal_graph.py:6056: AssertionError
+_ WalkSafeGoalGraphTest.test_historical_start_snapshot_may_differ_from_reconciled_checkpoint _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_historical_start_snapshot_may_differ_from_reconciled_checkpoint>
+
+    def test_historical_start_snapshot_may_differ_from_reconciled_checkpoint(
+        self,
+    ) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            start_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            historical_snapshot = json.loads(
+                json.dumps(start_event["repository_snapshot_before"])
+            )
+            checkpoint["working_tree_snapshot"][
+                "content_set_sha256"
+            ] = "a" * 64
+            self.assertNotEqual(
+                historical_snapshot[
+                    "checkpoint_content_set_sha256"
+                ],
+                checkpoint["working_tree_snapshot"][
+                    "content_set_sha256"
+                ],
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[514 chars]fer'] != []
+E       
+E       First list contains 8 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated',
+E       -  'Goal graph event 4: implementation start gate semantics/freshness differ']
+
+tests/test_walksafe_goal_graph.py:5173: AssertionError
+_ WalkSafeGoalGraphTest.test_in_progress_goal_can_open_a_fresh_resume_session __
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_in_progress_goal_can_open_a_fresh_resume_session>
+
+    def test_in_progress_goal_can_open_a_fresh_resume_session(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            goal_id = checkpoint["goal_execution"]["focus_goal_id"]
+            self.resume_goal(root, checkpoint, goal_id)
+            event_id = checkpoint["goal_execution"]["transition_history"][-1][
+                "event_id"
+            ]
+            latest_event = checkpoint["goal_execution"][
+                "transition_history"
+            ][-1]
+            recorded_payload = self.recorded_gate_repository_payload(
+                root,
+                latest_event,
+            )
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.continuation,
+                "capture_gate_repository_state",
+                return_value=recorded_payload,
+            ) as capture:
+                errors = graph.validate(
+                    root,
+                    check_continuation=False,
+                    current_work_session_id=event_id,
+                )
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[590 chars]fer'] != []
+E       
+E       First list contains 9 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       Diff is 675 characters long. Set self.maxDiff to None to see it.
+
+tests/test_walksafe_goal_graph.py:5893: AssertionError
+_ WalkSafeGoalGraphTest.test_planned_goal_can_become_ready_after_dependencies_complete _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_planned_goal_can_become_ready_after_dependencies_complete>
+
+    def test_planned_goal_can_become_ready_after_dependencies_complete(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_package(root, checkpoint)
+            self.materialize_artifact_work(
+                root,
+                checkpoint,
+                initial_status="PLANNED",
+            )
+            self.ready_materialized_artifact(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[438 chars]ted'] != []
+E       
+E       First list contains 7 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated']
+
+tests/test_walksafe_goal_graph.py:6122: AssertionError
+_ WalkSafeGoalGraphTest.test_snapshot_cutoff_can_advance_without_rewriting_initial_event _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_snapshot_cutoff_can_advance_without_rewriting_initial_event>
+
+    def test_snapshot_cutoff_can_advance_without_rewriting_initial_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            initial_hash = checkpoint["goal_execution"]["transition_history"][0][
+                "event_sha256"
+            ]
+            self.activate_package(root, checkpoint)
+            state = checkpoint["goal_execution"]
+            activation = state["transition_history"][-1]
+            activation["occurred_on"] = "2026-07-24"
+            activation["occurred_at"] = "2026-07-24T19:41:01+09:00"
+            state["validation_cutoff_at"] = "2026-07-24T23:59:59+09:00"
+            self.rehash_event(checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+            self.assertEqual(
+                checkpoint["goal_execution"]["transition_history"][0]["event_sha256"],
+                initial_hash,
+            )
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[438 chars]ted'] != []
+E       
+E       First list contains 7 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated']
+
+tests/test_walksafe_goal_graph.py:7024: AssertionError
+_ WalkSafeGoalGraphTest.test_unactivated_graph_cannot_contain_in_progress_work _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_unactivated_graph_cannot_contain_in_progress_work>
+
+    def test_unactivated_graph_cannot_contain_in_progress_work(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            state = checkpoint["goal_execution"]
+            state["status_by_goal"][state["focus_goal_id"]] = "IN_PROGRESS"
+            state["transition_history"][0]["status_changes"][
+                state["focus_goal_id"]
+            ] = "IN_PROGRESS"
+            self.rehash_event(checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertTrue(any("unactivated Goal graph" in error for error in errors))
+E       AssertionError: False is not true
+
+tests/test_walksafe_goal_graph.py:1974: AssertionError
+_ WalkSafeGoalGraphTest.test_work_item_completion_binds_start_receipt_and_event _
+
+self = <test_walksafe_goal_graph.WalkSafeGoalGraphTest testMethod=test_work_item_completion_binds_start_receipt_and_event>
+
+    def test_work_item_completion_binds_start_receipt_and_event(self) -> None:
+        with self.fixture_root() as root:
+            checkpoint = graph.load_json(root / graph.CHECKPOINT_RELATIVE)
+            self.activate_and_start_focus(root, checkpoint)
+            self.add_completion_receipt_binding(root, checkpoint)
+            self.complete_focus_work_item(root, checkpoint)
+            self.write_json(root / graph.CHECKPOINT_RELATIVE, checkpoint)
+    
+            with patch.object(
+                graph.legacy,
+                "validate_work_item_completion_receipt",
+                return_value=[],
+            ), patch.object(
+                graph,
+                "CANONICAL_PRODUCER_WORK_TYPES",
+                set(),
+            ), patch.object(
+                graph,
+                "validate_internal_producer_result_evidence",
+                return_value=[],
+            ):
+                errors = graph.validate(root, check_continuation=False)
+    
+>       self.assertEqual(errors, [])
+E       AssertionError: Lists differ: ['Goal graph event 2: package activation a[514 chars]fer'] != []
+E       
+E       First list contains 8 additional elements.
+E       First extra element 0:
+E       'Goal graph event 2: package activation authorization file differs'
+E       
+E       + []
+E       - ['Goal graph event 2: package activation authorization file differs',
+E       -  'Goal graph event 2: activation quick gate file differs',
+E       -  'Goal graph event 2: package activation authorization lacks the exact checker '
+E       -  'trust anchor',
+E       -  'Goal graph event 2: package activation authorization semantics differ',
+E       -  'Goal graph event 2: package activation receipt semantics differ',
+E       -  'Goal graph event 2: package activation: check run list is missing',
+E       -  'Goal graph event 3: package activation is duplicated',
+E       -  'Goal graph event 4: implementation start gate semantics/freshness differ']
+
+tests/test_walksafe_goal_graph.py:6650: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_activation_then_in_progress_focus_is_valid
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_completed_historical_goal_survives_new_current_backlog_binding
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_completed_workstream_reopens_without_rewriting_its_completion
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_current_work_session_argument_binds_latest_gate_event
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_dynamic_goal_materialization_does_not_rewrite_static_anchors
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_historical_start_snapshot_may_differ_from_reconciled_checkpoint
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_in_progress_goal_can_open_a_fresh_resume_session
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_planned_goal_can_become_ready_after_dependencies_complete
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_snapshot_cutoff_can_advance_without_rewriting_initial_event
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_unactivated_graph_cannot_contain_in_progress_work
+FAILED tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_work_item_completion_binds_start_receipt_and_event
+11 failed, 283 passed in 22.72s

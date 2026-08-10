@@ -1,0 +1,209 @@
+{
+  "schema_version": "walksafe.tactile_route_policy_cases.v1",
+  "thresholds": {
+    "minimum_confidence": 0.55,
+    "minimum_stable_frames": 3,
+    "minimum_stable_ms": 700,
+    "maximum_detection_age_ms": 1200,
+    "maximum_route_heading_delta_deg": 35,
+    "maximum_gps_accuracy_m": 25,
+    "steering_dead_zone": 0.15
+  },
+  "cases": [
+    {
+      "id": "no-tactile-uses-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": null,
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_not_visible" }
+    },
+    {
+      "id": "off-route-never-uses-local-tactile",
+      "navigation_active": true,
+      "tmap_on_route": false,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 50,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tmap_off_route" }
+    },
+    {
+      "id": "stable-aligned-center-uses-tactile",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.8,
+        "stable_frames": 3,
+        "stable_ms": 800,
+        "age_ms": 100,
+        "route_heading_delta_deg": 10,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tactile_local", "steering": "straight", "reason": "stable_aligned_tactile" }
+    },
+    {
+      "id": "stable-aligned-left-steers-left",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.8,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 100,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.25
+      },
+      "expected": { "mode": "tactile_local", "steering": "left", "reason": "stable_aligned_tactile" }
+    },
+    {
+      "id": "stable-aligned-right-steers-right",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.8,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 100,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.75
+      },
+      "expected": { "mode": "tactile_local", "steering": "right", "reason": "stable_aligned_tactile" }
+    },
+    {
+      "id": "single-frame-stays-on-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 1,
+        "stable_ms": 100,
+        "age_ms": 50,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_not_stable" }
+    },
+    {
+      "id": "misaligned-tactile-stays-on-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 50,
+        "route_heading_delta_deg": 70,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "route_heading_mismatch" }
+    },
+    {
+      "id": "outside-route-corridor-stays-on-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 50,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": false,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_outside_tmap_corridor" }
+    },
+    {
+      "id": "poor-gps-stays-on-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 40,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 4,
+        "stable_ms": 900,
+        "age_ms": 50,
+        "route_heading_delta_deg": 5,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "gps_untrusted" }
+    },
+    {
+      "id": "damaged-tactile-is-never-a-local-path",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "damaged_tactile_block",
+        "confidence": 0.95,
+        "stable_frames": 5,
+        "stable_ms": 1200,
+        "age_ms": 50,
+        "route_heading_delta_deg": 0,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_not_traversable" }
+    },
+    {
+      "id": "stale-tactile-falls-back-to-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 5,
+        "stable_ms": 1500,
+        "age_ms": 1800,
+        "route_heading_delta_deg": 0,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 0.5
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_stale" }
+    },
+    {
+      "id": "invalid-tactile-geometry-falls-back-to-tmap",
+      "navigation_active": true,
+      "tmap_on_route": true,
+      "gps_accuracy_m": 5,
+      "tactile": {
+        "class_name": "normal_tactile_block",
+        "confidence": 0.9,
+        "stable_frames": 5,
+        "stable_ms": 1500,
+        "age_ms": 100,
+        "route_heading_delta_deg": 0,
+        "overlaps_tmap_corridor": true,
+        "center_x_normalized": 1.2
+      },
+      "expected": { "mode": "tmap", "steering": null, "reason": "tactile_geometry_invalid" }
+    }
+  ]
+}

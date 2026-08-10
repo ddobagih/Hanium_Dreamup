@@ -1,0 +1,165 @@
+{
+  "schema_version": "walksafe.residual-risk-register.v1",
+  "metadata": {
+    "title": "WalkSafe 미해결 결함·잔여 위험 snapshot",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "TST-21"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "snapshot_status": "DRAFT_PRE_EXECUTION",
+  "risks": [
+    {
+      "risk_id": "RSK-GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "source_gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "source_control_ids": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT"
+      ],
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "source_gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "source_control_ids": [
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+      ],
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "source_gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "source_control_ids": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-GATE-CLOUD-COST-MEASUREMENT",
+      "source_gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "source_control_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT"
+      ],
+      "title": "실제 클라우드 저장비 측정",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "source_gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "source_control_ids": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-POLICY-FP035-NETWORK-001",
+      "source_gate_id": null,
+      "source_issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "source_control_ids": [
+        "FP-035",
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "title": "FP-035 원본 전송 네트워크 조건 정규화의 묶음 승인 대기",
+      "status": "OPEN",
+      "waived": false,
+      "normalization_status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "closure": "이미 포착한 사용자 정규화 지시를 영향 산출물에 반영하고 새 묶음 승인을 받아 세 가지 네트워크 분기의 요구·설계·시험을 기준선에 결속한다. 사용자에게 같은 정책 선택을 다시 묻지 않는다.",
+      "blocks": [
+        "FP-035 시험 승인·실행",
+        "FP-035 구현 확정",
+        "TST-22 출시 준비도 승인"
+      ]
+    },
+    {
+      "risk_id": "RSK-EXTERNAL-WS-21",
+      "source_gate_id": null,
+      "source_control_ids": [
+        "WS-21"
+      ],
+      "title": "현장시험 참여자 동의·안전계획 미승인",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "현장시험 전에 안전계획을 승인하고 참여자별 동의 원본을 확보한다.",
+      "blocks": [
+        "실제 사용자·현장시험"
+      ]
+    },
+    {
+      "risk_id": "RSK-EXTERNAL-REL-15",
+      "source_gate_id": null,
+      "source_control_ids": [
+        "REL-15"
+      ],
+      "title": "이전 버전으로 되돌리는 절차(rollback)·실행 증거 미확정",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "한 번에 함께 출시할 정확한 버전 묶음(release generation)에서 이전 버전으로 되돌리는 절차(rollback)를 승인하고 시험한다.",
+      "blocks": [
+        "TST-17 완료",
+        "단계적 배포"
+      ]
+    },
+    {
+      "risk_id": "RSK-EXTERNAL-TST-22-INPUTS",
+      "source_gate_id": null,
+      "source_control_ids": [
+        "REL-01",
+        "REL-02",
+        "SEC-14",
+        "WS-20"
+      ],
+      "title": "출시 준비도 외부 입력 미완료",
+      "status": "OPEN",
+      "waived": false,
+      "closure": "릴리스 계획·체크리스트, 활성 침투시험, 실제 휴대폰 E2E 증거를 확보한다.",
+      "blocks": [
+        "TST-22 출시 준비도 승인"
+      ]
+    }
+  ],
+  "open_risk_count": 9,
+  "release_status": "NOT_ELIGIBLE"
+}

@@ -1,0 +1,171 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "INTERNAL_REVIEW_SUBJECT",
+  "goal_id": "WS-GOAL-EPIC-02-FP-012-R001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "ce4448adcdc66deb8a48cb63378c8cfd5088e9a0decf833e396a0023d829da2a",
+    "VERIFICATION_RESULT": "1299b5b72ac856c7b9dd9f6af20ee7f41bccd16c0982b087a447e2462e577940",
+    "SUCCESSOR_TRACE": "b96ab130289198df4d07caec7db8a0993f503de565140304db603d27e481190e"
+  },
+  "implementation_scope": {
+    "scope": "EXACT_18_PATH_SET",
+    "exact_path_count": 18,
+    "product_path_count": 15,
+    "tooling_path_count": 3,
+    "product_paths": [
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp012StaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSessionTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleFp012Test.kt",
+      "apps/android-gateway/src/field-walk-ledger.ts",
+      "apps/android-gateway/src/routes.ts",
+      "apps/android-gateway/src/auth.ts",
+      "apps/android-gateway/openapi.json",
+      "apps/android-gateway/test/field-walk-ledger.test.ts",
+      "apps/android-gateway/test/gateway-contract.test.ts",
+      "configs/walksafe_product_boundary_20260722.json",
+      "deploy/nginx/walksafe-android-gateway.conf.example"
+    ],
+    "tooling_paths": [
+      "scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "tests/test_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "scripts/check_walksafe_android_gateway_boundary_20260723.py"
+    ],
+    "content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945"
+  },
+  "android_junit_evidence": {
+    "focused": {
+      "canonical_log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/focused-android-tests.log",
+      "canonical_log_sha256": "e333bdeb1ebefa8c2fa21eb9b2d38ba57570e61ecb43f607e99cb4b30f249bfd",
+      "markers_exact_once": true,
+      "xml_files": 4,
+      "tests": 32,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_content_set_sha256": "4917a2c3dd0d109397d09d14e01fabbde82b3e42d129bbc4a5fb810e38d0e1e4",
+      "summarizer_path": "scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "summarizer_sha256": "47f92f033bf23aee5dab41224df92eb51d17bd184c8e113a8dc928d592fc57cd"
+    },
+    "full": {
+      "canonical_log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/full-android-verification.log",
+      "canonical_log_sha256": "e4303013c621f8febc373490b061a4b456526d20ea76623d06fa63c54328ce01",
+      "markers_exact_once": true,
+      "xml_files": 95,
+      "tests": 711,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_content_set_sha256": "e065e5c0d80b4359458e1ddd496bd2430392d90823e474bb4ac8dd9fa3e5e91f",
+      "summarizer_path": "scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "summarizer_sha256": "47f92f033bf23aee5dab41224df92eb51d17bd184c8e113a8dc928d592fc57cd"
+    }
+  },
+  "verification_receipts": [
+    {
+      "name": "FP-012 focused Android multi-device session-ledger tests",
+      "command": "mkdir -p app/build/test-results/testDebugUnitTest && find app/build/test-results/testDebugUnitTest -mindepth 1 -delete && ./gradlew :app:testDebugUnitTest --tests '*MainActivityFp012StaticTest' --tests '*PermissionSessionLifecycleStaticTest' --tests '*GatewayWalkSessionTest' --tests '*WalkSessionLifecycleFp012Test' --rerun-tasks --offline --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process",
+      "command_sha256": "34008d24291efb18d0d2af4b56c3aa18bed2e430313f98c5ddf105518f647af2",
+      "run_id": "walksafe-fp012-focused-20260726-004",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/focused-android-tests.log",
+      "output_sha256": "e333bdeb1ebefa8c2fa21eb9b2d38ba57570e61ecb43f607e99cb4b30f249bfd",
+      "started_at": "2026-07-26T10:30:27+09:00",
+      "executed_at": "2026-07-26T10:30:50+09:00",
+      "execution_event_sequence": 29,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP012-20260726-001",
+      "execution_event_sha256": "4bb8af73254d6bd4c1c2d326aa3546c4d809b7e4d7610aac42d3e9837e7ab868",
+      "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+      "binding_markers_exact_once": true
+    },
+    {
+      "name": "full Android unit, build and lint verification",
+      "command": "mkdir -p app/build/test-results/testDebugUnitTest && find app/build/test-results/testDebugUnitTest -mindepth 1 -delete && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --rerun-tasks --offline --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process",
+      "command_sha256": "b4a0bbb123a2ea93d95f761463d553c40380a122f4b49dff59857db27ecaac8d",
+      "run_id": "walksafe-fp012-full-android-20260726-004",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/full-android-verification.log",
+      "output_sha256": "e4303013c621f8febc373490b061a4b456526d20ea76623d06fa63c54328ce01",
+      "started_at": "2026-07-26T10:31:10+09:00",
+      "executed_at": "2026-07-26T10:32:19+09:00",
+      "execution_event_sequence": 29,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP012-20260726-001",
+      "execution_event_sha256": "4bb8af73254d6bd4c1c2d326aa3546c4d809b7e4d7610aac42d3e9837e7ab868",
+      "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+      "binding_markers_exact_once": true
+    },
+    {
+      "name": "Android Gateway multi-device-session-ledger typecheck and tests",
+      "command": "cd apps/android-gateway && npm run typecheck && npm test",
+      "command_sha256": "9645b7b924c4a4ccb120b90d157697575fb334cd1bbe7d09dbdf635b25ad1fa7",
+      "run_id": "walksafe-fp012-gateway-20260726-004",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/android-gateway-verification.log",
+      "output_sha256": "97af706959908d52493ccb4f7e45e7cbc8be154a130fb02aea6b2f462a0d3250",
+      "started_at": "2026-07-26T10:32:44+09:00",
+      "executed_at": "2026-07-26T10:32:50+09:00",
+      "execution_event_sequence": 29,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP012-20260726-001",
+      "execution_event_sha256": "4bb8af73254d6bd4c1c2d326aa3546c4d809b7e4d7610aac42d3e9837e7ab868",
+      "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+      "binding_markers_exact_once": true
+    },
+    {
+      "name": "Android Gateway frozen public-boundary check",
+      "command": "python3 -B scripts/check_walksafe_android_gateway_boundary_20260723.py --root .",
+      "command_sha256": "eaed10b1f0f8d18588454771ad1bde0a11eb7aea34f95ddb2e115a8ca2c0055c",
+      "run_id": "walksafe-fp012-boundary-20260726-004",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/android-gateway-boundary.log",
+      "output_sha256": "1241a7356876f7332201580a1be055b6c3dc7a37b6b1c9e74ec7364433ca1ec2",
+      "started_at": "2026-07-26T10:33:07+09:00",
+      "executed_at": "2026-07-26T10:33:07+09:00",
+      "execution_event_sequence": 29,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP012-20260726-001",
+      "execution_event_sha256": "4bb8af73254d6bd4c1c2d326aa3546c4d809b7e4d7610aac42d3e9837e7ab868",
+      "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+      "binding_markers_exact_once": true
+    },
+    {
+      "name": "FP-012 deterministic trace regression",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m py_compile scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q tests/test_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "command_sha256": "d3f86e03ca99a747094b928c2d87c5c31a1dd58bd36624fb631c24a6266825cf",
+      "run_id": "walksafe-fp012-control-plane-20260726-004",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/logs/control-plane-verification.log",
+      "output_sha256": "aa630fa33a6ab0acdc9cd7e104aae3f5e97de2d488a603631f5275ab73d475da",
+      "started_at": "2026-07-26T10:33:30+09:00",
+      "executed_at": "2026-07-26T10:33:32+09:00",
+      "execution_event_sequence": 29,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP012-20260726-001",
+      "execution_event_sha256": "4bb8af73254d6bd4c1c2d326aa3546c4d809b7e4d7610aac42d3e9837e7ab868",
+      "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+      "binding_markers_exact_once": true
+    }
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-012-01",
+      "TC-FP-012-02",
+      "TC-FP-012-03",
+      "TC-FP-012-04",
+      "TC-FP-012-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_voice_confirmation_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_unstable_network_status": "NOT_RUN",
+    "operational_lease_policy_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

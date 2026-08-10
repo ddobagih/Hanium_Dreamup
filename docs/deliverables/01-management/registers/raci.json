@@ -1,0 +1,147 @@
+{
+  "schema_version": "walksafe.raci.v1",
+  "metadata": {
+    "title": "WalkSafe RACI",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-10"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "assignment_status": "INTERNAL_ROLES_ASSIGNED_TO_SINGLE_OWNER_EXTERNAL_INDEPENDENT_ROLES_OPEN",
+  "single_owner_rule": "김민호가 내부 역할을 겸임한다. 독립 검토·외부 인수는 존재하지 않는 사람을 배정하지 않고 미배정 상태로 유지한다.",
+  "rows": [
+    {
+      "work": "정책·범위 변경",
+      "responsible_role": "제품책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "프로젝트책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "기술",
+        "QA",
+        "보안·개인정보"
+      ],
+      "informed": [
+        "이해관계자"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "요구·인수조건",
+      "responsible_role": "요구사항책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "제품책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "기술",
+        "QA",
+        "접근성·안전"
+      ],
+      "informed": [
+        "개발"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "설계",
+      "responsible_role": "기술책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "제품책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "보안·개인정보",
+        "운영",
+        "접근성·안전"
+      ],
+      "informed": [
+        "QA"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "구현·build",
+      "responsible_role": "개발책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "기술책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "QA",
+        "보안"
+      ],
+      "informed": [
+        "제품책임자"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "시험계획·결함관리",
+      "responsible_role": "QA책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "제품책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "기술",
+        "접근성·안전"
+      ],
+      "informed": [
+        "개발"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "독립 개인정보·현장안전 검토",
+      "responsible_role": "독립 검토자",
+      "responsible_person": null,
+      "accountable_role": "제품책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "보안·개인정보",
+        "접근성·안전"
+      ],
+      "informed": [
+        "프로젝트"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "출시 준비도",
+      "responsible_role": "QA책임자",
+      "responsible_person": "김민호",
+      "accountable_role": "프로젝트책임자",
+      "accountable_person": "김민호",
+      "consulted": [
+        "제품",
+        "기술",
+        "보안·개인정보",
+        "운영"
+      ],
+      "informed": [
+        "인수자"
+      ],
+      "delegate": null
+    },
+    {
+      "work": "인수",
+      "responsible_role": "지정 인수자",
+      "responsible_person": null,
+      "accountable_role": "지정 인수자",
+      "accountable_person": null,
+      "consulted": [
+        "프로젝트책임자",
+        "QA"
+      ],
+      "informed": [
+        "이해관계자"
+      ],
+      "delegate": null
+    }
+  ]
+}

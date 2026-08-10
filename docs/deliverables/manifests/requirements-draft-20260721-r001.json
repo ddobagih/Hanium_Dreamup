@@ -1,0 +1,269 @@
+{
+  "schema_version": "walksafe.formal-requirements-draft-manifest.v1",
+  "metadata": {
+    "title": "WalkSafe REQ 정식 산출물 Draft manifest",
+    "version": "0.2.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "REQ-01",
+      "REQ-02",
+      "REQ-03",
+      "REQ-04",
+      "REQ-05",
+      "REQ-06",
+      "REQ-07",
+      "REQ-08",
+      "REQ-09",
+      "REQ-10",
+      "REQ-11",
+      "REQ-12",
+      "REQ-13",
+      "REQ-14",
+      "REQ-15",
+      "REQ-16",
+      "REQ-17",
+      "REQ-18",
+      "REQ-19"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "proposed_requirements_baseline": "RB-WALKSAFE-REQUIREMENTS-1.0.0",
+    "generated_by": "scripts/build_walksafe_requirements_draft_20260721.py",
+    "manifest_id": "WS-FORMAL-REQ-DRAFT-20260721-001",
+    "controlled_revision": 1
+  },
+  "approval_status": "NOT_APPROVED",
+  "release_status": "NOT_ELIGIBLE",
+  "artifact_type_ids": [
+    "REQ-01",
+    "REQ-02",
+    "REQ-03",
+    "REQ-04",
+    "REQ-05",
+    "REQ-06",
+    "REQ-07",
+    "REQ-08",
+    "REQ-09",
+    "REQ-10",
+    "REQ-11",
+    "REQ-12",
+    "REQ-13",
+    "REQ-14",
+    "REQ-15",
+    "REQ-16",
+    "REQ-17",
+    "REQ-18",
+    "REQ-19"
+  ],
+  "generated_by": "scripts/build_walksafe_requirements_draft_20260721.py",
+  "source_bindings": {
+    "policy": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    "policy_approval_record": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    "policy_baseline_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    "review_resolution": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-baseline-review-resolution-20260721-r001.json",
+      "sha256": "d71cf9940cf8037226d3e095be26aa4ed34fe2c2feabe565c88f803eaab0dc50"
+    },
+    "existing_owner_review_answers": {
+      "path": "docs/control/decision-interview/source-records/walksafe-feature-policy-comprehensive-review-20260719-answers.json",
+      "sha256": "ef840c33215767d210fc930a8087f09e5eda7b99af695ded5cd9d226d8ab5150"
+    },
+    "fp035_correction_candidate_not_effective": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "aligned_decision_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    "artifact_catalog": {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    "runtime_observations": {
+      "path": "docs/control/questionnaire/walksafe-integrated-baseline-analysis.json",
+      "sha256": "00efb50ddb4843829dc8b75904143e6ab694cd253cf26d9181deac4be2fc69e0"
+    },
+    "planned_test_catalog": {
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee"
+    },
+    "design_trace_mapping_source": {
+      "path": "scripts/build_walksafe_design_deliverables_20260721.py",
+      "sha256": "5ae37460731976da8ca7935269ff9f645b033a348a3cad4eb4b40a1d2e70e339"
+    },
+    "generator": {
+      "path": "scripts/build_walksafe_requirements_draft_20260721.py",
+      "sha256": "20f5de0a0ffcdb9610c2678280144c6bf27d90e3e86a94c2e0013ff87721c541"
+    }
+  },
+  "source_binding_sha256": "bfd2d1990357dc2018c54b539ef036766a4764c9e5dd8b57112d6a075484150a",
+  "coverage": {
+    "REQ": {
+      "expected": 19,
+      "covered": 19
+    },
+    "bundle_count": 3,
+    "requirement_count": 68,
+    "feature_requirement_count": 54,
+    "common_policy_requirement_count": 9,
+    "remaining_gate_requirement_count": 5,
+    "acceptance_condition_count": 279,
+    "aligned_decision_count": 135,
+    "decision_feature_edge_count": 428,
+    "not_effective_policy_correction_candidate_count": 1,
+    "fp035_direct_impact_requirement_type_count": 2,
+    "fp035_direct_impact_requirement_type_ids": [
+      "REQ-03",
+      "REQ-06"
+    ],
+    "fp035_required_related_change_record_ids": [
+      "REQ-18"
+    ],
+    "missing_artifact_type_ids": [],
+    "duplicate_artifact_type_ids": []
+  },
+  "generated_files": [
+    {
+      "path": "docs/deliverables/03-requirements/system-requirements.md",
+      "sha256": "efe0707df0cdbb63e6272602e52da76e00b20685fc83593a1504839f74481d6e",
+      "byte_length": 682747,
+      "artifact_type_ids": [
+        "REQ-01",
+        "REQ-02",
+        "REQ-03",
+        "REQ-04",
+        "REQ-07",
+        "REQ-08",
+        "REQ-09",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12",
+        "REQ-13",
+        "REQ-14",
+        "REQ-15"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/acceptance-specification.md",
+      "sha256": "d91dee4bfb4a8da3826625de4aa60243182bb3e21a95c1e20540813248705198",
+      "byte_length": 370696,
+      "artifact_type_ids": [
+        "REQ-05",
+        "REQ-06"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/requirements-traceability.md",
+      "sha256": "ab250dd0b139822aa0d8acbfe0b599b394e48b59556b44048d13403e4c0a9822",
+      "byte_length": 31722,
+      "artifact_type_ids": [
+        "REQ-16",
+        "REQ-17",
+        "REQ-18",
+        "REQ-19"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "1d73d1e6e0a47ea3833df779c945397d799b14e9b26fdac4bb577197a660a7bd",
+      "byte_length": 1903186,
+      "artifact_type_ids": [
+        "REQ-16"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/rtm.html",
+      "sha256": "353a8d43e7c8b02389764ea87ccede0fc1fdca33ee02212c1547207d0c3e200e",
+      "byte_length": 1511325,
+      "artifact_type_ids": [
+        "REQ-16"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/requirement-change-log.json",
+      "sha256": "cfdc36336c93fcb29635219a6067dd0c5a81cc3d287758af3c08bf4e0b46fa6b",
+      "byte_length": 6502,
+      "artifact_type_ids": [
+        "REQ-18"
+      ]
+    },
+    {
+      "path": "docs/deliverables/03-requirements/glossary.json",
+      "sha256": "635632c0d65cad9b64b80e5750f3d63db9e8a9b95e3e008bb220599f626c1404",
+      "byte_length": 15097,
+      "artifact_type_ids": [
+        "REQ-19"
+      ]
+    }
+  ],
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "authorization_boundary": {
+    "policy_baseline_status": "BASELINED",
+    "fp035_correction_candidate_approval_status": "NOT_APPROVED",
+    "fp035_correction_candidate_effective_status": "NOT_EFFECTIVE",
+    "fp035_bundled_approval_required": true,
+    "fp035_required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+    "fp035_authoring_and_planning_readiness": "ALLOWED",
+    "fp035_mobile_network_branch_implementation_and_test_readiness": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+    "fp035_directly_affected_artifact_codes": [
+      "REQ-03",
+      "REQ-06",
+      "DES-04",
+      "DES-13",
+      "DES-20"
+    ],
+    "decision_alignment_status": "COMPLETE",
+    "formal_deliverable_lifecycle_status": "DRAFT",
+    "formal_deliverables_approved": false,
+    "requirements_baselined": false,
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "rtm_binding": {
+    "requirement_binding_sha256": "a95e13477d0c538e678e32952f4ae5b2407e65ae80518ac734f070f10b34e25e",
+    "decision_binding_sha256": "d20171efde70a11fd31f53496e007e009879f9406516583d7f65a473eb0d8e34"
+  },
+  "manifest_content_sha256": "3f6706c9ca94f4136e2531f2678965cad081328a49f2d35a45cf87cac250fa17"
+}

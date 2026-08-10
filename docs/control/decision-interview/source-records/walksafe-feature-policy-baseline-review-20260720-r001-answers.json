@@ -1,0 +1,326 @@
+{
+  "schema_version": "walksafe.feature-policy-baseline-review-answers.v1",
+  "report_id": "WS-FEATURE-POLICY-DRAFT-20260720",
+  "document_content_sha256": "e49ffe0ee9e59de0cec173cac9425d61aa78e0ccd65980ba568045a3975e0b28",
+  "source_binding_sha256": "836e4107ab3dc6d4cab6e561ed56fabfca590a7fa671d64c486092b967e3d7d6",
+  "baseline_status": "NOT_APPROVED",
+  "reviewer": "김민호",
+  "exported_at": "2026-07-20T14:57:36.063Z",
+  "items": [
+    {
+      "id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-DATA-LIFECYCLE",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-SERVER-STORAGE-CAPACITY",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-PHONE-QUEUE-CAPACITY",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-AUTO-REPORT",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-001",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-002",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-003",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-004",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-005",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-006",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-007",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-008",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-009",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-010",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-011",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-012",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-013",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-014",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-015",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-016",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-017",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-018",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-019",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-020",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-021",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-022",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-023",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-024",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-025",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-026",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-027",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-028",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-029",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-030",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-031",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-032",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-033",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-034",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-035",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-036",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-037",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-038",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-039",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-040",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-041",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-042",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-043",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-044",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-045",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-046",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-047",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-048",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-049",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-050",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-051",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-052",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-053",
+      "decision": "confirm",
+      "note": ""
+    },
+    {
+      "id": "FP-054",
+      "decision": "confirm",
+      "note": ""
+    }
+  ]
+}

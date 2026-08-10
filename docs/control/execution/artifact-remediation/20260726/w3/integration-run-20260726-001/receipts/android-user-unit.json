@@ -1,0 +1,525 @@
+{
+  "argv": [
+    "./gradlew",
+    ":app:testDebugUnitTest",
+    "--offline",
+    "--no-daemon",
+    "--max-workers=1"
+  ],
+  "command_id": "android-user-unit",
+  "cwd": "apps/android",
+  "end": "2026-07-26T16:21:26.407476613Z",
+  "environment_constraints": {
+    "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx1536m",
+    "max_workers": 1,
+    "network": "OFFLINE"
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "4d6483f157c62f5e07ef3f3eec45b908c8bd5f534711eaa97f54372a46aba8ae"
+    }
+  },
+  "junit_counts": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 728,
+    "skipped": 0,
+    "tests": 728,
+    "xml_files": 95
+  },
+  "junit_results": [
+    {
+      "bytes": 1006,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.AndroidRiskSelectionPolicyTest.xml",
+      "sha256": "c4f22093c7eec9b66f3adcbf536a0a83e56669e0fa90d2cb998f78a0aea6649b"
+    },
+    {
+      "bytes": 652,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.ArCoreAvailabilityPolicyTest.xml",
+      "sha256": "ec5725bd0f2774a0634c1244d1708c4fddbdaa0c1159bff3281053d60b3404fe"
+    },
+    {
+      "bytes": 1449,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.BuildProvenanceStaticTest.xml",
+      "sha256": "4c0cd09565e8b60b1956eebbc1a136907a429ef8b0998f0f66baf29b6060ade2"
+    },
+    {
+      "bytes": 2242,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.CameraXFallbackCompositionStaticTest.xml",
+      "sha256": "8228cf62643004997f6ec1dbb5fced099ec3cb3aa786cc4e0d79aaf6b61fd835"
+    },
+    {
+      "bytes": 3290,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityAccessibilityStaticTest.xml",
+      "sha256": "581f19e0cbd99e8ac8a16eb6ae6cb74ecc7863feb6cf36f00c3c2ef811ed2288"
+    },
+    {
+      "bytes": 1315,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityAccountDeletionStaticTest.xml",
+      "sha256": "5ef762cd200ed71c672ca29ea01c88f5c04317ddcef4e297e58903b246ae94ee"
+    },
+    {
+      "bytes": 2021,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityFirstRunRegistrationStaticTest.xml",
+      "sha256": "ee3248d1c6ec26d88bd8466ea13d5f9c1f7f023b962a8df0733551256edff8cf"
+    },
+    {
+      "bytes": 969,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityFp012StaticTest.xml",
+      "sha256": "15f2e69c66f1360e41d874137cd8c00e7019e3dc2cca1a26b94454003bf00c67"
+    },
+    {
+      "bytes": 1003,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityFp016StaticTest.xml",
+      "sha256": "a198192b857751f892f6a8df086f960bc6cc0a61d2adc5648a384eb59b19bf65"
+    },
+    {
+      "bytes": 523,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest.xml",
+      "sha256": "f963b7e9eb02b863484bf713e87668c21231ae3946238167facc746dd3d97b9f"
+    },
+    {
+      "bytes": 1926,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityLongLivedLoginStaticTest.xml",
+      "sha256": "ff593e5560f844af5cd9ee93616d431d39d1dbebe644139184420fe1c0196357"
+    },
+    {
+      "bytes": 1272,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityNavigationCompositionTest.xml",
+      "sha256": "15e12a69aab2b4a86a60bd2ed7161447aaf0c188b9cdd905463414a8c95b8de2"
+    },
+    {
+      "bytes": 1706,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityOfficialEnvironmentStaticTest.xml",
+      "sha256": "b2d1ab004a30df072a1cb8e27002ae1b741073004ac2ffb82911f69027644c4f"
+    },
+    {
+      "bytes": 1536,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityPhoneMountingStaticTest.xml",
+      "sha256": "2d868a2ddb631aab6501e9cd7896b3c47ea633ab87e3a4d05f5d3ddc40ff70e2"
+    },
+    {
+      "bytes": 1812,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityStartupCapabilityStaticTest.xml",
+      "sha256": "db87f7e9c42cffeeb6460034e7826bcc691eab49d58e86f36607ea6b22b0dd73"
+    },
+    {
+      "bytes": 2795,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest.xml",
+      "sha256": "cffa91c3463c4bbdbba3784c11547e0b48606b9b983c863316d6e1705292e96a"
+    },
+    {
+      "bytes": 1363,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalRestartStaticTest.xml",
+      "sha256": "6758d10fcb8990c2210f763054aef47638388de4fa17651dd1c19f4be6b78529"
+    },
+    {
+      "bytes": 671,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalStaticTest.xml",
+      "sha256": "7ff5561c61ff8ab8893465987a61c42edc70bd3a69e5171480f62d8c9f8c3b37"
+    },
+    {
+      "bytes": 756,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MetadataCaptureLogTest.xml",
+      "sha256": "61bb743e28c45b523c918c0508662e942123354aa955c10f6e001da6c8a0c960"
+    },
+    {
+      "bytes": 2391,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.PermissionSessionLifecycleStaticTest.xml",
+      "sha256": "4d141271f9dab1f0c2b39dfafa03dbbe7a44bd6ac13b1c3f4827f20f32f105f7"
+    },
+    {
+      "bytes": 2567,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.PriorityUserOnboardingStaticTest.xml",
+      "sha256": "d2c9d3aeef98e70a96e61ee1b9216cd70d4fbdc50ce6f775c59687cb2e5620e7"
+    },
+    {
+      "bytes": 1009,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.ProductPurposeSurfacesStaticTest.xml",
+      "sha256": "475edc10371c125b9e0c0aed95c2ed09402c5e55d5dfe84eb6d366799d83825c"
+    },
+    {
+      "bytes": 3048,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.RuntimeMetricMainActivityStaticTest.xml",
+      "sha256": "c3b6aeb3733279b7df3b4f3e40ac33b7404e307b97981881531c886deae5da23"
+    },
+    {
+      "bytes": 1223,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.debuglog.HttpMetadataLogUploaderTest.xml",
+      "sha256": "f36006aa1c6b89fc174e575a6c08bccb00e7f5bf55496de762e69bc5e1484dfa"
+    },
+    {
+      "bytes": 659,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.debuglog.MetadataLogJsonEncoderTest.xml",
+      "sha256": "b5d2f6ce20f94f8ebd1d421bf119e701f019f2b41c941424ae1cd94b20678d38"
+    },
+    {
+      "bytes": 640,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.CoordinateMapperTest.xml",
+      "sha256": "236807a0943e90ddc1a1205ad77370d5cd2476bcfa671c9a232a140aeff7a956"
+    },
+    {
+      "bytes": 812,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.DepthEstimatorTest.xml",
+      "sha256": "86ae086d3bed80fbd46fea6670791c90ea49f69ea8428b87e1612ede5c5b9f73"
+    },
+    {
+      "bytes": 1214,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.DepthSamplerTest.xml",
+      "sha256": "4b6f04bc3eb611ad530053445068c6b3129e72fc42062d470410b5c6d5f62cb9"
+    },
+    {
+      "bytes": 958,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.DepthSmokePipelineTest.xml",
+      "sha256": "39db93df3f9202d0a760e4642a0de01d31a8e82ebf3c4b133b694642aa609054"
+    },
+    {
+      "bytes": 2576,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.MessagePolicyTest.xml",
+      "sha256": "0679046bd02d442ee187da622f0aa5f9fee92f3b99e512ae937adcff9d84633a"
+    },
+    {
+      "bytes": 762,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.MotionContextTest.xml",
+      "sha256": "b7d34ff488d9a5f149554f038d30200e0b969671d7496df89ebdb20ec6e482ac"
+    },
+    {
+      "bytes": 2245,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.ObjectDepthRuntimePipelineTest.xml",
+      "sha256": "1317b6eb0f9213318ba15a79aa4eaa3d38a225ba467110ad4b0e0410288b780c"
+    },
+    {
+      "bytes": 1676,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.ObjectTrackerTest.xml",
+      "sha256": "95d7d63f21a03b72ca8933ca898690de3b328384e9c6249fc6f26d604096d8a4"
+    },
+    {
+      "bytes": 501,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.TactilePathPolicyTest.xml",
+      "sha256": "e4df19c7511d82412440d8d1a1e9e60f7942d620da6730653fbe00ec0160c93a"
+    },
+    {
+      "bytes": 940,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.depth.TrackingRiskPolicyTest.xml",
+      "sha256": "1a7bfc590c747ccf2b2e5c9142b4eb2b88c668660d7c7465d63171f8e76d3265"
+    },
+    {
+      "bytes": 692,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.AndroidLocalTactileCapabilityTest.xml",
+      "sha256": "0689762fcd550192ff540c79124cfb7079f8d08747f42810d861b769cc92e1c7"
+    },
+    {
+      "bytes": 1272,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileTest.xml",
+      "sha256": "eecbed6c36ee867af0efbd7adcdfcb24f4cb7d2f176bd23469c59c55f894614d"
+    },
+    {
+      "bytes": 1291,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityPolicyTest.xml",
+      "sha256": "2a29eb084128d2e8bc8cf49dcf7d61a28b4fe16028e24a413f069ff8ae949e5b"
+    },
+    {
+      "bytes": 759,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.DeviceGateTest.xml",
+      "sha256": "2bd988378d56152b1780fea1036661214759beed192b2e9a6018ebb806da531a"
+    },
+    {
+      "bytes": 3721,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.PhoneMountingPolicyTest.xml",
+      "sha256": "0322955d22b23a35738252358c00540a2142d74f17712a95620ae73a6ed92463"
+    },
+    {
+      "bytes": 2492,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.RuntimeMetricPreflightTest.xml",
+      "sha256": "8f5915a1fd930ea6c6e6cf490e538f3ee0b32e4841a4e56c2fa8549db3e682d2"
+    },
+    {
+      "bytes": 1675,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityTest.xml",
+      "sha256": "9db9bde5cb53458e6783c669cd07ffb025b394c1768e6b96451a50a3796713c0"
+    },
+    {
+      "bytes": 1050,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.device.WalkSessionDeviceResourceSnapshotTest.xml",
+      "sha256": "824b030498a7fbed9c6571068bfc4762cee00f8a7ae65269e7ff1b0448a30a89"
+    },
+    {
+      "bytes": 2888,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.AndroidFeedbackActuatorStaticTest.xml",
+      "sha256": "e3f12405eb2d288123db41fb7d42f52e89e2de94d975fb7385b38bf3b0ea985e"
+    },
+    {
+      "bytes": 2834,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.AndroidNonMetricObstacleAdvisoryPolicyTest.xml",
+      "sha256": "202f48326c6526fc09e79850a13301c0375054795d814711eb4c26c6c896632b"
+    },
+    {
+      "bytes": 1061,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.NavigationSpeechDeliveryTest.xml",
+      "sha256": "842c7030dcd1447ffdedf18e78f48e90c66f0e2b5857fb6d4b3f0499ba07b7da"
+    },
+    {
+      "bytes": 963,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.PendingSpeechQueueTest.xml",
+      "sha256": "ce182e605ec4154410062bc06ce9c364b558142de7be65970a16358f5c15ca22"
+    },
+    {
+      "bytes": 853,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.UtteranceCallbackRegistryTest.xml",
+      "sha256": "598a315802bf37ee9bc3c93ec991b51f3014be1a16cf82a04d843c64efc13f69"
+    },
+    {
+      "bytes": 4129,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.feedback.WalkSafeFeedbackPolicyTest.xml",
+      "sha256": "ae7b1879d89981de842e49c56a578bd7ce6add9a3b64664ce05fefa2e15c0c7d"
+    },
+    {
+      "bytes": 1109,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.fieldlog.FieldSessionAccountDeletionPrivacyFenceTest.xml",
+      "sha256": "63130240ed4687c42c4c258b5e78a66243c9490b505808a280e2e4562f45a615"
+    },
+    {
+      "bytes": 3776,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.fieldlog.PersistentFieldSessionLogTest.xml",
+      "sha256": "4ab1c31efd84a55a71870d7b724bb0d460af3f6f9625c7fcba0bce6c97ba01ae"
+    },
+    {
+      "bytes": 686,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.inference.DetectorRuntimeSupervisorTest.xml",
+      "sha256": "1b1b6c0b992c6cf1533d704be8b991458d9082fffc8f0f2c1f9330c4272539c2"
+    },
+    {
+      "bytes": 992,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.inference.TwoModelRuntimeConfigTest.xml",
+      "sha256": "52f4acbac3c9ad4adb822c87bf5facfb02d88bd467ad2447df80b0772ffaaad5"
+    },
+    {
+      "bytes": 703,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteAssetContractTest.xml",
+      "sha256": "5368551e6b3a0ee4218a463de473ea9a67a151bfad16cc8a50fd126eca8b201c"
+    },
+    {
+      "bytes": 1694,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.inference.YoloEndToEndOutputParserTest.xml",
+      "sha256": "e958efa4be385b1e9341004ec4bbc2e43f10411bb4c2fa3a0fc7f9a1f1045191"
+    },
+    {
+      "bytes": 872,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.inference.YuvImagePreprocessorTest.xml",
+      "sha256": "b44850ce11b0d8e169c0b35a5ff60645ed4c7ec93c88717eaf44fd385c3be336"
+    },
+    {
+      "bytes": 3949,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.AndroidTactileRouteGuidanceTest.xml",
+      "sha256": "f359ee4c2a0fddb7cf61cf1e9787535243822cd4191667054695706d67ad1267"
+    },
+    {
+      "bytes": 2343,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.AndroidVoiceCommandTest.xml",
+      "sha256": "91cd75aabac797318a63f0cb9ad90167b319c46635277f31207cac982edee27a"
+    },
+    {
+      "bytes": 1104,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.ArCoreTactileProjectionContextFactoryTest.xml",
+      "sha256": "5b5487936f68a03f3874c226f2bc988802fad658561e4c5018c96e495be739b1"
+    },
+    {
+      "bytes": 1116,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.BackendWalkingRouteClientNetworkTest.xml",
+      "sha256": "6f292ccc11b9f89ddd3f53b7a0dbb988b46315ef98b824c4213f62f2295050a1"
+    },
+    {
+      "bytes": 2031,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.BackendWalkingRouteClientTest.xml",
+      "sha256": "9c6434767f353e868e9b9128d0cd52f7ab72024e85e4318867e2172e425853e6"
+    },
+    {
+      "bytes": 1490,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.LocationPolicyTest.xml",
+      "sha256": "65a1cc733b2ce1eb91f43eed7d3f7e42ccb44f07d52f8b1bd6fe24ec818d6ee6"
+    },
+    {
+      "bytes": 3777,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorTest.xml",
+      "sha256": "485fbe8ec3d5d7eab0c3f38ce9c9a6d25b7bfdbf6ef3d93931d252ad59b3b389"
+    },
+    {
+      "bytes": 648,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.StepLengthEstimatorTest.xml",
+      "sha256": "97aaa375e7385d13ea4523468f1c553af8251d904b90f4187cf0dec9e678cbcd"
+    },
+    {
+      "bytes": 1472,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.navigation.TactileRoutePolicyTest.xml",
+      "sha256": "3443c7a23802259e791f0b3a954a525e85f48dfa173c2269a8b9bdfcfbdb5ab8"
+    },
+    {
+      "bytes": 1760,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionStoreStaticTest.xml",
+      "sha256": "db22cb46c0cb7a90758e2d65f6059a80ab6b903c9bfdb254cd277a4524aff1b0"
+    },
+    {
+      "bytes": 3289,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicyTest.xml",
+      "sha256": "61165141d157ff4f3365228a7d09e92f8c8acba3754c2cb794fd96df76b04b6e"
+    },
+    {
+      "bytes": 726,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidPrivacyDeletionAccountDeletionTest.xml",
+      "sha256": "fc3a8634118d32f837782963d78f34e960e38a06c37e7928c99c9dce71b6dcbf"
+    },
+    {
+      "bytes": 911,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidPrivacyDeletionOriginHardeningTest.xml",
+      "sha256": "dbcf609447b9f6e3de10de23d254a0341e4ea25fde4f3aa1671e1c93f14cb94a"
+    },
+    {
+      "bytes": 666,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.GatewayEndpointPolicyTest.xml",
+      "sha256": "cfac38c6217c2d2b1c9bb4672ebe220dbec1daeb6d0abf0c5db25b76834e74bf"
+    },
+    {
+      "bytes": 4200,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.GatewayFieldSessionTest.xml",
+      "sha256": "eb39957fd17e4c0fa61b5865c29c46d6caa579870a89b60606345a05d1f16577"
+    },
+    {
+      "bytes": 1353,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.GatewayPersistedLoginStateTest.xml",
+      "sha256": "b4a5563c85d6f5e6997af3c8cb0ba572aaab2edff35d42d8910f169d87899c88"
+    },
+    {
+      "bytes": 1379,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.GatewaySessionProcessCoordinatorTest.xml",
+      "sha256": "0caa81e56545a8d36022f5232573ddf4d15b434a045a4164c3eff3e1e02900b2"
+    },
+    {
+      "bytes": 2528,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.GatewayWalkSessionTest.xml",
+      "sha256": "055eb00146bd6eab09a06ffb944d77f04c83d073475160c3c7872fa0beaec2ee"
+    },
+    {
+      "bytes": 1866,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.AndroidReportCandidatePolicyTest.xml",
+      "sha256": "cc36e2089ecc6315e409882ab1ee33a5b62440f6b5677643bd88861cf7def493"
+    },
+    {
+      "bytes": 1386,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.AndroidReportCooldownPolicyTest.xml",
+      "sha256": "bf6f7f7a75b66c8c87f300b5a24f5948532e559bf9f8628addd703e02cd70456"
+    },
+    {
+      "bytes": 704,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.AndroidReportPurposeHeaderStaticTest.xml",
+      "sha256": "657fde0b956bde32580bb3b75fb9d73dd91a7231eaac2575a7b49e8c7bab5489"
+    },
+    {
+      "bytes": 1923,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.AndroidReportUploaderTest.xml",
+      "sha256": "ea45d8773daac7d774ccf236c0fe2d04d5adef7e006240ffe811066f3ee7da3d"
+    },
+    {
+      "bytes": 2142,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.MainActivityReportUploadStaticTest.xml",
+      "sha256": "89b3086a60428d379accd25f184fc2757c2bbf1614cbf220635cfe79bdfdbd8e"
+    },
+    {
+      "bytes": 866,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.ReportPrivacyAccountDeletionTest.xml",
+      "sha256": "534afc4d6bd4672bf120ee5fba3ab882b40097ef75f386fc60d4b5ac79c070bf"
+    },
+    {
+      "bytes": 1925,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.report.ReportPrivacyConsentSessionTest.xml",
+      "sha256": "b51dc4c2b1c3dda1ab0ddb5b28f8dc191cb74d3f1cd81871820c6568bb8192d7"
+    },
+    {
+      "bytes": 518,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.AndroidSensorLifecycleStaticTest.xml",
+      "sha256": "db34901dd0c8d548c2460cc19ebfac0e13ee9b4cf560fa3f044b30d4f5852e07"
+    },
+    {
+      "bytes": 2004,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicyTest.xml",
+      "sha256": "86bc2b4261be06de6b93f622ff8ad6b7d7b0d8140db1f0543393522954eb4633"
+    },
+    {
+      "bytes": 852,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.IntegratedConsentPolicyTest.xml",
+      "sha256": "7110f83c083163a1054ed829656aa871ed19001141838732974a45c6ac3c0332"
+    },
+    {
+      "bytes": 2518,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.IntegratedConsentRevisionHardeningTest.xml",
+      "sha256": "31d6c1299705eec077c59a1e8e5359723f71b40eb92d091ff24a2c49fc74ff6f"
+    },
+    {
+      "bytes": 855,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.IntegratedConsentWithdrawalTest.xml",
+      "sha256": "6e985aaeba08da0a9fe8f42063633b59a97e3ea92a0a33a8df030dcb7fc896b1"
+    },
+    {
+      "bytes": 2353,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentPolicyTest.xml",
+      "sha256": "1dac212f0693f417226e0606b08bb2b1663bc08d039a2ee2a539d2a5f3a80f10"
+    },
+    {
+      "bytes": 2000,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.PermissionSessionPolicyTest.xml",
+      "sha256": "3c05c660ec41551cf6142826591a580aedcc428f1a809854dce1cec1153bfad0"
+    },
+    {
+      "bytes": 2891,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingPolicyTest.xml",
+      "sha256": "306afdee95598598637589e113e713f3445348d5d86100eb135ced7d74d6fa91"
+    },
+    {
+      "bytes": 983,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.PrivacyAccountDeletionPolicyTest.xml",
+      "sha256": "a85fe51631485acc604909e1ffc6e1ec7967e153510fd75796148dffe233af7b"
+    },
+    {
+      "bytes": 1003,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.PrivacyDeletionHardeningTest.xml",
+      "sha256": "4b63ebef4d5d424f96632cc85221dc497f1a18134277418daf133037dbe9d376"
+    },
+    {
+      "bytes": 693,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleFp012Test.xml",
+      "sha256": "c298177a192c1e54c95f5034bfb1e74afb5b0c22703220411454f3cae841d38e"
+    },
+    {
+      "bytes": 1693,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleFp018Test.xml",
+      "sha256": "5fee8d2c3e2f55d48cdebc6fcc23c9a77f50aa4d0e58ab49773c8f3ec1e31024"
+    },
+    {
+      "bytes": 2426,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleTest.xml",
+      "sha256": "fe41dbc7963e015bc296afbd596c96acb205c04533ab4642fd3abb738806ce3b"
+    },
+    {
+      "bytes": 1652,
+      "path": "app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessTest.xml",
+      "sha256": "ef8422818e0ca031e2a6c8c6591c388403ca619faf0b3dad7c556eaa214be995"
+    }
+  ],
+  "log_path": "logs/android-user-unit.log",
+  "log_sha256": "c64f2cbb73ac74ed60dc528fa02fd1d2cf3e7da5938f34e8d0c83924a18231e6",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 638184,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-integration-command-receipt.v1",
+  "start": "2026-07-26T16:21:13.670833432Z",
+  "status": "PASS",
+  "time_log_path": "logs/android-user-unit.time",
+  "time_log_sha256": "84f909c0fbd6fba8a0a1e394361579bd24d7afde227037338b770acfa4d305e5",
+  "tool": {
+    "gradle_wrapper": "./gradlew",
+    "java": "openjdk version \"21.0.11\" 2026-04-21"
+  }
+}

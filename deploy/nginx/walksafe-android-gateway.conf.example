@@ -1,0 +1,93 @@
+# DRAFT_DEPLOYMENT_EXAMPLE — NOT_APPLIED.
+# Do not install or reload nginx from this example without separate review.
+# Replace every CHANGE_ME placeholder with an approved hostname/certificate.
+# This ingress exposes exactly five Android API paths plus the independent
+# privacy-rights page and never falls back to Next/Web or the protected backend.
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name CHANGE_ME_ANDROID_GATEWAY_HOSTNAME;
+
+    ssl_certificate CHANGE_ME_TLS_CERTIFICATE_PATH;
+    ssl_certificate_key CHANGE_ME_TLS_PRIVATE_KEY_PATH;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    server_tokens off;
+
+    # Search terms and exact coordinates are query parameters. Do not inherit
+    # a combined access log that records the request line. A reviewed $uri-only
+    # minimal log format may replace this when deployment evidence is prepared.
+    access_log off;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Cache-Control "no-store" always;
+
+    client_max_body_size 1k;
+    client_header_timeout 10s;
+    client_body_timeout 15s;
+    send_timeout 20s;
+
+    proxy_http_version 1.1;
+    proxy_request_buffering on;
+    proxy_connect_timeout 2s;
+    proxy_send_timeout 15s;
+    proxy_read_timeout 20s;
+    proxy_set_header Connection "";
+    proxy_set_header Host $server_name;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto https;
+
+    # Remove client-supplied forwarding aliases. The Gateway trusts only the
+    # X-Real-IP value nginx overwrites above.
+    proxy_set_header Forwarded "";
+    proxy_set_header CF-Connecting-IP "";
+    proxy_set_header True-Client-IP "";
+    proxy_set_header X-Client-IP "";
+    proxy_set_header X-Cluster-Client-IP "";
+    proxy_set_header X-Forwarded-Host "";
+    proxy_set_header X-Forwarded-Port "";
+    proxy_set_header X-Forwarded-Server "";
+    proxy_set_header X-Original-Forwarded-For "";
+
+    location = /api/field-session {
+        client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/navigation/walking {
+        client_max_body_size 16k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/navigation/destinations/search {
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/reports/v2 {
+        client_max_body_size 9m;
+        proxy_request_buffering off;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /api/field-walk {
+        if ($request_method !~ ^(GET|POST)$) {
+            return 405;
+        }
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    location = /privacy/rights {
+        client_max_body_size 1k;
+        proxy_pass http://127.0.0.1:8081;
+    }
+
+    # No health, Web/PWA, admin, legacy API, backend, or catch-all proxy is
+    # externally reachable through this server block.
+    location / {
+        return 404;
+    }
+}

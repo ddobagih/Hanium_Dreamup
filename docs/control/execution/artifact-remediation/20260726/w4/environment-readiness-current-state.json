@@ -1,0 +1,742 @@
+{
+  "schema_version": "walksafe.w4-environment-readiness-current-state.v2",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W4-ENVIRONMENT-READINESS-20260727-002",
+  "wave_id": "W4",
+  "prepared_on": "2026-07-27",
+  "status": "INTERNAL_GAP",
+  "authority_boundary": {
+    "artifact_approval_claimed": false,
+    "formal_execution_claimed": false,
+    "external_action_completed_claimed": false,
+    "n_a_decision_claimed": false,
+    "release_change_claimed": false,
+    "interpretation": "This current-state packet separates repository-internal readiness work from device, credential, live-service and human-approval work. It does not promote any TST artifact or test result."
+  },
+  "canonical_environment_summary": {
+    "logical_environment_count": 6,
+    "environment_instance_count": 0,
+    "formal_ready_environment_count": 0,
+    "formal_test_environment_ready": false,
+    "device_field_test_authorized": false,
+    "support_matrix_status": "DRAFT_UNAPPROVED"
+  },
+  "logical_environments": [
+    {
+      "environment_id": "ENV-UNIT-ANDROID",
+      "purpose": "Android JVM unit and contract testing",
+      "current_registry_status": "NOT_PROVISIONED_FOR_FORMAL_RUN",
+      "boundary_class": "INTERNAL",
+      "current_status": "INTERNAL_GAP",
+      "external_dependency": false,
+      "readiness_gap": "Create an immutable-source formal instance record with JDK, Gradle, Android plugin, APK and model-config bindings plus smoke evidence.",
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    },
+    {
+      "environment_id": "ENV-UNIT-SERVER",
+      "purpose": "Python unit and API contract testing",
+      "current_registry_status": "NOT_PROVISIONED_FOR_FORMAL_RUN",
+      "boundary_class": "INTERNAL",
+      "current_status": "INTERNAL_GAP",
+      "external_dependency": false,
+      "readiness_gap": "Create an immutable-source formal instance record with Python, dependency lock, OpenAPI hash and smoke evidence.",
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    },
+    {
+      "environment_id": "ENV-INTEGRATION-POSTGIS",
+      "purpose": "Isolated PostGIS integration testing",
+      "current_registry_status": "NOT_PROVISIONED_FOR_FORMAL_RUN",
+      "boundary_class": "INTERNAL",
+      "current_status": "INTERNAL_GAP",
+      "external_dependency": false,
+      "readiness_gap": "Provision a test-only database instance with image digest, migration head, secret reference, cleanup and formal run binding.",
+      "w3_candidate_evidence": {
+        "status": "PASS_INTERNAL_CANDIDATE_ONLY",
+        "facts": "Fresh migration, schema parity, two sequential exact-node runs and cleanup passed in W3.",
+        "formal_execution_status": "NOT_RUN",
+        "android_gateway_backend_postgis_cross_process_status": "NOT_RUN",
+        "production_status": "NOT_RUN",
+        "relabel_as_formal_pass_allowed": false
+      },
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    },
+    {
+      "environment_id": "ENV-DEVICE-SUPPORTED",
+      "purpose": "Supported Android physical-device functional, performance, compatibility and accessibility testing",
+      "current_registry_status": "PENDING_SUPPORTED_DEVICE_MATRIX",
+      "boundary_class": "EXTERNAL",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "external_dependency": true,
+      "readiness_gap": "Obtain physical user and administrator devices, approve the support matrix and bind device pseudonym, manufacturer/model, Android/API, ARCore/depth, APK, model, config and network evidence.",
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    },
+    {
+      "environment_id": "ENV-FIELD-CONTROLLED",
+      "purpose": "Controlled walking, noise, GPS and route testing",
+      "current_registry_status": "BLOCKED_BY_WS_21_AND_RECOVERY_GATE",
+      "boundary_class": "EXTERNAL",
+      "current_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+      "external_dependency": true,
+      "readiness_gap": "Before activation, obtain WS-21 safety approval, participant consent, safety staff, stop and emergency rules, location conditions and required recovery-gate evidence.",
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    },
+    {
+      "environment_id": "ENV-LEGACY-WEB",
+      "purpose": "Historical Web/PWA comparison only",
+      "current_registry_status": "REFERENCE_ONLY",
+      "boundary_class": "REFERENCE_ONLY",
+      "current_status": "REFERENCE_ONLY",
+      "external_dependency": false,
+      "readiness_gap": "This environment is never eligible to substitute for Android formal, device, accessibility, compatibility or release evidence.",
+      "instances": [],
+      "instance_count": 0,
+      "formal_ready_instance_count": 0
+    }
+  ],
+  "formal_subject_binding": {
+    "current": {
+      "source_commit": null,
+      "build_id": null,
+      "artifact_sha256": null,
+      "model_sha256": null,
+      "config_sha256": null,
+      "openapi_sha256": null,
+      "db_migration": null,
+      "environment_instance_id": null,
+      "formal_binding_status": "NOT_BOUND"
+    },
+    "required_before_formal_execution": [
+      "non-null approved source commit or explicitly approved equivalent immutable source identity",
+      "build ID and installable artifact SHA-256",
+      "model SHA-256",
+      "configuration SHA-256",
+      "OpenAPI SHA-256",
+      "database migration head or an explicit not-applicable reason",
+      "approved environment instance ID with tool/runtime/network/data/secret-reference bindings",
+      "controlled test-data IDs",
+      "executor and reviewer pseudonyms",
+      "append-only raw-evidence control ID, retention, access class and SHA-256"
+    ],
+    "w3_candidate_openapi_sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+    "candidate_reuse_rule": "A W3 hash or PASS may be used as an input candidate only. It becomes formal evidence only through a new approved formal run bound to the immutable subject and formal environment instance."
+  },
+  "local_internal_work_items": [
+    {
+      "work_item_id": "W4-INT-ENV-001",
+      "title": "Provision the three local formal environment instances",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "QA owner",
+        "Android owner",
+        "Backend owner",
+        "DB owner"
+      ],
+      "owner_input": [
+        "immutable subject candidate",
+        "approved tool/runtime versions",
+        "test-only secret references"
+      ],
+      "evidence_required": [
+        "three environment instance records",
+        "smoke receipts",
+        "tool/runtime/network/data boundary bindings"
+      ],
+      "acceptance_rule": "ENV-UNIT-ANDROID, ENV-UNIT-SERVER and ENV-INTEGRATION-POSTGIS each have one unique approved instance with every required field and successful smoke evidence; this does not authorize device or field execution."
+    },
+    {
+      "work_item_id": "W4-INT-BIND-002",
+      "title": "Freeze the formal subject bindings",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "Build owner",
+        "QA owner"
+      ],
+      "owner_input": [
+        "source commit",
+        "build outputs",
+        "model",
+        "configuration",
+        "OpenAPI",
+        "migration head"
+      ],
+      "evidence_required": [
+        "subject manifest",
+        "component SHA-256 values",
+        "dirty-state declaration",
+        "build receipt"
+      ],
+      "acceptance_rule": "Every formal run input resolves to one immutable subject manifest and no required binding is null."
+    },
+    {
+      "work_item_id": "W4-INT-MAP-003",
+      "title": "Bind all 279 formal cases to executable fixtures or explicit external actions",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "QA owner",
+        "Test inventory owner"
+      ],
+      "owner_input": [
+        "canonical 279-case register",
+        "current fixture inventory",
+        "external dependency classification"
+      ],
+      "evidence_required": [
+        "exact-279 mapping",
+        "duplicate and unassigned checks",
+        "fixture or external-action reference per case"
+      ],
+      "acceptance_rule": "The exact 279 case IDs are unique and each has an explicit fixture mapping or an explicit external action; mapping alone does not change NOT_RUN."
+    },
+    {
+      "work_item_id": "W4-INT-POSTGIS-004",
+      "title": "Run local formal-candidate Gateway to Backend to PostGIS integration",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "Integration test owner",
+        "Backend owner",
+        "DB owner"
+      ],
+      "owner_input": [
+        "formal subject candidate",
+        "test-only PostGIS instance",
+        "local Gateway and Backend process contract"
+      ],
+      "evidence_required": [
+        "process identities",
+        "request and response trace",
+        "database assertions",
+        "migration and cleanup receipts",
+        "defect and retest linkage"
+      ],
+      "acceptance_rule": "Actual cross-process traffic reaches the isolated PostGIS database and assertions pass on the same bound candidate. W3 database-only PASS is not sufficient and production is not claimed."
+    },
+    {
+      "work_item_id": "W4-INT-EVIDENCE-005",
+      "title": "Prepare append-only formal execution capture",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "QA owner",
+        "Evidence custodian"
+      ],
+      "owner_input": [
+        "approved evidence schema",
+        "encrypted raw-evidence store",
+        "retention and access rules"
+      ],
+      "evidence_required": [
+        "new-run path allocation",
+        "raw-evidence control reference",
+        "identity pseudonym rules",
+        "result and defect linkage checks"
+      ],
+      "acceptance_rule": "A new run can be recorded without overwriting a predecessor and without storing secrets, exact location, raw audio/video or real device identifiers in Git."
+    },
+    {
+      "work_item_id": "W4-INT-A11Y-006",
+      "title": "Execute accessibility-specific automated suites for both Android apps on the current source",
+      "current_status": "INTERNAL_GAP",
+      "owner_roles": [
+        "Android user-app owner",
+        "Android admin-app owner",
+        "QA owner"
+      ],
+      "owner_input": [
+        "one immutable current-source binding for both Android apps",
+        "explicit accessibility assertion selectors for the user app and administrator app",
+        "fixed JDK, Gradle and Android plugin versions"
+      ],
+      "evidence_required": [
+        "user-app accessibility suite command, raw log, exit code and SHA-256",
+        "administrator-app accessibility suite command, raw log, exit code and SHA-256",
+        "source/content-set binding for both suites",
+        "assertion-to-TST-14 candidate mapping with formal contribution fixed at zero"
+      ],
+      "acceptance_rule": "Both accessibility-specific suites pass against the same current-source binding. Generic JVM suite totals alone are insufficient, and the automated PASS remains an internal candidate until physical TalkBack and human QA also close."
+    }
+  ],
+  "internal_readiness_before_external_wait": {
+    "required_count": 7,
+    "satisfied_count": 0,
+    "status": "NOT_READY_TO_TRANSITION_TO_WAITING_EXTERNAL",
+    "preconditions": [
+      {
+        "precondition_id": "W4-INT-PRE-01",
+        "status": "NOT_SATISFIED",
+        "rule": "Exact 279 case-to-fixture or external-action mapping has zero duplicates and zero unassigned cases."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-02",
+        "status": "NOT_SATISFIED",
+        "rule": "The immutable subject has non-null source, build, artifact, model, config, OpenAPI and DB bindings as applicable."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-03",
+        "status": "NOT_SATISFIED",
+        "rule": "All local formal environment instances have required fields and successful smoke evidence."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-04",
+        "status": "NOT_SATISFIED",
+        "rule": "Controlled test-data IDs and sensitive-evidence handling are assigned to the cases selected for execution."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-05",
+        "status": "NOT_SATISFIED",
+        "rule": "Append-only run paths, raw-evidence control references, executor/reviewer pseudonyms and defect linkage are ready."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-06",
+        "status": "NOT_SATISFIED",
+        "rule": "Each requested external action has a bounded owner request, procedure, stop rule and evidence checklist; the approval candidate is prepared without claiming approval."
+      },
+      {
+        "precondition_id": "W4-INT-PRE-07",
+        "status": "NOT_SATISFIED",
+        "rule": "Accessibility-specific automated suites for both Android apps PASS on the same current-source binding with raw receipts and explicit TST-14 candidate mapping."
+      }
+    ]
+  },
+  "transition_control": {
+    "current_external_status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS",
+    "waiting_external_transition_allowed_now": false,
+    "waiting_external_transition_rule": "Only after all six internal preconditions pass may a bounded action be handed to its external owner and transition to WAITING_EXTERNAL. Creating this packet alone does not perform that transition.",
+    "completion_rule": "No external item becomes PASS, CLOSED, OK or N/A until its required evidence and authorized human decision exist."
+  },
+  "resource_safety": {
+    "heavy_lane_limit": 1,
+    "parallel_heavy_execution_allowed": false,
+    "serial_order": [
+      "freeze subject and complete light readiness checks",
+      "Android user/admin Gradle build",
+      "Gateway/Node build after Gradle exits",
+      "local unit, contract and regression execution",
+      "isolated PostGIS cross-process execution and cleanup",
+      "physical Android baseline and compatibility",
+      "TalkBack and accessibility on the bound physical-device build",
+      "live TMAP and controlled network transitions",
+      "device latency, battery, thermal and queue measurement",
+      "staging load, capacity-state and cloud-cost measurement",
+      "security verification",
+      "formal aggregation and QA review"
+    ],
+    "semaphore_rules": [
+      "Do not overlap Android Gradle, Node build, PostGIS, device measurement or load testing.",
+      "During a full gate, pause source writes and every other build or test.",
+      "Do not start a new heavy step in Red memory state; in Amber allow one heavy process and at most three active light tools."
+    ],
+    "logout_guard": [
+      "Stop assigning new packets before logout or shutdown.",
+      "Finish the active heavy step or preserve it as an incomplete attempt without a PASS receipt.",
+      "Stop local processes, clean the single-use PostGIS environment and remove temporary secret files when safe.",
+      "Record the exact active step, subject digest, output paths and next action in the handoff owned by the coordinator.",
+      "After restart, treat receipt-less RUNNING output as ABANDONED_BY_REBOOT and use a new attempt ID.",
+      "Never reuse a receipt-less PASS or an old environment instance as current formal evidence."
+    ]
+  },
+  "claim_boundary": {
+    "formal_test_planned_count": 279,
+    "formal_test_execution_status": "NOT_RUN",
+    "formal_test_pass_count": 0,
+    "formal_test_pass_claimed": false,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "actual_device_status": "NOT_RUN",
+    "talkback_accessibility_status": "NOT_RUN",
+    "tmap_live_network_status": "NOT_RUN",
+    "device_performance_status": "NOT_RUN",
+    "staging_load_status": "NOT_RUN",
+    "security_external_verification_status": "NOT_RUN_OR_NOT_ASSESSED",
+    "qa_approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_refs": [
+    "docs/deliverables/06-testing/test-plan.md",
+    "docs/deliverables/06-testing/test-evidence.md",
+    "docs/deliverables/06-testing/registers/environments.json",
+    "docs/deliverables/06-testing/evidence/evidence-register.json",
+    "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+    "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+    "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.md",
+    "plans/features/2026-07-26_artifact_completion_execution_plan/07-parallel-resource-resumption.md"
+  ],
+  "integrity": {
+    "artifact_scope_count": 13,
+    "logical_environment_count": 6,
+    "environment_instance_count": 0,
+    "formal_ready_environment_count": 0,
+    "local_internal_work_item_count": 6,
+    "internal_precondition_count": 7,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "f64618bd4900e7224bec36604828a9f4c176730f759ef9eab355cc17f4c8f945"
+    },
+    "covered_exact13_count": 13,
+    "auxiliary_dependency_count": 8,
+    "environment_instance_array_count": 6,
+    "environment_instance_field_group_count": 12,
+    "review_finding_count": 7,
+    "review_finding_closed_count": 7
+  },
+  "revision_reason": "Close independent-review findings for TST-02/03/09/14, formal instance schema, scope separation, actionable procedures and acyclic pair/predecessor binding.",
+  "scope_boundary": {
+    "covered_exact13": [
+      "DLV-TST-01",
+      "DLV-TST-02",
+      "DLV-TST-03",
+      "DLV-TST-04",
+      "DLV-TST-05",
+      "DLV-TST-07",
+      "DLV-TST-09",
+      "DLV-TST-11",
+      "DLV-TST-14",
+      "DLV-TST-18",
+      "DLV-TST-19",
+      "DLV-TST-20",
+      "DLV-TST-21"
+    ],
+    "covered_exact13_count": 13,
+    "auxiliary_dependency_ids": [
+      "DLV-TST-12",
+      "DLV-TST-13",
+      "DLV-TST-16",
+      "DLV-TST-17",
+      "DLV-TST-22",
+      "DLV-TST-23",
+      "DLV-SEC-14",
+      "DLV-WS-21"
+    ],
+    "auxiliary_dependency_count": 8,
+    "sets_disjoint": true,
+    "auxiliary_dependencies_expand_w4_exact_scope": false,
+    "interpretation": "Auxiliary IDs are prerequisites, measurements or downstream approvals only; they are not W4 exact artifact coverage."
+  },
+  "canonical_environment_instance_contract": {
+    "field_group_count": 12,
+    "field_groups": [
+      {
+        "ordinal": 1,
+        "field": "environment_id",
+        "type": "string",
+        "nullable": false
+      },
+      {
+        "ordinal": 2,
+        "field": "instance_id",
+        "type": "string",
+        "nullable": false
+      },
+      {
+        "ordinal": 3,
+        "field": "owner_role",
+        "type": "string",
+        "nullable": false
+      },
+      {
+        "ordinal": 4,
+        "field": "provisioned_at",
+        "type": "timestamp_with_timezone",
+        "nullable": false
+      },
+      {
+        "ordinal": 5,
+        "field": "retire_at",
+        "type": "timestamp_with_timezone",
+        "nullable": false
+      },
+      {
+        "ordinal": 6,
+        "field": "source_binding",
+        "type": "object",
+        "nullable": false,
+        "required_leaf_fields": [
+          "source_commit",
+          "source_dirty"
+        ]
+      },
+      {
+        "ordinal": 7,
+        "field": "build_binding",
+        "type": "object",
+        "nullable": false,
+        "required_leaf_fields": [
+          "build_id",
+          "artifact_sha256"
+        ]
+      },
+      {
+        "ordinal": 8,
+        "field": "model_config_binding",
+        "type": "object",
+        "nullable": false,
+        "required_leaf_fields": [
+          "model_sha256",
+          "config_sha256"
+        ]
+      },
+      {
+        "ordinal": 9,
+        "field": "interface_data_binding",
+        "type": "object",
+        "nullable": false,
+        "required_leaf_fields": [
+          "openapi_sha256",
+          "db_migration"
+        ]
+      },
+      {
+        "ordinal": 10,
+        "field": "device_network_binding",
+        "type": "object",
+        "nullable": "ONLY_WITH_REASON",
+        "required_leaf_fields": [
+          "device_pseudonym",
+          "network_profile"
+        ]
+      },
+      {
+        "ordinal": 11,
+        "field": "verification_evidence_id",
+        "type": "string",
+        "nullable": false
+      },
+      {
+        "ordinal": 12,
+        "field": "approval_status",
+        "type": "enum",
+        "nullable": false,
+        "allowed": [
+          "NOT_APPROVED",
+          "APPROVED",
+          "RETIRED"
+        ]
+      }
+    ],
+    "requested_binding_coverage": [
+      "source",
+      "build",
+      "model",
+      "config",
+      "OpenAPI",
+      "DB",
+      "device",
+      "network"
+    ],
+    "formal_ready_rule": "An instance is formal-ready only when all 12 field groups are present, every required leaf binding is populated or has an allowed reason, smoke evidence exists and approval_status is APPROVED."
+  },
+  "tst14_dual_closure": {
+    "closure_operator": "AND",
+    "automated_current_source_axis": {
+      "required_status": "PASS_INTERNAL_CURRENT_SOURCE",
+      "current_status": "NOT_RUN_AS_ACCESSIBILITY_SPECIFIC_SUITE",
+      "required_apps": [
+        "ANDROID_USER_APP",
+        "ANDROID_ADMIN_APP"
+      ],
+      "generic_candidate_evidence": [
+        {
+          "suite_axis": "ANDROID_USER_JVM_INTERNAL",
+          "result": "PASS_INTERNAL",
+          "test_count": 728,
+          "receipt_sha256": "e4d0a386bdfc7863045f4b73b0c6175a1dfd183bcad16c33006f286845da5420",
+          "accessibility_specific_pass_claimed": false
+        },
+        {
+          "suite_axis": "ANDROID_ADMIN_JVM_INTERNAL",
+          "result": "PASS_INTERNAL",
+          "test_count": 38,
+          "receipt_sha256": "695de382418e5f9f25d55e29d9a0dd9e52c4d1f18d43c9dd44970654997e910b",
+          "accessibility_specific_pass_claimed": false
+        }
+      ],
+      "formal_result_contribution": 0,
+      "closure_rule": "Run and bind accessibility-specific automated suites for both apps; do not infer accessibility PASS from generic totals."
+    },
+    "physical_human_axis": {
+      "required_status": "PASS_PHYSICAL_TALKBACK_AND_HUMAN_QA",
+      "current_status": "NOT_RUN",
+      "required_evidence": [
+        "physical-device TalkBack tree",
+        "focus and announcement trace",
+        "reflow and touch observations",
+        "authorized accessibility QA receipt"
+      ]
+    },
+    "overall_current_status": "OPEN_BOTH_AXES_REQUIRED",
+    "formal_result_contribution": 0
+  },
+  "predecessor_bindings": [
+    {
+      "binding_id": "PRED-W4-TESTING-CURRENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+      "file_sha256": "2853458b3d6ee14ae34a2d1973068101ab2c3eae0dd3502a25f2dcf6e06e00d2",
+      "content_fingerprint": "bb3eeb5f914a3a69685b8a2dfd003595d81b1f1a55807c486ecdf9edc36a6151",
+      "content_fingerprint_source": "DECLARED_PREDECESSOR_CONTENT_FINGERPRINT",
+      "immutable_at_capture": true
+    },
+    {
+      "binding_id": "PRED-W4-TEST-TRACE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+      "content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86",
+      "content_fingerprint_source": "DECLARED_PREDECESSOR_CONTENT_FINGERPRINT",
+      "immutable_at_capture": true
+    },
+    {
+      "binding_id": "PRED-W3-INTEGRATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "file_sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c",
+      "content_fingerprint": "101e565547945a56c938b9f27b71beff4dac450e0352db978bf0a147a428bbe1",
+      "content_fingerprint_source": "DECLARED_PREDECESSOR_CONTENT_FINGERPRINT",
+      "immutable_at_capture": true
+    },
+    {
+      "binding_id": "PRED-CANONICAL-ENVIRONMENTS",
+      "path": "docs/deliverables/06-testing/registers/environments.json",
+      "file_sha256": "8d01ad85534e5f740ce5d89ecfadbc93a8bb58c13e3a06f15a4ed5e9deb51dc7",
+      "content_fingerprint": "6a8c36648c01745fb0a29562fd7941ec5de5b6453f301edf587ba262aa893d3f",
+      "content_fingerprint_source": "COMPUTED_CANONICAL_FULL_JSON",
+      "immutable_at_capture": true
+    }
+  ],
+  "review_findings_closure_matrix": [
+    {
+      "finding_id": "W4-REVIEW-FINDING-01",
+      "requirement": "TST-02 governance approval and TST-03 environment/device-matrix approval actions",
+      "closure": "W4-EXT-TST02-APPROVAL-000 and W4-EXT-TST03-APPROVAL-000 define owner input, ordered procedure, stop conditions, evidence and acceptance.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-02",
+      "requirement": "TST-09 one-session full physical Android/live TMAP/PostGIS E2E",
+      "closure": "W4-EXT-TMAP-003 now requires one run/session and one source/build/model/config/OpenAPI/DB binding through Android user to Gateway to Backend to PostGIS.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-03",
+      "requirement": "TST-14 dual automated and physical/human closure",
+      "closure": "W4-INT-A11Y-006 and W4-EXT-A11Y-002 are joined by an AND closure; generic 728/38 suites are not inferred as accessibility-specific PASS.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-04",
+      "requirement": "Canonical environment instance 12-field-group model with per-environment arrays",
+      "closure": "All six logical environments carry empty instances arrays and the canonical contract covers source/build/model/config/OpenAPI/DB/device/network bindings.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-05",
+      "requirement": "Separate covered exact13 from auxiliary dependencies",
+      "closure": "scope_boundary records exact13 and a disjoint auxiliary ID set that cannot expand W4 coverage.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-06",
+      "requirement": "Every external action has owner_role, ordered procedure, stop conditions, evidence and acceptance",
+      "closure": "The external packet validator requires all five fields on every action and rejects empty lists or rules.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    },
+    {
+      "finding_id": "W4-REVIEW-FINDING-07",
+      "requirement": "Exact predecessor and JSON/Markdown pair binding with an acyclic DAG",
+      "closure": "Each JSON binds exact predecessor and Markdown file SHA-256/content fingerprints in one direction; downstream receipts bind JSON raw SHA-256, avoiding self-hash cycles.",
+      "status": "CLOSED_BY_THIS_REVISION",
+      "execution_or_approval_claimed": false
+    }
+  ],
+  "binding_dag": {
+    "graph_id": "W4-ENV-BINDING-DAG-20260727-002",
+    "direction": "PREDECESSOR_OR_MARKDOWN_TO_ENVIRONMENT_JSON",
+    "nodes": [
+      {
+        "node_id": "PRED-W4-TESTING-CURRENT",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "2853458b3d6ee14ae34a2d1973068101ab2c3eae0dd3502a25f2dcf6e06e00d2",
+        "content_fingerprint": "bb3eeb5f914a3a69685b8a2dfd003595d81b1f1a55807c486ecdf9edc36a6151"
+      },
+      {
+        "node_id": "PRED-W4-TEST-TRACE",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+        "content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86"
+      },
+      {
+        "node_id": "PRED-W3-INTEGRATION",
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c",
+        "content_fingerprint": "101e565547945a56c938b9f27b71beff4dac450e0352db978bf0a147a428bbe1"
+      },
+      {
+        "node_id": "PRED-CANONICAL-ENVIRONMENTS",
+        "path": "docs/deliverables/06-testing/registers/environments.json",
+        "kind": "EXTERNAL_PREDECESSOR",
+        "file_sha256": "8d01ad85534e5f740ce5d89ecfadbc93a8bb58c13e3a06f15a4ed5e9deb51dc7",
+        "content_fingerprint": "6a8c36648c01745fb0a29562fd7941ec5de5b6453f301edf587ba262aa893d3f"
+      },
+      {
+        "node_id": "W4-ENV-MD",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+        "kind": "MARKDOWN_PROJECTION",
+        "file_sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+        "content_fingerprint": "cddef2cc06e35951fa278b06898af6ffff1ff7f2689fcd2de43ffda097750f7b"
+      },
+      {
+        "node_id": "W4-ENV-JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+        "kind": "CURRENT_JSON"
+      }
+    ],
+    "edges": [
+      {
+        "from": "PRED-W4-TESTING-CURRENT",
+        "to": "W4-ENV-JSON"
+      },
+      {
+        "from": "PRED-W4-TEST-TRACE",
+        "to": "W4-ENV-JSON"
+      },
+      {
+        "from": "PRED-W3-INTEGRATION",
+        "to": "W4-ENV-JSON"
+      },
+      {
+        "from": "PRED-CANONICAL-ENVIRONMENTS",
+        "to": "W4-ENV-JSON"
+      },
+      {
+        "from": "W4-ENV-MD",
+        "to": "W4-ENV-JSON"
+      }
+    ],
+    "cycle_count": 0,
+    "result": "PASS_ACYCLIC_BY_CONSTRUCTION",
+    "json_raw_sha256_binding_rule": "The downstream W4 external packet or central implementation receipt binds the environment JSON raw file SHA-256; self SHA-256 is not embedded in the same file."
+  },
+  "markdown_projection_binding": {
+    "binding_id": "W4-ENV-MD-PROJECTION",
+    "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+    "file_sha256": "ed6279cdd4adc73af38904b20bb869e33e73af712717dc800e9e2180d1f45e01",
+    "content_fingerprint": "cddef2cc06e35951fa278b06898af6ffff1ff7f2689fcd2de43ffda097750f7b",
+    "content_fingerprint_canonicalization": "UTF-8 LF Markdown, declared Markdown content fingerprint value normalized to null, trailing LF",
+    "binding_direction": "MARKDOWN_TO_JSON"
+  }
+}

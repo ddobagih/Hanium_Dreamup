@@ -1,0 +1,518 @@
+{
+  "schema_version": "walksafe.artifact-independent-review-record.v1",
+  "metadata": {
+    "review_record_id": "WS-ARTIFACT-INDEPENDENT-REVIEW-20260722-001",
+    "document_version": "1.0.0",
+    "controlled_revision": 1,
+    "prepared_at": "2026-07-22T20:30:00+09:00",
+    "review_status": "PASS",
+    "approval_status": "NOT_AN_ARTIFACT_APPROVAL",
+    "reviewer_identity_class": "PEER_SOFTWARE_AGENTS_NOT_HUMAN_REVIEWERS"
+  },
+  "scope": {
+    "artifact_count": 257,
+    "candidate_count": 129,
+    "pending_count": 128,
+    "readiness_audit_id": "WS-ARTIFACT-CONTENT-READINESS-AUDIT-20260722-001",
+    "review_purpose": "2026-07-22 산출물 승인 후보 생성 전 독립 기술 교차검토"
+  },
+  "source_bindings": [
+    {
+      "path": "scripts/build_walksafe_artifact_independent_review_record_20260722.py",
+      "sha256": "dd3ca1e2d7b233b58aaad272a865428889c18adc2eb2b15a2b2834b19802f2e1",
+      "byte_length": 33212,
+      "role": "REVIEW_RECORD_GENERATOR"
+    },
+    {
+      "path": "docs/control/audits/walksafe-artifact-content-readiness-audit-20260722-r001.json",
+      "sha256": "8551c2ad5ee3a3ddae8b10b3ab7488a07d0d7fab8e9da4601e720a84a6df0439",
+      "byte_length": 599149,
+      "role": "REVIEWED_257_ARTIFACT_READINESS_AUDIT"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "1b20c37f89b4335c84de0b64d9c20f7e3b72b0ddd4b01bde43631204864f859b",
+      "byte_length": 3135701,
+      "role": "FINAL_DOC01_SOURCE_SNAPSHOT"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "b25cbb5143e25fa0cb3c3a8ff2edf078099d3d98811c89b26b84f31607a4fbe1",
+      "byte_length": 89523,
+      "role": "FINAL_DOC05_SOURCE_SNAPSHOT"
+    },
+    {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+      "byte_length": 12381,
+      "role": "FP035_CORRECTION_CANDIDATE_NOT_APPROVED_NOT_EFFECTIVE"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5",
+      "byte_length": 21006,
+      "role": "APPROVED_POLICY_1_0_0_RECORD"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be",
+      "byte_length": 19099,
+      "role": "APPROVED_POLICY_1_0_0_MANIFEST"
+    }
+  ],
+  "source_binding_sha256": "b86a3fe5b5fb13769c77cb8bcffb85224d96afaadca25d1cbb105590cc168979",
+  "reviews": [
+    {
+      "review_id": "IR-A-REQ-DES-FP035-20260722",
+      "reviewer_label": "PEER_AGENT_A",
+      "reviewer_type": "PEER_AGENT_TECHNICAL_REVIEW",
+      "reviewed_scope": {
+        "name": "REQ·DES·통합추적·FP-035 정정 경계 재검토",
+        "artifact_codes": [
+          "REQ-03",
+          "REQ-06",
+          "REQ-18",
+          "DES-04",
+          "DES-09",
+          "DES-13",
+          "DES-20"
+        ],
+        "checks": [
+          "direct 5의 후보 ID·정확한 활성화 사건·구현 및 정식시험 동결",
+          "DES-09의 related-only 의존성",
+          "REQ-18의 변경참조·direct 5·후보 path/raw SHA",
+          "정책 1.0.0 불변과 후보 미승인·미효력",
+          "5개 gate와 출시 경계",
+          "결정적 재생성 및 변조 거부"
+        ]
+      },
+      "independent_from_authored_scope": true,
+      "result": "PASS",
+      "severity_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "test_count": 74,
+      "checks_run": [
+        {
+          "command": "python3 scripts/build_walksafe_requirements_draft_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 scripts/build_walksafe_design_deliverables_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 scripts/build_walksafe_trace_integration_report_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 scripts/build_walksafe_fp035_correction_candidate_20260722.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 scripts/build_walksafe_feature_policy_baseline_approval_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -m unittest -v tests.test_walksafe_requirements_draft tests.test_walksafe_design_deliverables tests.test_walksafe_trace_integration_report tests.test_walksafe_fp035_correction_candidate tests.test_walksafe_feature_policy_baseline_approval",
+          "result": "PASS",
+          "test_count": 74
+        },
+        {
+          "command": "read-only direct field/path/SHA comparison",
+          "result": "PASS"
+        }
+      ],
+      "source_bindings": [
+        {
+          "path": "scripts/build_walksafe_requirements_draft_20260721.py",
+          "sha256": "20f5de0a0ffcdb9610c2678280144c6bf27d90e3e86a94c2e0013ff87721c541",
+          "byte_length": 147902,
+          "role": "REVIEWED_REQUIREMENTS_GENERATOR"
+        },
+        {
+          "path": "docs/deliverables/03-requirements/rtm.json",
+          "sha256": "1d73d1e6e0a47ea3833df779c945397d799b14e9b26fdac4bb577197a660a7bd",
+          "byte_length": 1903186,
+          "role": "REVIEWED_REQUIREMENTS_TRACE_SNAPSHOT"
+        },
+        {
+          "path": "docs/deliverables/03-requirements/requirement-change-log.json",
+          "sha256": "cfdc36336c93fcb29635219a6067dd0c5a81cc3d287758af3c08bf4e0b46fa6b",
+          "byte_length": 6502,
+          "role": "REVIEWED_REQ18_CHANGE_RECORD"
+        },
+        {
+          "path": "docs/deliverables/manifests/requirements-draft-20260721-r001.json",
+          "sha256": "3c943657f84fd338723370a76a3594424ec61bec8a83cdb16fd6bb860de71586",
+          "byte_length": 8852,
+          "role": "REVIEWED_REQUIREMENTS_MANIFEST"
+        },
+        {
+          "path": "scripts/build_walksafe_design_deliverables_20260721.py",
+          "sha256": "5ae37460731976da8ca7935269ff9f645b033a348a3cad4eb4b40a1d2e70e339",
+          "byte_length": 183499,
+          "role": "REVIEWED_DESIGN_GENERATOR"
+        },
+        {
+          "path": "docs/deliverables/04-design/design-traceability-register.json",
+          "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+          "byte_length": 459175,
+          "role": "REVIEWED_DESIGN_TRACE_SNAPSHOT"
+        },
+        {
+          "path": "docs/deliverables/manifests/design-draft-20260721-r001.json",
+          "sha256": "4f58349da209e4c6c23bd637b6e085530583dd5d58083ffc5a11d69cbc2e19a3",
+          "byte_length": 7810,
+          "role": "REVIEWED_DESIGN_MANIFEST"
+        },
+        {
+          "path": "scripts/build_walksafe_trace_integration_report_20260721.py",
+          "sha256": "d06781a9536c2ea7696b92e0984bd1431619655b7d2f4c36b60aa59a80395159",
+          "byte_length": 63982,
+          "role": "REVIEWED_TRACE_GENERATOR"
+        },
+        {
+          "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+          "sha256": "d74dcd2a5bd7e65c44f2ab9d1baedb20ac63efc413b5f00ccead6459543b1203",
+          "byte_length": 306664,
+          "role": "REVIEWED_TRACE_REPORT"
+        },
+        {
+          "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+          "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+          "byte_length": 12381,
+          "role": "REVIEWED_FP035_NOT_APPROVED_NOT_EFFECTIVE_CANDIDATE"
+        },
+        {
+          "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+          "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5",
+          "byte_length": 21006,
+          "role": "REVIEWED_APPROVED_POLICY_RECORD"
+        },
+        {
+          "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+          "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be",
+          "byte_length": 19099,
+          "role": "REVIEWED_APPROVED_POLICY_MANIFEST"
+        }
+      ],
+      "conclusion": "두 초기 finding(REQ-18 후보 SHA 누락, downstream test catalog 변경 뒤 REQ snapshot stale)을 수정·재생성 뒤 다시 검사하여 모두 닫았고 새 open finding은 없다."
+    },
+    {
+      "review_id": "IR-B-ARTIFACTS-05-12-DOC01-20260722",
+      "reviewer_label": "PEER_AGENT_B",
+      "reviewer_type": "PEER_AGENT_TECHNICAL_REVIEW",
+      "reviewed_scope": {
+        "name": "05~12 정식 산출물·DOC-01·pending 계약 독립 교차검토",
+        "authored_by_reviewer": false,
+        "quantitative_reconciliation": {
+          "formal_7_to_12": {
+            "artifact_count": 129,
+            "draft": 77,
+            "planned": 52
+          },
+          "formal_05_to_12": {
+            "artifact_count": 173,
+            "draft": 101,
+            "planned": 72
+          },
+          "doc01_all": {
+            "artifact_count": 257,
+            "draft": 182,
+            "planned": 75
+          },
+          "pending_completion_contracts": {
+            "count": 128,
+            "evidence_or_external_value_pending": 53,
+            "planned_not_run": 75,
+            "required_fields_complete": true,
+            "fabricated_result_prohibited": true
+          }
+        },
+        "checks": [
+          "05~12 Draft/Planned 수량과 DOC-01 257개 일대일 대조",
+          "Draft 182개의 version·path·hash 및 Planned 75개의 미생성 경계",
+          "128개 pending 계약의 입력·실행자·시점·선행조건·완료판정·fabrication 금지",
+          "현재 구현 비규범·Android 정식·PWA legacy 경계",
+          "NOT_APPROVED·NOT_RUN·5개 gate·release NOT_ELIGIBLE 경계"
+        ],
+        "known_control_dependency_not_a_new_finding": {
+          "id": "FP-035_CORRECTION_CANDIDATE_PENDING",
+          "severity_in_existing_control": "HIGH",
+          "status": "NOT_APPROVED_NOT_EFFECTIVE_BRANCH_FROZEN"
+        }
+      },
+      "independent_from_authored_scope": true,
+      "result": "PASS",
+      "severity_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "test_count": 124,
+      "checks_run": [
+        {
+          "command": "python3 -B scripts/build_walksafe_formal_dev_test_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B scripts/build_walksafe_formal_sec_ws_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B scripts/build_walksafe_formal_aiml_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B scripts/build_walksafe_formal_rel_ops_cls_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B scripts/build_walksafe_formal_trace_7_12_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B scripts/build_walksafe_control_bootstrap.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -B -m unittest tests.test_walksafe_formal_dev_test tests.test_walksafe_formal_sec_ws tests.test_walksafe_formal_aiml tests.test_walksafe_formal_rel_ops_cls tests.test_walksafe_formal_trace_7_12 tests.test_walksafe_control_bootstrap tests.test_walksafe_artifact_content_readiness_audit tests.test_walksafe_trace_integration_report",
+          "result": "PASS",
+          "test_count": 124
+        },
+        {
+          "command": "read-only 257-row quantitative/contract/path/SHA comparison",
+          "result": "PASS"
+        }
+      ],
+      "source_bindings": [
+        {
+          "path": "scripts/build_walksafe_formal_dev_test_20260721.py",
+          "sha256": "34a23f2ace70d9820d16c39fc21e6c395fd970411286e878d510677e8c0915fe",
+          "byte_length": 152546,
+          "role": "REVIEWED_DEV_TST_GENERATOR"
+        },
+        {
+          "path": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+          "sha256": "69f77b91135d19dad9dc7dc83a71f3b30fe8e5e3144a3c343ac6feb0a764ef4b",
+          "byte_length": 102048,
+          "role": "REVIEWED_SEC_WS_GENERATOR"
+        },
+        {
+          "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+          "sha256": "36b5e799bd63884f458c2e923c445bc57e90defad437c3f75661f2cddfca2930",
+          "byte_length": 70770,
+          "role": "REVIEWED_AIML_GENERATOR"
+        },
+        {
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "0948eb24040ba721c6b5ffa50283ff3d08a041321502ea4e1c88ae224d716271",
+          "byte_length": 80355,
+          "role": "REVIEWED_REL_OPS_CLS_GENERATOR"
+        },
+        {
+          "path": "scripts/build_walksafe_formal_trace_7_12_20260721.py",
+          "sha256": "4dee9c582b77e0d581db71c1235fb1a016cd1ea444e4962b91eba5199ad913a1",
+          "byte_length": 27869,
+          "role": "REVIEWED_7_12_TRACE_GENERATOR"
+        },
+        {
+          "path": "scripts/build_walksafe_control_bootstrap.py",
+          "sha256": "6b791acc8854925ebb8d7e8f174f0b3ebfc734d94cc79600e5669ce4b8e08f49",
+          "byte_length": 145883,
+          "role": "REVIEWED_DOC01_CONTROL_GENERATOR"
+        },
+        {
+          "path": "docs/deliverables/00-control/artifact-register.json",
+          "sha256": "1b20c37f89b4335c84de0b64d9c20f7e3b72b0ddd4b01bde43631204864f859b",
+          "byte_length": 3135701,
+          "role": "REVIEWED_DOC01_257_ROW_REGISTER_RAW_BYTES"
+        },
+        {
+          "path": "docs/deliverables/traceability/formal-7-12-integration-report-20260721-r001.json",
+          "sha256": "03b66c52eafe6e633b54b10120984182e2adb80e6f10187c630734a8bea86d6d",
+          "byte_length": 470133,
+          "role": "REVIEWED_FORMAL_7_12_TRACE_REPORT"
+        },
+        {
+          "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+          "sha256": "1702f3fb7d21446a14087cc4adf4b6eaec05872ef341c6d4b77084f365ea6f76",
+          "byte_length": 15004,
+          "role": "REVIEWED_DEV_TST_MANIFEST"
+        },
+        {
+          "path": "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+          "sha256": "38ea6ba2d82ffe10efb6a09cb45d88b59ec55537ca7eb4b6349fc5407cc86534",
+          "byte_length": 10986,
+          "role": "REVIEWED_SEC_WS_MANIFEST"
+        },
+        {
+          "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+          "sha256": "84df883262004975b3272d66c2dc36fa732f2b802cda11cd94dc76f254264723",
+          "byte_length": 38212,
+          "role": "REVIEWED_AIML_MANIFEST"
+        },
+        {
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "5070e8359c7adf162be4cb9adaeaa4134cb49014c53ae2f677a20f6caf5c3776",
+          "byte_length": 79977,
+          "role": "REVIEWED_REL_OPS_CLS_MANIFEST"
+        },
+        {
+          "path": "docs/deliverables/05-implementation/module-register.json",
+          "sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+          "byte_length": 62222,
+          "role": "REVIEWED_MODULE_REGISTER"
+        },
+        {
+          "path": "docs/deliverables/06-testing/registers/test-cases.json",
+          "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+          "byte_length": 2590342,
+          "role": "REVIEWED_TEST_CASE_REGISTER"
+        },
+        {
+          "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+          "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+          "byte_length": 12381,
+          "role": "REVIEWED_KNOWN_PENDING_FP035_DEPENDENCY"
+        }
+      ],
+      "conclusion": "05~12와 DOC-01의 수량·상태·pending 계약·경계를 독립 교차검토해 새 open finding 없이 통과했다; FP-035 미승인 의존성과 5개 NOT_RUN gate는 종결한 finding이 아니라 공개된 기존 출시 전 경계다."
+    },
+    {
+      "review_id": "IR-C-MGT-DSC-20260722",
+      "reviewer_label": "PEER_AGENT_C",
+      "reviewer_type": "PEER_AGENT_TECHNICAL_REVIEW",
+      "reviewed_scope": {
+        "name": "MGT-01~18·DSC-01~15 내용·관리계약·과장방지 교차검토",
+        "artifact_type_count": 33,
+        "generated_file_count": 18,
+        "checks": [
+          "33개 산출물 anchor 및 10개 관리 차원",
+          "확정 관리 입력의 반영과 미실행 결과 비조작",
+          "사용자·경쟁조사·PoC 결과 비발명",
+          "정책·결정 source 지문과 경계",
+          "5개 gate·출시 경계 및 deterministic output"
+        ]
+      },
+      "independent_from_authored_scope": true,
+      "result": "PASS",
+      "severity_counts": {
+        "critical": 0,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      },
+      "test_count": 20,
+      "checks_run": [
+        {
+          "command": "python3 scripts/build_walksafe_formal_management_discovery_20260721.py --check",
+          "result": "PASS"
+        },
+        {
+          "command": "python3 -m unittest -v tests.test_walksafe_formal_management_discovery",
+          "result": "PASS",
+          "test_count": 20
+        }
+      ],
+      "source_bindings": [
+        {
+          "path": "scripts/build_walksafe_formal_management_discovery_20260721.py",
+          "sha256": "5828aeed2e33e44f12708d5785b0bdbf9706e772e866b6dbedde5e7e47b592e7",
+          "byte_length": 111283,
+          "role": "REVIEWED_MGT_DSC_GENERATOR"
+        },
+        {
+          "path": "docs/deliverables/manifests/management-discovery-draft-20260721-r001.json",
+          "sha256": "78f694b85799439a2810b6edc659067021b813dbe05113a37336fa24ed47fea3",
+          "byte_length": 10700,
+          "role": "REVIEWED_MGT_DSC_MANIFEST_BINDING_18_OUTPUTS"
+        },
+        {
+          "path": "docs/deliverables/01-management/project-charter.md",
+          "sha256": "0cb97e9ba61924485e2b27ad40c0e2dca4dddc3e9d88481c59eeac17f6f7190e",
+          "byte_length": 20452,
+          "role": "REVIEWED_MGT_PRIMARY_DOCUMENT"
+        },
+        {
+          "path": "docs/deliverables/01-management/project-management-plan.md",
+          "sha256": "a1c6579e27fd07284902bce5c23ddab14539557b5320d0dd257da47b89857cb0",
+          "byte_length": 33187,
+          "role": "REVIEWED_MGT_PLAN_DOCUMENT"
+        },
+        {
+          "path": "docs/deliverables/02-discovery/product-definition.md",
+          "sha256": "38a18a03d7522f55c8ec0ce67fd651157ec30d3c55ea6d736bcc6a35a4391af0",
+          "byte_length": 21494,
+          "role": "REVIEWED_DSC_PRIMARY_DOCUMENT"
+        },
+        {
+          "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+          "sha256": "8bd0acb7210a58624da3ec9721b38e7ac8a31281f78a231f7ae18a2f22e5979f",
+          "byte_length": 35720,
+          "role": "REVIEWED_DSC_EVIDENCE_BOUNDARY_DOCUMENT"
+        }
+      ],
+      "conclusion": "20개 검증이 모두 통과했고 open finding은 없다."
+    }
+  ],
+  "review_binding_sha256": "614e330595bf6079f4b55f4149752d9b3719199f600d0fe567633b2ac7a6ab0f",
+  "resolved_findings": [
+    {
+      "finding_id": "IR-A-FINDING-001",
+      "original_severity": "HIGH",
+      "title": "REQ-18에 FP-035 정정 후보 raw SHA 직접 결속 누락",
+      "status": "RESOLVED_AND_REVERIFIED",
+      "resolution": "REQ-CHG-20260722-002에 policy_correction_candidate_sha256을 추가하고 실제 후보 raw SHA와 일치 및 변조 거부를 재검증했다.",
+      "evidence_paths": [
+        "docs/deliverables/03-requirements/requirement-change-log.json",
+        "tests/test_walksafe_requirements_draft.py"
+      ]
+    },
+    {
+      "finding_id": "IR-A-FINDING-002",
+      "original_severity": "MEDIUM",
+      "title": "downstream test catalog 변경 뒤 요구사항 snapshot stale",
+      "status": "RESOLVED_AND_REVERIFIED",
+      "resolution": "REQ→DES→통합추적 순서로 다시 생성하고 모든 --check와 관련 테스트를 통과했다.",
+      "evidence_paths": [
+        "docs/deliverables/03-requirements/rtm.json",
+        "docs/deliverables/manifests/requirements-draft-20260721-r001.json",
+        "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json"
+      ]
+    }
+  ],
+  "final_result": {
+    "status": "PASS",
+    "open_critical": 0,
+    "open_high": 0,
+    "open_medium": 0,
+    "open_low": 0,
+    "all_required_reviews_passed": true,
+    "required_review_count": 3,
+    "completed_review_count": 3,
+    "total_test_count": 218,
+    "result_interpretation": "세 기술 교차검토가 검토 범위의 구조·내용 경계·결속·결정적 생성을 통과했다는 뜻이며 산출물 승인이나 제품 실행 완료를 뜻하지 않는다."
+  },
+  "limitations": [
+    "이 기록은 사용자의 명시적 사람 승인 또는 산출물 승인 사건을 대신하지 않는다.",
+    "법률·개인정보·보안·안전 분야의 외부 전문 검토나 책임 판단을 대신하지 않는다.",
+    "NOT_RUN인 시험·현장시험·배포·운영의 실행 증거를 만들거나 대신하지 않는다.",
+    "현행 구현이 승인 요구·설계를 충족한다고 판정하지 않는다."
+  ],
+  "authorization_boundary": {
+    "record_generation_is_artifact_approval": false,
+    "human_review_claimed": false,
+    "external_professional_review_claimed": false,
+    "implementation_conformance_assessed": false,
+    "formal_test_execution_claimed": false,
+    "remaining_gates_are_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "content_sha256": "aa1a0f305db49662ca4f2436f1fe5e9b8dd83f1ca176a3360559617b168370f5"
+}

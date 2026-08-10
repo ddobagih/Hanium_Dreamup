@@ -1,0 +1,207 @@
+{
+  "schema_version": "walksafe.test-evidence-register.v1",
+  "metadata": {
+    "title": "WalkSafe 시험 구현·실행 증거 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "TST-06",
+      "TST-07",
+      "TST-08",
+      "TST-09",
+      "TST-10",
+      "TST-11",
+      "TST-12",
+      "TST-13",
+      "TST-14",
+      "TST-15",
+      "TST-16",
+      "TST-17"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "storage_model": {
+    "this_file_role": "GENERATED_EMPTY_SNAPSHOT_AND_SCHEMA",
+    "edit_this_file_for_execution": false,
+    "append_only_instance_path": "docs/deliverables/06-testing/evidence/executions/<run-id>.json",
+    "mutation_rule": "CREATE_NEW_FILE_ONLY",
+    "snapshot_update_rule": "승인된 집계 절차가 append-only instance를 읽어 새 revision을 만들 때만 갱신한다.",
+    "generator_overwrites_append_only_instances": false
+  },
+  "evidence_schema": {
+    "required_fields": [
+      "run_id",
+      "evidence_id",
+      "verification_activity_type",
+      "test_type_id",
+      "test_case_ids",
+      "requirement_ids",
+      "policy_ids",
+      "source_commit",
+      "source_dirty",
+      "build_id",
+      "artifact_sha256",
+      "model_sha256",
+      "config_sha256",
+      "openapi_sha256",
+      "db_migration",
+      "environment_id",
+      "device_pseudonym",
+      "started_at",
+      "finished_at",
+      "executor_pseudonym",
+      "reviewer_pseudonym",
+      "raw_evidence_control_id",
+      "raw_evidence_access_class",
+      "raw_evidence_retention_until",
+      "raw_evidence_sha256",
+      "result",
+      "defect_ids",
+      "residual_risk_ids",
+      "waiver_ids",
+      "not_applicable_reasons"
+    ],
+    "allowed_results": [
+      "PASS",
+      "FAIL",
+      "BLOCKED",
+      "NOT_RUN"
+    ],
+    "nullable_only_with_reason": [
+      "test_type_id",
+      "model_sha256",
+      "config_sha256",
+      "openapi_sha256",
+      "db_migration",
+      "device_pseudonym"
+    ],
+    "identity_rules": {
+      "executor_pseudonym": "실명·이메일 대신 내부 가명 ID를 사용한다.",
+      "reviewer_pseudonym": "실명·이메일 대신 내부 가명 ID를 사용한다.",
+      "device_pseudonym": "실제 serial·광고식별자 대신 시험기기 가명 ID를 사용한다."
+    },
+    "raw_evidence_rule": "영상·음성·정확 위치·서명 원본은 Git에 넣지 않고 암호화 저장소 통제 ID와 SHA-256만 기록한다."
+  },
+  "test_types": [
+    {
+      "test_type_id": "TST-06",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-07",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-08",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-09",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-10",
+      "applicability": "ACTIVE_BEFORE_LIMITED_USER_TEST",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-11",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-12",
+      "applicability": "ACTIVE_BEFORE_BETA",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-13",
+      "applicability": "ACTIVE_BEFORE_BETA",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-14",
+      "applicability": "ACTIVE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-15",
+      "applicability": "ACTIVE_BEFORE_RELEASE",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-16",
+      "applicability": "ACTIVE_BEFORE_BETA",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    },
+    {
+      "test_type_id": "TST-17",
+      "applicability": "ACTIVE_BEFORE_BETA",
+      "execution_status": "NOT_RUN",
+      "evidence_ids": []
+    }
+  ],
+  "remaining_gates": [
+    {
+      "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false,
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false,
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false,
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false,
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false,
+      "evidence_ids": []
+    }
+  ],
+  "execution_instance_refs": [],
+  "evidence": [],
+  "approval_boundary": {
+    "formal_execution_count": 0,
+    "pass_count": 0,
+    "test_completion_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "record_id": "WS-GOAL-PREACTIVATION-SUPERSESSION-20260724-002",
+  "recorded_at": "2026-07-24T03:31:00+09:00",
+  "superseded_package": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-1",
+    "plan_version": "2.1.0",
+    "activation_status": "READY_NOT_ACTIVATED",
+    "manifest_path": "docs/control/goals/walksafe-completion-graph-v2-1/static-plan-manifest-v2.1.0.json",
+    "manifest_sha256": "d8eccbe651c89895b9d1830d7af63b3d18f9bcf23683a5b0f61cc54eb5b01649",
+    "initial_transition_event_path": "docs/control/goals/walksafe-completion-graph-v2-2/superseded-v2.1.0-package-prepared-event.json",
+    "initial_transition_event_sha256": "b2a1b08556ee11713854dcafd4df9107860eeab563b1e3cfe1a191384b1bb425",
+    "protected_file_count": 20,
+    "managed_path_count": 21,
+    "path_set_sha256": "28b034519b85127019410487df6b61cf1ee6010ed626659c4d0a0380d38bd1b3",
+    "content_set_sha256": "1462f0366b7fa6ae2a2f9499c3b1d1a4860abf6e17ee5e2e38ff626d5e1ce2d0"
+  },
+  "successor_package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-2",
+  "successor_plan_version": "2.2.0",
+  "reason": "PACKAGE_PREPARED 이후 발견된 scheduler bootstrap coverage, deterministic blocker focus, 내부 branch non-preemption, 사용자 질문 전달 유예, canonical logical request identity, event-scoped external action packet, artifact assessment·completion boundary, 전체 Git-visible repository-state gate 결함을 v2.1 불변 파일과 event를 보존한 versioned successor에서 보완한다.",
+  "execution_effect": "NO_PRODUCT_WORK_EXECUTED_BY_V2_1; NO_ACTIVATION_EVENT_RECORDED; V2_1_RETAINED_BYTE_EXACT_FOR_AUDIT_ONLY"
+}

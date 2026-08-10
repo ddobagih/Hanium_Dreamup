@@ -1,0 +1,36 @@
+{
+  "as_of": "2026-07-27T19:06:09+09:00",
+  "authorization_boundary": {
+    "approval_status": "NOT_APPROVED",
+    "formal_test_credit": false,
+    "release_credit": false,
+    "verdict": "NO_GO"
+  },
+  "manifest_id": "WS-PHASE0-FORMAL279-NOT-RUN-MANIFEST-20260727-001",
+  "prepared_on": "2026-07-27",
+  "schema_version": "walksafe.formal279-not-run-control-manifest.v1",
+  "subject_fingerprint": {
+    "canonical_byte_length": 569,
+    "canonicalization": "subject bindings sorted by path; UTF-8 JSON sort_keys=true compact separators trailing LF",
+    "manifest_self_included": false,
+    "sha256": "c334c39698dc836c7c9c66d401196e6e08bdbb367a5113a95ff021b0cba06f4d"
+  },
+  "subjects": [
+    {
+      "byte_length": 41119,
+      "captured_at": "2026-07-27T19:10:32+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+      "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+      "subject_role": "IMMUTABLE_FORMAL279_NOT_RUN_CONTROL_RECORD"
+    },
+    {
+      "byte_length": 2590342,
+      "captured_at": "2026-07-27T19:04:59+09:00",
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+      "subject_role": "AUTHORITATIVE_FORMAL_TEST_PLAN_REGISTER"
+    }
+  ],
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00"
+}

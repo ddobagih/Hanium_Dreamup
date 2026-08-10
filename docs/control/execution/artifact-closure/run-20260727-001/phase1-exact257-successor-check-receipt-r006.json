@@ -1,0 +1,575 @@
+{
+  "checks": [
+    {
+      "check_id": "R006-CHK-001",
+      "expected": [
+        {
+          "binding_id": "PRE-R005-LEDGER",
+          "byte_length": 2529885,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json",
+          "sha256": "748790e4dbee3bd2a0718546e83f3815941f6e028ccfea22cb97950ac486a001",
+          "subject_role": "R005_LEDGER_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R005-EVIDENCE",
+          "byte_length": 24193,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r005/evidence.json",
+          "sha256": "5d44db7359ae9be39f057091e82e9a6771b89e1f75254eec332190cd85ea4cc6",
+          "subject_role": "R005_EVIDENCE_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R005-RECEIPT",
+          "byte_length": 19757,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json",
+          "sha256": "afa82a68b378b3b99566d8d16ffd2499382aaa3d99213179051ea875fe09f85e",
+          "subject_role": "R005_CHECK_RECEIPT_PREDECESSOR"
+        },
+        {
+          "binding_id": "TRANSITION-APPLICATION",
+          "byte_length": 169355,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+          "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+          "subject_role": "SCOPE45_TRANSITION_APPLICATION_CANONICAL"
+        }
+      ],
+      "name": "R005_PREDECESSOR_PHYSICAL_AND_INTEGRITY_BOUND",
+      "observed": [
+        {
+          "binding_id": "PRE-R005-LEDGER",
+          "byte_length": 2529885,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json",
+          "sha256": "748790e4dbee3bd2a0718546e83f3815941f6e028ccfea22cb97950ac486a001",
+          "subject_role": "R005_LEDGER_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R005-EVIDENCE",
+          "byte_length": 24193,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r005/evidence.json",
+          "sha256": "5d44db7359ae9be39f057091e82e9a6771b89e1f75254eec332190cd85ea4cc6",
+          "subject_role": "R005_EVIDENCE_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R005-RECEIPT",
+          "byte_length": 19757,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json",
+          "sha256": "afa82a68b378b3b99566d8d16ffd2499382aaa3d99213179051ea875fe09f85e",
+          "subject_role": "R005_CHECK_RECEIPT_PREDECESSOR"
+        },
+        {
+          "binding_id": "TRANSITION-APPLICATION",
+          "byte_length": 169355,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+          "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+          "subject_role": "SCOPE45_TRANSITION_APPLICATION_CANONICAL"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-002",
+      "expected": {
+        "count": 257,
+        "order_equal_r005": true,
+        "unique": 257
+      },
+      "name": "EXACT257_ORDER_AND_UNIQUE_PRESERVED",
+      "observed": {
+        "count": 257,
+        "order_equal_r005": true,
+        "unique": 257
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-003",
+      "expected": true,
+      "name": "PREDECESSOR_CANONICAL_SOURCE_SNAPSHOT_ACCEPTANCE_CONTRACTS_PRESERVED",
+      "observed": true,
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-004",
+      "expected": {
+        "application_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "exact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "ledger_status": "CLOSED_N_A_FOR_CURRENT_SCOPE"
+      },
+      "name": "EXACT2_TRANSITION_APPLICATION_CANONICAL_STATUS_EQUALITY",
+      "observed": {
+        "application_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "exact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "ledger_status": "CLOSED_N_A_FOR_CURRENT_SCOPE"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-005",
+      "expected": {
+        "alias_mapping": [
+          {
+            "canonical_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+            "legacy_path": "/records/*/claim_boundary/artifact_completion_claimed",
+            "required_equality": true,
+            "semantics": "GLOBAL_UNQUALIFIED_ARTIFACT_COMPLETION"
+          },
+          {
+            "canonical_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+            "legacy_path": "/records/*/artifact_closure/completion_claimed",
+            "required_equality_when_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+            "semantics": "CURRENT_SCOPE_N_A_CLOSURE_ONLY"
+          }
+        ],
+        "definitions": {
+          "artifact_closure.completion_claimed": "Legacy current-scope alias. It MUST equal current_scope_n_a_closure_claimed only for status CLOSED_N_A_FOR_CURRENT_SCOPE and MUST NOT be interpreted as global completion.",
+          "artifact_completion_claimed": "Legacy claim_boundary field with global/unqualified semantics; it MUST equal global_artifact_completion_claimed.",
+          "current_scope_n_a_closure_claimed": "True only when the artifact is approved N/A for the currently controlled scope. It is not global artifact completion or release credit.",
+          "global_artifact_completion_claimed": "Unqualified/global artifact completion across applicable scopes. Current value is false for all 257 records."
+        },
+        "schema_id": "walksafe.exact257.claim-semantics.v2"
+      },
+      "name": "CLAIM_SCHEMA_DEFINITION_AND_ALIAS_MAPPING_PRESENT",
+      "observed": {
+        "alias_mapping": [
+          {
+            "canonical_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+            "legacy_path": "/records/*/claim_boundary/artifact_completion_claimed",
+            "required_equality": true,
+            "semantics": "GLOBAL_UNQUALIFIED_ARTIFACT_COMPLETION"
+          },
+          {
+            "canonical_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+            "legacy_path": "/records/*/artifact_closure/completion_claimed",
+            "required_equality_when_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+            "semantics": "CURRENT_SCOPE_N_A_CLOSURE_ONLY"
+          }
+        ],
+        "definitions": {
+          "artifact_closure.completion_claimed": "Legacy current-scope alias. It MUST equal current_scope_n_a_closure_claimed only for status CLOSED_N_A_FOR_CURRENT_SCOPE and MUST NOT be interpreted as global completion.",
+          "artifact_completion_claimed": "Legacy claim_boundary field with global/unqualified semantics; it MUST equal global_artifact_completion_claimed.",
+          "current_scope_n_a_closure_claimed": "True only when the artifact is approved N/A for the currently controlled scope. It is not global artifact completion or release credit.",
+          "global_artifact_completion_claimed": "Unqualified/global artifact completion across applicable scopes. Current value is false for all 257 records."
+        },
+        "schema_id": "walksafe.exact257.claim-semantics.v2"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-006",
+      "expected": {
+        "artifact_completion_claimed": false,
+        "current_scope_n_a_closure_claimed": true,
+        "global_artifact_completion_claimed": false,
+        "legacy_completion_claimed": true
+      },
+      "name": "EXACT2_ROW_CLAIM_FIELD_CONSISTENCY",
+      "observed": {
+        "artifact_completion_claimed": false,
+        "current_scope_n_a_closure_claimed": true,
+        "global_artifact_completion_claimed": false,
+        "legacy_completion_claimed": true
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-007",
+      "expected": {
+        "current_scope_true_count": 0,
+        "global_true_count": 0,
+        "row_count": 255
+      },
+      "name": "NON_EXACT2_GLOBAL_AND_CURRENT_SCOPE_CLAIMS_FALSE",
+      "observed": {
+        "current_scope_true_count": 0,
+        "global_true_count": 0,
+        "row_count": 255
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-008",
+      "expected": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "routes": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        }
+      },
+      "name": "CANONICAL_AND_CURRENT_ROUTE_COUNTS_PRESERVED",
+      "observed": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "routes": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-009",
+      "expected": {
+        "closure_delta": 2,
+        "global_completion": 0,
+        "open": 131
+      },
+      "name": "CLOSURE2_OPEN131_PRESERVED",
+      "observed": {
+        "closure_delta": 2,
+        "global_completion": 0,
+        "open": 131
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-010",
+      "expected": {
+        "binding_count": 18,
+        "fingerprint": {
+          "algorithm": "SHA-256",
+          "canonical_byte_length": 4750,
+          "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+          "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+          "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+          "tuple_count": 18,
+          "tuple_fields": [
+            "path",
+            "byte_length",
+            "sha256",
+            "subject_role"
+          ]
+        }
+      },
+      "name": "R005_SOURCE_BINDINGS_AND_PHYSICAL_FINGERPRINT_PRESERVED",
+      "observed": {
+        "binding_count": 18,
+        "fingerprint": {
+          "algorithm": "SHA-256",
+          "canonical_byte_length": 4750,
+          "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+          "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+          "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+          "tuple_count": 18,
+          "tuple_fields": [
+            "path",
+            "byte_length",
+            "sha256",
+            "subject_role"
+          ]
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-011",
+      "expected": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "routes": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "zero_credits": {
+          "actual_device_event_count": 0,
+          "attestation_approval_count": 0,
+          "formal279_pass_count": 0,
+          "in_scope_substantive_credit_count": 0,
+          "owner_approval_count": 0,
+          "real_event_count": 0,
+          "release_eligible_count": 0,
+          "verified_rights_or_external_fact_count": 0
+        }
+      },
+      "name": "R005_COUNTS_ROUTES_INTEGRITY_CREDITS_PRESERVED",
+      "observed": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "routes": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "zero_credits": {
+          "actual_device_event_count": 0,
+          "attestation_approval_count": 0,
+          "formal279_pass_count": 0,
+          "in_scope_substantive_credit_count": 0,
+          "owner_approval_count": 0,
+          "real_event_count": 0,
+          "release_eligible_count": 0,
+          "verified_rights_or_external_fact_count": 0
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-012",
+      "expected": {
+        "finding_id": "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001",
+        "status": "CLOSED"
+      },
+      "name": "R005_MINOR_CLOSURE_REGISTER_COMPLETE",
+      "observed": {
+        "finding_id": "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001",
+        "status": "CLOSED"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-013",
+      "expected": {
+        "policy_reopened": false,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "name": "NO_POLICY_REOPEN_RELEASE_NOT_ELIGIBLE",
+      "observed": {
+        "policy_reopened": false,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-014",
+      "expected": {
+        "algorithm": "SHA-256",
+        "content_sha256": "515c4e3ba4c00e54d292b8d7bdda7da06e38c7e99a4b59ad3eb5e3fae3ba88dc",
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "excluded_field": "/integrity/content_sha256",
+        "final_lf": true,
+        "json_separators": [
+          ",",
+          ":"
+        ],
+        "line_ending": "LF",
+        "projection_byte_length": 1803926,
+        "projection_null_paths": [
+          "/integrity/content_sha256",
+          "/integrity/projection_byte_length"
+        ],
+        "projection_path": "/",
+        "recursive_key_order": "LEXICOGRAPHIC",
+        "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r006.json"
+      },
+      "name": "R006_LEDGER_NONSELF_INTEGRITY",
+      "observed": {
+        "algorithm": "SHA-256",
+        "content_sha256": "515c4e3ba4c00e54d292b8d7bdda7da06e38c7e99a4b59ad3eb5e3fae3ba88dc",
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "excluded_field": "/integrity/content_sha256",
+        "final_lf": true,
+        "json_separators": [
+          ",",
+          ":"
+        ],
+        "line_ending": "LF",
+        "projection_byte_length": 1803926,
+        "projection_null_paths": [
+          "/integrity/content_sha256",
+          "/integrity/projection_byte_length"
+        ],
+        "projection_path": "/",
+        "recursive_key_order": "LEXICOGRAPHIC",
+        "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r006.json"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-015",
+      "expected": {
+        "canonical_length": 42947,
+        "sha256": "0a4c57f7ca5db77e6e25a0d56ca8929425f8615eca6d719ed20d517ad39d7526"
+      },
+      "name": "R006_EVIDENCE_NONSELF_INTEGRITY",
+      "observed": {
+        "canonical_length": 42947,
+        "sha256": "0a4c57f7ca5db77e6e25a0d56ca8929425f8615eca6d719ed20d517ad39d7526"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R006-CHK-016",
+      "detail_path": "/receipt_self_integrity_check",
+      "name": "R006_RECEIPT_NONSELF_INTEGRITY",
+      "status": "PASS"
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "ef04245ef5b8bd912a1a51fb445c0ba7f6e37bb4c11bf9c15a8f45af3719163b",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 15932,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/canonical_length",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r006.json"
+  },
+  "output_bindings": [
+    {
+      "binding_id": "CURRENT-R006-LEDGER",
+      "byte_length": 2588324,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r006.json",
+      "sha256": "b6df12ff338bdab823858d14adc3ba84c057a9dadc5a380ce82e4f4010e72244",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_R006_OUTPUT"
+    },
+    {
+      "byte_length": 57180,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r006/evidence.json",
+      "sha256": "cd20d1eea159f5b02f662fe2c17859f507fc0a9a8b7a23cd061360c60c8f41bd",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_R006_EVIDENCE_OUTPUT"
+    }
+  ],
+  "predecessor_r005_bindings": [
+    {
+      "binding_id": "PRE-R005-LEDGER",
+      "byte_length": 2529885,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json",
+      "sha256": "748790e4dbee3bd2a0718546e83f3815941f6e028ccfea22cb97950ac486a001",
+      "subject_role": "R005_LEDGER_PREDECESSOR"
+    },
+    {
+      "binding_id": "PRE-R005-EVIDENCE",
+      "byte_length": 24193,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r005/evidence.json",
+      "sha256": "5d44db7359ae9be39f057091e82e9a6771b89e1f75254eec332190cd85ea4cc6",
+      "subject_role": "R005_EVIDENCE_PREDECESSOR"
+    },
+    {
+      "binding_id": "PRE-R005-RECEIPT",
+      "byte_length": 19757,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json",
+      "sha256": "afa82a68b378b3b99566d8d16ffd2499382aaa3d99213179051ea875fe09f85e",
+      "subject_role": "R005_CHECK_RECEIPT_PREDECESSOR"
+    },
+    {
+      "binding_id": "TRANSITION-APPLICATION",
+      "byte_length": 169355,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+      "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+      "subject_role": "SCOPE45_TRANSITION_APPLICATION_CANONICAL"
+    }
+  ],
+  "prepared_on": "2026-07-28",
+  "receipt_id": "WS-PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-20260728-R006",
+  "receipt_self_integrity_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 15932,
+    "content_sha256": "ef04245ef5b8bd912a1a51fb445c0ba7f6e37bb4c11bf9c15a8f45af3719163b",
+    "encoding": "UTF-8",
+    "line_ending": "LF",
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r006.json"
+  },
+  "schema_version": "walksafe.phase1-exact257-successor-check-receipt.v6",
+  "status": "PASS",
+  "summary": {
+    "actual_device_event_count": 0,
+    "attestation_approval_count": 0,
+    "canonical_exact2_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "check_count": 16,
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_closed_exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "current_scope_closure_delta_count": 2,
+    "current_scope_n_a_closure_claim_count": 2,
+    "fail_count": 0,
+    "formal279_pass_count": 0,
+    "global_artifact_completion_claim_count": 0,
+    "in_scope_substantive_credit_count": 0,
+    "open_artifact_count": 131,
+    "owner_approval_count": 0,
+    "pass_count": 16,
+    "policy_reopened": false,
+    "r005_minor_closure_status": {
+      "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001": "CLOSED"
+    },
+    "real_event_count": 0,
+    "record_count": 257,
+    "release_eligible_count": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "verified_rights_or_external_fact_count": 0
+  }
+}

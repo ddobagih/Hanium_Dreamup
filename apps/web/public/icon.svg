@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WalkSafe Assist icon">
+  <rect width="512" height="512" rx="96" fill="#10201C"/>
+  <path d="M128 356c64-72 128-72 192 0" fill="none" stroke="#F7F5EE" stroke-width="34" stroke-linecap="round"/>
+  <circle cx="192" cy="188" r="42" fill="#BE3D20"/>
+  <path d="M280 142h72l-32 88h64l-120 144 34-104h-64z" fill="#F7F5EE"/>
+</svg>

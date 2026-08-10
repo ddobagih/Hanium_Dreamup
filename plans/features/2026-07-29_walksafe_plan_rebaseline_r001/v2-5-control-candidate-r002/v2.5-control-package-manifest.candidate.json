@@ -1,0 +1,950 @@
+{
+  "schema_version": "walksafe.v2.5-control-package-manifest.candidate.v1",
+  "metadata": {
+    "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R002",
+    "prepared_at": "2026-08-02T17:32:53.360217+09:00",
+    "status": "NON_EFFECTIVE_NOT_APPROVED_NOT_APPLIED"
+  },
+  "effective": false,
+  "approved": false,
+  "applied": false,
+  "post_commit_receipt_created": false,
+  "active_discovery_registered": false,
+  "source_bindings": [
+    {
+      "role": "V2_4_STATIC_PLAN",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/static-plan-manifest-v2.4.0.json",
+      "sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+      "bytes": 39534,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "V2_4_SEQ39_CHECKPOINT",
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+      "bytes": 1329415,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+      "bytes": 488160,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+      "bytes": 59266,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_EXACT68_LEDGER",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/exact68-reassessment-ledger.json",
+      "sha256": "82ecdfbfc9a35d39f1f8648971df62c18faf861745ccc9a28f5b24d8d354493f",
+      "bytes": 189900,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_IMPLEMENTATION_GAP",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-gap-r022.candidate.json",
+      "sha256": "3dee2cccad7fb264077dc8858ac3940821af6b4cda0e7664c3e8809b69dc8595",
+      "bytes": 535938,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_IMPLEMENTATION_BACKLOG",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-backlog-r022.candidate.json",
+      "sha256": "8e2c9cc565ffdd1039f7e03fbfefed348e568d8b62a7750ff06f989a0b20f098",
+      "bytes": 58007,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_PAIR_MANIFEST",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/gap-backlog-pair-manifest.json",
+      "sha256": "7d1e5c0488342e62d3ee37db657cd3257ba7631a16a29bca676f9b858a9c5b08",
+      "bytes": 12972,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_INDEPENDENT_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/INDEPENDENT-REVIEW-R001.md",
+      "sha256": "f390c653e73646d68b94d5e9b96c81684eb32f0802d1ae98a5a3d7d5d2d75fb7",
+      "bytes": 2366,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_CONTROL_MIGRATION_DESIGN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/R022-CONTROL-MIGRATION-CANDIDATE-R001.md",
+      "sha256": "eacc7f529e9b2dbfabece9bf2bb01bb6a33a745baa2b9da521364bdb6c505295",
+      "bytes": 17312,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_CONTROL_MIGRATION_DESIGN_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/R022-CONTROL-MIGRATION-CANDIDATE-R001-independent-review-r001.md",
+      "sha256": "ea38e10d99debbc6def323b3abd4173e7df5b9627433f3b2f03592334d75993e",
+      "bytes": 1967,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016.md",
+      "sha256": "49ca08d423dd6ec648de4907e81dc671980d9e0ee6f1bb8acff6f68f7175d8c2",
+      "bytes": 12690,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_STRUCTURAL_PASS_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016-independent-structural-review-r001.md",
+      "sha256": "eced95aa2343427b24f80f8865e2fa8e9e3f320ad48c74fab7970d646a1fac87",
+      "bytes": 3758,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_SKEPTICAL_PASS_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016-independent-skeptical-review-r001.md",
+      "sha256": "9bae362ad4c1f0c4b2567b534197938f77d825b5d73d76dbd3a184542649bc0e",
+      "bytes": 5354,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R027_FAILED_SOURCE_STRUCTURAL_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002-source-independent-structural-review-r001.md",
+      "sha256": "fed5d269e5be776b4b786e34994e40cfe389ebf297de706938d13ca312ad8b86",
+      "bytes": 12646,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R027_FAILED_SOURCE_SKEPTICAL_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002-source-independent-skeptical-review-r001.md",
+      "sha256": "6cf06ede378ffe10ddcc2e9ca679cd77a57f38911faee298457e01e07f04f00a",
+      "bytes": 11381,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R017_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R017.md",
+      "sha256": "6437009fe07692f56e9c4320ce645bc9b13f5b28d8fe6d448e26c634c6f442a5",
+      "bytes": 13494,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R017_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R017-independent-structural-review-r001.md",
+      "sha256": "cbcb6a14e4af2b82ec84c300799575fd99a81b65e9e8236177ff7221be958e81",
+      "bytes": 9466,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R017_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R017-independent-skeptical-review-r001.md",
+      "sha256": "d10ba282eee810c58a0d76d8658a4a21d937dcd4c76882a4936dc97538d61fe4",
+      "bytes": 5326,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R018_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R018.md",
+      "sha256": "2a1df2cd5f0fdccb3183b15607b6a017ab6b2556d661ea16e9b6caaa9d9255f7",
+      "bytes": 17914,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R018_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R018-independent-structural-review-r001.md",
+      "sha256": "a87d59d2a3a5bbf601b4c3d9c3fdf8adaa1511c99e1c538a03db7be474a3b584",
+      "bytes": 8180,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R018_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R018-independent-skeptical-review-r001.md",
+      "sha256": "8fa2bfe82ac5b0b4a7a9d3708f9cf3407e995c8c82bd74d79ce2e8a4161879a4",
+      "bytes": 4551,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R019_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R019.md",
+      "sha256": "3c21f917793b0ffbe5f6aa892e1d73d122799fcfe005c22f2f289571b45d4eb2",
+      "bytes": 21461,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R019_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R019-independent-structural-review-r001.md",
+      "sha256": "97bfa16d3c0f02e6ac601c92bc78c19779438948fc089624dfa9dcc235c0a548",
+      "bytes": 11122,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R019_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R019-independent-skeptical-review-r001.md",
+      "sha256": "b2995ccd45980cfecd422f88bd02aed6d98b42f445824a29876336efb7e1d8fc",
+      "bytes": 7168,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R020_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R020.md",
+      "sha256": "276f499ce235289cbe7b6f15abc835ce87ed0ce8ccd76d03df904bc5f5cd44f1",
+      "bytes": 25239,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R020_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R020-independent-structural-review-r001.md",
+      "sha256": "9b378e4555c6c3a1edf1e712acb90f5f51089ed469116b552b1be496f7058316",
+      "bytes": 9096,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R020_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R020-independent-skeptical-review-r001.md",
+      "sha256": "8ac10e419f31409e5062cf82ab1066f3dafaff6eaaed63155662c3ff56ca9690",
+      "bytes": 10753,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R021.md",
+      "sha256": "b65d0242656b5898392fcab2b168832a6ce19577fa5e469cbbce2cfda777b919",
+      "bytes": 28757,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R021-independent-structural-review-r001.md",
+      "sha256": "d9dc411e51d3e6a724bb626630b20de8f258c6659829475d98c81903eee26a94",
+      "bytes": 9574,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R021-independent-skeptical-review-r001.md",
+      "sha256": "4e751ad91a3efec2546949ad393fa16692fb268300aea6df6aeeafeae068b93b",
+      "bytes": 8170,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R022.md",
+      "sha256": "2a05166af626fae929decf0fef28fc6c70b4b448a312e6e73ba2aa9e8cac3caa",
+      "bytes": 18978,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R022-independent-structural-review-r001.md",
+      "sha256": "46b227c645fa047d5c6fb2799cde6f40eed77b433a198b6e95f7b007586e111f",
+      "bytes": 9610,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R022-independent-skeptical-review-r001.md",
+      "sha256": "84b3cbff023acbc111681fce2484b2a636bcb45d1aa76b4bdbfe51d79f01cc75",
+      "bytes": 7295,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R023_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R023.md",
+      "sha256": "e0d2f11064b3a38745555332aca16bcc6b876094c33d89d26db0aa5da289272d",
+      "bytes": 25895,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R023_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R023-independent-structural-review-r001.md",
+      "sha256": "48e7e6f9221753657443b4a08d1df10bf813810690f0b4fa44165aed31a7ca1f",
+      "bytes": 9441,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R023_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R023-independent-skeptical-review-r001.md",
+      "sha256": "5939652d33a2ae54a09c9028160de7f2856f1a2a7515830ff52a7f87dae78ed3",
+      "bytes": 9728,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R024_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R024.md",
+      "sha256": "356fb4308542b129e0d2ef5957328cfd0fdebc57bd8dbf297b0856675eb21a92",
+      "bytes": 26522,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R024_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R024-independent-structural-review-r001.md",
+      "sha256": "40ff2e4cd20b49d34e90df55bf0af34e3a734639e89e67ba4adcb42b05e1c04d",
+      "bytes": 9087,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R024_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R024-independent-skeptical-review-r001.md",
+      "sha256": "4abcccdd066f608bd92854f3ec0794ccd3118d4046d58988222460b1f7bb03b4",
+      "bytes": 8568,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R025_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R025.md",
+      "sha256": "8ee466ee1433108dd015f0318351bbcb9a0158ccdd1e4d238f991e72ea323e12",
+      "bytes": 11950,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R025_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R025-independent-structural-review-r001.md",
+      "sha256": "6b8b9c7dfd76512b154f9e48977973547c6092f050a8aef49b0b09533d5bc4da",
+      "bytes": 7958,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R025_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R025-independent-skeptical-review-r001.md",
+      "sha256": "b3172b204eec4372961339e9b0b457a41822048e55ab2d3825acd77185c3801f",
+      "bytes": 8567,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R026_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R026.md",
+      "sha256": "b5485b82c679824ca8e5a53e441bd0750e09cbad5c9ecef090224191db3db479",
+      "bytes": 19518,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R026_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R026-independent-structural-review-r001.md",
+      "sha256": "f0b1e69159554282b072894009adcd2681ee533250e37cfc4d5c7f4b2df79cac",
+      "bytes": 5798,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R026_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R026-independent-skeptical-review-r001.md",
+      "sha256": "0c50eb94c748e974922f8f8cf2e77a80307036e7f7b28bb08301e24bd773733d",
+      "bytes": 7091,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R027_FAILED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R027.md",
+      "sha256": "79544b59b5f3168cc16925f7972ff23cc47c221d83e69b6cdaea751f21005467",
+      "bytes": 22055,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R027_FAILED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R027-independent-structural-review-r001.md",
+      "sha256": "eeeb854ae71c0179db85c0806c636eaea6757c51261feac207fb207ffcf468a2",
+      "bytes": 3324,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R027_FAILED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R027-independent-skeptical-review-r001.md",
+      "sha256": "eaa7f3ccde30b77b8208d76b64b512e61b6b7a6b4c8af54a732cf0f0d5b9ba0c",
+      "bytes": 6233,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R028_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R028.md",
+      "sha256": "0a83406951f4963405035649a52675e781f706cbd11bac6d0060540a8567f6db",
+      "bytes": 20142,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R028_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R028-independent-structural-review-r001.md",
+      "sha256": "72f4597411e59e666a2d84363a46789eada3eee8583e3331efeedbb735596ce5",
+      "bytes": 6804,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R028_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R028-independent-skeptical-review-r001.md",
+      "sha256": "cb7285561a4eaa70a49da286aba783cc03b83cf7870abfe94fbeef63a2e556b5",
+      "bytes": 7496,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R029_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R029.md",
+      "sha256": "5d02a6332ca79fc5a33143d92dbbe1f20aa22cb55046fd4a174caf7844b45c58",
+      "bytes": 20138,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R029_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R029-independent-structural-review-r001.md",
+      "sha256": "206858b97741aa84425c86af7e10d2d0ab024e50f392f5edf943f8537b602f16",
+      "bytes": 6038,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R029_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R029-independent-skeptical-review-r001.md",
+      "sha256": "d7e40b81b8e5ab63e5d35d7035bb814814316b75bb67236c0bac09a493e3f0ca",
+      "bytes": 7631,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R030_FAILED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R030.md",
+      "sha256": "f3a4391751b61fe488c5f2b2a6d052f611194e4e0a145f495e4e451e250ceb50",
+      "bytes": 22387,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R030_FAILED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R030-independent-structural-review-r001.md",
+      "sha256": "f963ff7a34080c76cd1808be93b2f5dc4690238ffa4b9e322c7da2547e8fa4d6",
+      "bytes": 6546,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R030_FAILED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R030-independent-skeptical-review-r001.md",
+      "sha256": "56d7192f23348fb223d8cc06205f848d814efc552f244dc3e9a957549f3c9ce0",
+      "bytes": 6474,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R031_FAILED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R031.md",
+      "sha256": "43f9d3cb119d3638ea743e6e5e5371d1cfa0aa50df817e7850fa449519405ea2",
+      "bytes": 15468,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R031_FAILED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R031-independent-structural-review-r001.md",
+      "sha256": "9eb38d17a94dd75bb1a43004bf15e46f53439cc8f6391543477084f04380ccfc",
+      "bytes": 7026,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R031_FAILED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R031-independent-skeptical-review-r001.md",
+      "sha256": "1516b6a0253eee6b73f8827ba0e9278a16f35523c88efc82d339a17eac3640af",
+      "bytes": 8763,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R032_REJECTED_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R032.md",
+      "sha256": "143006abec69046c1bd633c5ac03beb95220bf03f990a385a6db9bffada3b5e1",
+      "bytes": 15410,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R032_REJECTED_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R032-independent-structural-review-r001.md",
+      "sha256": "ad03b130908ffc821564e962bc3747486107702bb764f0f56fd88bf7503b076a",
+      "bytes": 3391,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R032_REJECTED_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R032-independent-skeptical-review-r001.md",
+      "sha256": "73def50764f75e1ba07294c3bf4253c4473077e5e9af7acd1801ea7326b159d8",
+      "bytes": 10006,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R033_CURRENT_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R033.md",
+      "sha256": "8e884c68162e2287336ec8fe6020de50ece753c7a707d38711760d3ce99467db",
+      "bytes": 20605,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R033_CURRENT_STRUCTURAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R033-independent-structural-review-r001.md",
+      "sha256": "a04e30f85f717bc0d4780ea9bb50ddb8c7984552a906fa7ba767529b4a1e6802",
+      "bytes": 7742,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R033_CURRENT_SKEPTICAL_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R033-independent-skeptical-review-r001.md",
+      "sha256": "9f21cd7a86eee8f84ead74b663c9b71f79d8f4764d3507bdab58eb2bffd5dd7c",
+      "bytes": 10633,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    }
+  ],
+  "generator_bindings": [
+    {
+      "path": "scripts/build_walksafe_v2_5_control_candidate_20260730.py",
+      "sha256": "ebf06f12e409a9b14fc168dd9892da4bde02632ad6b403b2cc3102a2919d8ed6",
+      "bytes": 52856
+    },
+    {
+      "path": "scripts/walksafe_v2_5_candidate_validation.py",
+      "sha256": "bddcfaf105500b0bdf46fe8b6beb34fb1371ce344101e04e9eb50bcea7b12465",
+      "bytes": 199526
+    },
+    {
+      "path": "scripts/check_walksafe_project_continuation_v2_5_candidate.py",
+      "sha256": "1a2dc4f1d8c28c5163cae8306a160e8f942f962ea2ec190a625b64dc688ece5c",
+      "bytes": 2513
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_5_candidate.py",
+      "sha256": "98d656e8c3c54e122a419eee9d2c3b3285f2594f4abd3abbb5597d8e9470feda",
+      "bytes": 2434
+    },
+    {
+      "path": "tests/test_walksafe_v2_5_control_candidate_20260730.py",
+      "sha256": "c8adec852304469a1e9063dca9cab088937d7692c206935ab16c631ba2181a3d",
+      "bytes": 79969
+    }
+  ],
+  "outputs": [
+    {
+      "role": "STATIC_PLAN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/static-plan-manifest-v2.5.0.candidate.json",
+      "sha256": "382a4f9941ad2db28c9ca1aa0a1fa3f657f7dc8edeeb0baa93648d8f121567f9",
+      "bytes": 34117,
+      "content_sha256": "5c9aece50a4db79a4dc115ef5015fbf53090b02ce758104bac94e78c6f87cafb"
+    },
+    {
+      "role": "APPLICATION_TRANSACTION_PLAN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json",
+      "sha256": "a5c955f2f24edced49c2a40cebd8b4e8c664c8416d783eb6082d730a494dd84c",
+      "bytes": 693880,
+      "content_sha256": "3a07ce2a8e508a1fbe6959cd5e4fda07557e61eaba8f31922f6d3aa1b6617229"
+    },
+    {
+      "role": "TRANSITION_HISTORY",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/transition-history-v2.5.candidate.json",
+      "sha256": "09899bb768fb25aef591e47b15c95aee0657b76f6af05ee67141d58084e86d32",
+      "bytes": 2683,
+      "content_sha256": "71f194245361d081acdb3f5f765859ff16407d3c53907bd4fe705d5218954f63"
+    },
+    {
+      "role": "CHECKPOINT_AFTER_PROJECTION",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+      "sha256": "b60dee2e53c992485009350ccfe6a125968f0a26891f255f058a86fbe92d7bfe",
+      "bytes": 218583,
+      "content_sha256": "31f7b6c3ff7d109897c1dfd159112635706e488e8943682a791dd596455fc44c"
+    }
+  ],
+  "package_manifest_self_binding": {
+    "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-control-package-manifest.candidate.json",
+    "hash_kind": "LOGICAL_SELF_SEAL_ONLY",
+    "excluded_from_physical_output_bindings": true
+  },
+  "byte_exact_promotion_mapping": [
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-gap-r022.candidate.json",
+      "final_path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r022.json",
+      "sha256": "3dee2cccad7fb264077dc8858ac3940821af6b4cda0e7664c3e8809b69dc8595",
+      "bytes": 535938,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-backlog-r022.candidate.json",
+      "final_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r022.json",
+      "sha256": "8e2c9cc565ffdd1039f7e03fbfefed348e568d8b62a7750ff06f989a0b20f098",
+      "bytes": 58007,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/superseded-v2.4.0-active-checkpoint.json",
+      "sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+      "bytes": 1329415,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/static-plan-manifest-v2.5.0.candidate.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/static-plan-manifest-v2.5.0.json",
+      "sha256": "382a4f9941ad2db28c9ca1aa0a1fa3f657f7dc8edeeb0baa93648d8f121567f9",
+      "bytes": 34117,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json",
+      "final_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-002/application-transaction-plan.json",
+      "sha256": "a5c955f2f24edced49c2a40cebd8b4e8c664c8416d783eb6082d730a494dd84c",
+      "bytes": 693880,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/transition-history-v2.5.candidate.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-seq1-prefix-v2.5.json",
+      "sha256": "09899bb768fb25aef591e47b15c95aee0657b76f6af05ee67141d58084e86d32",
+      "bytes": 2683,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/walksafe_v2_5_candidate_validation.py",
+      "final_path": "scripts/walksafe_v2_5_validation.py",
+      "sha256": "bddcfaf105500b0bdf46fe8b6beb34fb1371ce344101e04e9eb50bcea7b12465",
+      "bytes": 199526,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/check_walksafe_project_continuation_v2_5_candidate.py",
+      "final_path": "scripts/check_walksafe_project_continuation_v2_5.py",
+      "sha256": "1a2dc4f1d8c28c5163cae8306a160e8f942f962ea2ec190a625b64dc688ece5c",
+      "bytes": 2513,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/check_walksafe_goal_graph_v2_5_candidate.py",
+      "final_path": "scripts/check_walksafe_goal_graph_v2_5.py",
+      "sha256": "98d656e8c3c54e122a419eee9d2c3b3285f2594f4abd3abbb5597d8e9470feda",
+      "bytes": 2434,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    }
+  ],
+  "sealed_deterministic_transforms": [
+    {
+      "transform_id": "WS-V25-R022-AUTHORIZED-FINAL-TRANSFORM-20260730-R002",
+      "promotion_mode": "SEALED_DETERMINISTIC_TRANSFORM",
+      "input_candidate_checkpoint_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+      "input_candidate_checkpoint_sha256": "b60dee2e53c992485009350ccfe6a125968f0a26891f255f058a86fbe92d7bfe",
+      "input_candidate_checkpoint_bytes": 218583,
+      "input_history_prefix_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/transition-history-v2.5.candidate.json",
+      "input_history_prefix_sha256": "09899bb768fb25aef591e47b15c95aee0657b76f6af05ee67141d58084e86d32",
+      "transform_spec": {
+        "transform_id": "WS-V25-R022-AUTHORIZED-FINAL-TRANSFORM-20260730-R002",
+        "function": "project_authorized_transition",
+        "core_binding": {
+          "path": "scripts/walksafe_v2_5_candidate_validation.py",
+          "sha256": "bddcfaf105500b0bdf46fe8b6beb34fb1371ce344101e04e9eb50bcea7b12465",
+          "bytes": 199526
+        },
+        "sealed_static_inputs": [
+          {
+            "role": "STATIC_PLAN_CANDIDATE",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/static-plan-manifest-v2.5.0.candidate.json",
+            "sha256": "382a4f9941ad2db28c9ca1aa0a1fa3f657f7dc8edeeb0baa93648d8f121567f9",
+            "bytes": 34117
+          },
+          {
+            "role": "SEQ1_CANDIDATE_CHECKPOINT",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+            "sha256": "b60dee2e53c992485009350ccfe6a125968f0a26891f255f058a86fbe92d7bfe",
+            "bytes": 218583
+          },
+          {
+            "role": "SEQ1_HISTORY_PREFIX",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/transition-history-v2.5.candidate.json",
+            "sha256": "09899bb768fb25aef591e47b15c95aee0657b76f6af05ee67141d58084e86d32",
+            "bytes": 2683
+          },
+          {
+            "role": "APPLICATION_TRANSACTION_PLAN",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json",
+            "sha256": "a5c955f2f24edced49c2a40cebd8b4e8c664c8416d783eb6082d730a494dd84c",
+            "bytes": 693880
+          }
+        ],
+        "required_dynamic_input_roles": [
+          "CONTROL_CORE_INDEPENDENT_REVIEW_RECEIPT",
+          "CONTROL_TRANSITION_AUTHORIZATION_RECEIPT",
+          "FRESH_QUICK_GATE_RECEIPT"
+        ],
+        "source_cas_binding_sha256": "dd126b3a3ef72b3f46185aba4011fa4a37d6f43af2dd51944a7dec4f77100b20",
+        "output_paths": [
+          "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+          "docs/control/walksafe-project-continuation-checkpoint.json"
+        ],
+        "allowed_delta_source": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json",
+        "final_history_projection_contract": {
+          "chronology_contract": {
+            "strict_sequence_order": [
+              1,
+              2,
+              3
+            ],
+            "seq1_before_seq2_before_seq3": true,
+            "seq2_source": "FRESH_QUICK_GATE.checked_at",
+            "seq3_source": "CANONICAL_RFC3339_CHECKED_AT_PLUS_1_MICROSECOND",
+            "seq3_not_after": "FRESH_QUICK_GATE.valid_until"
+          },
+          "fixed_rows": [
+            {
+              "json_pointer": "/candidate_state",
+              "after": "TARGET_ACTIVE_ONLY_AT_AUTHORIZED_ATOMIC_CHECKPOINT_SWITCH"
+            },
+            {
+              "json_pointer": "/future_events_materialized",
+              "after": true
+            },
+            {
+              "json_pointer": "/effective_state_semantics",
+              "after": "ACTIVE_ONLY_WHEN_FINAL_HISTORY_AND_CHECKPOINT_BYTES_ARE_COMMITTED"
+            }
+          ],
+          "dynamic_rows": [
+            {
+              "json_pointer": "/events",
+              "source": "SEQ1_PREFIX_PLUS_FIXED_SEQ2_ACTIVATION_AND_SEQ3_R022"
+            },
+            {
+              "json_pointer": "/tail_event_sha256",
+              "source": "PROJECTED_SEQ3.event_sha256"
+            },
+            {
+              "json_pointer": "/authorization_binding",
+              "source": "AUTHORIZATION_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/fresh_quick_gate_binding",
+              "source": "FRESH_QUICK_GATE_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/history_content_sha256",
+              "source": "HISTORY_LOGICAL_SELF_SEAL"
+            }
+          ],
+          "delta_outside_fixed_and_dynamic_rows_allowed": false
+        },
+        "activation_envelope_projection_contract": {
+          "fixed_rows": [
+            {
+              "json_pointer": "/metadata/checkpoint_id",
+              "after": "WS-V25-R022-ACTIVE-CHECKPOINT-20260730-R002"
+            },
+            {
+              "json_pointer": "/metadata/version",
+              "after": "1.25.0"
+            },
+            {
+              "json_pointer": "/metadata/status",
+              "after": "TARGET_ACTIVE_AFTER_AUTHORIZED_ATOMIC_COMMIT"
+            },
+            {
+              "json_pointer": "/metadata/purpose",
+              "after": "승인된 v2.5 seq1~3 전환과 r022 canonical pair를 원자적으로 활성화한 checkpoint다."
+            },
+            {
+              "json_pointer": "/goal_execution/schema_version",
+              "after": "2.5"
+            },
+            {
+              "json_pointer": "/goal_execution/package_status",
+              "after": "ACTIVE"
+            },
+            {
+              "json_pointer": "/goal_execution/activation_status",
+              "after": "ACTIVE"
+            },
+            {
+              "json_pointer": "/goal_execution/transition_history_assurance",
+              "after": "PREDECESSOR_ANCHORED_AUTHORIZED_SEQ1_SEQ2_SEQ3_POSTCOMMIT_RECEIPT_PENDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/state",
+              "after": "R022_ACTIVE_SEQ3_POSTCOMMIT_RECEIPT_PENDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/effective",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/approved",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/applied",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/state_semantics",
+              "after": "TRUE_ONLY_WHEN_THESE_EXACT_BYTES_ARE_AT_THE_ACTIVE_CHECKPOINT_PATH"
+            }
+          ],
+          "dynamic_rows": [
+            {
+              "json_pointer": "/goal_execution/transition_history",
+              "source": "PROJECTED_FINAL_HISTORY.events"
+            },
+            {
+              "json_pointer": "/goal_execution/transition_history_anchor_sha256",
+              "source": "PROJECTED_FINAL_HISTORY.tail_event_sha256"
+            },
+            {
+              "json_pointer": "/goal_execution/validation_cutoff_at",
+              "source": "FRESH_QUICK_GATE.checked_at"
+            },
+            {
+              "json_pointer": "/goal_execution/verification_evidence_refs",
+              "source": "SEQ1_CANDIDATE_PLUS_AUTHORIZATION_AND_QUICK_GATE_IDS"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/history_binding",
+              "source": "PROJECTED_FINAL_HISTORY_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/authorization_binding",
+              "source": "AUTHORIZATION_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/fresh_quick_gate_binding",
+              "source": "FRESH_QUICK_GATE_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/working_tree_snapshot",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/session_handoff/source_commit_or_snapshot",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/session_handoff/changed_files",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/checkpoint_content_sha256",
+              "source": "CHECKPOINT_LOGICAL_SELF_SEAL"
+            }
+          ],
+          "predecessor_goal_non_envelope_sha256": "03844e4ea34d00f4d4cf2ede085b1996e3586f66d7d8ac7720b6e6db3ebc1ab2",
+          "delta_outside_fixed_dynamic_r022_and_snapshot_contracts_allowed": false
+        },
+        "working_snapshot_transform_contract_sha256": "935224b01f042bb5f2f9e840139de72b2ef9815a6707bf4d587374813352e23e",
+        "canonicalization": "UTF8_JSON_ENSURE_ASCII_FALSE_INDENT_2_LF_ALLOW_NAN_FALSE",
+        "final_hash_state": "DERIVED_AFTER_AUTHORIZATION"
+      },
+      "transform_spec_sha256": "d7a11e885324820359f4bc94f232cf30a2987b3cf5a4157d4158357a9db7ee89",
+      "delegation_requirement_id": "WS-V25-R022-CURRENT-LIVE-SESSION-DELEGATION-20260802-R033-R002",
+      "fresh_quick_gate_requirement_id": "WS-V25-R022-FRESH-QUICK-GATE-REQUIRED-20260730-R002",
+      "final_history_path": "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+      "final_checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "final_hash_state": "DERIVED_AFTER_AUTHORIZATION",
+      "final_hashes": null,
+      "allowed_delta_source": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json"
+    }
+  ],
+  "candidate_specific_delegation_subject": {
+    "requirement_id": "WS-V25-R022-CURRENT-LIVE-SESSION-DELEGATION-20260802-R033-R002",
+    "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R002",
+    "transaction_plan_id": "WS-V25-R022-APPLICATION-TRANSACTION-PLAN-20260730-R002",
+    "status": "SATISFIED_BY_CURRENT_LIVE_SESSION_DELEGATION_PENDING_LOCAL_RECORD",
+    "authority_kind": "CURRENT_LIVE_SESSION_USER_DELEGATION",
+    "authority_claim_boundary": "LOCAL_SESSION_CONTENT_DELEGATION_NOT_EXTERNAL_IDENTITY_OR_CRYPTOGRAPHIC_SIGNATURE",
+    "delegation_observed": true,
+    "local_receipt_recorded": false,
+    "authorized": false,
+    "promotion_mapping_sha256": "cf9ae772030c77294db226cc01eb0a453b861f819bac1594596b54ce920b82fa",
+    "transaction_plan_sha256": "a5c955f2f24edced49c2a40cebd8b4e8c664c8416d783eb6082d730a494dd84c",
+    "transaction_plan_content_sha256": "3a07ce2a8e508a1fbe6959cd5e4fda07557e61eaba8f31922f6d3aa1b6617229",
+    "prepared_event_sha256": "de87018e80801ed64dc98a77b07ffbe500149d9fb76bf5754a8246c8e4c331c0",
+    "normalized_execution_scope": {
+      "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R002",
+      "transaction_plan_id": "WS-V25-R022-APPLICATION-TRANSACTION-PLAN-20260730-R002",
+      "r002_pair_fingerprint_sha256": "09fcf9cba249a777946fc90a9ee903f2e70143a431e68d0fda2564a7ea8ba67f",
+      "goal_topology_delta": 0,
+      "goal_status_delta": 0,
+      "runtime_queue_delta": 0,
+      "goal_materialization_credit_delta": 0,
+      "goal_start_credit_delta": 0,
+      "goal_completion_credit_delta": 0,
+      "artifact_completion_credit_delta": 0,
+      "approval_credit_delta": 0,
+      "formal_test_credit_delta": 0,
+      "actual_device_credit_delta": 0,
+      "actual_event_credit_delta": 0,
+      "release_gate_credit_delta": 0,
+      "product_code_delta": 0,
+      "release_status_after": "NOT_ELIGIBLE"
+    }
+  },
+  "future_activation_attempt_contract": {
+    "monotonic_freshness": {
+      "clock": "time.monotonic_ns()",
+      "start": "PREPARE_START",
+      "end": "IMMEDIATELY_BEFORE_C1_CAS",
+      "same_process_required": true,
+      "same_lock_epoch_required": true,
+      "max_elapsed_seconds": 600,
+      "wall_clock_authoritative": false,
+      "enforced_by_future_supervisor": true
+    },
+    "partial_crash_recovery": {
+      "preexisting_final_allowed": false,
+      "partial_resume_allowed": false,
+      "overwrite_allowed": false,
+      "delete_allowed": false,
+      "repair_allowed": false,
+      "pre_c1_partial_terminal": "NEW_REVISION_REQUIRED_UNCOMMITTED_AUTHORITY_ZERO",
+      "v2_4_r021_remains_active": true
+    }
+  },
+  "publication_contract": {
+    "candidate_directory_add_only": true,
+    "all_output_bytes_built_and_validated_before_publication": true,
+    "single_atomic_directory_publish": true,
+    "rename_noreplace_required": true,
+    "partial_candidate_directory_allowed": false,
+    "canonical_paths_written": false
+  },
+  "resolved_output_manifest_contract": {
+    "created_by_candidate": false,
+    "created_after_authorization_and_fresh_quick_gate": true,
+    "created_before_any_final_write": true,
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-002/resolved-output-manifest.json",
+    "publication": [
+      "TEMP_O_EXCL",
+      "FILE_FSYNC",
+      "RENAME_NOREPLACE",
+      "PARENT_FSYNC"
+    ],
+    "binds": [
+      "TRANSACTION_ID",
+      "AUTHORIZATION_RECEIPT_SHA256",
+      "FRESH_QUICK_GATE_RECEIPT_SHA256",
+      "ALL_FINAL_PATH_SHA256_BYTES"
+    ],
+    "exact_member_paths": [
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r022.json",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r022.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/static-plan-manifest-v2.5.0.json",
+      "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-002/application-transaction-plan.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-seq1-prefix-v2.5.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/control-package-manifest-v2.5.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/superseded-v2.4.0-active-checkpoint.json",
+      "scripts/walksafe_v2_5_validation.py",
+      "scripts/check_walksafe_project_continuation_v2_5.py",
+      "scripts/check_walksafe_goal_graph_v2_5.py",
+      "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+      "docs/control/walksafe-project-continuation-checkpoint.json"
+    ],
+    "excluded_member_kinds": [
+      "RESOLVED_MANIFEST_SELF",
+      "TEMPORARY_FILE",
+      "FAILURE_RECEIPT",
+      "INCIDENT_RECORD",
+      "POSTCHECK_OUTPUT",
+      "POST_COMMIT_RECEIPT"
+    ],
+    "preexisting_final_allowed": false,
+    "partial_resume_allowed": false,
+    "overwrite_allowed": false,
+    "pre_c1_partial_terminal": "NEW_REVISION_REQUIRED_UNCOMMITTED_AUTHORITY_ZERO",
+    "referenced_by_events": false,
+    "bound_one_way_by_post_commit_receipt": true
+  },
+  "hash_cycle_boundary": {
+    "package_manifest_self_reference": "LOGICAL_SELF_SEAL_ONLY",
+    "package_manifest_excluded_from_physical_output_bindings": true,
+    "transaction_plan_binds_final_checkpoint_hash": false,
+    "events_bind_post_commit_receipt": false,
+    "post_commit_receipt_present": false
+  },
+  "manifest_content_sha256": "90123050f10814dd6e530fa269ef320fbb4efd5481029d186164f1cfbf0255bc"
+}

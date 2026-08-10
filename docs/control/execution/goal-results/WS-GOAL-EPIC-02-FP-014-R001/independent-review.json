@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-INTERNAL-REVIEW-20260726-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-FP-014-R001",
+  "status": "PASS",
+  "reviewer_id": "WS-FP014-INDEPENDENT-REVIEWER-001",
+  "reviewer_task": "/root/fp014_final_evidence_review",
+  "review_subject_sha256": "3809992833e63d6a32a090a5816ed3f380411071a9293c9e162e972bba1db2ae",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "b200db586fd9c16bed10b6895bb8f502276cb2ebca4abea64fbdddd8d010fced",
+    "VERIFICATION_RESULT": "e70c039b52457d1cec6031e11047e8b223020ca4b46312f9a8cc05fdee0e7e52",
+    "SUCCESSOR_TRACE": "8ed523061652c1d819a6296bd50ed3b16e90503d66e47979512ac1d4f932a92c"
+  },
+  "reviewed_at": "2026-07-26T05:11:01+09:00",
+  "attestation_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/review-attestation.json",
+    "sha256": "67fb8ad978cd1f9678d34a553cb054e79900ca4a1a4e0082cca799d479cc5fde"
+  },
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "Permission denial and revocation enter a fail-closed recovery barrier, stop permission-dependent work and require explicit user resume before restart.",
+      "Automatic callbacks, lifecycle resume, state restore and rendering paths cannot clear or bypass the explicit-resume gate.",
+      "Accessibility status, focus, labels and touch-target semantics remain bound across permission recovery states.",
+      "FieldSessionLog persists a recovery fence, rejects stale cross-instance restore and remains fail closed until a user-confirmed fresh start.",
+      "The review subject exactly binds the current exact-11 content set, all three result hashes, five canonical logs, exact-once markers and all-pass JUnit summaries."
+    ],
+    "known_nonblocking_boundaries": [
+      "TC-FP-014-01 through TC-FP-014-03 and the planned 279 formal tests were not run.",
+      "Actual users, TalkBack users, Android devices, Android platform review and operational permission-profile approval were not run.",
+      "Production deployment and five release gates were not run or waived; release remains not eligible.",
+      "This is a separate internal review pass and does not claim external independence."
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "actual_user_tests_remain_not_run": true,
+    "actual_talkback_user_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "android_platform_review_remains_not_run": true,
+    "operational_permission_profile_approval_remains_not_run": true,
+    "production_deployment_remains_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

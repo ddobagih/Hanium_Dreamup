@@ -1,0 +1,57 @@
+WALKSAFE_EXECUTION_EVENT_SEQUENCE=24
+WALKSAFE_EXECUTION_EVENT_ID=WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP016-20260726-001
+WALKSAFE_EXECUTION_EVENT_SHA256=4939c7612a7b1b452df2273977305f057ff856e7f95633f5b2922d7052bc71f6
+WALKSAFE_IMPLEMENTATION_EXACT_13_CONTENT_SET_SHA256=ff9f07c1b811d11bda64a0b52fbc58844c917197f6b0e8d82b0c11847f662fd6
+WALKSAFE_RUN_ID=walksafe-fp016-focused-20260726-002
+WALKSAFE_COMMAND_SHA256=14f4ecacf61353f69845c7bcfb38a11fb8dfe19ccfc2e6c401d3dfd680eda699
+WALKSAFE_RESOURCE_LIMIT=MemoryMax:6G,MemoryHigh:5G,CPUQuota:250%,GradleMaxWorkers:1
+WALKSAFE_COMMAND_STARTED_AT=2026-07-26T07:48:39+09:00
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:generateDebugRFile
+
+> Task :app:compileDebugKotlin
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:11381:24 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:11569:59 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+
+> Task :app:javaPreCompileDebug
+> Task :app:compileDebugJavaWithJavac
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+
+BUILD SUCCESSFUL in 22s
+26 actionable tasks: 26 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+WALKSAFE_JUNIT_XML_FILES=12
+WALKSAFE_JUNIT_TESTS=128
+WALKSAFE_JUNIT_FAILURES=0
+WALKSAFE_JUNIT_ERRORS=0
+WALKSAFE_JUNIT_SKIPPED=0
+WALKSAFE_JUNIT_XML_CONTENT_SET_SHA256=edaaf526a6144cdfed20983ef73d0d577c814e076996e61aac225d063f10d978
+WALKSAFE_JUNIT_SUMMARIZER_SHA256=f40d6e4d97b6e1721661fef4e735e17f81d24e46b40d2e807bd31d8068bae11f
+WALKSAFE_COMMAND_ENDED_AT=2026-07-26T07:49:02+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0

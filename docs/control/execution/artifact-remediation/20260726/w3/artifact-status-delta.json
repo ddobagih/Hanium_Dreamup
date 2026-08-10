@@ -1,0 +1,325 @@
+{
+  "schema_version": "walksafe.artifact-status-delta.v3",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-STATUS-DELTA-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "APPLIED_PARTIAL_WAVE_DELTA",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+    "upstream": {
+      "trace_json": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "sha256": "0c816c830a4371fc4abbef0e3f4848940daa130837e3cead06a0e7a9eb800ce0"
+      },
+      "trace_markdown": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.md",
+        "sha256": "d002f65855525e407918b2855f4274c1b959840e2a954992c655b211dcb219be"
+      },
+      "trace_pair_sha256": "24aa9b0b43d56e9a1d8c834b2ee2c4d39ee8718bbb59aac5f2e5a5c8aa958c66"
+    },
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC"
+  },
+  "scope": {
+    "wave_id": "W3",
+    "artifact_count": 17,
+    "exact_artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-02",
+      "DLV-DEV-03",
+      "DLV-DEV-04",
+      "DLV-DEV-05",
+      "DLV-DEV-06",
+      "DLV-DEV-07",
+      "DLV-DEV-08",
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-14",
+      "DLV-DEV-16",
+      "DLV-DEV-17",
+      "DLV-DEV-18",
+      "DLV-DEV-19",
+      "DLV-DEV-20",
+      "DLV-DEV-21"
+    ]
+  },
+  "baseline_counts_before_w3": {
+    "OK": 98,
+    "INTERNAL_GAP": 82,
+    "EXTERNAL": 41,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "applied_delta": {
+    "OK": 9,
+    "INTERNAL_GAP": -9,
+    "EXTERNAL": 0,
+    "N_A_CANDIDATE": 0,
+    "TOTAL": 0
+  },
+  "counts_after_w3": {
+    "OK": 107,
+    "INTERNAL_GAP": 73,
+    "EXTERNAL": 41,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "transitions": [
+    {
+      "artifact_type_code": "DLV-DEV-01",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-02",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-03",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-04",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-05",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-06",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-07",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-08",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-09",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-12",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-14",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-16",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-17",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-18",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "delta_effect": {
+        "OK": 1,
+        "INTERNAL_GAP": -1
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-19",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-20",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    },
+    {
+      "artifact_type_code": "DLV-DEV-21",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "delta_effect": {
+        "OK": 0,
+        "INTERNAL_GAP": 0
+      },
+      "review_status": "APPROVED_WITH_OPEN_GAPS"
+    }
+  ],
+  "classification_result": {
+    "OK": {
+      "count": 9,
+      "artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-07",
+        "DLV-DEV-08",
+        "DLV-DEV-18"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 8,
+      "artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-14",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20",
+        "DLV-DEV-21"
+      ]
+    }
+  },
+  "independent_review": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+    "sha256": "006f676b0eb06df3843c1838c7adc247747f886369242cb4c087b26b2f837107",
+    "status": "APPROVED_WITH_OPEN_GAPS",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    }
+  },
+  "accounting_invariants": {
+    "pre_total_exact_257": true,
+    "post_total_exact_257": true,
+    "ok_delta_exact_9": true,
+    "internal_gap_delta_exact_minus_9": true,
+    "external_unchanged": true,
+    "n_a_candidate_unchanged": true,
+    "out_of_scope_status_change_count": 0
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_fixture_linked_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "formal_pass_claimed": false,
+    "actual_device_status": "NOT_RUN",
+    "cross_process_android_gateway_backend_postgis": "NOT_RUN",
+    "tmap_status": "NOT_RUN",
+    "deploy_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "signing_status": "NOT_ASSESSED",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "meaning": "독립 검토가 승인한 9건만 OK로 전이하고 8건은 INTERNAL_GAP으로 유지한다.",
+  "integrity": {
+    "transition_count": 17,
+    "transition_unique_count": 17,
+    "changed_count": 9,
+    "retained_count": 8,
+    "trace_pair_sha256": "24aa9b0b43d56e9a1d8c834b2ee2c4d39ee8718bbb59aac5f2e5a5c8aa958c66",
+    "common_fingerprint": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON; ensure_ascii=false; sort_keys=true; compact separators; integrity.content_fingerprint.value=null; trailing LF",
+      "value": "50523a6566c02019196200e474b9b8aee7eab4267b8d978949d26e8080f58f09"
+    }
+  }
+}

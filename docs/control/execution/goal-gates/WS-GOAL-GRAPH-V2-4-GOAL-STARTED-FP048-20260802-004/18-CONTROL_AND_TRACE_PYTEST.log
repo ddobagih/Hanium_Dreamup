@@ -1,0 +1,566 @@
+EEEEEEEEEEEEEEEEEEEE.................................................... [ 44%]
+........................................................................ [ 89%]
+.................                                                        [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_active_overlay_is_minimal_and_does_not_promote_dev18 _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_builder_writes_only_new_phase_b_and_r002_outputs _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_every_top_level_content_hash_rejects_tampering _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_immutable_baseline_and_r001_inputs_remain_exact _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_phase_b_record_is_internal_and_epic_remains_in_progress _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_r002_backlog_keeps_epic01_open_and_selects_runtime_preflight _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_r002_changes_only_two_focused_assessments _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_r002_does_not_overstate_formal_or_release_state _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseBTraceTest.test_recovery_drill_is_only_a_draft_procedure _
+
+cls = <class 'test_walksafe_epic01_phase_b_trace_20260722.WalkSafeEpic01PhaseBTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_b_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:1111: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:210: in _assert_immutable_inputs
+    _require(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_b_trace.TraceBuildError: immutable r001/baseline input changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_b_trace_20260722.py:154: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_active_overlay_is_successor_only_and_does_not_promote_dev18 _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_backlog_keeps_epic01_open_and_selects_legacy_web_closure _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_builder_writes_exactly_eight_new_phase_c_outputs _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_every_top_level_content_hash_rejects_tampering _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_phase_c_record_is_internal_and_profiles_are_empty _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_r001_r002_and_phase_b_predecessors_remain_byte_exact _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_r003_keeps_all_formal_and_release_boundaries_open _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_r003_reassesses_only_gap018_from_conflicting_to_partial _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_runtime_metric_policy_contract_matches_kotlin_and_exact_boundaries _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_runtime_metric_policy_source_drift_is_rejected _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseCTraceTest.test_snapshot_contains_only_phase_c_android_paths _
+
+cls = <class 'test_walksafe_epic01_phase_c_trace_20260722.WalkSafeEpic01PhaseCTraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_c_trace_20260722.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:1067: in build_outputs
+    _assert_immutable_inputs()
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:310: in _assert_immutable_inputs
+    _require(_file_sha256(path) == expected, f"immutable predecessor changed: {_relative(path)}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'immutable predecessor changed: docs/deliverables/00-control/artifact-register.json'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_c_trace.TraceBuildError: immutable predecessor changed: docs/deliverables/00-control/artifact-register.json
+
+scripts/build_walksafe_epic01_phase_c_trace_20260722.py:139: TraceBuildError
+=========================== short test summary info ============================
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_active_overlay_is_minimal_and_does_not_promote_dev18
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_builder_writes_only_new_phase_b_and_r002_outputs
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_every_top_level_content_hash_rejects_tampering
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_immutable_baseline_and_r001_inputs_remain_exact
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_phase_b_record_is_internal_and_epic_remains_in_progress
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_r002_backlog_keeps_epic01_open_and_selects_runtime_preflight
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_r002_changes_only_two_focused_assessments
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_r002_does_not_overstate_formal_or_release_state
+ERROR tests/test_walksafe_epic01_phase_b_trace_20260722.py::WalkSafeEpic01PhaseBTraceTest::test_recovery_drill_is_only_a_draft_procedure
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_active_overlay_is_successor_only_and_does_not_promote_dev18
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_backlog_keeps_epic01_open_and_selects_legacy_web_closure
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_builder_writes_exactly_eight_new_phase_c_outputs
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_every_top_level_content_hash_rejects_tampering
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_phase_c_record_is_internal_and_profiles_are_empty
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_r001_r002_and_phase_b_predecessors_remain_byte_exact
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_r003_keeps_all_formal_and_release_boundaries_open
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_r003_reassesses_only_gap018_from_conflicting_to_partial
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_runtime_metric_policy_contract_matches_kotlin_and_exact_boundaries
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_runtime_metric_policy_source_drift_is_rejected
+ERROR tests/test_walksafe_epic01_phase_c_trace_20260722.py::WalkSafeEpic01PhaseCTraceTest::test_snapshot_contains_only_phase_c_android_paths
+141 passed, 6 deselected, 20 errors in 12.71s

@@ -1,0 +1,43 @@
+Script started on 2026-07-25 02:17:11+09:00 [COMMAND="./gradlew --offline --no-daemon :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.session.FirstRunOnboardingPolicyTest --tests kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessTest --tests kr.co.hanium.dreamup.walksafe.MainActivityFirstRunRegistrationStaticTest --tests kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingPolicyTest --tests kr.co.hanium.dreamup.walksafe.PriorityUserOnboardingStaticTest --tests kr.co.hanium.dreamup.walksafe.PermissionSessionLifecycleStaticTest --tests kr.co.hanium.dreamup.walksafe.RuntimeMetricMainActivityStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityStartupCapabilityStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityOfficialEnvironmentStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityPhoneMountingStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityAccessibilityStaticTest --tests kr.co.hanium.dreamup.walksafe.ProductPurposeSurfacesStaticTest --rerun-tasks" <not executed on terminal>]
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:javaPreCompileDebug
+> Task :app:mapDebugSourceSetPaths
+> Task :app:checkDebugAarMetadata
+> Task :app:parseDebugLocalResources
+> Task :app:compileDebugNavigationResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:generateDebugRFile
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+
+> Task :app:compileDebugKotlin
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:8616:24 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:8802:59 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+
+BUILD SUCCESSFUL in 18s
+26 actionable tasks: 26 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+
+Script done on 2026-07-25 02:17:30+09:00 [COMMAND_EXIT_CODE="0"]

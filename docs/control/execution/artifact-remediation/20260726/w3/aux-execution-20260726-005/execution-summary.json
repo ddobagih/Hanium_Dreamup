@@ -1,0 +1,359 @@
+{
+  "auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-005",
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "cross_process_device_backend_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "legal_approval_claimed": false,
+    "production_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "cleanup_actions": [
+    {
+      "action": "REMOVE_REDIRECTED_PYCACHE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-aux005-pycache"
+    },
+    {
+      "action": "REMOVE_TEMP_LICENSE_HELPER",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-license-review-005.py"
+    },
+    {
+      "action": "REMOVE_TEMP_LICENSE_BASE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-license-review-005-base.json"
+    },
+    {
+      "action": "REMOVE_TEMP_SCHEMA_HELPER",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-schema-validation-005.py"
+    },
+    {
+      "action": "REMOVE_TEMP_SCHEMA_BASE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-schema-validation-005-base.json"
+    }
+  ],
+  "common_subject_fingerprint": {
+    "algorithm": "SHA-256",
+    "basis": "canonical aux005 current evidence + reuse + executed logs",
+    "value": "00781d4b26ca8d8b854d61af5d6684780e193e3d54c20d9c57a53ad19c7360d3"
+  },
+  "document_id": "WALKSAFE-W3-FINAL-CURRENT-AUX-SUMMARY-20260726-005",
+  "executed_commands": [
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "compileall",
+        "-q",
+        "-f",
+        "backend/app",
+        "model"
+      ],
+      "cleanup": [],
+      "command_id": "python-compileall-backend-model",
+      "cwd": ".",
+      "end": "2026-07-26T16:59:04.273199Z",
+      "environment_constraints": {
+        "process_concurrency": 1,
+        "pycache_prefix": "/tmp/w3-aux005-pycache"
+      },
+      "exit_code": 0,
+      "log_path": "logs/python-compileall-backend-model.log",
+      "log_sha256": "3cfc1c779d037f81803d3c24244a7b95eabc689b15421c4aaa7da481abb2a075",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 22860,
+      "role": "PYTHON_BYTECODE_COMPILE",
+      "start": "2026-07-26T16:59:04.067692Z",
+      "status": "PASS",
+      "tool_version": "Python 3.14.6"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--offline",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "/tmp/w3-license-review-005.py",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+        "/tmp/w3-license-review-005-base.json"
+      ],
+      "cleanup": [],
+      "command_id": "license-metadata-review-current-sbom",
+      "cwd": ".",
+      "end": "2026-07-26T16:59:04.431611Z",
+      "environment_constraints": {
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "legal_approval_claimed": false,
+        "uv_offline": true
+      },
+      "exit_code": 0,
+      "log_path": "logs/license-metadata-review-current-sbom.log",
+      "log_sha256": "8014670dc46fe301cc2432388961bf64d01eaebde55f95e73f68162a77f776df",
+      "output_paths": [
+        "license-review.json"
+      ],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 56196,
+      "role": "SBOM_LICENSE_METADATA_REVIEW",
+      "start": "2026-07-26T16:59:04.282256Z",
+      "status": "PASS",
+      "tool_version": "uv offline exact Python closure"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--offline",
+        "--with",
+        "jsonschema==4.25.1",
+        "python",
+        "/tmp/w3-schema-validation-005.py",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas",
+        "/tmp/w3-schema-validation-005-base.json"
+      ],
+      "cleanup": [],
+      "command_id": "official-schema-validation-current-sbom",
+      "cwd": ".",
+      "end": "2026-07-26T16:59:04.991447Z",
+      "environment_constraints": {
+        "full_backend_install_allowed": false,
+        "gpu_dependencies_allowed": false,
+        "schema_ref_network_allowed": false,
+        "uv_offline": true
+      },
+      "exit_code": 0,
+      "log_path": "logs/official-schema-validation-current-sbom.log",
+      "log_sha256": "d8f802ca5844f8a6d27c9c31f011198120dc4a845911ead7d785de887159b1f4",
+      "output_paths": [
+        "sbom-validation-result.json"
+      ],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 40716,
+      "role": "OFFICIAL_LOCAL_SCHEMA_VALIDATION",
+      "start": "2026-07-26T16:59:04.440303Z",
+      "status": "PASS",
+      "tool_version": "jsonschema 4.25.1 via uv offline cache"
+    }
+  ],
+  "helper_bindings": {
+    "license_helper_sha256": "3810c28c255bbbce2090b686b7ed01d75f9974fc5f1ecbae0af1d4887c4132c2",
+    "schema_helper_sha256": "1a50a355b6404710142344b5453e83702f5a5ee3df70cc8845a937496b81a674"
+  },
+  "input_bindings": {
+    "cyclonedx": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+    },
+    "evidence003_manifest": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+      "sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5"
+    },
+    "integration_run004": {
+      "current_backend_subject": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/subjects/backend.json",
+        "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+      },
+      "execution_summary": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+        "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+      },
+      "formal_or_production_result_claimed": false,
+      "integration_run004_backend_subject": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+        "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+      },
+      "local_validation": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+        "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d"
+      },
+      "scope": "INTERNAL_BACKEND_INTEGRATION_AND_POSTGIS_MIGRATION_ONLY",
+      "status": "PASS_REUSED_EXACT_BACKEND_SUBJECT"
+    },
+    "lock_inventory": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+      "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+    },
+    "module_inventory": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "sha256": "5473ba952634f7c9596ce970d377c62bed78beba9be1a86b846d29ac78830fb1"
+    },
+    "run003_receipt": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/command-receipt.json",
+      "sha256": "899d88cfd6337e80992c1ccaba620d23fdca4a611f51aeac9cc19923a7b3cdf4"
+    },
+    "spdx": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+      "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e"
+    }
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "8de37fcc6de83fe5bc3c1e585c80e547d5e3b7bd3f3fcdd6766af81b60444a17"
+    }
+  },
+  "output_bindings": {
+    "license_review": {
+      "content_fingerprint": "82f4155c98de4bac571642c4909477094196ff01834218aac9208d1f9e1ac10e",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/license-review.json",
+      "sha256": "428b90d44a9f293d219c06921f1d7a9c829fbf87f5bb2c78a376259b8041f613"
+    },
+    "sbom_validation_result": {
+      "content_fingerprint": "b6daea5a1b3384a87a5267d4585244ac490cb4f60aeea2ad00b0a0aba4fb40a9",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/sbom-validation-result.json",
+      "sha256": "ed5048d91819a9e8f5b190f9b782a375e358cc3573b8bc8949135a18d9a1f57b"
+    }
+  },
+  "prepared_on": "2026-07-27",
+  "resource_summary": {
+    "commands_run_serially": true,
+    "peak_command_id": "license-metadata-review-current-sbom",
+    "peak_process_tree_rss_kb": 56196,
+    "resource_anomaly_detected": false
+  },
+  "results": {
+    "android_admin_lint": "PASS_REUSED_EXACT_SOURCE",
+    "android_app_lint": "PASS_REUSED_EXACT_SOURCE",
+    "backend_integration_and_migration": "PASS_REUSED_EXACT_BACKEND_SUBJECT",
+    "compileall_backend_model": "PASS",
+    "gateway_typecheck": "PASS_REUSED_EXACT_SOURCE",
+    "license_review": "PASS_METADATA_INVENTORY_NOT_LEGAL_APPROVAL",
+    "official_cyclonedx_1_6_validation": "PASS",
+    "official_spdx_2_3_validation": "PASS",
+    "overall_status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES"
+  },
+  "reused_backend_integration": {
+    "current_backend_subject": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/subjects/backend.json",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+    },
+    "execution_summary": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+    },
+    "formal_or_production_result_claimed": false,
+    "integration_run004_backend_subject": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+    },
+    "local_validation": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+      "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d"
+    },
+    "scope": "INTERNAL_BACKEND_INTEGRATION_AND_POSTGIS_MIGRATION_ONLY",
+    "status": "PASS_REUSED_EXACT_BACKEND_SUBJECT"
+  },
+  "reused_module_results": [
+    {
+      "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+      "current_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "evidence_log": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-app-lint.log",
+        "sha256": "499bceeda8b403a337791f3cdab3cbbf361e640d782017221c1f8546aeccb599"
+      },
+      "formal_or_device_result_claimed": false,
+      "module_id": "app",
+      "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782",
+      "predecessor_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/module-inventory.json",
+      "result_id": "ANDROID_APP_LINT",
+      "status": "PASS_REUSED_EXACT_MODULE_PATH_AND_CONTENT_SET"
+    },
+    {
+      "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "current_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "evidence_log": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-admin-lint.log",
+        "sha256": "ff9e721afb1799f978a10edfdae32673b4233559e2bd6e07d7a210b558e75d84"
+      },
+      "formal_or_device_result_claimed": false,
+      "module_id": "adminapp",
+      "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f",
+      "predecessor_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/module-inventory.json",
+      "result_id": "ANDROID_ADMIN_LINT",
+      "status": "PASS_REUSED_EXACT_MODULE_PATH_AND_CONTENT_SET"
+    },
+    {
+      "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "current_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "evidence_log": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/gateway-typecheck.log",
+        "sha256": "450be6540062a7231730f8f389ae4cff23118793118005653acf6aba9203bb2c"
+      },
+      "formal_or_device_result_claimed": false,
+      "module_id": "android-gateway",
+      "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3",
+      "predecessor_module_inventory": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/module-inventory.json",
+      "result_id": "GATEWAY_TYPECHECK",
+      "status": "PASS_REUSED_EXACT_MODULE_PATH_AND_CONTENT_SET"
+    }
+  ],
+  "schema_version": "walksafe.w3-aux-execution-summary.v2",
+  "source_commit": null
+}

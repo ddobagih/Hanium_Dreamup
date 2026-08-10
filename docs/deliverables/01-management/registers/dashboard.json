@@ -1,0 +1,62 @@
+{
+  "schema_version": "walksafe.project-dashboard.v1",
+  "metadata": {
+    "title": "WalkSafe 진행상태 대시보드",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-17"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "observed_at": "2026-07-22T00:00:00+09:00",
+  "observation_precision": "DATE_BOUNDARY_NOT_REAL_TIME",
+  "status": {
+    "policy_baseline": "BASELINED",
+    "policy_items_confirmed": 63,
+    "aligned_decisions": 135,
+    "formal_0_to_6_type_count": 128,
+    "formal_draft_generation": "DRAFT_FILES_GENERATED_REVIEW_PENDING",
+    "formal_approvals": 0,
+    "remaining_gates_not_run": 5,
+    "remaining_gates_waived": 0,
+    "formal_test_executions": 0,
+    "open_policy_correction_count": 1,
+    "open_policy_correction_ids": [
+      "ISS-POLICY-FP035-NETWORK-001"
+    ],
+    "fp035_correction_status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "milestones": {
+    "policy_baseline": "COMPLETE_2026-07-21",
+    "formal_drafts": "IN_PROGRESS",
+    "final_demo": "PLANNED_2026-07-26",
+    "release_readiness": "BLOCKED"
+  },
+  "p0_open_items": [
+    "ISS-POLICY-FP035-NETWORK-001",
+    "GATE-PHONE-QUEUE-BYTE-LIMIT",
+    "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+    "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+    "GATE-CLOUD-COST-MEASUREMENT",
+    "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+  ],
+  "coverage": {
+    "policy_items": "63/63",
+    "aligned_decisions": "135/135",
+    "formal_0_to_6_types": "128/128 paths generated; content review in progress"
+  },
+  "trend": {
+    "previous_observation": null,
+    "delta": "INITIAL_CONTROLLED_OBSERVATION",
+    "claim": "추세 비교를 위한 이전 동일 정의 관측값 없음"
+  },
+  "interpretation": "정책 기준선은 승인됐고 0~6 Draft를 만들었지만 정식 승인·구현·시험·출시는 완료되지 않았다. FP-035 전송망 방향은 사용자 지시로 포착됐으며 요구·설계 정합화와 새 일괄 승인을 기다린다. 그 전까지 이동통신망 전송 동결을 유지한다."
+}

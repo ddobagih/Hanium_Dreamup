@@ -1,0 +1,40 @@
+{
+  "schema_version": "walksafe.owner-decision-review-answers.v1",
+  "baseline_id": "walksafe-feature-policy-baseline-20260718",
+  "storage_binding_hash": "66136a59a1b57764b7a36d70e5519ca58bb2db568b218a6d84430e0ad36ddb4c",
+  "source_bindings": {
+    "artifact_catalog": "dcd998b930a2e7c80f1dd2339a690069392357fee9f16408d8a2f10a8ec18136",
+    "delta_answers": "4f06ff07e4afd5023e6362d40685e7a567bd6f2ef853d8904d99fea89f25488c",
+    "delta_questions": "3bcac1ef3fbe16bffa3a94d6f58f0d94c79044c53ff55e67c82fd81188223c96",
+    "feature_policy": "6840540ec8339302adde9dbc3bae076ddc381470ce084e2f6b0762ff82d8099b",
+    "integrated_analysis": "00efb50ddb4843829dc8b75904143e6ab694cd253cf26d9181deac4be2fc69e0",
+    "integrated_questions": "572150b4980dc570bcc7f511abc10e30eb83326c011e37458cada11ff8a9ffb6",
+    "original_answers": "6e132df56ab5004be1130fdcb31e48be30cc5e3536747d90367253302817df24",
+    "original_questions": "0b6f0242195e1d26c4add11e25c8607db25f1bdc7f02b669db51d35e8a345ff3",
+    "owner_questions": "8f97c22620d0a4b3a06ccfbf880ed9b1137473ef88f1ad7ba4fa5bc95dbba128",
+    "responsibility": "0e8bfe62f8d857d3390906a0c73050bb2022c14853e962d5656abacdac2eda34",
+    "storage_binding_hash": "66136a59a1b57764b7a36d70e5519ca58bb2db568b218a6d84430e0ad36ddb4c"
+  },
+  "exported_at": "2026-07-18T16:00:03.789Z",
+  "status": "QUESTIONNAIRE_COMPLETE",
+  "baseline_status": "NOT_APPROVED",
+  "answers": {
+    "ODQ-003": "teen",
+    "ODQ-009": "exclude_both",
+    "ODQ-011": "limited",
+    "ODQ-013": "phone_only",
+    "ODQ-015": "selected",
+    "ODQ-019": "manual",
+    "ODQ-026": "after",
+    "ODQ-029": "wifi",
+    "ODQ-032": "confirm",
+    "ODQ-034": "09_18"
+  },
+  "notes": {},
+  "feature_corrections": {},
+  "correction_enabled": {
+    "FP-001": false
+  },
+  "unresolved_required": [],
+  "correction_errors": []
+}

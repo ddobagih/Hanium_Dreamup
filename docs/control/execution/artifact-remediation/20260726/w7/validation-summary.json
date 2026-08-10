@@ -1,0 +1,639 @@
+{
+  "schema_version": "walksafe.validation-summary.v7",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W7-VALIDATION-SUMMARY-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "PARTIAL_WAVE_COMPLETED_WITH_7_OPEN_INTERNAL_GAPS",
+  "validation_result": "PASS",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "b30c42ba8af7b4e38e43aa704685a574b06e09d5e14e5262406d3b191d07ca19"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+    "upstream": {
+      "input_set_sha256": "45997dd2966d6a062cee12266edbd459224cc31107b3f27f0c02cfc47aea2bbc",
+      "artifact_status_delta": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0",
+        "byte_count": 32623
+      }
+    },
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS"
+  },
+  "scope": {
+    "wave_id": "W7",
+    "artifact_count": 8,
+    "exact_artifact_ids": [
+      "DLV-AIML-06",
+      "DLV-AIML-07",
+      "DLV-AIML-10",
+      "DLV-AIML-14",
+      "DLV-AIML-15",
+      "DLV-AIML-16",
+      "DLV-AIML-17",
+      "DLV-AIML-23"
+    ]
+  },
+  "state_transition": {
+    "before": {
+      "OK": 115,
+      "INTERNAL_GAP": 64,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "delta": {
+      "OK": 1,
+      "INTERNAL_GAP": -1,
+      "EXTERNAL": 0,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    },
+    "after": {
+      "OK": 116,
+      "INTERNAL_GAP": 63,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "OK": {
+      "count": 1,
+      "artifact_ids": [
+        "DLV-AIML-14"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 7,
+      "artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-10",
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ]
+    }
+  },
+  "transition_authority": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+    "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8",
+    "status": "GO",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "sole_transition_authority": true,
+    "subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+    "subject_count": 11,
+    "subject_digest_reproduced": true,
+    "superseded_review": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+      "sha256": "d3d7508823de8282904e44add8aedeab16e692ddeeea8cf98111d05f25d50345",
+      "status": "GO",
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 2
+      },
+      "authority": "HISTORICAL_ONLY",
+      "subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f"
+    },
+    "formal_approval_claimed": false,
+    "final_authority_reason": "The rereview closed both minor findings and binds the current 11-file subject set with 0/0/0 findings."
+  },
+  "review_subject_lineage": {
+    "historical_review": {
+      "subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f",
+      "subject_count": 11,
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 2
+      },
+      "authority": "HISTORICAL_ONLY"
+    },
+    "final_rereview": {
+      "subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+      "subject_count": 11,
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "authority": "SOLE_TRANSITION_AUTHORITY",
+      "independently_recomputed": true
+    },
+    "closed_minor_count": 2
+  },
+  "validation_matrix": [
+    {
+      "check_id": "W7-01-SCHEMA_VERSION",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-02-DOCUMENT_ID",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-03-EXACT_SCOPE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-04-EXACT_SCOPE_UNIQUE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-05-TRANSITION_AUTHORITY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-06-REVIEW_FINDINGS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-07-CURRENT_REVIEW_SUBJECT_SET",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-08-TEMPORAL_REVIEW_LINEAGE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-09-SOURCE7_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-10-CURRENT_PAIRS_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-11-REVIEW_FILES_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-12-PREDECESSOR_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-13-INPUT_SET_RECOMPUTE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-14-COMMON_FINGERPRINT_RECOMPUTE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-15-SELF_FINGERPRINT_CONTRACT",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-16-DAG_ACYCLIC",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-17-PRE_COUNTS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-18-APPLIED_DELTA",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-19-POST_COUNTS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-20-TOTAL_EXACT_257",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-21-EXTERNAL_UNCHANGED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-22-N_A_CANDIDATE_UNCHANGED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-23-EXACT_ONE_OK",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-24-EXACT_SEVEN_OPEN_INTERNAL_GAPS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-25-BOUNDARY_PRESERVATION",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W7-26-RAW_SECRET_AND_ADVISORY_EXCLUSION",
+      "result": "PASS"
+    }
+  ],
+  "validation_totals": {
+    "check_count": 26,
+    "passed": 26,
+    "failed": 0,
+    "result": "PASS"
+  },
+  "boundary_assertions": {
+    "dataset_manifest_status": "NO_IMMUTABLE_CONTENT_HASHED_INSTANCE",
+    "gold_set_and_adjudication_status": "NOT_RUN",
+    "immutable_split_status": "NOT_MATERIALIZED",
+    "training_provenance_status": "NOT_MATERIALIZED",
+    "formal_experiment_status": "NOT_RUN",
+    "same_protocol_comparison_status": "NOT_RUN",
+    "prediction_equivalence_status": "NOT_RUN",
+    "model_card_set_status": "NOT_APPROVED",
+    "data_quality_execution_status": "NOT_RUN",
+    "leakage_execution_status": "NOT_RUN",
+    "frozen_protocol_status": "NOT_MATERIALIZED",
+    "threshold_sweep_status": "NOT_RUN",
+    "formal_test_catalog_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "actual_device_validation_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gates_waived": false,
+    "release_gate_status": "NOT_RUN",
+    "release_approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "evidence_exclusion_boundary": {
+    "raw_secret_material_included": false,
+    "raw_advisory_dump_included": false,
+    "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+  },
+  "validation_statement": "W7 exact8에서 독립 검토가 허용한 1건만 OK로 전이하고 7건은 INTERNAL_GAP으로 유지했다. 입력·공통·자기 지문과 비순환 DAG 및 257건 회계를 재현했다.",
+  "integrity": {
+    "input_count": 14,
+    "input_set_sha256": "45997dd2966d6a062cee12266edbd459224cc31107b3f27f0c02cfc47aea2bbc",
+    "delta_sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0",
+    "check_count": 26,
+    "passed_check_count": 26,
+    "failed_check_count": 0,
+    "common_fingerprint": "b30c42ba8af7b4e38e43aa704685a574b06e09d5e14e5262406d3b191d07ca19",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "c7eb134f2ba73f9a953a421e2c77a1ce4a3b77e1243e871589878f8a12e93a43"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "role_excluded": true
+      },
+      "preimage": [
+        {
+          "byte_count": 22179,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+          "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f"
+        },
+        {
+          "byte_count": 11828,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.md",
+          "sha256": "a3c455d6a5a892e519574c2bb703f1c5a590e04ca4326fb7efdccaab0a94b661"
+        },
+        {
+          "byte_count": 22403,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+          "sha256": "5f04aa4c55ca4d52c9fd9e995ae8336413c7c957b983cef87d26da08c81e3db1"
+        },
+        {
+          "byte_count": 41414,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "byte_count": 11458,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.md",
+          "sha256": "466a3e869dac2c8be3389e7f44fbb5bdefcc78b434ea67f773e674a160a86714"
+        },
+        {
+          "byte_count": 3444,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+          "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8"
+        },
+        {
+          "byte_count": 6359,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+          "sha256": "d3d7508823de8282904e44add8aedeab16e692ddeeea8cf98111d05f25d50345"
+        },
+        {
+          "byte_count": 39378,
+          "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+          "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559"
+        },
+        {
+          "byte_count": 23552,
+          "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+          "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939"
+        },
+        {
+          "byte_count": 26684,
+          "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+          "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd"
+        },
+        {
+          "byte_count": 12663,
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+        },
+        {
+          "byte_count": 38456,
+          "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+          "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770"
+        },
+        {
+          "byte_count": 84116,
+          "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+          "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15"
+        },
+        {
+          "byte_count": 23351,
+          "path": "tests/test_walksafe_formal_aiml.py",
+          "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "45997dd2966d6a062cee12266edbd459224cc31107b3f27f0c02cfc47aea2bbc"
+    },
+    "current_review_subject_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "11 review subject records as {path,sha256,byte_length}",
+      "preimage": [
+        {
+          "byte_length": 22179,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+          "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f"
+        },
+        {
+          "byte_length": 11828,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.md",
+          "sha256": "a3c455d6a5a892e519574c2bb703f1c5a590e04ca4326fb7efdccaab0a94b661"
+        },
+        {
+          "byte_length": 41414,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "byte_length": 11458,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.md",
+          "sha256": "466a3e869dac2c8be3389e7f44fbb5bdefcc78b434ea67f773e674a160a86714"
+        },
+        {
+          "byte_length": 39378,
+          "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+          "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559"
+        },
+        {
+          "byte_length": 23552,
+          "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+          "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939"
+        },
+        {
+          "byte_length": 26684,
+          "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+          "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd"
+        },
+        {
+          "byte_length": 12663,
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+        },
+        {
+          "byte_length": 38456,
+          "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+          "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770"
+        },
+        {
+          "byte_length": 84116,
+          "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+          "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15"
+        },
+        {
+          "byte_length": 23351,
+          "path": "tests/test_walksafe_formal_aiml.py",
+          "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": false,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "digest": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact wave central state, review authority, predecessor, evidence and boundary object reproduced in preimage",
+      "basis_fields": [
+        "schema",
+        "wave_id",
+        "predecessor",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "current_review_subject_set_sha256",
+        "transition_authority",
+        "source_binding",
+        "boundary",
+        "evidence_exclusion_boundary"
+      ],
+      "preimage": {
+        "schema": "walksafe.w7-central-common.v1",
+        "wave_id": "W7",
+        "predecessor": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+          "sha256": "5f04aa4c55ca4d52c9fd9e995ae8336413c7c957b983cef87d26da08c81e3db1",
+          "byte_count": 22403
+        },
+        "exact": [
+          "DLV-AIML-06",
+          "DLV-AIML-07",
+          "DLV-AIML-10",
+          "DLV-AIML-14",
+          "DLV-AIML-15",
+          "DLV-AIML-16",
+          "DLV-AIML-17",
+          "DLV-AIML-23"
+        ],
+        "OK": [
+          "DLV-AIML-14"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-AIML-06",
+          "DLV-AIML-07",
+          "DLV-AIML-10",
+          "DLV-AIML-15",
+          "DLV-AIML-16",
+          "DLV-AIML-17",
+          "DLV-AIML-23"
+        ],
+        "pre": {
+          "OK": 115,
+          "INTERNAL_GAP": 64,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 116,
+          "INTERNAL_GAP": 63,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "45997dd2966d6a062cee12266edbd459224cc31107b3f27f0c02cfc47aea2bbc",
+        "current_review_subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+        "transition_authority": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+          "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8",
+          "status": "GO",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 0
+          },
+          "sole_transition_authority": true,
+          "subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+          "subject_count": 11,
+          "subject_digest_reproduced": true,
+          "superseded_review": {
+            "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+            "sha256": "d3d7508823de8282904e44add8aedeab16e692ddeeea8cf98111d05f25d50345",
+            "status": "GO",
+            "findings": {
+              "blocking": 0,
+              "major": 0,
+              "minor": 2
+            },
+            "authority": "HISTORICAL_ONLY",
+            "subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f"
+          }
+        },
+        "source_binding": {
+          "common_aiml_source_count": 7,
+          "current_state_pair_count": 2,
+          "cross_wave_current_state_pair_count": 2,
+          "review_file_count": 2
+        },
+        "boundary": {
+          "dataset_manifest_status": "NO_IMMUTABLE_CONTENT_HASHED_INSTANCE",
+          "gold_set_and_adjudication_status": "NOT_RUN",
+          "immutable_split_status": "NOT_MATERIALIZED",
+          "training_provenance_status": "NOT_MATERIALIZED",
+          "formal_experiment_status": "NOT_RUN",
+          "same_protocol_comparison_status": "NOT_RUN",
+          "prediction_equivalence_status": "NOT_RUN",
+          "model_card_set_status": "NOT_APPROVED",
+          "data_quality_execution_status": "NOT_RUN",
+          "leakage_execution_status": "NOT_RUN",
+          "frozen_protocol_status": "NOT_MATERIALIZED",
+          "threshold_sweep_status": "NOT_RUN",
+          "formal_test_catalog_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "actual_device_validation_status": "NOT_RUN",
+          "release_gate_count": 5,
+          "release_gates_waived": false,
+          "release_gate_status": "NOT_RUN",
+          "release_approval_status": "NOT_APPROVED",
+          "release_status": "NOT_ELIGIBLE"
+        },
+        "evidence_exclusion_boundary": {
+          "raw_secret_material_included": false,
+          "raw_advisory_dump_included": false,
+          "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+        }
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "arrays": "preserve declared semantic order"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "all central raw output SHA-256 values",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "b30c42ba8af7b4e38e43aa704685a574b06e09d5e14e5262406d3b191d07ca19"
+    }
+  },
+  "digest_contract_validation": {
+    "input_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "current_review_subject_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "common_fingerprint": "PASS_INDEPENDENT_RECOMPUTE",
+    "artifact_status_delta_sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0"
+  }
+}

@@ -1,0 +1,349 @@
+[
+  {
+    "canonical_decision_id": "CD-PRODUCT-RELEASE",
+    "affected_feature_ids": ["FP-002", "FP-049", "FP-050", "FP-051"],
+    "reason": "목표 출시 단계는 완료 판정, 시험 게이트, 사용자 UAT, Play 배포 경로에 직접 영향을 줍니다.",
+    "normalization_status": "PENDING",
+    "decision_statement": "정식 운영을 목표로 하고 사용자 앱은 Play Store production, 관리자 앱은 private 배포 대상으로 정했습니다. 다만 사용자 앱의 최초 rollout이 internal→closed→production인지 바로 production인지는 한 값으로 확정되지 않았습니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-GOV-003",
+      "SRC-DELTA-ANSWERS#FUP-001",
+      "SRC-DELTA-ANSWERS#FUP-037",
+      "SRC-ORIGINAL-ANSWERS#Q-REL-011",
+      "USER-20260718-RELEASE"
+    ],
+    "normalization_note": "IBQ-001의 운영 목표는 확인되지만 함께 병합된 IBQ-136의 정확한 단계 배포 순서는 미확정입니다."
+  },
+  {
+    "canonical_decision_id": "CD-SAFETY-POSITION",
+    "affected_feature_ids": ["FP-001", "FP-006"],
+    "reason": "기존 보조수단과의 관계는 제품 목적 문구와 단독 보행 허용 조건을 바꿉니다.",
+    "normalization_status": "PENDING",
+    "decision_statement": "일반 도심에서 기존 보조수단 없이 WalkSafe만으로 보행 가능하게 만드는 것은 제품 목표입니다. 그러나 현재 릴리스에서 기존 보조수단을 공식적으로 대체한다고 고지할 수 있는지는 안전시험 전 확정되지 않았습니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-USR-002",
+      "SRC-ORIGINAL-ANSWERS#Q-USR-003",
+      "SRC-DELTA-ANSWERS#FUP-060"
+    ],
+    "normalization_note": "최신 FUP-060 메모는 이를 현재 보장 정책이 아니라 목표로 표현합니다."
+  },
+  {
+    "canonical_decision_id": "CD-USER-AGE",
+    "affected_feature_ids": ["FP-004", "FP-010", "FP-013", "FP-015", "FP-046"],
+    "reason": "가입 연령과 보호자 동의는 대상 사용자, 가입, 동의, 철회·삭제, 개인정보 처리 흐름을 함께 바꿉니다."
+  },
+  {
+    "canonical_decision_id": "CD-USE-ENVIRONMENT",
+    "affected_feature_ids": ["FP-005", "FP-006"],
+    "reason": "공식 사용 장소는 보행환경 범위와 단독 보행 목표의 검증 조건을 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "공식 사용 범위는 일반 도심 보도이며 횡단보도에서는 참고 안내만 제공합니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-USR-004",
+      "SRC-DELTA-ANSWERS#FUP-061"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-CROSSWALK-SCOPE",
+    "affected_feature_ids": ["FP-005"],
+    "reason": "횡단보도에서 제공할 정보와 제공하지 않을 안전 판단을 FP-005가 직접 정의합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "횡단보도의 존재와 주의사항은 참고로 안내하지만 신호·차량 상태를 종합한 안전 횡단 판단은 제공하지 않습니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-USR-005",
+      "SRC-DELTA-ANSWERS#FUP-061"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-POOR-IMAGE-BEHAVIOR",
+    "affected_feature_ids": ["FP-018", "FP-021", "FP-043"],
+    "reason": "영상 품질 저하는 탐지 입력 유효성, 세션 상태, 지속 장애 전면정지를 함께 결정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "비·눈·야간·카메라 가림 등으로 영상 품질이 나쁘면 제한적으로 다시 확인하고, 계속 나쁘면 장애 유형을 알린 뒤 보행 기능을 안전정지합니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-RES-012",
+      "SRC-ORIGINAL-ANSWERS#Q-RES-015",
+      "USER-20260718-FAILURE",
+      "DIR-012"
+    ],
+    "normalization_note": "재시도 횟수와 시간은 별도 기술·측정 결정으로 남아 있습니다."
+  },
+  {
+    "canonical_decision_id": "CD-PHONE-MOUNT",
+    "affected_feature_ids": ["FP-006", "FP-016"],
+    "reason": "장착 방식은 카메라 입력 조건과 보행 화면 방향을 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "후면 카메라가 보행 방향을 향하도록 휴대폰을 가슴·목걸이형으로 고정하고 보행 화면은 세로 방향으로 사용합니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-USR-007",
+      "SRC-DELTA-ANSWERS#FUP-057"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-LANGUAGE-SCOPE",
+    "affected_feature_ids": ["FP-004", "FP-025", "FP-027"],
+    "reason": "지원 언어는 사용자 안내, STT 명령, TTS 발화 정책에 직접 적용됩니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "첫 버전의 UI, STT, TTS와 사용자 문서는 한국어만 공식 지원합니다.",
+    "source_record_refs": ["SRC-ORIGINAL-ANSWERS#Q-PLT-011"]
+  },
+  {
+    "canonical_decision_id": "CD-EXCLUDED-FEATURES",
+    "affected_feature_ids": ["FP-001", "FP-002"],
+    "reason": "보호자 추적과 넘어짐 탐지 제외는 제품 핵심 범위와 현재 버전 완료 판정을 바꿉니다."
+  },
+  {
+    "canonical_decision_id": "CD-APP-SEPARATION",
+    "affected_feature_ids": ["FP-007", "FP-008", "FP-040", "FP-047"],
+    "reason": "두 앱의 빌드 경계, 서버 진입점, 인증·권한 분리를 함께 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "사용자 앱과 관리자 앱은 공통 모듈을 공유하되 별도 Android APK로 빌드합니다. IdP를 공유하더라도 client, audience와 session은 앱별로 분리합니다.",
+    "source_record_refs": [
+      "SRC-DELTA-ANSWERS#FUP-002",
+      "SRC-DELTA-ANSWERS#FUP-042"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-011",
+    "affected_feature_ids": ["FP-007", "FP-008"],
+    "reason": "앱 이름과 applicationId는 사용자·관리자 APK의 공식 식별자입니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-012",
+    "affected_feature_ids": ["FP-007", "FP-009"],
+    "reason": "Android 하한은 설치 가능 범위와 공식 지원 기기 정책을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-013",
+    "affected_feature_ids": ["FP-009", "FP-050"],
+    "reason": "기준 기기는 공식 지원 범위와 온디바이스 성능시험 대상을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-DEPTH-UNSUPPORTED",
+    "affected_feature_ids": ["FP-009", "FP-019", "FP-020", "FP-021", "FP-044"],
+    "reason": "Depth 미지원 동작은 지원 기기, 탐지, 위험 안내, 거리 근거와 제한 모드를 함께 바꿉니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-015",
+    "affected_feature_ids": ["FP-009", "FP-019", "FP-020", "FP-021"],
+    "reason": "대체 거리 기술은 기기 지원, 단말 탐지, 위험 판단과 거리 근거에 직접 연결됩니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-016",
+    "affected_feature_ids": ["FP-009", "FP-048"],
+    "reason": "루팅폰·에뮬레이터 지원 여부는 공식 기기 범위와 단말 보안 신뢰 경계를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-017",
+    "affected_feature_ids": ["FP-008", "FP-047", "FP-051"],
+    "reason": "관리자 앱 배포 대상은 관리자 APK, 관리자 인증 기기와 배포 채널 정책에 영향을 줍니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-018",
+    "affected_feature_ids": ["FP-007", "FP-009"],
+    "reason": "Web/PWA 보존·차단 방법은 Android 제품 기준선과 legacy 취급 정책을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-019",
+    "affected_feature_ids": ["FP-010", "FP-013", "FP-014", "FP-017"],
+    "reason": "첫 실행 순서는 회원가입, 동의, 권한 거부와 자동 보행 시작의 선후관계를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-SIGNUP-DATA",
+    "affected_feature_ids": ["FP-010", "FP-011", "FP-046", "FP-047"],
+    "reason": "가입 정보는 계정 생성, 로그인, 개인정보 수집과 인증 저장 항목을 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "회원가입에는 사용자 ID와 비밀번호를 사용하며 서비스 기록의 사용자 식별에는 계정 ID를 직접 연결하는 방향이 선택됐습니다.",
+    "source_record_refs": [
+      "SRC-DELTA-ANSWERS#FUP-043",
+      "SRC-ORIGINAL-ANSWERS#Q-PRV-010"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-IDENTITY-VERIFY",
+    "affected_feature_ids": ["FP-010", "FP-046", "FP-047"],
+    "reason": "가입 확인 방식은 온보딩, 확인용 개인정보와 인증 경계를 결정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-LOGIN-PERSISTENCE",
+    "affected_feature_ids": ["FP-011", "FP-047"],
+    "reason": "로그인 유지기간은 기기 token 보관과 서버 session 폐기 조건을 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "한 번 로그인한 기기는 사용자가 로그아웃하거나 앱을 삭제할 때까지 로그인 상태를 유지합니다. 새 기기 로그인만으로 기존 기기 session을 종료하지 않습니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-021",
+      "USER-20260718-SESSION",
+      "DIR-011"
+    ],
+    "normalization_note": "보안사고·원격 해제·비밀번호 변경은 별도 session 폐기 정책으로 관리해야 합니다."
+  },
+  {
+    "canonical_decision_id": "CD-MULTI-DEVICE-KEEP",
+    "affected_feature_ids": ["FP-012", "FP-047"],
+    "reason": "새 기기 로그인 동작은 기기별 session과 인증 폐기 정책을 결정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "새 기기에서 로그인해도 기존 기기의 로그인 session은 유지하며 각 기기를 별도 session으로 관리합니다.",
+    "source_record_refs": [
+      "USER-20260718-SESSION",
+      "DIR-011"
+    ],
+    "superseded_source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-022"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-CONCURRENT-WALK",
+    "affected_feature_ids": ["FP-012", "FP-018"],
+    "reason": "동시 보행 허용 여부는 다중기기 충돌 처리와 보행 세션 상태를 정합니다.",
+    "normalization_status": "PENDING",
+    "decision_statement": "여러 기기의 동시 로그인은 허용됐지만 여러 기기에서 동시에 보행하는 것은 아직 확정되지 않았습니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-022",
+      "USER-20260718-SESSION",
+      "DIR-011"
+    ],
+    "normalization_note": "DIR-011이 동시 로그인과 동시 보행을 별도 정책으로 확정해야 한다고 명시합니다."
+  },
+  {
+    "canonical_decision_id": "CD-REMOTE-LOGOUT",
+    "affected_feature_ids": ["FP-011", "FP-012", "FP-047"],
+    "reason": "분실 기기 해제는 장기 로그인, 기기 목록과 인증 session 폐기에 직접 적용됩니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-027",
+    "affected_feature_ids": ["FP-011", "FP-012", "FP-047"],
+    "reason": "비밀번호 변경 시 기존 session 처리는 장기 로그인과 모든 기기 token의 유효성을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-028",
+    "affected_feature_ids": ["FP-013", "FP-031", "FP-034", "FP-035", "FP-036", "FP-046"],
+    "reason": "동의 항목은 자동신고, 활동데이터 수집·업로드·보존과 개인정보 사용 근거를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-029",
+    "affected_feature_ids": ["FP-013", "FP-014", "FP-046"],
+    "reason": "모든 동의를 필수로 묶을 수 있는지는 통합 동의, 거부 시 차단과 개인정보 적법성을 결정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-030",
+    "affected_feature_ids": ["FP-010", "FP-013", "FP-014", "FP-028"],
+    "reason": "동의 선택 방식은 첫 실행 화면, 전체 동의·거부 처리와 TalkBack 조작을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-031",
+    "affected_feature_ids": ["FP-010", "FP-014"],
+    "reason": "필수 Android 권한 목록은 첫 실행 권한 요청과 권한 누락 시 차단 조건의 기준입니다."
+  },
+  {
+    "canonical_decision_id": "CD-REQUIRED-DENIAL-EXIT",
+    "affected_feature_ids": ["FP-010", "FP-014", "FP-015", "FP-018"],
+    "reason": "거부·철회 시 동작은 온보딩 차단, 사용 중 안전정지와 세션 상태를 함께 바꿉니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "필수 동의나 권한이 하나라도 없으면 해당 항목을 알려주고 접근 가능한 확인 뒤 앱을 종료하며 어떤 기능도 열지 않습니다. 사용 중 필수 권한이 철회되면 즉시 보행 기능을 안전정지하고 진행 중 작업을 취소합니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-005",
+      "SRC-ORIGINAL-ANSWERS#Q-RES-008",
+      "SRC-DELTA-ANSWERS#FUP-014",
+      "SRC-ORIGINAL-ANSWERS#Q-SES-012",
+      "SRC-ORIGINAL-ANSWERS#Q-SES-015",
+      "USER-20260718-CONSENT",
+      "DIR-008"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-035",
+    "affected_feature_ids": ["FP-013", "FP-015", "FP-046"],
+    "reason": "정책 변경 시 재동의 기준은 동의 유효성, 철회 상태와 개인정보 처리 근거를 갱신합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-036",
+    "affected_feature_ids": ["FP-013", "FP-015", "FP-036", "FP-046"],
+    "reason": "철회·삭제 요청 경로는 동의 상태, 계정·서버 데이터 삭제와 보존본 처리를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-TALKBACK-SCOPE",
+    "affected_feature_ids": ["FP-028", "FP-029", "FP-030"],
+    "reason": "TalkBack 범위는 모든 조작 화면, 거부·장애 확인창과 저시력 접근성 출시 게이트를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-CAMERA-ONLY-WALK-VIEW",
+    "affected_feature_ids": ["FP-016", "FP-028"],
+    "reason": "무버튼 카메라 화면은 보행 UI와 TalkBack·앱 TTS의 역할 경계를 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "온보딩 뒤 정상 보행 화면에는 조작 버튼을 두지 않고 카메라 영상과 최소 읽기 전용 상태만 표시하며 보행 기능은 음성으로 사용합니다.",
+    "source_record_refs": [
+      "SRC-DELTA-ANSWERS#FUP-017",
+      "USER-20260718-UI",
+      "DIR-003"
+    ],
+    "normalization_note": "화면에 남길 읽기 전용 상태의 정확한 목록은 별도 기술 제안이 필요합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-039",
+    "affected_feature_ids": ["FP-016", "FP-027", "FP-028"],
+    "reason": "카메라 화면 진입 안내는 보행 화면, TTS 발화와 화면읽기 중복 방지에 영향을 줍니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-040",
+    "affected_feature_ids": ["FP-016", "FP-017", "FP-018", "FP-026"],
+    "reason": "뒤로가기는 무버튼 화면의 종료 확인, 보행 상태 전이와 음성 확인 동작을 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-BACKGROUND-LOCK",
+    "affected_feature_ids": ["FP-017", "FP-018"],
+    "reason": "화면 전환·잠금은 자동 일시중지와 재개 전 상태 확인을 결정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "앱이 background로 가거나 화면이 잠기면 모든 보행 기능을 즉시 일시중지하고, 화면 복귀 뒤 상태를 다시 확인한 후에만 재개합니다.",
+    "source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-009",
+      "SRC-DELTA-ANSWERS#FUP-012"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-043",
+    "affected_feature_ids": ["FP-016", "FP-018", "FP-029", "FP-043"],
+    "reason": "전면정지 화면은 오류 상태, 접근 가능한 확인 조작과 지속 장애 대응을 표시합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-044",
+    "affected_feature_ids": ["FP-004", "FP-028", "FP-030"],
+    "reason": "저시력 지원 범위는 대상 사용자 정책과 화면 확대·고대비 접근성 게이트를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-045",
+    "affected_feature_ids": ["FP-016", "FP-019", "FP-045"],
+    "reason": "화면 켜짐 정책은 카메라 탐지 지속 여부와 배터리·발열 안전제어를 결정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-STARTUP-DETECTION",
+    "affected_feature_ids": ["FP-017", "FP-019", "FP-020", "FP-022"],
+    "reason": "로그인 뒤 자동 시작과 목적지 없는 탐지는 세션 시작, 카메라 탐지, 위험 안내와 경로 기능 경계를 정합니다.",
+    "normalization_status": "NORMALIZED",
+    "decision_statement": "동의·가입·로그인과 필수 권한 확인이 끝나고 필수 기능이 준비되면 보행 탐지를 자동 시작합니다. 목적지를 정하지 않아도 장애물 탐지와 위험 경고는 동작합니다.",
+    "source_record_refs": [
+      "SRC-DELTA-ANSWERS#FUP-013",
+      "USER-20260718-UI",
+      "DIR-003",
+      "SRC-ORIGINAL-ANSWERS#Q-NAV-001",
+      "USER-20260718-NAV"
+    ],
+    "superseded_source_record_refs": [
+      "SRC-ORIGINAL-ANSWERS#Q-SES-001"
+    ]
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-048",
+    "affected_feature_ids": ["FP-018", "FP-035", "FP-043"],
+    "reason": "상태 이름은 보행 세션, 업로드·재시도와 전면정지를 같은 상태기계로 연결합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-049",
+    "affected_feature_ids": ["FP-017", "FP-018", "FP-019", "FP-022", "FP-025", "FP-031", "FP-035"],
+    "reason": "일시정지 범위는 카메라, 길안내, STT, 신고 생성과 로컬 queue의 계속 여부를 정합니다."
+  },
+  {
+    "canonical_decision_id": "CD-IBQ-050",
+    "affected_feature_ids": ["FP-014", "FP-017", "FP-018", "FP-019", "FP-021", "FP-023", "FP-025", "FP-027", "FP-043", "FP-044", "FP-045"],
+    "reason": "재개 검사는 필수 권한, 카메라·센서·모델, STT/TTS, 서버 연결과 자원 상태를 다시 검증하는 공통 readiness gate입니다."
+  }
+]

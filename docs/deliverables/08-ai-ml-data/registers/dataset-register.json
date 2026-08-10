@@ -1,0 +1,1073 @@
+{
+  "schema_version": "walksafe.aiml-dataset-register.v1",
+  "metadata": {
+    "document_id": "WS-AIML-DATASET-REGISTER-20260721",
+    "title": "dataset-register",
+    "document_version": "0.2.0",
+    "as_of": "2026-07-27",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "AIML-02",
+      "AIML-04"
+    ]
+  },
+  "fp034_current_dataset_control": {
+    "traceability": {
+      "gap_ids": [
+        "GAP-043"
+      ],
+      "requirement_ids": [
+        "RQ-FP-034-001"
+      ],
+      "policy_feature_ids": [
+        "FP-034"
+      ],
+      "artifact_type_ids": [
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04"
+      ],
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "policy_manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "current_state_snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+      "current_state_snapshot_path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json"
+    },
+    "current_state_binding": {
+      "snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json",
+      "prepared_on": "2026-07-27"
+    },
+    "source_inventory": {
+      "declared_source_entry_count": 6,
+      "declared_unique_provider_dataset_pair_count": 5,
+      "rights_verified_unique_pair_count": 0,
+      "privacy_reviewed_unique_pair_count": 0,
+      "directly_captured_source_inclusion": "UNKNOWN",
+      "user_provided_source_inclusion": "UNKNOWN",
+      "source_list_completeness": "NOT_VERIFIED"
+    },
+    "dataset_reference": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627",
+    "dataset_status": "DECLARED_CANDIDATE_NOT_REPRODUCIBLE_FROM_CURRENT_REPOSITORY",
+    "declared_counts_not_recomputed": {
+      "class_count": 13,
+      "train_images": 167759,
+      "validation_images": 28747,
+      "independent_test_images": 0,
+      "materialized_images": 196506,
+      "bounding_boxes": 607814
+    },
+    "manifest": {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv",
+      "exists": false,
+      "declared_sha256": "5ea9796589e02fcb64b82af564400df081731d7b2136e9a654422df56fdb94f6",
+      "verified_sha256": null,
+      "content_hash_status": "NOT_VERIFIED"
+    },
+    "data_yaml": {
+      "path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "exists": false
+    },
+    "gate_states": {
+      "source_rights": "NOT_VERIFIED",
+      "source_privacy": "NOT_VERIFIED",
+      "materialization": "NOT_VERIFIED_MANIFEST_MISSING",
+      "data_quality": "NOT_RUN",
+      "label_quality": "NOT_RUN",
+      "split": "NOT_VERIFIED",
+      "sequence_leakage": "NOT_VERIFIED",
+      "independent_test": "NOT_ESTABLISHED_DECLARED_COUNT_ZERO_NOT_RECOMPUTED",
+      "training": "NOT_RUN",
+      "release": "NOT_ELIGIBLE"
+    },
+    "workflow_stages": [
+      {
+        "stage_id": "FP034-WF-01",
+        "name": "SOURCE_NOMINATION",
+        "allowed": "저장소에서 확인되는 선언·역사 metadata와 통제 저장소 참조를 후보로 기록한다.",
+        "prohibited": "선언된 수량·포함 상태를 재현 완료, source 목록 완전성, 권리 확인으로 표현하지 않는다.",
+        "fail_closed": "후보 상태와 UNKNOWN/NOT_VERIFIED를 유지하고 materialization·학습 승격을 막는다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-01",
+        "current_status": "DECLARED_NOT_REPRODUCED"
+      },
+      {
+        "stage_id": "FP034-WF-02",
+        "name": "CONSENTED_COLLECTION_START",
+        "allowed": "승인 항목표가 있고 별도 연구 동의, 활성 보행, 필요한 OS 권한·암호화·용량 조건이 모두 참인 범위만 수집한다.",
+        "prohibited": "동의·항목표·권한 중 하나라도 없을 때 원본을 수집하거나 연구 동의 거부를 이유로 핵심 보행 기능을 제한하지 않는다.",
+        "fail_closed": "원본 수집을 시작하지 않거나 즉시 중지하고 핵심 실시간 탐지·길안내는 가능한 범위에서 유지한다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-01",
+        "current_status": "DIRECT_AND_USER_PROVIDED_FACT_UNKNOWN"
+      },
+      {
+        "stage_id": "FP034-WF-03",
+        "name": "ENCRYPTED_QUEUE_AND_STOPPED_TRANSFER",
+        "allowed": "동의 범위 원본을 단말 암호화 대기열에 보관한다. 보행 정지 뒤 이동통신망 명시 선택자는 허용된 이동통신망, 미선택자는 Wi-Fi에서만 전송한다.",
+        "prohibited": "보행 중 일반 활동원본 전송, 허용되지 않은 망 전송, 별도 동의·계약 없는 제3자 제공을 금지한다.",
+        "fail_closed": "망·용량·서버 상태가 허용되지 않으면 암호화 대기열에 유지하고 보존·삭제 정책을 적용하며 전송 완료로 처리하지 않는다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-01",
+        "current_status": "POLICY_CONTROL_AUTHORED_IMPLEMENTATION_TEST_NOT_CLAIMED"
+      },
+      {
+        "stage_id": "FP034-WF-04",
+        "name": "SERVER_QUARANTINE_AND_SOURCE_GATE",
+        "allowed": "수신 자료를 검역 상태로 격리하고 source·취득·license·학습·재배포·privacy·consent 증거를 source별로 심사한다.",
+        "prohibited": "검역·동의·출처·권리 확인 전 자료를 승인 학습자료로 승격하지 않는다.",
+        "fail_closed": "증거가 없거나 충돌하면 검역 또는 후보 상태를 유지하고 promotion_eligible=false로 둔다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-02",
+        "current_status": "FAIL_CLOSED_RIGHTS_AND_PRIVACY_ZERO_VERIFIED"
+      },
+      {
+        "stage_id": "FP034-WF-05",
+        "name": "MATERIALIZATION_QUALITY_AND_SPLIT_GATE",
+        "allowed": "앞선 source gate를 통과한 자료만 불변 manifest로 materialize하고 품질·라벨·capture-group split·누수 검사를 수행한다.",
+        "prohibited": "누락된 manifest, 재계산하지 않은 수량, 미검증 split을 학습 재현성이나 독립 시험 근거로 사용하지 않는다.",
+        "fail_closed": "manifest 또는 검사 증거가 없으면 dataset을 training_or_release_eligible=false로 유지한다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-03",
+        "current_status": "FAIL_CLOSED_MANIFEST_AND_DATA_YAML_MISSING"
+      },
+      {
+        "stage_id": "FP034-WF-06",
+        "name": "TRAINING_EVALUATION_AND_RELEASE_GATE",
+        "allowed": "권리·privacy·manifest·품질·split·누수와 독립 평가 gate가 모두 통과한 고정 dataset/model hash만 승인 절차에 제출한다.",
+        "prohibited": "현재 후보 지표나 파일 존재를 정식 평가, 승인 학습, 출시 적합성으로 승격하지 않는다.",
+        "fail_closed": "선행 증거 또는 독립 검토가 없으면 학습·평가·출시 완료를 주장하지 않고 NOT_ELIGIBLE을 유지한다.",
+        "owner_due_predicate_id": "FP034-OWNER-DUE-04",
+        "current_status": "NOT_RUN_NOT_ELIGIBLE"
+      }
+    ],
+    "owner_due_predicates": [
+      {
+        "predicate_id": "FP034-OWNER-DUE-01",
+        "owner_role": "DATA_OWNER",
+        "due_predicate": "BEFORE_NEXT_SOURCE_ACQUISITION_OR_DATASET_MATERIALIZATION",
+        "completion_predicate": "현재 학습·검증 source 목록의 완전성, 6개 entry와 5개 고유 provider/dataset pair, 직접촬영·사용자제공 포함 여부를 증거 ID로 확정한다.",
+        "status": "OPEN_EVIDENCE_FACT_REQUIRED"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-02",
+        "owner_role": "LEGAL_AND_PRIVACY_REVIEWER",
+        "due_predicate": "BEFORE_ANY_SOURCE_PROMOTION_OR_DATASET_MATERIALIZATION",
+        "completion_predicate": "실제 사용 source마다 취득 근거, 공식 URL·약관 또는 license, 학습·재배포 권한, 개인정보·동의 적용성과 철회 영향을 검토한다.",
+        "status": "OPEN_ZERO_OF_FIVE_UNIQUE_PAIRS_VERIFIED"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-03",
+        "owner_role": "DATA_ENGINEER_AND_QA_OWNER",
+        "due_predicate": "BEFORE_ANY_TRAINING_OR_INDEPENDENT_EVALUATION_COMMAND",
+        "completion_predicate": "불변 materialized manifest와 data.yaml을 만들고 content hash, 품질·라벨 검사, capture-group sequence-safe split과 누수 검사를 실행해 증거를 등록한다.",
+        "status": "OPEN_MANIFEST_AND_DATA_YAML_MISSING"
+      },
+      {
+        "predicate_id": "FP034-OWNER-DUE-04",
+        "owner_role": "PRODUCT_OWNER_AND_INDEPENDENT_REVIEWER",
+        "due_predicate": "BEFORE_TST_22_RELEASE_READINESS_OR_REL_02_APPROVAL",
+        "completion_predicate": "GATE-RAW-COLLECTION-RELEASE-REVIEW를 실행하고 고지·동의·권리행사 절차와 잔여 위험을 승인한다.",
+        "status": "OPEN_GATE_NOT_RUN_NOT_WAIVED"
+      }
+    ],
+    "completion_boundary": {
+      "documentation_and_register_control_authored": true,
+      "source_acquisition_completed": false,
+      "rights_or_privacy_review_completed": false,
+      "dataset_materialized": false,
+      "quality_or_label_check_completed": false,
+      "split_or_leakage_check_completed": false,
+      "training_or_test_completed": false,
+      "approval_or_release_claimed": false
+    }
+  },
+  "internal_candidate_completion_scope": [
+    "AIML-04"
+  ],
+  "non_claimed_completion_ids": [
+    "AIML-05",
+    "AIML-06",
+    "AIML-07",
+    "AIML-08",
+    "AIML-09",
+    "AIML-10",
+    "AIML-11",
+    "AIML-12",
+    "AIML-13",
+    "AIML-16",
+    "AIML-17",
+    "AIML-21",
+    "AIML-23"
+  ],
+  "runtime_class_schema_exact_model_ids": [
+    "unified_walksafe",
+    "custom_tactile",
+    "coco_general"
+  ],
+  "runtime_class_schemas": [
+    {
+      "schema_id": "WS-RUNTIME-CLASS-SCHEMA-UNIFIED_WALKSAFE",
+      "schema_version": "1.0.0",
+      "approval_status": "NOT_APPROVED",
+      "runtime_model_id": "unified_walksafe",
+      "class_id_namespace": "walksafe.unified_walksafe.class_id",
+      "class_count": 13,
+      "class_order": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "traffic light",
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "crosswalk",
+        "curb_step",
+        "uneven_sidewalk",
+        "e_scooter_obstruction"
+      ],
+      "class_order_sha256": "5a01ce89ef0123c136fc17910c326fc64e70a3eaed77f3d4e80548518722d6d3",
+      "classes": [
+        {
+          "class_id": 0,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:0",
+          "runtime_label": "person",
+          "canonical_name": "person"
+        },
+        {
+          "class_id": 1,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:1",
+          "runtime_label": "bicycle",
+          "canonical_name": "bicycle"
+        },
+        {
+          "class_id": 2,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:2",
+          "runtime_label": "car",
+          "canonical_name": "car"
+        },
+        {
+          "class_id": 3,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:3",
+          "runtime_label": "motorcycle",
+          "canonical_name": "motorcycle"
+        },
+        {
+          "class_id": 4,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:4",
+          "runtime_label": "bus",
+          "canonical_name": "bus"
+        },
+        {
+          "class_id": 5,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:5",
+          "runtime_label": "truck",
+          "canonical_name": "truck"
+        },
+        {
+          "class_id": 6,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:6",
+          "runtime_label": "traffic light",
+          "canonical_name": "traffic_light"
+        },
+        {
+          "class_id": 7,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:7",
+          "runtime_label": "normal_tactile_block",
+          "canonical_name": "normal_tactile_block"
+        },
+        {
+          "class_id": 8,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:8",
+          "runtime_label": "damaged_tactile_block",
+          "canonical_name": "damaged_tactile_block"
+        },
+        {
+          "class_id": 9,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:9",
+          "runtime_label": "crosswalk",
+          "canonical_name": "crosswalk"
+        },
+        {
+          "class_id": 10,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:10",
+          "runtime_label": "curb_step",
+          "canonical_name": "curb_step"
+        },
+        {
+          "class_id": 11,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:11",
+          "runtime_label": "uneven_sidewalk",
+          "canonical_name": "uneven_sidewalk"
+        },
+        {
+          "class_id": 12,
+          "qualified_class_id": "walksafe.unified_walksafe.class_id:12",
+          "runtime_label": "e_scooter_obstruction",
+          "canonical_name": "e_scooter_obstruction"
+        }
+      ],
+      "canonical_name_conversion": {
+        "algorithm": "trim, lowercase ASCII, replace each non-alphanumeric run with underscore, trim edge underscores",
+        "cross_model_numeric_id_equivalence": false
+      },
+      "breaking_changes": {
+        "class_addition": "BREAKING_MAJOR",
+        "class_deletion": "BREAKING_MAJOR",
+        "class_reorder": "BREAKING_MAJOR",
+        "required_actions": [
+          "새 class schema major version 발행",
+          "runtime config와 TwoModelClassMap 동시 갱신",
+          "영향 모델 재-export",
+          "AIML-21 변환 동등성 재검증"
+        ],
+        "migration_status": "NOT_RUN",
+        "conversion_equivalence_revalidation_status": "NOT_RUN"
+      }
+    },
+    {
+      "schema_id": "WS-RUNTIME-CLASS-SCHEMA-CUSTOM_TACTILE",
+      "schema_version": "1.0.0",
+      "approval_status": "NOT_APPROVED",
+      "runtime_model_id": "custom_tactile",
+      "class_id_namespace": "walksafe.custom_tactile.class_id",
+      "class_count": 3,
+      "class_order": [
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "tactile_damage_area"
+      ],
+      "class_order_sha256": "85210b06510e5f0967d1c3ae325aa82e0731a11fe53e0b6a83f67e3d1ad84c00",
+      "classes": [
+        {
+          "class_id": 0,
+          "qualified_class_id": "walksafe.custom_tactile.class_id:0",
+          "runtime_label": "normal_tactile_block",
+          "canonical_name": "normal_tactile_block"
+        },
+        {
+          "class_id": 1,
+          "qualified_class_id": "walksafe.custom_tactile.class_id:1",
+          "runtime_label": "damaged_tactile_block",
+          "canonical_name": "damaged_tactile_block"
+        },
+        {
+          "class_id": 2,
+          "qualified_class_id": "walksafe.custom_tactile.class_id:2",
+          "runtime_label": "tactile_damage_area",
+          "canonical_name": "tactile_damage_area"
+        }
+      ],
+      "canonical_name_conversion": {
+        "algorithm": "trim, lowercase ASCII, replace each non-alphanumeric run with underscore, trim edge underscores",
+        "cross_model_numeric_id_equivalence": false
+      },
+      "breaking_changes": {
+        "class_addition": "BREAKING_MAJOR",
+        "class_deletion": "BREAKING_MAJOR",
+        "class_reorder": "BREAKING_MAJOR",
+        "required_actions": [
+          "새 class schema major version 발행",
+          "runtime config와 TwoModelClassMap 동시 갱신",
+          "영향 모델 재-export",
+          "AIML-21 변환 동등성 재검증"
+        ],
+        "migration_status": "NOT_RUN",
+        "conversion_equivalence_revalidation_status": "NOT_RUN"
+      }
+    },
+    {
+      "schema_id": "WS-RUNTIME-CLASS-SCHEMA-COCO_GENERAL",
+      "schema_version": "1.0.0",
+      "approval_status": "NOT_APPROVED",
+      "runtime_model_id": "coco_general",
+      "class_id_namespace": "coco.coco_general.class_id",
+      "class_count": 80,
+      "class_order": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "airplane",
+        "bus",
+        "train",
+        "truck",
+        "boat",
+        "traffic light",
+        "fire hydrant",
+        "stop sign",
+        "parking meter",
+        "bench",
+        "bird",
+        "cat",
+        "dog",
+        "horse",
+        "sheep",
+        "cow",
+        "elephant",
+        "bear",
+        "zebra",
+        "giraffe",
+        "backpack",
+        "umbrella",
+        "handbag",
+        "tie",
+        "suitcase",
+        "frisbee",
+        "skis",
+        "snowboard",
+        "sports ball",
+        "kite",
+        "baseball bat",
+        "baseball glove",
+        "skateboard",
+        "surfboard",
+        "tennis racket",
+        "bottle",
+        "wine glass",
+        "cup",
+        "fork",
+        "knife",
+        "spoon",
+        "bowl",
+        "banana",
+        "apple",
+        "sandwich",
+        "orange",
+        "broccoli",
+        "carrot",
+        "hot dog",
+        "pizza",
+        "donut",
+        "cake",
+        "chair",
+        "couch",
+        "potted plant",
+        "bed",
+        "dining table",
+        "toilet",
+        "tv",
+        "laptop",
+        "mouse",
+        "remote",
+        "keyboard",
+        "cell phone",
+        "microwave",
+        "oven",
+        "toaster",
+        "sink",
+        "refrigerator",
+        "book",
+        "clock",
+        "vase",
+        "scissors",
+        "teddy bear",
+        "hair drier",
+        "toothbrush"
+      ],
+      "class_order_sha256": "a2bb9c8218affdef450cc85951e6a5abc5e4d956cd37b1be3d04840ae0120c8e",
+      "classes": [
+        {
+          "class_id": 0,
+          "qualified_class_id": "coco.coco_general.class_id:0",
+          "runtime_label": "person",
+          "canonical_name": "person"
+        },
+        {
+          "class_id": 1,
+          "qualified_class_id": "coco.coco_general.class_id:1",
+          "runtime_label": "bicycle",
+          "canonical_name": "bicycle"
+        },
+        {
+          "class_id": 2,
+          "qualified_class_id": "coco.coco_general.class_id:2",
+          "runtime_label": "car",
+          "canonical_name": "car"
+        },
+        {
+          "class_id": 3,
+          "qualified_class_id": "coco.coco_general.class_id:3",
+          "runtime_label": "motorcycle",
+          "canonical_name": "motorcycle"
+        },
+        {
+          "class_id": 4,
+          "qualified_class_id": "coco.coco_general.class_id:4",
+          "runtime_label": "airplane",
+          "canonical_name": "airplane"
+        },
+        {
+          "class_id": 5,
+          "qualified_class_id": "coco.coco_general.class_id:5",
+          "runtime_label": "bus",
+          "canonical_name": "bus"
+        },
+        {
+          "class_id": 6,
+          "qualified_class_id": "coco.coco_general.class_id:6",
+          "runtime_label": "train",
+          "canonical_name": "train"
+        },
+        {
+          "class_id": 7,
+          "qualified_class_id": "coco.coco_general.class_id:7",
+          "runtime_label": "truck",
+          "canonical_name": "truck"
+        },
+        {
+          "class_id": 8,
+          "qualified_class_id": "coco.coco_general.class_id:8",
+          "runtime_label": "boat",
+          "canonical_name": "boat"
+        },
+        {
+          "class_id": 9,
+          "qualified_class_id": "coco.coco_general.class_id:9",
+          "runtime_label": "traffic light",
+          "canonical_name": "traffic_light"
+        },
+        {
+          "class_id": 10,
+          "qualified_class_id": "coco.coco_general.class_id:10",
+          "runtime_label": "fire hydrant",
+          "canonical_name": "fire_hydrant"
+        },
+        {
+          "class_id": 11,
+          "qualified_class_id": "coco.coco_general.class_id:11",
+          "runtime_label": "stop sign",
+          "canonical_name": "stop_sign"
+        },
+        {
+          "class_id": 12,
+          "qualified_class_id": "coco.coco_general.class_id:12",
+          "runtime_label": "parking meter",
+          "canonical_name": "parking_meter"
+        },
+        {
+          "class_id": 13,
+          "qualified_class_id": "coco.coco_general.class_id:13",
+          "runtime_label": "bench",
+          "canonical_name": "bench"
+        },
+        {
+          "class_id": 14,
+          "qualified_class_id": "coco.coco_general.class_id:14",
+          "runtime_label": "bird",
+          "canonical_name": "bird"
+        },
+        {
+          "class_id": 15,
+          "qualified_class_id": "coco.coco_general.class_id:15",
+          "runtime_label": "cat",
+          "canonical_name": "cat"
+        },
+        {
+          "class_id": 16,
+          "qualified_class_id": "coco.coco_general.class_id:16",
+          "runtime_label": "dog",
+          "canonical_name": "dog"
+        },
+        {
+          "class_id": 17,
+          "qualified_class_id": "coco.coco_general.class_id:17",
+          "runtime_label": "horse",
+          "canonical_name": "horse"
+        },
+        {
+          "class_id": 18,
+          "qualified_class_id": "coco.coco_general.class_id:18",
+          "runtime_label": "sheep",
+          "canonical_name": "sheep"
+        },
+        {
+          "class_id": 19,
+          "qualified_class_id": "coco.coco_general.class_id:19",
+          "runtime_label": "cow",
+          "canonical_name": "cow"
+        },
+        {
+          "class_id": 20,
+          "qualified_class_id": "coco.coco_general.class_id:20",
+          "runtime_label": "elephant",
+          "canonical_name": "elephant"
+        },
+        {
+          "class_id": 21,
+          "qualified_class_id": "coco.coco_general.class_id:21",
+          "runtime_label": "bear",
+          "canonical_name": "bear"
+        },
+        {
+          "class_id": 22,
+          "qualified_class_id": "coco.coco_general.class_id:22",
+          "runtime_label": "zebra",
+          "canonical_name": "zebra"
+        },
+        {
+          "class_id": 23,
+          "qualified_class_id": "coco.coco_general.class_id:23",
+          "runtime_label": "giraffe",
+          "canonical_name": "giraffe"
+        },
+        {
+          "class_id": 24,
+          "qualified_class_id": "coco.coco_general.class_id:24",
+          "runtime_label": "backpack",
+          "canonical_name": "backpack"
+        },
+        {
+          "class_id": 25,
+          "qualified_class_id": "coco.coco_general.class_id:25",
+          "runtime_label": "umbrella",
+          "canonical_name": "umbrella"
+        },
+        {
+          "class_id": 26,
+          "qualified_class_id": "coco.coco_general.class_id:26",
+          "runtime_label": "handbag",
+          "canonical_name": "handbag"
+        },
+        {
+          "class_id": 27,
+          "qualified_class_id": "coco.coco_general.class_id:27",
+          "runtime_label": "tie",
+          "canonical_name": "tie"
+        },
+        {
+          "class_id": 28,
+          "qualified_class_id": "coco.coco_general.class_id:28",
+          "runtime_label": "suitcase",
+          "canonical_name": "suitcase"
+        },
+        {
+          "class_id": 29,
+          "qualified_class_id": "coco.coco_general.class_id:29",
+          "runtime_label": "frisbee",
+          "canonical_name": "frisbee"
+        },
+        {
+          "class_id": 30,
+          "qualified_class_id": "coco.coco_general.class_id:30",
+          "runtime_label": "skis",
+          "canonical_name": "skis"
+        },
+        {
+          "class_id": 31,
+          "qualified_class_id": "coco.coco_general.class_id:31",
+          "runtime_label": "snowboard",
+          "canonical_name": "snowboard"
+        },
+        {
+          "class_id": 32,
+          "qualified_class_id": "coco.coco_general.class_id:32",
+          "runtime_label": "sports ball",
+          "canonical_name": "sports_ball"
+        },
+        {
+          "class_id": 33,
+          "qualified_class_id": "coco.coco_general.class_id:33",
+          "runtime_label": "kite",
+          "canonical_name": "kite"
+        },
+        {
+          "class_id": 34,
+          "qualified_class_id": "coco.coco_general.class_id:34",
+          "runtime_label": "baseball bat",
+          "canonical_name": "baseball_bat"
+        },
+        {
+          "class_id": 35,
+          "qualified_class_id": "coco.coco_general.class_id:35",
+          "runtime_label": "baseball glove",
+          "canonical_name": "baseball_glove"
+        },
+        {
+          "class_id": 36,
+          "qualified_class_id": "coco.coco_general.class_id:36",
+          "runtime_label": "skateboard",
+          "canonical_name": "skateboard"
+        },
+        {
+          "class_id": 37,
+          "qualified_class_id": "coco.coco_general.class_id:37",
+          "runtime_label": "surfboard",
+          "canonical_name": "surfboard"
+        },
+        {
+          "class_id": 38,
+          "qualified_class_id": "coco.coco_general.class_id:38",
+          "runtime_label": "tennis racket",
+          "canonical_name": "tennis_racket"
+        },
+        {
+          "class_id": 39,
+          "qualified_class_id": "coco.coco_general.class_id:39",
+          "runtime_label": "bottle",
+          "canonical_name": "bottle"
+        },
+        {
+          "class_id": 40,
+          "qualified_class_id": "coco.coco_general.class_id:40",
+          "runtime_label": "wine glass",
+          "canonical_name": "wine_glass"
+        },
+        {
+          "class_id": 41,
+          "qualified_class_id": "coco.coco_general.class_id:41",
+          "runtime_label": "cup",
+          "canonical_name": "cup"
+        },
+        {
+          "class_id": 42,
+          "qualified_class_id": "coco.coco_general.class_id:42",
+          "runtime_label": "fork",
+          "canonical_name": "fork"
+        },
+        {
+          "class_id": 43,
+          "qualified_class_id": "coco.coco_general.class_id:43",
+          "runtime_label": "knife",
+          "canonical_name": "knife"
+        },
+        {
+          "class_id": 44,
+          "qualified_class_id": "coco.coco_general.class_id:44",
+          "runtime_label": "spoon",
+          "canonical_name": "spoon"
+        },
+        {
+          "class_id": 45,
+          "qualified_class_id": "coco.coco_general.class_id:45",
+          "runtime_label": "bowl",
+          "canonical_name": "bowl"
+        },
+        {
+          "class_id": 46,
+          "qualified_class_id": "coco.coco_general.class_id:46",
+          "runtime_label": "banana",
+          "canonical_name": "banana"
+        },
+        {
+          "class_id": 47,
+          "qualified_class_id": "coco.coco_general.class_id:47",
+          "runtime_label": "apple",
+          "canonical_name": "apple"
+        },
+        {
+          "class_id": 48,
+          "qualified_class_id": "coco.coco_general.class_id:48",
+          "runtime_label": "sandwich",
+          "canonical_name": "sandwich"
+        },
+        {
+          "class_id": 49,
+          "qualified_class_id": "coco.coco_general.class_id:49",
+          "runtime_label": "orange",
+          "canonical_name": "orange"
+        },
+        {
+          "class_id": 50,
+          "qualified_class_id": "coco.coco_general.class_id:50",
+          "runtime_label": "broccoli",
+          "canonical_name": "broccoli"
+        },
+        {
+          "class_id": 51,
+          "qualified_class_id": "coco.coco_general.class_id:51",
+          "runtime_label": "carrot",
+          "canonical_name": "carrot"
+        },
+        {
+          "class_id": 52,
+          "qualified_class_id": "coco.coco_general.class_id:52",
+          "runtime_label": "hot dog",
+          "canonical_name": "hot_dog"
+        },
+        {
+          "class_id": 53,
+          "qualified_class_id": "coco.coco_general.class_id:53",
+          "runtime_label": "pizza",
+          "canonical_name": "pizza"
+        },
+        {
+          "class_id": 54,
+          "qualified_class_id": "coco.coco_general.class_id:54",
+          "runtime_label": "donut",
+          "canonical_name": "donut"
+        },
+        {
+          "class_id": 55,
+          "qualified_class_id": "coco.coco_general.class_id:55",
+          "runtime_label": "cake",
+          "canonical_name": "cake"
+        },
+        {
+          "class_id": 56,
+          "qualified_class_id": "coco.coco_general.class_id:56",
+          "runtime_label": "chair",
+          "canonical_name": "chair"
+        },
+        {
+          "class_id": 57,
+          "qualified_class_id": "coco.coco_general.class_id:57",
+          "runtime_label": "couch",
+          "canonical_name": "couch"
+        },
+        {
+          "class_id": 58,
+          "qualified_class_id": "coco.coco_general.class_id:58",
+          "runtime_label": "potted plant",
+          "canonical_name": "potted_plant"
+        },
+        {
+          "class_id": 59,
+          "qualified_class_id": "coco.coco_general.class_id:59",
+          "runtime_label": "bed",
+          "canonical_name": "bed"
+        },
+        {
+          "class_id": 60,
+          "qualified_class_id": "coco.coco_general.class_id:60",
+          "runtime_label": "dining table",
+          "canonical_name": "dining_table"
+        },
+        {
+          "class_id": 61,
+          "qualified_class_id": "coco.coco_general.class_id:61",
+          "runtime_label": "toilet",
+          "canonical_name": "toilet"
+        },
+        {
+          "class_id": 62,
+          "qualified_class_id": "coco.coco_general.class_id:62",
+          "runtime_label": "tv",
+          "canonical_name": "tv"
+        },
+        {
+          "class_id": 63,
+          "qualified_class_id": "coco.coco_general.class_id:63",
+          "runtime_label": "laptop",
+          "canonical_name": "laptop"
+        },
+        {
+          "class_id": 64,
+          "qualified_class_id": "coco.coco_general.class_id:64",
+          "runtime_label": "mouse",
+          "canonical_name": "mouse"
+        },
+        {
+          "class_id": 65,
+          "qualified_class_id": "coco.coco_general.class_id:65",
+          "runtime_label": "remote",
+          "canonical_name": "remote"
+        },
+        {
+          "class_id": 66,
+          "qualified_class_id": "coco.coco_general.class_id:66",
+          "runtime_label": "keyboard",
+          "canonical_name": "keyboard"
+        },
+        {
+          "class_id": 67,
+          "qualified_class_id": "coco.coco_general.class_id:67",
+          "runtime_label": "cell phone",
+          "canonical_name": "cell_phone"
+        },
+        {
+          "class_id": 68,
+          "qualified_class_id": "coco.coco_general.class_id:68",
+          "runtime_label": "microwave",
+          "canonical_name": "microwave"
+        },
+        {
+          "class_id": 69,
+          "qualified_class_id": "coco.coco_general.class_id:69",
+          "runtime_label": "oven",
+          "canonical_name": "oven"
+        },
+        {
+          "class_id": 70,
+          "qualified_class_id": "coco.coco_general.class_id:70",
+          "runtime_label": "toaster",
+          "canonical_name": "toaster"
+        },
+        {
+          "class_id": 71,
+          "qualified_class_id": "coco.coco_general.class_id:71",
+          "runtime_label": "sink",
+          "canonical_name": "sink"
+        },
+        {
+          "class_id": 72,
+          "qualified_class_id": "coco.coco_general.class_id:72",
+          "runtime_label": "refrigerator",
+          "canonical_name": "refrigerator"
+        },
+        {
+          "class_id": 73,
+          "qualified_class_id": "coco.coco_general.class_id:73",
+          "runtime_label": "book",
+          "canonical_name": "book"
+        },
+        {
+          "class_id": 74,
+          "qualified_class_id": "coco.coco_general.class_id:74",
+          "runtime_label": "clock",
+          "canonical_name": "clock"
+        },
+        {
+          "class_id": 75,
+          "qualified_class_id": "coco.coco_general.class_id:75",
+          "runtime_label": "vase",
+          "canonical_name": "vase"
+        },
+        {
+          "class_id": 76,
+          "qualified_class_id": "coco.coco_general.class_id:76",
+          "runtime_label": "scissors",
+          "canonical_name": "scissors"
+        },
+        {
+          "class_id": 77,
+          "qualified_class_id": "coco.coco_general.class_id:77",
+          "runtime_label": "teddy bear",
+          "canonical_name": "teddy_bear"
+        },
+        {
+          "class_id": 78,
+          "qualified_class_id": "coco.coco_general.class_id:78",
+          "runtime_label": "hair drier",
+          "canonical_name": "hair_drier"
+        },
+        {
+          "class_id": 79,
+          "qualified_class_id": "coco.coco_general.class_id:79",
+          "runtime_label": "toothbrush",
+          "canonical_name": "toothbrush"
+        }
+      ],
+      "canonical_name_conversion": {
+        "algorithm": "trim, lowercase ASCII, replace each non-alphanumeric run with underscore, trim edge underscores",
+        "cross_model_numeric_id_equivalence": false
+      },
+      "breaking_changes": {
+        "class_addition": "BREAKING_MAJOR",
+        "class_deletion": "BREAKING_MAJOR",
+        "class_reorder": "BREAKING_MAJOR",
+        "required_actions": [
+          "새 class schema major version 발행",
+          "runtime config와 TwoModelClassMap 동시 갱신",
+          "영향 모델 재-export",
+          "AIML-21 변환 동등성 재검증"
+        ],
+        "migration_status": "NOT_RUN",
+        "conversion_equivalence_revalidation_status": "NOT_RUN"
+      }
+    }
+  ],
+  "schema_draft": {
+    "schema_id": "WS-DATASET-SCHEMA-DRAFT",
+    "version": "0.1.0",
+    "status": "DRAFT_NOT_APPROVED",
+    "class_order_candidate": [
+      "person",
+      "bicycle",
+      "car",
+      "motorcycle",
+      "bus",
+      "truck",
+      "traffic light",
+      "normal_tactile_block",
+      "damaged_tactile_block",
+      "crosswalk",
+      "curb_step",
+      "uneven_sidewalk",
+      "e_scooter_obstruction"
+    ],
+    "sample_fields": [
+      "sample_id",
+      "source_id",
+      "capture_group_id",
+      "content_sha256",
+      "width",
+      "height",
+      "consent_record_id",
+      "storage_object_id"
+    ],
+    "annotation_fields": [
+      "sample_id",
+      "class_id",
+      "bbox_xywh_normalized",
+      "occlusion",
+      "truncation",
+      "reviewer_state",
+      "annotation_version"
+    ],
+    "raw_personal_values_in_git": false
+  },
+  "datasets": [
+    {
+      "dataset_id": "DS-CANDIDATE-FROM-MODEL-REGISTRY",
+      "version": null,
+      "status": "CANDIDATE_REVALIDATION_REQUIRED",
+      "manifest_path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv",
+      "manifest_exists": false,
+      "declared_manifest_sha256": "5ea9796589e02fcb64b82af564400df081731d7b2136e9a654422df56fdb94f6",
+      "verified_manifest_sha256": null,
+      "content_hash_status": "NOT_VERIFIED",
+      "split_status": "NOT_VERIFIED",
+      "leakage_check_status": "NOT_VERIFIED",
+      "data_quality_status": "NOT_RUN",
+      "label_quality_status": "NOT_RUN",
+      "rights_status": "NOT_VERIFIED",
+      "class_count": 13,
+      "class_order_candidate": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "traffic light",
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "crosswalk",
+        "curb_step",
+        "uneven_sidewalk",
+        "e_scooter_obstruction"
+      ],
+      "training_or_release_eligible": false,
+      "blockers": [
+        "DATASET_MANIFEST_MISSING",
+        "SEQUENCE_SAFE_SPLIT_NOT_VERIFIED",
+        "RIGHTS_AND_PRIVACY_REVIEW_NOT_RUN",
+        "DATA_YAML_MISSING",
+        "DATASET_CONTENT_HASH_NOT_VERIFIED",
+        "CURRENT_SOURCE_LIST_COMPLETENESS_NOT_VERIFIED",
+        "DIRECT_OR_USER_PROVIDED_SOURCE_FACT_UNKNOWN",
+        "INDEPENDENT_TEST_NOT_ESTABLISHED"
+      ],
+      "data_yaml_path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "data_yaml_exists": false,
+      "declared_counts_not_recomputed": {
+        "class_count": 13,
+        "train_images": 167759,
+        "validation_images": 28747,
+        "independent_test_images": 0,
+        "materialized_images": 196506,
+        "bounding_boxes": 607814
+      },
+      "source_list_completeness": "NOT_VERIFIED",
+      "declared_source_entry_count": 6,
+      "declared_unique_provider_dataset_pair_count": 5,
+      "rights_verified_unique_pair_count": 0,
+      "privacy_reviewed_unique_pair_count": 0,
+      "directly_captured_source_inclusion": "UNKNOWN",
+      "user_provided_source_inclusion": "UNKNOWN",
+      "privacy_status": "NOT_VERIFIED"
+    }
+  ],
+  "formal_dataset_count": 0,
+  "approved_dataset_count": 0
+}

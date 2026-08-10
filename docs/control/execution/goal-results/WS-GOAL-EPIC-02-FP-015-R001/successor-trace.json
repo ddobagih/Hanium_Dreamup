@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP015-WITHDRAWAL-ACCOUNT-DELETION-SUCCESSOR-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-015-R001",
+  "kind": "SUCCESSOR_TRACE",
+  "status": "PASS",
+  "observed_at": "2026-07-26T02:07:17+09:00",
+  "canonical_update_event_type": "CANONICAL_BINDINGS_UPDATED",
+  "resulting_canonical_bindings": {
+    "IMPLEMENTATION_BACKLOG": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r017.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-017",
+      "file_sha256": "0ca4724ffad40891503c7df1578e4bbb274991276ef852d1dd3b74ca3011dc35"
+    },
+    "IMPLEMENTATION_GAP": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260725-r017.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260725-017",
+      "file_sha256": "eb155dbec7228882871dea7df76c8e24cfef0fe51be9ec95e7f91c5e5b1e7be0"
+    }
+  },
+  "changed_subject_ids_by_role": {
+    "IMPLEMENTATION_BACKLOG": [
+      "FP-015"
+    ],
+    "IMPLEMENTATION_GAP": [
+      "FP-015",
+      "GAP-024"
+    ]
+  },
+  "next_policy_gap_pair": {
+    "source_policy_id": "FP-014",
+    "gap_id": "GAP-023"
+  }
+}

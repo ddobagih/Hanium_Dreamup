@@ -1,0 +1,73 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_authentication_status": "NOT_RUN",
+    "external_institution_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-008-01",
+      "TC-FP-008-02",
+      "TC-FP-008-03",
+      "TC-FP-008-04"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP008_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP008-BACKEND_ADMIN_DEVICE_PROOF_POSTGRES-RECEIPT-20260803-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "implementation_content_set_sha256": "77a9ec5b6bebce7aa68088e74a7ffb68d5f3d4e2d70484cfc690ace0d1bccae0",
+  "lane_id": "BACKEND_ADMIN_DEVICE_PROOF_POSTGRES",
+  "observation": {
+    "command": "env WALKSAFE_TEST_DATABASE_URL='postgresql+psycopg://walksafe_test:walksafe_test_password@127.0.0.1:32768/walksafe_fp008_test' PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -p no:cacheprovider -q backend/tests/test_admin_device_proof.py backend/tests/test_fp008_postgres_integration.py::test_fp008_postgres_schema_device_key_and_single_use_proof",
+    "ended_at": "2026-08-09T16:36:08+09:00",
+    "evidence_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "evidence_kind": "REPOSITORY_INTERNAL_AUTOMATED_CHECK",
+      "external_status": "NOT_RUN",
+      "formal_test_status": "NOT_RUN",
+      "production_status": "NOT_RUN"
+    },
+    "exit_code": 0,
+    "lane_id": "BACKEND_ADMIN_DEVICE_PROOF_POSTGRES",
+    "metrics": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 34,
+      "result_format": "PYTEST_TERMINAL_SUMMARY_V1",
+      "skipped": 0,
+      "working_directory": "."
+    },
+    "raw_output_byte_length": 664,
+    "raw_output_sha256": "d36674ae31a2b5b6560fa964a99f2c2a92bace0ad2b3ab2a296a58825ee0f898",
+    "schema_version": "walksafe.fp008-internal-lane-observation.v1",
+    "started_at": "2026-08-09T16:36:06+09:00",
+    "status": "PASS"
+  },
+  "raw_output_binding": {
+    "byte_length": 664,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/backend-admin-device-proof.log",
+    "sha256": "d36674ae31a2b5b6560fa964a99f2c2a92bace0ad2b3ab2a296a58825ee0f898"
+  },
+  "receipt_content_sha256": "6878dc426a01c56490a800649ec6439fffe90a0ba161302b52792ea062e5b0d7",
+  "resume_gate_binding": {
+    "byte_length": 10245,
+    "event_id": "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+    "event_sequence": 48,
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/implementation-resume-gate-receipt.json",
+    "role": "SEQ48_WORK_SESSION_RESUME_GATE",
+    "sha256": "394c9775c8ed3b2fbdac1b3cf8354ff839006b91998adc8cbbbb7c5f13dd8c5e"
+  },
+  "schema_version": "walksafe.fp008-internal-lane-receipt.v1",
+  "status": "PASS",
+  "title": "Registered-device and additional-auth proof"
+}

@@ -1,0 +1,7 @@
+WALKSAFE_FP046_COMMAND cd apps/android && ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks
+WALKSAFE_FP046_STARTED_AT 2026-08-10T06:52:15+09:00
+BUILD SUCCESSFUL in 25s
+JUnit tests=981 failures=0 errors=0 skipped=0
+WALKSAFE_FP046_SUMMARY passed=981 failed=0 errors=0 skipped=0
+WALKSAFE_FP046_EXIT_CODE 0
+WALKSAFE_FP046_ENDED_AT 2026-08-10T06:52:41+09:00

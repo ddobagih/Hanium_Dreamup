@@ -1,0 +1,753 @@
+{
+  "schema_version": "walksafe.phase1-ready-foundation.evidence.v1",
+  "packet_id": "WS-PHASE1-READY-FOUNDATION-20260727-001",
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "prepared_on": "2026-07-27",
+  "scope": {
+    "workstream": "W1_READY_FOUNDATION",
+    "artifact_count": 11,
+    "artifact_type_codes": [
+      "DLV-DES-15",
+      "DLV-DES-19",
+      "DLV-DES-20",
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-14",
+      "DLV-SEC-01",
+      "DLV-SEC-19",
+      "DLV-TST-02",
+      "DLV-TST-03",
+      "DLV-TST-05"
+    ],
+    "exact_set": true
+  },
+  "policy_binding": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "manifest_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+    "effective_decision_register_path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+    "effective_decision_register_sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+    "activation_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT",
+    "fp035_overlay_status": "APPROVED_EFFECTIVE_COMMITTED"
+  },
+  "source_binding": {
+    "binding_kind": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT",
+    "snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+    "snapshot_sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+    "path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+    "content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+    "file_count": 2960,
+    "stable_file_read_count": 2960,
+    "source_commit": null,
+    "clean_commit_claimed": false
+  },
+  "support_bindings": [
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "byte_length": 8054,
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "role": "CURRENT_EFFECTIVE_POLICY_MANIFEST"
+    },
+    {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "byte_length": 10001,
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "role": "CURRENT_EFFECTIVE_DECISION_REGISTER"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+      "byte_length": 4664,
+      "sha256": "f26709242bf7520ec9385feb70f5df859124700657d8fe2dc71c8d1d1df839c2",
+      "role": "CURRENT_IMPLEMENTATION_SUCCESSOR"
+    }
+  ],
+  "input_files": [
+    {
+      "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+      "byte_length": 50966,
+      "sha256": "962b3b9471faac60a895f2056865a8e4b12cb354874e197928ba35aa964dbe06"
+    },
+    {
+      "path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "byte_length": 81777,
+      "sha256": "3e076d2d0955882752378a3af2af202c33505a9f32571e2d6d8fe0c8293fc4f1"
+    },
+    {
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "byte_length": 459175,
+      "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "byte_length": 6221,
+      "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "byte_length": 248944,
+      "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc"
+    },
+    {
+      "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "byte_length": 67710,
+      "sha256": "a3d8999159b08d9d70816dc21819ec12c4e7eed71b90c1aeb35e1a3b1aad9ed1"
+    },
+    {
+      "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+      "byte_length": 32370,
+      "sha256": "c034bcc7ee6faa8247ac99522ea10e1107e481bd7101d1e74ae6314d20fc5f5b"
+    },
+    {
+      "path": "docs/deliverables/06-testing/test-plan.md",
+      "byte_length": 8743,
+      "sha256": "2b84c874501a4e6b3b2b3a3d1ba18c405203d40432b60c7474a028a36fda9e23"
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/environments.json",
+      "byte_length": 3503,
+      "sha256": "8d01ad85534e5f740ce5d89ecfadbc93a8bb58c13e3a06f15a4ed5e9deb51dc7"
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "byte_length": 2590342,
+      "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee"
+    }
+  ],
+  "output_files": [
+    {
+      "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+      "byte_length": 52729,
+      "sha256": "10b3cfeb21692f58da7959cca787c7f6056fdba2b4a59d938dcc0e5d6562c850",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "byte_length": 83400,
+      "sha256": "e99b96971d411c7ce07c26679adc4eb229ab78d5a3f62ee50af7cc366b3970ac",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "byte_length": 463652,
+      "sha256": "18775a3f4d5d1faf0ae692b27888613c3d43f0b276d5a71dfbb08aad47c6b4ae",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "byte_length": 8682,
+      "sha256": "10b609ebf0c1d5db22cbbb8fa1650bd1f4bc8d730b8f832f7c541bca4165fe25",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "byte_length": 248944,
+      "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+      "changed": false
+    },
+    {
+      "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "byte_length": 69161,
+      "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+      "byte_length": 33912,
+      "sha256": "e12637797b00007cff56ba727bbd3c66fa176c177ed60f0299ba8d1e41e306fe",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/06-testing/test-plan.md",
+      "byte_length": 10905,
+      "sha256": "a01a410b77479e351f3e73ee04ecbfdfab64a820fef63714e5fbec87540189e2",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/environments.json",
+      "byte_length": 5812,
+      "sha256": "d28e8847f780c4ab1375990ecb6957512b362b2c9a3ad1f93addbada7cf21e40",
+      "changed": true
+    },
+    {
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "byte_length": 2592818,
+      "sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+      "changed": true
+    }
+  ],
+  "artifact_dispositions": [
+    {
+      "artifact_type_code": "DLV-DES-15",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "NO_OP_CONTENT_SUFFICIENT_CURRENT_BINDING_ADDED",
+      "target_paths": [
+        "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+        "docs/deliverables/04-design/design-traceability-register.json"
+      ],
+      "linked_requirement_refs": [
+        "RQ-FP-010-001",
+        "RQ-FP-011-001",
+        "RQ-FP-012-001",
+        "RQ-FP-013-001",
+        "RQ-FP-014-001",
+        "RQ-FP-015-001",
+        "RQ-FP-016-001",
+        "RQ-FP-017-001",
+        "RQ-FP-018-001",
+        "RQ-FP-019-001",
+        "RQ-FP-020-001",
+        "RQ-FP-021-001",
+        "RQ-FP-022-001",
+        "RQ-FP-023-001",
+        "RQ-FP-024-001",
+        "RQ-FP-025-001",
+        "RQ-FP-026-001",
+        "RQ-FP-027-001",
+        "RQ-FP-028-001",
+        "RQ-FP-029-001",
+        "RQ-FP-030-001",
+        "RQ-FP-031-001",
+        "RQ-FP-032-001",
+        "RQ-FP-033-001",
+        "RQ-FP-043-001",
+        "RQ-FP-044-001",
+        "RQ-NPC-AUTO-REPORT-001",
+        "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+        "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001",
+        "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+        "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+        "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001"
+      ],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-DES-19",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "NO_OP_CONTENT_SUFFICIENT_CURRENT_BINDING_ADDED",
+      "target_paths": [
+        "docs/deliverables/04-design/security-and-operations-design.md",
+        "docs/deliverables/04-design/design-traceability-register.json"
+      ],
+      "linked_requirement_refs": [
+        "RQ-FP-003-001",
+        "RQ-FP-008-001",
+        "RQ-FP-010-001",
+        "RQ-FP-011-001",
+        "RQ-FP-012-001",
+        "RQ-FP-013-001",
+        "RQ-FP-014-001",
+        "RQ-FP-015-001",
+        "RQ-FP-040-001",
+        "RQ-FP-047-001",
+        "RQ-FP-048-001",
+        "RQ-FP-051-001",
+        "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001",
+        "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+        "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+        "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001"
+      ],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-DES-20",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "NO_OP_CONTENT_SUFFICIENT_POLICY_AUTHORITY_CORRECTED",
+      "target_paths": [
+        "docs/deliverables/04-design/security-and-operations-design.md",
+        "docs/deliverables/04-design/design-traceability-register.json"
+      ],
+      "linked_requirement_refs": [
+        "RQ-FP-002-001",
+        "RQ-FP-003-001",
+        "RQ-FP-008-001",
+        "RQ-FP-013-001",
+        "RQ-FP-015-001",
+        "RQ-FP-031-001",
+        "RQ-FP-034-001",
+        "RQ-FP-035-001",
+        "RQ-FP-036-001",
+        "RQ-FP-040-001",
+        "RQ-FP-041-001",
+        "RQ-FP-043-001",
+        "RQ-FP-044-001",
+        "RQ-FP-045-001",
+        "RQ-FP-046-001",
+        "RQ-FP-047-001",
+        "RQ-FP-048-001",
+        "RQ-FP-051-001",
+        "RQ-FP-053-001",
+        "RQ-FP-054-001",
+        "RQ-NPC-RAW-ORIGINAL-COLLECTION-001",
+        "RQ-NPC-DATA-LIFECYCLE-001",
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001",
+        "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+        "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+        "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+        "RQ-GATE-CLOUD-COST-MEASUREMENT-001",
+        "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001"
+      ],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-DEV-09",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "CONTENT_AND_PROVENANCE_CONTRACT_READY_FOR_REVIEW",
+      "target_paths": [
+        "docs/deliverables/05-implementation/implementation-configuration.md",
+        "docs/deliverables/05-implementation/implementation-manifest.json"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-DEV-12",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "CONTENT_AND_MIGRATION_CONTRACT_READY_FOR_REVIEW",
+      "target_paths": [
+        "docs/deliverables/05-implementation/implementation-configuration.md",
+        "docs/deliverables/05-implementation/implementation-manifest.json"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-DEV-14",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "CONTENT_AND_FIXTURE_TRACE_CONTRACT_READY_FOR_REVIEW",
+      "target_paths": [
+        "docs/deliverables/05-implementation/implementation-configuration.md",
+        "docs/deliverables/05-implementation/implementation-manifest.json",
+        "docs/deliverables/06-testing/registers/test-cases.json"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [
+        "REQ-SET-FORMAL279-68"
+      ],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-SEC-01",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "NO_OP_CONTENT_SUFFICIENT_CURRENT_BINDING_ADDED",
+      "target_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md"
+      ],
+      "linked_requirement_refs": [
+        "DLV-REQ-09",
+        "DLV-REQ-10"
+      ],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-SEC-19",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "NO_OP_CONTENT_SUFFICIENT_CURRENT_BINDING_ADDED",
+      "target_paths": [
+        "docs/deliverables/07-security/security-response-and-monitoring.md"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-TST-02",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "PLAN_CONTENT_BOUND_FOR_DESIGNATED_REVIEW",
+      "target_paths": [
+        "docs/deliverables/06-testing/test-plan.md"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [
+        "REQ-SET-FORMAL279-68"
+      ],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-TST-03",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "AS_OF_ENVIRONMENT_REGISTER_BOUND_NOT_PROVISIONED",
+      "target_paths": [
+        "docs/deliverables/06-testing/test-plan.md",
+        "docs/deliverables/06-testing/registers/environments.json"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [
+        "REQ-SET-FORMAL279-68"
+      ],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-TST-05",
+      "queue_state_at_input": "INTERNAL_READY",
+      "packet_disposition": "EXACT279_CASE_PLAN_BOUND_ALL_NOT_RUN",
+      "target_paths": [
+        "docs/deliverables/06-testing/test-plan.md",
+        "docs/deliverables/06-testing/registers/test-cases.json"
+      ],
+      "linked_requirement_refs": [],
+      "linked_requirement_set_refs": [
+        "REQ-SET-FORMAL279-68"
+      ],
+      "linked_gap_refs": [],
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "content_binding_status": "PREPARED_FOR_DESIGNATED_REVIEW",
+      "review_status": "NOT_PERFORMED",
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE",
+      "final_completion_claimed": false
+    }
+  ],
+  "trace_sets": {
+    "DES-15": [
+      "RQ-FP-010-001",
+      "RQ-FP-011-001",
+      "RQ-FP-012-001",
+      "RQ-FP-013-001",
+      "RQ-FP-014-001",
+      "RQ-FP-015-001",
+      "RQ-FP-016-001",
+      "RQ-FP-017-001",
+      "RQ-FP-018-001",
+      "RQ-FP-019-001",
+      "RQ-FP-020-001",
+      "RQ-FP-021-001",
+      "RQ-FP-022-001",
+      "RQ-FP-023-001",
+      "RQ-FP-024-001",
+      "RQ-FP-025-001",
+      "RQ-FP-026-001",
+      "RQ-FP-027-001",
+      "RQ-FP-028-001",
+      "RQ-FP-029-001",
+      "RQ-FP-030-001",
+      "RQ-FP-031-001",
+      "RQ-FP-032-001",
+      "RQ-FP-033-001",
+      "RQ-FP-043-001",
+      "RQ-FP-044-001",
+      "RQ-NPC-AUTO-REPORT-001",
+      "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+      "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001",
+      "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+      "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+      "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001"
+    ],
+    "DES-19": [
+      "RQ-FP-003-001",
+      "RQ-FP-008-001",
+      "RQ-FP-010-001",
+      "RQ-FP-011-001",
+      "RQ-FP-012-001",
+      "RQ-FP-013-001",
+      "RQ-FP-014-001",
+      "RQ-FP-015-001",
+      "RQ-FP-040-001",
+      "RQ-FP-047-001",
+      "RQ-FP-048-001",
+      "RQ-FP-051-001",
+      "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+      "RQ-NPC-SINGLE-ADMIN-RECOVERY-001",
+      "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+      "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+      "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001"
+    ],
+    "DES-20": [
+      "RQ-FP-002-001",
+      "RQ-FP-003-001",
+      "RQ-FP-008-001",
+      "RQ-FP-013-001",
+      "RQ-FP-015-001",
+      "RQ-FP-031-001",
+      "RQ-FP-034-001",
+      "RQ-FP-035-001",
+      "RQ-FP-036-001",
+      "RQ-FP-040-001",
+      "RQ-FP-041-001",
+      "RQ-FP-043-001",
+      "RQ-FP-044-001",
+      "RQ-FP-045-001",
+      "RQ-FP-046-001",
+      "RQ-FP-047-001",
+      "RQ-FP-048-001",
+      "RQ-FP-051-001",
+      "RQ-FP-053-001",
+      "RQ-FP-054-001",
+      "RQ-NPC-RAW-ORIGINAL-COLLECTION-001",
+      "RQ-NPC-DATA-LIFECYCLE-001",
+      "RQ-NPC-SINGLE-ADMIN-RECOVERY-001",
+      "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+      "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+      "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+      "RQ-GATE-CLOUD-COST-MEASUREMENT-001",
+      "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001"
+    ],
+    "REQ-SET-FORMAL279-68": [
+      "RQ-FP-001-001",
+      "RQ-FP-002-001",
+      "RQ-FP-003-001",
+      "RQ-FP-004-001",
+      "RQ-FP-005-001",
+      "RQ-FP-006-001",
+      "RQ-FP-007-001",
+      "RQ-FP-008-001",
+      "RQ-FP-009-001",
+      "RQ-FP-010-001",
+      "RQ-FP-011-001",
+      "RQ-FP-012-001",
+      "RQ-FP-013-001",
+      "RQ-FP-014-001",
+      "RQ-FP-015-001",
+      "RQ-FP-016-001",
+      "RQ-FP-017-001",
+      "RQ-FP-018-001",
+      "RQ-FP-019-001",
+      "RQ-FP-020-001",
+      "RQ-FP-021-001",
+      "RQ-FP-022-001",
+      "RQ-FP-023-001",
+      "RQ-FP-024-001",
+      "RQ-FP-025-001",
+      "RQ-FP-026-001",
+      "RQ-FP-027-001",
+      "RQ-FP-028-001",
+      "RQ-FP-029-001",
+      "RQ-FP-030-001",
+      "RQ-FP-031-001",
+      "RQ-FP-032-001",
+      "RQ-FP-033-001",
+      "RQ-FP-034-001",
+      "RQ-FP-035-001",
+      "RQ-FP-036-001",
+      "RQ-FP-037-001",
+      "RQ-FP-038-001",
+      "RQ-FP-039-001",
+      "RQ-FP-040-001",
+      "RQ-FP-041-001",
+      "RQ-FP-042-001",
+      "RQ-FP-043-001",
+      "RQ-FP-044-001",
+      "RQ-FP-045-001",
+      "RQ-FP-046-001",
+      "RQ-FP-047-001",
+      "RQ-FP-048-001",
+      "RQ-FP-049-001",
+      "RQ-FP-050-001",
+      "RQ-FP-051-001",
+      "RQ-FP-052-001",
+      "RQ-FP-053-001",
+      "RQ-FP-054-001",
+      "RQ-GATE-CLOUD-COST-MEASUREMENT-001",
+      "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+      "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+      "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+      "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001",
+      "RQ-NPC-AUTO-REPORT-001",
+      "RQ-NPC-DATA-LIFECYCLE-001",
+      "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001",
+      "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+      "RQ-NPC-PHONE-QUEUE-CAPACITY-001",
+      "RQ-NPC-RAW-ORIGINAL-COLLECTION-001",
+      "RQ-NPC-SERVER-CAPACITY-STATE-SYNC-001",
+      "RQ-NPC-SERVER-STORAGE-CAPACITY-001",
+      "RQ-NPC-SINGLE-ADMIN-RECOVERY-001"
+    ]
+  },
+  "gap_binding": {
+    "source_path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-gap-analysis.json",
+    "source_sha256": "a392e95bb0a6219dba8f0bd5e493ac0eb9782b61b63cff48f523191c676d7b55",
+    "direct_linked_gap_ref_count": 0,
+    "boundary": "All exact-11 Phase 1 queue rows carry empty linked_gap_refs. No gap resolution is claimed by this packet."
+  },
+  "remaining_gates": [
+    {
+      "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "validation": {
+    "mode": "JSON_STRUCTURE_AND_STATIC_CONSISTENCY_ONLY",
+    "build_executed": false,
+    "test_executed": false,
+    "git_used": false,
+    "formal279_status": "NOT_RUN",
+    "formal279_planned_count": 279,
+    "formal279_pass_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "operational_monitoring_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "authorization_boundary": {
+    "packet_is_designated_review": false,
+    "packet_is_owner_approval": false,
+    "implementation_completion_claimed": false,
+    "formal_test_completion_claimed": false,
+    "operational_monitoring_completion_claimed": false,
+    "release_or_final_completion_claimed": false
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact JSON; array order preserved",
+    "excluded_json_paths": [
+      "$.content_fingerprint"
+    ],
+    "input_projection": "Entire evidence packet excluding only the top-level content_fingerprint member",
+    "non_self_referential": true,
+    "canonical_byte_length": 20332,
+    "sha256": "e4bc04b1ee8671ef130ace80a3c0af93265145c8817d3005ff9b0c83eb4c7231"
+  }
+}

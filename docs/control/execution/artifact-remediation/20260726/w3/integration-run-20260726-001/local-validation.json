@@ -1,0 +1,139 @@
+{
+  "checks": [
+    {
+      "check_id": "DEV21-EXACTLY-ONE-DISPOSITION",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-SIX-COVERAGE-COMPONENTS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "REQUIRED-COMMANDS-ALL-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "OPEN-GAP-STABLE-UNIQUE",
+      "status": "PASS"
+    },
+    {
+      "check_id": "OPEN-GAP-TARGET-WAVES",
+      "status": "PASS"
+    },
+    {
+      "check_id": "FORMAL-GATE-RELEASE-BOUNDARY",
+      "status": "PASS"
+    },
+    {
+      "check_id": "FP047-REUSE-PROHIBITED-AFTER-CHECK-FAIL",
+      "status": "PASS"
+    },
+    {
+      "check_id": "COMMON-CONTENT-FINGERPRINTS",
+      "status": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "cross_process_network_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "document_id": "WALKSAFE-W3-DEV21-LOCAL-VALIDATION-20260726-001",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "e49544aceacd1876ef4392cfdd334347c0ebdb553a68fbbeed3405e63209c2cb"
+    }
+  },
+  "output_bindings": [
+    {
+      "bytes": 1300,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json",
+      "role": "GATEWAY_COMMAND_RECEIPT",
+      "sha256": "79cae4f38d8ccd990aa99b1f15a0a80ca40838e868d9e41cc5e2e02b2901ab6d"
+    },
+    {
+      "bytes": 25267,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-user-unit.json",
+      "role": "ANDROID_USER_COMMAND_RECEIPT",
+      "sha256": "e4d0a386bdfc7863045f4b73b0c6175a1dfd183bcad16c33006f286845da5420"
+    },
+    {
+      "bytes": 3066,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-admin-unit.json",
+      "role": "ANDROID_ADMIN_COMMAND_RECEIPT",
+      "sha256": "695de382418e5f9f25d55e29d9a0dd9e52c4d1f18d43c9dd44970654997e910b"
+    },
+    {
+      "bytes": 1402,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/fp047-current-check.json",
+      "role": "FP047_CHECK_RECEIPT",
+      "sha256": "a8e4f4b5562d5411971cd19ed191402a2dcfef2675bc7ef40a7259d69dc0183f"
+    },
+    {
+      "bytes": 12556,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json",
+      "role": "EVIDENCE_REUSE_RECEIPT",
+      "sha256": "1b49bcb2b682efb3f716c053fdded26cafdb69fdadd7a91d8e3abbe5423b8c53"
+    },
+    {
+      "bytes": 15314,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/integration-current-state.json",
+      "role": "INTEGRATION_CURRENT_STATE_JSON",
+      "sha256": "83ee018074364d96c3983b7c8826f04a4bf815b2bfef500b5f83f06d1acea76d"
+    },
+    {
+      "bytes": 2979,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/integration-current-state.md",
+      "role": "INTEGRATION_CURRENT_STATE_MARKDOWN",
+      "sha256": "bd0d118b55e85f348a234af23dc6dcf464088b3158e077095775102bc376b76f"
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "raw_log_bindings": [
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.log",
+      "sha256": "00bb601dc150b5004e1792d160237cbdd1f2c9dafdbf9558e15d9faea8bd0ab2"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.time",
+      "sha256": "5763d317ad495671300b3b22328683b2abf8e7eeee6a1df0ac592e94b3790881"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-user-unit.log",
+      "sha256": "c64f2cbb73ac74ed60dc528fa02fd1d2cf3e7da5938f34e8d0c83924a18231e6"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-user-unit.time",
+      "sha256": "84f909c0fbd6fba8a0a1e394361579bd24d7afde227037338b770acfa4d305e5"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-admin-unit.log",
+      "sha256": "b03bf76161733ca1d998fdd8583a4219591d5ddd78006173173863cd8327396e"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-admin-unit.time",
+      "sha256": "b760a7b00e98c97c1abb95a1e948de2499cbab53fad25b4bfd2dd1301cf0ed12"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/fp047-current-check.log",
+      "sha256": "1a833db433b51b4ac8d22519e344dc31075d98bef77f10f43fd32aabfea38d92"
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/fp047-current-check.time",
+      "sha256": "b952a431f0d9bb8259ec89917e1ad57160a5168c31bdf994c3ac312fa73f4dc3"
+    }
+  ],
+  "schema_version": "walksafe.w3-dev21-local-validation.v1",
+  "status": "PASS"
+}

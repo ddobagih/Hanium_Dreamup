@@ -1,0 +1,353 @@
+...........................................................EEEEEEEEEEEE. [ 75%]
+........................                                                 [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_backlog_advances_only_epic02_and_points_to_fp018 _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_builder_emits_exactly_eight_new_successor_outputs _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_gap_counts_formal_and_release_boundaries_are_conservative _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_missing_or_changed_immutable_predecessor_is_rejected _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_object_seals_detect_mutation _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_overlay_has_nine_active_to_active_events_without_approval_change _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_phase_g_builder_test_and_eight_outputs_are_byte_exact _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_phase_g_live_builder_is_frozen_as_expected_stale _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_r008_changes_only_gap026_assessment_from_r007 _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_record_captures_fp017_partial_lifecycle_contract _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_snapshot_contains_only_thirteen_fp017_implementation_paths _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+_ ERROR at setup of WalkSafeEpic02PhaseATraceTest.test_validation_rejects_promotion_or_waiver _
+
+cls = <class 'test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.WalkSafeEpic02PhaseATraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:1154: in build_outputs
+    contract = _source_contract()
+               ^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:402: in _source_contract
+    _require(marker in lifecycle_test, f"lifecycle regression is missing: {marker}")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False
+message = 'lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic02_phase_a_trace.TraceBuildError: lifecycle regression is missing: leavingForegroundWhileAwaitingConfirmationRequiresAnotherRecheck
+
+scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py:152: TraceBuildError
+=========================== short test summary info ============================
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_backlog_advances_only_epic02_and_points_to_fp018
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_builder_emits_exactly_eight_new_successor_outputs
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_gap_counts_formal_and_release_boundaries_are_conservative
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_missing_or_changed_immutable_predecessor_is_rejected
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_object_seals_detect_mutation
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_overlay_has_nine_active_to_active_events_without_approval_change
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_phase_g_builder_test_and_eight_outputs_are_byte_exact
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_phase_g_live_builder_is_frozen_as_expected_stale
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_r008_changes_only_gap026_assessment_from_r007
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_record_captures_fp017_partial_lifecycle_contract
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_snapshot_contains_only_thirteen_fp017_implementation_paths
+ERROR tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py::WalkSafeEpic02PhaseATraceTest::test_validation_rejects_promotion_or_waiver
+84 passed, 6 deselected, 12 errors in 4.55s

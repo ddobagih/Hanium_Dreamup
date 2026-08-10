@@ -1,0 +1,306 @@
+{
+  "schema_version": "walksafe.feature-policy-correction-candidate.v1",
+  "metadata": {
+    "candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+    "candidate_version": "1.0.0",
+    "controlled_revision": 1,
+    "prepared_at": "2026-07-22T12:48:00+09:00",
+    "lifecycle_status": "READY_FOR_BUNDLED_APPROVAL",
+    "approval_status": "NOT_APPROVED",
+    "effective_status": "NOT_EFFECTIVE",
+    "approver": null,
+    "approved_at": null,
+    "supersedes_candidate_id": null
+  },
+  "source_bindings": [
+    {
+      "name": "approved_policy_payload",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "byte_length": 1437541,
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    {
+      "name": "approved_policy_record",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "byte_length": 21006,
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    {
+      "name": "approved_policy_manifest",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "byte_length": 19099,
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    {
+      "name": "approved_review_resolution",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-baseline-review-resolution-20260721-r001.json",
+      "byte_length": 21234,
+      "sha256": "d71cf9940cf8037226d3e095be26aa4ed34fe2c2feabe565c88f803eaab0dc50"
+    },
+    {
+      "name": "original_owner_answer_export",
+      "path": "docs/control/decision-interview/source-records/walksafe-feature-policy-comprehensive-review-20260719-answers.json",
+      "byte_length": 23731,
+      "sha256": "ef840c33215767d210fc930a8087f09e5eda7b99af695ded5cd9d226d8ab5150"
+    },
+    {
+      "name": "authoring_goal_owner_directive_intake",
+      "path": "docs/control/decision-interview/source-records/walksafe-artifact-authoring-goal-20260722-r001.intake.json",
+      "byte_length": 2937,
+      "sha256": "38234fb4cfd07f13044470a3c07d58c9d63532cc81946a616aaec47af2e58ed8"
+    },
+    {
+      "name": "generator",
+      "path": "scripts/build_walksafe_fp035_correction_candidate_20260722.py",
+      "byte_length": 19036,
+      "sha256": "4711f7973e4bbd1fadfcb46f635dc32d4bfbe7306f407ec76b3f405a2be43a93"
+    }
+  ],
+  "source_binding_sha256": "0d3f38ae8b537cfcb21cc57b5a1eb500d570582a953b0f45c26c02b9f9107325",
+  "base_policy": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "baseline_version": "1.0.0",
+    "document_id": "WS-FEATURE-POLICY-DRAFT-20260720",
+    "document_version": "1.0.0",
+    "document_content_sha256": "e49ffe0ee9e59de0cec173cac9425d61aa78e0ccd65980ba568045a3975e0b28",
+    "decision_binding_sha256": "16064cabf95dc16109bfe315032905a12881cab40cf7730e97d8171d15476538",
+    "bytes_modified_by_this_candidate": false
+  },
+  "correction": {
+    "change_request_id": "CR-0002",
+    "change_control_refs": [
+      "CR-0002",
+      "ISS-POLICY-FP035-NETWORK-001",
+      "RAID-011"
+    ],
+    "feature_id": "FP-035",
+    "policy_clause_id": "FP-035-POLICY-001",
+    "change_kind": "OWNER_CLARIFICATION_CORRECTION",
+    "reason": "SP-13의 '데이터'가 일반 수집 동의가 아니라 이동통신망 사용 선택을 뜻한다는 후속 설명을 반영해, Wi-Fi 전용으로 읽히는 기존 문장을 바로잡는다.",
+    "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+    "decision_branches": [
+      {
+        "condition": "보행 중",
+        "result": "일반 활동원본을 어떤 망으로도 전송하지 않는다."
+      },
+      {
+        "condition": "보행 정지 후, 이동통신망 전송을 명시적으로 선택했고 현재 망이 허용됨",
+        "result": "배터리·저장공간 등 다른 전송 조건도 충족하면 이동통신망 전송을 허용한다."
+      },
+      {
+        "condition": "보행 정지 후, 이동통신망 전송을 선택하지 않음",
+        "result": "Wi-Fi에서만 전송한다."
+      },
+      {
+        "condition": "허용된 망이 없음",
+        "result": "암호화 대기열에 보관하고 기존 보존·용량·삭제 정책을 적용한다."
+      }
+    ],
+    "overlay_interpretation": {
+      "replaces_unconditional_wifi_only_reading": true,
+      "unchanged_rules": [
+        "보행 중 일반 활동원본 전송 금지",
+        "명시적 선택 없이 이동통신망으로 자동 전환 금지",
+        "전송 실패 시 암호화 대기와 보존·용량·삭제 정책 적용",
+        "신고자료 우선 보호와 조각 무결성 확인"
+      ],
+      "base_document_remains_immutable": true
+    },
+    "affected_artifact_codes": [
+      "REQ-03",
+      "REQ-06",
+      "DES-04",
+      "DES-13",
+      "DES-20"
+    ],
+    "required_related_records": [
+      {
+        "artifact_code": "REQ-16",
+        "path": "docs/deliverables/03-requirements/rtm.json"
+      },
+      {
+        "artifact_code": "REQ-18",
+        "path": "docs/deliverables/03-requirements/requirement-change-log.json"
+      },
+      {
+        "artifact_code": "DES-06",
+        "path": "docs/deliverables/04-design/design-traceability-register.json"
+      },
+      {
+        "artifact_code": "MGT-14",
+        "path": "docs/deliverables/01-management/registers/raid.json"
+      },
+      {
+        "artifact_code": "MGT-16",
+        "path": "docs/deliverables/01-management/registers/change-requests.json"
+      },
+      {
+        "artifact_code": "DOC-05",
+        "path": "docs/deliverables/00-control/artifact-change-log.json"
+      }
+    ]
+  },
+  "correction_binding_sha256": "5f44ee6d1baae95e57e318946d4b8f0c2bed857a8bd3b9cdc16805a7ae80fcfd",
+  "planned_effective_policy": {
+    "baseline_id_after_explicit_approval": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version_after_explicit_approval": "1.0.1",
+    "composition": "PB-WALKSAFE-FEATURE-POLICY-1.0.0 + this exact correction overlay",
+    "state_change_now": false,
+    "must_be_approved_with_affected_artifacts": true
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "kind_label": "실측",
+      "completion_condition": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다.",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-044",
+        "FP-045"
+      ],
+      "must_close_before": "지원 기기별 실제 사용자시험 범위 확정과 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "지원 기기별 대기열 용량 기준 확정",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "kind_label": "개발 설계 검토",
+      "completion_condition": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다.",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-040",
+        "FP-044",
+        "FP-052",
+        "FP-053"
+      ],
+      "must_close_before": "관련 기능의 통합시험 완료와 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "서버 용량상태 연동 통합시험 완료",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "kind_label": "독립 검토",
+      "completion_condition": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다.",
+      "affected_feature_ids": [
+        "FP-013",
+        "FP-015",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-022",
+        "FP-023",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-041",
+        "FP-046",
+        "FP-048",
+        "FP-049",
+        "FP-050",
+        "FP-053",
+        "FP-054"
+      ],
+      "must_close_before": "TST-22 출시 준비도 판단과 실제 서비스 배포 전",
+      "blocks_until_complete": [
+        "무가림 원본수집 출시 적합 판정",
+        "REL-02 릴리스 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "title": "실제 클라우드 저장비 측정",
+      "kind_label": "실측",
+      "completion_condition": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다.",
+      "affected_feature_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "must_close_before": "운영비 기준 확정과 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "월 저장비 상한 충족 판정",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "kind_label": "복구훈련",
+      "completion_condition": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다.",
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-008",
+        "FP-047",
+        "FP-048",
+        "FP-050",
+        "FP-051",
+        "FP-052",
+        "FP-053"
+      ],
+      "must_close_before": "실제 사용자시험 또는 배포 전",
+      "blocks_until_complete": [
+        "실제 사용자시험 시작",
+        "REL-02 릴리스 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    }
+  ],
+  "authorization_boundary": {
+    "owner_directive_captured": true,
+    "new_product_question_required": false,
+    "candidate_generation_is_approval": false,
+    "policy_1_0_0_is_superseded_now": false,
+    "affected_artifacts_are_approved_now": false,
+    "implementation_conformance_assessed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_are_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+    "authoring_and_planning_allowed_before_activation": true,
+    "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+    "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL"
+  },
+  "owner_directive_source": {
+    "intake_record_id": "WS-ARTIFACT-AUTHORING-GOAL-INTAKE-20260722-001",
+    "source_attachment_sha256": "2a4d2de081cb94152662d7e966509b14713417a37586fe19304c237b3e9f1687",
+    "exact_rule_sha256": "bb7220f01d94909e96639923fbe14f89ee8999f03e5ce34c8f4d1cb6bdec40b3"
+  },
+  "candidate_content_sha256": "1918e10fd03d74fc3a7c292b077f1da51027bcdc7b9945f6c22c0acafc877a9d"
+}

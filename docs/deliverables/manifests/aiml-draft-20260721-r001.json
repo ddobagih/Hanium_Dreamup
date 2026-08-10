@@ -1,0 +1,1191 @@
+{
+  "schema_version": "walksafe.formal-aiml-draft-manifest.v1",
+  "metadata": {
+    "document_id": "WS-AIML-WALKSAFE-AIML-정식-산출물-DRAFT-MANIFEST-20260721",
+    "title": "WalkSafe AIML 정식 산출물 Draft manifest",
+    "document_version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "AIML-01",
+      "AIML-02",
+      "AIML-03",
+      "AIML-04",
+      "AIML-06",
+      "AIML-07",
+      "AIML-12",
+      "AIML-14",
+      "AIML-15",
+      "AIML-16",
+      "AIML-17",
+      "AIML-24",
+      "AIML-25",
+      "AIML-26"
+    ],
+    "manifest_id": "WS-FORMAL-AIML-DRAFT-20260721-001",
+    "controlled_revision": 1,
+    "generated_by": "scripts/build_walksafe_formal_aiml_20260721.py"
+  },
+  "scope_artifact_type_ids": [
+    "AIML-01",
+    "AIML-02",
+    "AIML-03",
+    "AIML-04",
+    "AIML-05",
+    "AIML-06",
+    "AIML-07",
+    "AIML-08",
+    "AIML-09",
+    "AIML-10",
+    "AIML-11",
+    "AIML-12",
+    "AIML-13",
+    "AIML-14",
+    "AIML-15",
+    "AIML-16",
+    "AIML-17",
+    "AIML-18",
+    "AIML-19",
+    "AIML-20",
+    "AIML-21",
+    "AIML-22",
+    "AIML-23",
+    "AIML-24",
+    "AIML-25",
+    "AIML-26"
+  ],
+  "materialized_artifact_type_ids": [
+    "AIML-01",
+    "AIML-02",
+    "AIML-03",
+    "AIML-04",
+    "AIML-06",
+    "AIML-07",
+    "AIML-12",
+    "AIML-14",
+    "AIML-15",
+    "AIML-16",
+    "AIML-17",
+    "AIML-24",
+    "AIML-25",
+    "AIML-26"
+  ],
+  "planned_artifact_type_ids": [
+    "AIML-05",
+    "AIML-08",
+    "AIML-09",
+    "AIML-10",
+    "AIML-11",
+    "AIML-13",
+    "AIML-18",
+    "AIML-19",
+    "AIML-20",
+    "AIML-21",
+    "AIML-22",
+    "AIML-23"
+  ],
+  "planned_execution_contracts": {
+    "AIML-05": {
+      "when": "학습·검증·시험 데이터셋 버전을 승인하기 전과 자료구성이 바뀔 때",
+      "executor": "데이터책임자",
+      "prerequisites": [
+        "불변 dataset manifest와 파일 지문",
+        "출처·권리·동의 상태",
+        "승인된 품질항목과 표본추출 방법"
+      ],
+      "evidence": [
+        "전체·출처·class별 수량과 결측·중복·손상 통계",
+        "검사 도구·설정·실행 log",
+        "제외 목록과 조치·재검사 결과"
+      ],
+      "judgment": "사전에 정한 품질항목을 모두 계산하고 중대한 결측·손상·권리 미확인이 0건이며 남은 한계가 승인돼야 PASS"
+    },
+    "AIML-08": {
+      "when": "라벨 묶음을 학습 또는 독립 평가에 사용하기 전",
+      "executor": "라벨링 품질검사자",
+      "prerequisites": [
+        "AIML-07 지침 version",
+        "가명화된 표본 목록",
+        "검사자와 라벨 작성자의 역할 구분"
+      ],
+      "evidence": [
+        "class·난이도별 표본",
+        "일치·누락·경계 오류 집계",
+        "불일치 조정 기록과 수정 version"
+      ],
+      "judgment": "승인된 표본수와 오류기준을 충족하고 치명적 class 혼동·누락을 모두 조치한 경우만 PASS"
+    },
+    "AIML-09": {
+      "when": "학습 실행을 시작하기 전과 dataset version이 바뀔 때",
+      "executor": "데이터 엔지니어",
+      "prerequisites": [
+        "불변 sample·capture_group·source ID",
+        "분할 비율과 독립 시험 잠금 규칙"
+      ],
+      "evidence": [
+        "train·validation·test manifest",
+        "각 manifest SHA-256",
+        "group 겹침 0건 검사 결과"
+      ],
+      "judgment": "동일 보행·연속촬영·원본 파생물이 분할 사이에 겹치지 않고 독립 시험 묶음이 잠겨야 PASS"
+    },
+    "AIML-10": {
+      "when": "분할 뒤, 학습 전, 그리고 평가 결과를 승인하기 전",
+      "executor": "ML 검증책임자",
+      "prerequisites": [
+        "AIML-09 분할 manifest",
+        "원본·파생·중복을 찾을 content/group key"
+      ],
+      "evidence": [
+        "정확·유사·group 중복 검사 원자료",
+        "누수 후보별 판정",
+        "재분할·재실행 기록"
+      ],
+      "judgment": "확정 누수 0건이고 모든 후보의 근거 있는 판정과 재검사가 끝나야 PASS"
+    },
+    "AIML-11": {
+      "when": "정식 학습마다 실행 전에 고정하고 종료 직후 기록",
+      "executor": "ML 개발책임자",
+      "prerequisites": [
+        "승인 dataset·split hash",
+        "학습 코드 commit",
+        "환경·의존성 lock",
+        "설정·seed"
+      ],
+      "evidence": [
+        "실행 ID와 명령·설정",
+        "환경·GPU·도구 version",
+        "stdout·metric 원자료",
+        "결과 모델·checkpoint SHA-256"
+      ],
+      "judgment": "입력·코드·환경·seed와 결과 지문이 한 실행으로 결속되고 같은 절차의 재실행 가능성을 검토해야 완료"
+    },
+    "AIML-13": {
+      "when": "새 모델 후보를 승격하기 전",
+      "executor": "ML 검증책임자",
+      "prerequisites": [
+        "같은 독립 시험 split",
+        "현재 승인본 또는 명시한 단순 기준모델",
+        "AIML-17 평가 protocol"
+      ],
+      "evidence": [
+        "후보별 model hash",
+        "동일 입력의 전체 지표",
+        "차이와 통계적 불확실성",
+        "퇴행 목록"
+      ],
+      "judgment": "필수 안전지표 퇴행이 없고 승인된 개선조건을 충족해야 PASS; 일부 평균 개선으로 치명적 class 퇴행을 상쇄하지 않음"
+    },
+    "AIML-18": {
+      "when": "모델 후보·dataset·평가 protocol 중 하나가 바뀔 때마다",
+      "executor": "독립 평가책임자",
+      "prerequisites": [
+        "잠긴 독립 test split",
+        "평가 대상 model·runtime hash",
+        "AIML-17 protocol"
+      ],
+      "evidence": [
+        "전체·class·거리·환경별 원지표",
+        "confusion 자료",
+        "평가 명령·환경·원출력 SHA-256"
+      ],
+      "judgment": "사전 등록한 모든 필수 구간과 지표가 누락 없이 계산되고 기준을 충족해야 PASS"
+    },
+    "AIML-19": {
+      "when": "AIML-18 평가 뒤와 중대한 현장 결함이 생길 때",
+      "executor": "ML 안전분석자",
+      "prerequisites": [
+        "예측·정답 연결 결과",
+        "class·거리·환경·위해도 분류규칙"
+      ],
+      "evidence": [
+        "오탐·미탐 사례 묶음",
+        "원인 taxonomy와 빈도",
+        "안전 영향·완화·회귀시험 연결"
+      ],
+      "judgment": "치명적 사례를 모두 분류·조치하거나 명시적으로 출시 차단하고 잔여위험을 승인해야 종결"
+    },
+    "AIML-20": {
+      "when": "출시 후보 평가와 대상 환경·사용자 범위 변경 시",
+      "executor": "독립 안전·편향 검토자",
+      "prerequisites": [
+        "대표 조도·날씨·기기·장착·지역 구간",
+        "위해 시나리오와 중단기준"
+      ],
+      "evidence": [
+        "구간별 강건성·편차 결과",
+        "최악 구간",
+        "공격·손상·범위 밖 입력 결과",
+        "제한·완화 기록"
+      ],
+      "judgment": "중대한 안전 격차가 기준 안이거나 지원범위 제한·차단으로 통제되고 독립 검토가 완료돼야 PASS"
+    },
+    "AIML-21": {
+      "when": "학습 모델을 TFLite 등 배포 형식으로 변환할 때마다",
+      "executor": "ML·Android 통합책임자",
+      "prerequisites": [
+        "원본·변환 모델 hash",
+        "고정 동등성 입력 묶음",
+        "정확한 전처리·후처리 설정"
+      ],
+      "evidence": [
+        "샘플별 원출력과 배포출력",
+        "허용 오차·불일치 통계",
+        "변환 명령·도구 version",
+        "재변환 결과"
+      ],
+      "judgment": "사전 허용오차와 class·순서·shape 계약을 모두 충족하고 치명적 판정 불일치가 0건이어야 PASS"
+    },
+    "AIML-22": {
+      "when": "지원 Android 기기 후보와 release model 조합마다 베타 전",
+      "executor": "Android 성능시험자",
+      "prerequisites": [
+        "APK·model·config hash",
+        "기기·OS·전원·온도·장착 조건",
+        "warmup·반복 protocol"
+      ],
+      "evidence": [
+        "지연 percentile·FPS·memory",
+        "배터리·온도·throttling 원자료",
+        "기기별 log와 결함"
+      ],
+      "judgment": "지원 기기별 사전 성능·발열·배터리 기준을 충족해야 PASS; Web/PWA는 별도 재승인 전 제외"
+    },
+    "AIML-23": {
+      "when": "모델·거리계산·위험단계·지원범위 중 하나가 바뀔 때",
+      "executor": "ML·안전책임자",
+      "prerequisites": [
+        "AIML-18·19 결과",
+        "거리·class별 위해 비용",
+        "FP-020 행동단계 계약"
+      ],
+      "evidence": [
+        "후보 임계값 sweep",
+        "오탐·미탐 trade-off",
+        "선정 근거·버전",
+        "독립 재평가 결과"
+      ],
+      "judgment": "평균점수만이 아니라 거리·class별 안전비용을 충족하고 선정값이 앱 설정 hash에 결속돼야 PASS"
+    }
+  },
+  "source_bindings": {
+    "policy": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    "policy_approval_record": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    "policy_baseline_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    "artifact_catalog": {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    "aligned_decision_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    "fp035_correction_candidate": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "control_trace_helper": {
+      "path": "scripts/build_walksafe_control_bootstrap.py",
+      "sha256": "6b791acc8854925ebb8d7e8f174f0b3ebfc734d94cc79600e5669ce4b8e08f49"
+    },
+    "candidate_model_registry": {
+      "path": "model/registry/walksafe-model-registry.json",
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a"
+    },
+    "candidate_deployment": {
+      "path": "model/deployments/local-deployment.json",
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    "candidate_android_runtime_config": {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+    },
+    "candidate_android_kotlin_class_map": {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+      "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f"
+    },
+    "generator": {
+      "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+      "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15"
+    }
+  },
+  "source_binding_sha256": "ee78f1878ca710066b106ff375dcfbf0f757fc87fbf664916eb1aed4088cd9a9",
+  "artifact_trace": [
+    {
+      "artifact_type_id": "AIML-01",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-027",
+        "FP-031",
+        "FP-032",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-046",
+        "FP-053"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-AUTO-REPORT-TIMING",
+        "DEC-IBQ-091",
+        "DEC-IBQ-092",
+        "DEC-IBQ-098",
+        "DEC-ONDEVICE-AUDIO-HAPTIC-DATA"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [
+        "ISS-POLICY-FP035-NETWORK-001",
+        "CR-0002",
+        "RAID-011",
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-02",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-038"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-03",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-031",
+        "FP-032",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-046",
+        "FP-047"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-AUTO-REPORT-TIMING",
+        "DEC-DATA-SHARING",
+        "DEC-IBQ-121"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [
+        "ISS-POLICY-FP035-NETWORK-001",
+        "CR-0002",
+        "RAID-011",
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-04",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-021",
+        "FP-034",
+        "FP-035",
+        "FP-045",
+        "FP-046",
+        "FP-053"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-093"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [
+        "ISS-POLICY-FP035-NETWORK-001",
+        "CR-0002",
+        "RAID-011",
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-05",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-034",
+        "FP-036",
+        "FP-038",
+        "FP-046"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-121"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-06",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-07",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-038"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-122"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-08",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-09",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-036",
+        "FP-038",
+        "FP-042",
+        "FP-049"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-097",
+        "DEC-IBQ-120",
+        "DEC-IBQ-122"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-10",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-038"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-122"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-11",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-12",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-13",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-14",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-001",
+        "FP-037",
+        "FP-039",
+        "FP-049",
+        "FP-051"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-126",
+        "DEC-MODEL-LATER-SWAP"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-15",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-001",
+        "FP-021",
+        "FP-037",
+        "FP-039",
+        "FP-049"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-MODEL-LATER-SWAP",
+        "DEC-OBSTACLE-CLASS-SCOPE"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-16",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-037",
+        "FP-039",
+        "FP-051"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-126"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-17",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-009",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-024",
+        "FP-025",
+        "FP-038",
+        "FP-049",
+        "FP-050"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-015",
+        "DEC-IBQ-056",
+        "DEC-IBQ-075",
+        "DEC-IBQ-080",
+        "DEC-IBQ-119",
+        "DEC-IBQ-120"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-18",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-020",
+        "FP-021",
+        "FP-037",
+        "FP-038",
+        "FP-049",
+        "FP-050"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-119"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-19",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-20",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [],
+      "direct_decision_link_status": "NO_DIRECT_DECISION_USE_POLICY_AND_UPSTREAM_TRACE",
+      "remaining_gate_refs": [],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-21",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-019",
+        "FP-039",
+        "FP-051"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-124"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-22",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-019",
+        "FP-020",
+        "FP-022",
+        "FP-025",
+        "FP-027",
+        "FP-031",
+        "FP-035",
+        "FP-040",
+        "FP-044",
+        "FP-045",
+        "FP-050"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-058",
+        "DEC-IBQ-061",
+        "DEC-IBQ-076",
+        "DEC-IBQ-127",
+        "DEC-IBQ-129",
+        "DEC-IBQ-130",
+        "DEC-IBQ-131"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [
+        "ISS-POLICY-FP035-NETWORK-001",
+        "CR-0002",
+        "RAID-011",
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-23",
+      "materialization_state": "PLANNED_NOT_RUN",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-020",
+        "FP-021",
+        "FP-024",
+        "FP-031"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-074"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-24",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-019",
+        "FP-039",
+        "FP-051",
+        "FP-054"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-124",
+        "DEC-IBQ-125"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-25",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-038",
+        "FP-039"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-123"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-26",
+      "materialization_state": "DRAFT",
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "policy_bundle_refs": [
+        "FP-038",
+        "FP-039"
+      ],
+      "common_policy_refs": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE",
+        "NPC-SERVER-STORAGE-CAPACITY"
+      ],
+      "direct_aligned_decision_refs": [
+        "DEC-IBQ-123"
+      ],
+      "direct_decision_link_status": "DIRECT_LINKS_INDEXED",
+      "remaining_gate_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_issue_refs": [],
+      "verification_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED"
+    }
+  ],
+  "generated_files": [
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559",
+      "byte_length": 39378,
+      "artifact_type_ids": [
+        "AIML-01",
+        "AIML-02",
+        "AIML-03",
+        "AIML-04",
+        "AIML-06",
+        "AIML-07"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939",
+      "byte_length": 23552,
+      "artifact_type_ids": [
+        "AIML-12",
+        "AIML-14",
+        "AIML-15",
+        "AIML-16"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "sha256": "6d3d92bb8b565241dd57556eee7f5a3817339026d036b11e656035028f79eaa4",
+      "byte_length": 28026,
+      "artifact_type_ids": [
+        "AIML-17"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-operations.md",
+      "sha256": "b9f8426a733c3498e00faf4b0f966641e3a75033b804d4b102fa3379a7e5f0e9",
+      "byte_length": 11410,
+      "artifact_type_ids": [
+        "AIML-24",
+        "AIML-25",
+        "AIML-26"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+      "sha256": "f0a18fa7758ebbeeb572225dbd67053909f5551c394970c7827515820f3f5f74",
+      "byte_length": 5834,
+      "artifact_type_ids": [
+        "AIML-03"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+      "byte_length": 26684,
+      "artifact_type_ids": [
+        "AIML-02",
+        "AIML-04"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+      "sha256": "51a1be7c6f400585d5fe885d1a81c01ff864a41ff01b4daf92f6e673767c2a61",
+      "byte_length": 13235,
+      "artifact_type_ids": [],
+      "supports_planned_artifact_type_ids": [
+        "AIML-05",
+        "AIML-08",
+        "AIML-09",
+        "AIML-10",
+        "AIML-11",
+        "AIML-13",
+        "AIML-18",
+        "AIML-19",
+        "AIML-20",
+        "AIML-21",
+        "AIML-22",
+        "AIML-23"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+      "sha256": "733299a99043b75425a57cc8e2d11039068283c3c54753f7f1707f50edd13d08",
+      "byte_length": 2936,
+      "artifact_type_ids": [
+        "AIML-12"
+      ]
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-operations-register.json",
+      "sha256": "f10dfbb765aeb2d7d9b4df12058b2b43ce2149b12889ba0581f21b1c166bee2f",
+      "byte_length": 869,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+      "byte_length": 12663,
+      "artifact_type_ids": [
+        "AIML-14",
+        "AIML-16"
+      ]
+    }
+  ],
+  "coverage": {
+    "scope_count": 26,
+    "materialized_draft_count": 14,
+    "planned_not_run_count": 12,
+    "bundle_count": 4,
+    "missing_ids": [],
+    "duplicate_ids": []
+  },
+  "candidate_boundary": {
+    "current_model_and_code_are_candidates": true,
+    "candidate_revalidation_required": true,
+    "existing_candidate_metrics_are_formal_evaluation": false,
+    "approved_dataset_count": 0,
+    "approved_model_count": 0,
+    "formal_training_run_count": 0,
+    "formal_evaluation_run_count": 0,
+    "formal_monitoring_run_count": 0
+  },
+  "sensitive_data_boundary": {
+    "raw_video_audio_location_in_git_allowed": false,
+    "controlled_storage_reference_required": true,
+    "raw_collection_policy_status": "APPROVED",
+    "fp035_network_issue_id": "ISS-POLICY-FP035-NETWORK-001",
+    "fp035_network_issue_status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+    "fp035_normalized_policy": {
+      "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+      "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+      "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+    },
+    "fp035_related_test_status": "NOT_RUN",
+    "fp035_correction_candidate_binding": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "fp035_correction_candidate_approval_status": "NOT_APPROVED",
+    "fp035_correction_candidate_effective_status": "NOT_EFFECTIVE",
+    "fp035_policy_effect_claimed": false
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "authorization_boundary": {
+    "policy_baseline_status": "BASELINED",
+    "formal_deliverable_lifecycle_status": "DRAFT",
+    "formal_deliverables_approved": false,
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "manifest_content_sha256": "74e178bb8d2faea2025c4d9fd065377becf1b2a354f579a4fad155475b5fa942"
+}

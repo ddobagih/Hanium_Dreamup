@@ -1,0 +1,83 @@
+{
+  "claim_boundary": {
+    "build_or_test_result_claimed": false,
+    "release_or_approval_claimed": false
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "62d5dcbd9a36122f9501330099fb853c5e08a739736bd2759ff191cbd95a7449"
+    }
+  },
+  "paths": [
+    {
+      "bytes": 5508,
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+    },
+    {
+      "bytes": 1463,
+      "path": "configs/README.md",
+      "sha256": "970b99515ac8ab61ed1da50ea338dc964346143bfa7f459180eab9e523fdfc2f"
+    },
+    {
+      "bytes": 827,
+      "path": "configs/submission_exact8_requirements.lock",
+      "sha256": "d78dfeaf489a25e88a081bf07ca0fe702b16c3c9a6acdde79ba204fa1c6da87f"
+    },
+    {
+      "bytes": 97,
+      "path": "configs/submission_installer_requirements.lock",
+      "sha256": "f18cd67f07b661db59219d1825cd2557d8e2d9996c5183e116b2ddd64d081901"
+    },
+    {
+      "bytes": 4703,
+      "path": "configs/submission_toolchain_lock_20260713.json",
+      "sha256": "5ddd5ce86e3080ac278ec9e157e9a3bcb4642c996e1a38be1ba7f77df2a8fc81"
+    },
+    {
+      "bytes": 1777,
+      "path": "configs/walksafe_node_toolchain_lock_20260715.json",
+      "sha256": "3b71481dee20943c6a7039315068809c6858c720bfc9df9133d43048b7b7b1a3"
+    },
+    {
+      "bytes": 11227,
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0"
+    },
+    {
+      "bytes": 11393,
+      "path": "configs/walksafe_product_quality_policy_20260713.json",
+      "sha256": "c4a9dccedcee730f6542ed2a5b627780bb9419c13a10ce7fd011ecdc8e73a6f5"
+    },
+    {
+      "bytes": 1984,
+      "path": "configs/walksafe_two_model_runtime_20260522.yaml",
+      "sha256": "aaf0c5a84f4e53479dbc370be3642948b835fc43e341e6942a6038892977b948"
+    },
+    {
+      "bytes": 2503,
+      "path": "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json",
+      "sha256": "d0db3538baf71385d2655e7167db70110f24e5f42afcdaa579801479d8eb9714"
+    },
+    {
+      "bytes": 1627,
+      "path": "configs/walksafe_unified_epoch270_field_20260711.json",
+      "sha256": "3352774fe5ffc7cf896aad6c47e67821e52742b2bfefbf9cbd9056c047dd67a3"
+    }
+  ],
+  "roots": [
+    "configs",
+    "apps/android/app/src/main/assets/model-config"
+  ],
+  "schema_version": "walksafe.w3-engineering-evidence.source-subject.v1",
+  "source_commit": null,
+  "source_identity_basis": "FILESYSTEM_TRAVERSAL_NOT_GIT",
+  "subject_id": "config",
+  "summary": {
+    "content_set_sha256": "0a22d7617f719090c2f0d9b8d0b9ad9d4387827b1213322b6c495139c330e63b",
+    "path_count": 11,
+    "path_set_sha256": "76ed4c6bdb09d63c5b487bd92c975a464771bdc334fc96240dc0b6a8d9437c37"
+  }
+}

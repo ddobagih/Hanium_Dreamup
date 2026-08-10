@@ -1,0 +1,50 @@
+{
+  "approval_status": "NOT_APPROVED",
+  "as_of": "2026-07-27T19:06:09+09:00",
+  "designated_authority": {
+    "approval_role": "제품책임자",
+    "approval_status": "PENDING",
+    "review_role": "독립QA검토자",
+    "review_status": "PENDING_INDEPENDENT_REVIEW"
+  },
+  "formal_test_credit": false,
+  "formal_test_status": "NOT_RUN",
+  "integrity": {
+    "canonical_byte_length": 1546,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "33edede32a949cef8f14817bd35aa74b702545655762b98e7bc37a44d02f1876"
+  },
+  "no_event_disclaimer": "The 279 NOT_RUN tuples describe only the bound controlled register. They do not prove that no unbound real-world activity occurred, and they confer no formal or release credit.",
+  "prepared_on": "2026-07-27",
+  "receipt_id": "WS-PHASE0-FORMAL279-NOT-RUN-RECEIPT-20260727-001",
+  "receipt_status": "RECORDED_PENDING_REVIEW_AND_APPROVAL",
+  "release_credit": false,
+  "release_status": "NOT_ELIGIBLE",
+  "schema_version": "walksafe.formal279-not-run-control-receipt.v1",
+  "subject_artifact_type_codes": [
+    "DLV-OPS-17",
+    "DLV-OPS-19",
+    "DLV-OPS-23",
+    "DLV-TST-22"
+  ],
+  "subject_bindings": [
+    {
+      "byte_length": 1415,
+      "captured_at": "2026-07-27T19:10:32+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-manifest.json",
+      "sha256": "ec697cdf5730e2cc6d9e640fd6c566673ac9f45780918c85bf5159b1afe24706",
+      "subject_role": "NON_SELF_REFERENTIAL_FORMAL279_CONTROL_MANIFEST"
+    },
+    {
+      "byte_length": 41119,
+      "captured_at": "2026-07-27T19:10:32+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+      "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+      "subject_role": "IMMUTABLE_FORMAL279_NOT_RUN_CONTROL_RECORD"
+    }
+  ],
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00",
+  "verdict": "NO_GO"
+}

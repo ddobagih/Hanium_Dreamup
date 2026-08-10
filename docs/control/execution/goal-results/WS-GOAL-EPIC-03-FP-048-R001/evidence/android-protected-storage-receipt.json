@@ -1,0 +1,82 @@
+{
+  "schema_version": "walksafe.fp048-internal-lane-receipt.v1",
+  "document_id": "WS-FP048-ANDROID_PROTECTED_STORAGE-RECEIPT-20260802-001",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "lane_id": "ANDROID_PROTECTED_STORAGE",
+  "status": "PASS",
+  "command_execution": {
+    "lane_id": "ANDROID_PROTECTED_STORAGE",
+    "name": "Android protected local storage",
+    "status": "PASS",
+    "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --tests 'kr.co.hanium.dreamup.walksafe.security.*' --tests 'kr.co.hanium.dreamup.walksafe.fieldlog.*' --tests 'kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionStoreStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.network.UserNetworkSecurityBoundaryStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.report.AndroidAccountDeletionFallbackMarkerTest' --tests 'kr.co.hanium.dreamup.walksafe.report.MainActivityReportUploadStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.AndroidReportSuccessorStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityAccountDeletionStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalRestartStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.PersistentReportQueueDisabledStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.PriorityUserOnboardingStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.AccountDeletionResetCoordinatorTest' --tests 'kr.co.hanium.dreamup.walksafe.BuildProvenanceStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionCryptoLifecycleTest' && cd ../.. && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/build_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py --root . --emit-android-junit-xml && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_android_field_session_summary.py tests/test_release_evidence_gate.py && cd apps/android && ./gradlew :app:compileDebugAndroidTestKotlin :app:assembleDebug :app:lintDebug --offline --no-daemon --rerun-tasks",
+    "command_sha256": "bacab812f68731346a93066a0e0008c0870e1d35d18d22f9ba4286721c926996",
+    "run_id": "fp048-android-protected-storage-d2460f252567da5e",
+    "exit_code": 0,
+    "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/android-protected-storage.log",
+    "output_sha256": "bdb1dba28f3cf72219e4f8590433d4a7cb5ba01f6805828a0887c60103d38280",
+    "started_at": "2026-08-03T01:33:35.801447+09:00",
+    "executed_at": "2026-08-03T01:34:54.999691+09:00",
+    "execution_event_sequence": 42,
+    "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+    "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+    "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+    "binding_markers_exact_once": true,
+    "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+    "observed_assertions": {
+      "WALKSAFE_ANDROID_JUNIT_SUITES": "19",
+      "WALKSAFE_ANDROID_JUNIT_TESTS": "147",
+      "WALKSAFE_ANDROID_JUNIT_FAILURES": "0",
+      "WALKSAFE_ANDROID_JUNIT_ERRORS": "0",
+      "WALKSAFE_ANDROID_JUNIT_SKIPPED": "0",
+      "WALKSAFE_ANDROID_HOST_PYTEST_PASSED": "303",
+      "WALKSAFE_ANDROID_BUILD_STATUS": "PASS"
+    }
+  },
+  "start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP048-20260802-005",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/implementation-start-gate-receipt.json",
+    "sha256": "faba570d1e8d24651272b52e6ca0190ac43ff97c57bead00bcd5fd60e06951fd"
+  },
+  "repository_state_binding": {
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/19-REPOSITORY_STATE.log",
+    "sha256": "6516933756c6cca92aa34ad05c63fc1ae912151453304dfaa49007beec3e6f5d",
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d"
+  },
+  "verification_input_manifest": [
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "byte_count": 18873,
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+    }
+  ],
+  "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "receipt_content_sha256": "cd3eba0aab8b459d57336ebc40cd135974763c4a217c79a1ff442ae030cc2e96"
+}

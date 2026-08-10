@@ -1,0 +1,573 @@
+{
+  "claim_boundary": {
+    "actual_device_event_count": 0,
+    "attestation_approval_count": 0,
+    "current_scope_closure_delta_count": 2,
+    "formal279_pass_count": 0,
+    "global_artifact_completion_claim_count": 0,
+    "in_scope_substantive_credit_count": 0,
+    "open_artifact_count": 131,
+    "owner_approval_count": 0,
+    "policy_reopened": false,
+    "real_event_count": 0,
+    "release_eligible_count": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "verified_rights_or_external_fact_count": 0
+  },
+  "completion_boolean_coverage": {
+    "current_scope_comparison": {
+      "left_path_id": "CURRENT_SCOPE_ARTIFACT_CLOSURE",
+      "right_path_id": "CURRENT_SCOPE_CLAIM_BOUNDARY",
+      "rowwise_mismatch_count": 0,
+      "true_exact_ids": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "true_id_set_fingerprint": {
+        "algorithm": "SHA-256",
+        "byte_length": 21,
+        "item_count": 2,
+        "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+        "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+      }
+    },
+    "global_unqualified_comparison": {
+      "all_paths_true_count": 0,
+      "all_row_mismatch_count": 0,
+      "pairwise_mismatch_counts": {
+        "GLOBAL_ARTIFACT_CLOSURE__VS__GLOBAL_CLAIM_BOUNDARY": 0,
+        "GLOBAL_ARTIFACT_CLOSURE__VS__LEGACY_GLOBAL_CLAIM_BOUNDARY": 0,
+        "GLOBAL_CLAIM_BOUNDARY__VS__LEGACY_GLOBAL_CLAIM_BOUNDARY": 0
+      },
+      "path_ids": [
+        "GLOBAL_ARTIFACT_CLOSURE",
+        "GLOBAL_CLAIM_BOUNDARY",
+        "LEGACY_GLOBAL_CLAIM_BOUNDARY"
+      ]
+    },
+    "legacy_ambiguous": {
+      "credit": "NONE",
+      "false_count": 257,
+      "path_id": "LEGACY_ARTIFACT_CLOSURE_COMPLETION",
+      "true_count": 0
+    },
+    "path_count": 6,
+    "path_statistics": {
+      "CURRENT_SCOPE_ARTIFACT_CLOSURE": {
+        "boolean_count": 257,
+        "false_count": 255,
+        "json_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "CURRENT_SCOPE_ARTIFACT_CLOSURE",
+        "row_count": 257,
+        "semantic_group": "CURRENT_SCOPE_EXPLICIT",
+        "semantics": "Canonical explicit current-scope N/A closure claim",
+        "true_artifact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "true_count": 2,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 21,
+          "item_count": 2,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+        }
+      },
+      "CURRENT_SCOPE_CLAIM_BOUNDARY": {
+        "boolean_count": 257,
+        "false_count": 255,
+        "json_path": "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "CURRENT_SCOPE_CLAIM_BOUNDARY",
+        "row_count": 257,
+        "semantic_group": "CURRENT_SCOPE_EXPLICIT",
+        "semantics": "Canonical explicit claim-boundary mirror for current-scope N/A closure",
+        "true_artifact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "true_count": 2,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 21,
+          "item_count": 2,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+        }
+      },
+      "GLOBAL_ARTIFACT_CLOSURE": {
+        "boolean_count": 257,
+        "false_count": 257,
+        "json_path": "/records/*/artifact_closure/global_artifact_completion_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "GLOBAL_ARTIFACT_CLOSURE",
+        "row_count": 257,
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Canonical global/unqualified completion field",
+        "true_artifact_ids": [],
+        "true_count": 0,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 0,
+          "item_count": 0,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "GLOBAL_CLAIM_BOUNDARY": {
+        "boolean_count": 257,
+        "false_count": 257,
+        "json_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "GLOBAL_CLAIM_BOUNDARY",
+        "row_count": 257,
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Canonical claim-boundary global/unqualified completion field",
+        "true_artifact_ids": [],
+        "true_count": 0,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 0,
+          "item_count": 0,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "LEGACY_ARTIFACT_CLOSURE_COMPLETION": {
+        "boolean_count": 257,
+        "false_count": 257,
+        "json_path": "/records/*/artifact_closure/completion_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "LEGACY_ARTIFACT_CLOSURE_COMPLETION",
+        "row_count": 257,
+        "semantic_group": "LEGACY_AMBIGUOUS_NO_CREDIT",
+        "semantics": "Deprecated ambiguous field, required false for all exact257 rows",
+        "true_artifact_ids": [],
+        "true_count": 0,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 0,
+          "item_count": 0,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "LEGACY_GLOBAL_CLAIM_BOUNDARY": {
+        "boolean_count": 257,
+        "false_count": 257,
+        "json_path": "/records/*/claim_boundary/artifact_completion_claimed",
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path_id": "LEGACY_GLOBAL_CLAIM_BOUNDARY",
+        "row_count": 257,
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Legacy global/unqualified alias, required false for all exact257 rows",
+        "true_artifact_ids": [],
+        "true_count": 0,
+        "true_id_set_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 0,
+          "item_count": 0,
+          "serialization": "UTF-8 lexicographically sorted true artifact IDs, one per line, final LF when non-empty; empty set is zero bytes",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "paths": [
+      {
+        "json_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+        "path_id": "CURRENT_SCOPE_ARTIFACT_CLOSURE",
+        "semantic_group": "CURRENT_SCOPE_EXPLICIT",
+        "semantics": "Canonical explicit current-scope N/A closure claim"
+      },
+      {
+        "json_path": "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+        "path_id": "CURRENT_SCOPE_CLAIM_BOUNDARY",
+        "semantic_group": "CURRENT_SCOPE_EXPLICIT",
+        "semantics": "Canonical explicit claim-boundary mirror for current-scope N/A closure"
+      },
+      {
+        "json_path": "/records/*/artifact_closure/completion_claimed",
+        "path_id": "LEGACY_ARTIFACT_CLOSURE_COMPLETION",
+        "semantic_group": "LEGACY_AMBIGUOUS_NO_CREDIT",
+        "semantics": "Deprecated ambiguous field, required false for all exact257 rows"
+      },
+      {
+        "json_path": "/records/*/artifact_closure/global_artifact_completion_claimed",
+        "path_id": "GLOBAL_ARTIFACT_CLOSURE",
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Canonical global/unqualified completion field"
+      },
+      {
+        "json_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "path_id": "GLOBAL_CLAIM_BOUNDARY",
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Canonical claim-boundary global/unqualified completion field"
+      },
+      {
+        "json_path": "/records/*/claim_boundary/artifact_completion_claimed",
+        "path_id": "LEGACY_GLOBAL_CLAIM_BOUNDARY",
+        "semantic_group": "GLOBAL_UNQUALIFIED",
+        "semantics": "Legacy global/unqualified alias, required false for all exact257 rows"
+      }
+    ],
+    "schema_id": "walksafe.exact257.completion-boolean-path-coverage.v1",
+    "subject_ledger_binding_id": "SUBJECT-R007-LEDGER"
+  },
+  "exact2_status_equality": {
+    "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+    "current_scope_artifact_closure_true_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "current_scope_claim_boundary_true_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "exact_set_equality": true,
+    "status": "PASS",
+    "status_exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ]
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "182922fc63bc9b8c53f8e4f22c71256f1de4d255526fa10c22f8797c72ca9b2c",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 18398,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/nonself_digest_check/canonical_length",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 18398,
+    "content_sha256": "182922fc63bc9b8c53f8e4f22c71256f1de4d255526fa10c22f8797c72ca9b2c",
+    "projection_path": "/",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json"
+  },
+  "packet_id": "WS-PHASE1-EXACT257-SUCCESSOR-CORRECTION-WRAPPER-EVIDENCE-20260728-R008",
+  "prepared_on": "2026-07-28",
+  "prior_minor_closure_register": {
+    "all_closed": true,
+    "entries": [
+      {
+        "credit_delta": 0,
+        "evidence_pointers": [
+          "/predecessor_r006_preservation/r006_minor_closure_register",
+          "/r007_field_consistency"
+        ],
+        "finding_id": "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001",
+        "origin": "R005_CONTROLLED_CLOSURE_ID",
+        "origin_detail": "Canonical exact2 status and global/current-scope claim distinction remain preserved from R006.",
+        "status": "CLOSED"
+      },
+      {
+        "controlled_detail_id": "R006-MINOR-LEGACY-COMPLETION-ALWAYS-FALSE-001",
+        "credit_delta": 0,
+        "evidence_pointers": [
+          "/claim_semantics",
+          "/r007_field_consistency/legacy_artifact_closure_completion_claimed"
+        ],
+        "finding_id": "R006-MINOR-001",
+        "origin": "R006_INDEPENDENT_REVIEW_MESSAGE",
+        "origin_detail": "Legacy /artifact_closure/completion_claimed was true for exact2; R007 fixes all 257 values to false.",
+        "status": "CLOSED"
+      },
+      {
+        "controlled_detail_id": "R006-MINOR-EXPLICIT-CURRENT-SCOPE-PATH-EQUALITY-002",
+        "credit_delta": 0,
+        "evidence_pointers": [
+          "/claim_semantics",
+          "/r007_field_consistency/current_scope_explicit_paths"
+        ],
+        "finding_id": "R006-MINOR-002",
+        "origin": "R006_INDEPENDENT_REVIEW_MESSAGE",
+        "origin_detail": "R007 explicitly defines and rowwise checks both current-scope claim paths, their exact2 set, and global separation.",
+        "status": "CLOSED"
+      }
+    ],
+    "entry_count": 3,
+    "register_id": "WS-PHASE1-EXACT257-SUCCESSOR-R007-MINOR-CLOSURE-REGISTER-001",
+    "status": "COMPLETE"
+  },
+  "r007_preservation": {
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_closure_delta_count": 2,
+    "ledger_changed": false,
+    "ledger_replicated": false,
+    "open_artifact_count": 131,
+    "r007_evidence_integrity": {
+      "algorithm": "SHA-256",
+      "content_sha256": "beb6267336f446dd5a4a958b8f3d5a46ce3fbf6ddc6a0a37ba5cb14efce97b8a",
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "excluded_field": "/integrity/content_sha256",
+      "final_lf": true,
+      "json_separators": [
+        ",",
+        ":"
+      ],
+      "line_ending": "LF",
+      "projection_byte_length": 69949,
+      "projection_null_paths": [
+        "/integrity/content_sha256",
+        "/integrity/projection_byte_length",
+        "/nonself_digest_check/canonical_length",
+        "/nonself_digest_check/content_sha256"
+      ],
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r007/evidence.json"
+    },
+    "r007_receipt_integrity": {
+      "algorithm": "SHA-256",
+      "content_sha256": "aed8ccfcf780c9c3a939489c89082bc6eaa5b44a5c60533ab6722008aa087063",
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "excluded_field": "/integrity/content_sha256",
+      "final_lf": true,
+      "json_separators": [
+        ",",
+        ":"
+      ],
+      "line_ending": "LF",
+      "projection_byte_length": 17628,
+      "projection_null_paths": [
+        "/integrity/content_sha256",
+        "/integrity/projection_byte_length",
+        "/receipt_self_integrity_check/canonical_length",
+        "/receipt_self_integrity_check/content_sha256"
+      ],
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r007.json"
+    },
+    "r007_receipt_self_integrity_check": {
+      "algorithm": "SHA-256",
+      "canonical_length": 17628,
+      "content_sha256": "aed8ccfcf780c9c3a939489c89082bc6eaa5b44a5c60533ab6722008aa087063",
+      "encoding": "UTF-8",
+      "line_ending": "LF",
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "status": "PASS",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r007.json"
+    },
+    "source_binding_count": 18,
+    "source_physical_tuple_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonical_byte_length": 4750,
+      "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+      "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+      "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+      "tuple_count": 18,
+      "tuple_fields": [
+        "path",
+        "byte_length",
+        "sha256",
+        "subject_role"
+      ]
+    },
+    "zero_credits": {
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "formal279_pass_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "r008_minor_closure_register": {
+    "all_closed": true,
+    "entries": [
+      {
+        "credit_delta": 0,
+        "evidence_pointer": "/completion_boolean_coverage",
+        "finding_id": "R007-MINOR-RECEIPT-COMPLETION-BOOLEAN-COVERAGE-001",
+        "ledger_changed": false,
+        "origin": "R007_INDEPENDENT_REVIEW_MESSAGE",
+        "origin_detail": "R007 ledger data passed; receipt coverage did not explicitly report all alias/schema completion boolean paths. R008 adds exhaustive path statistics without replacing the R007 ledger.",
+        "status": "CLOSED",
+        "subject_binding_id": "SUBJECT-R007-LEDGER"
+      }
+    ],
+    "prior_minor_closures": {
+      "all_closed": true,
+      "entries": [
+        {
+          "credit_delta": 0,
+          "evidence_pointers": [
+            "/predecessor_r006_preservation/r006_minor_closure_register",
+            "/r007_field_consistency"
+          ],
+          "finding_id": "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001",
+          "origin": "R005_CONTROLLED_CLOSURE_ID",
+          "origin_detail": "Canonical exact2 status and global/current-scope claim distinction remain preserved from R006.",
+          "status": "CLOSED"
+        },
+        {
+          "controlled_detail_id": "R006-MINOR-LEGACY-COMPLETION-ALWAYS-FALSE-001",
+          "credit_delta": 0,
+          "evidence_pointers": [
+            "/claim_semantics",
+            "/r007_field_consistency/legacy_artifact_closure_completion_claimed"
+          ],
+          "finding_id": "R006-MINOR-001",
+          "origin": "R006_INDEPENDENT_REVIEW_MESSAGE",
+          "origin_detail": "Legacy /artifact_closure/completion_claimed was true for exact2; R007 fixes all 257 values to false.",
+          "status": "CLOSED"
+        },
+        {
+          "controlled_detail_id": "R006-MINOR-EXPLICIT-CURRENT-SCOPE-PATH-EQUALITY-002",
+          "credit_delta": 0,
+          "evidence_pointers": [
+            "/claim_semantics",
+            "/r007_field_consistency/current_scope_explicit_paths"
+          ],
+          "finding_id": "R006-MINOR-002",
+          "origin": "R006_INDEPENDENT_REVIEW_MESSAGE",
+          "origin_detail": "R007 explicitly defines and rowwise checks both current-scope claim paths, their exact2 set, and global separation.",
+          "status": "CLOSED"
+        }
+      ],
+      "entry_count": 3,
+      "register_id": "WS-PHASE1-EXACT257-SUCCESSOR-R007-MINOR-CLOSURE-REGISTER-001",
+      "status": "COMPLETE"
+    },
+    "register_id": "WS-PHASE1-EXACT257-SUCCESSOR-R008-CORRECTION-CLOSURE-REGISTER-001",
+    "status": "COMPLETE"
+  },
+  "schema_version": "walksafe.phase1-exact257-successor-correction-wrapper-evidence.v8",
+  "subject_bindings": [
+    {
+      "binding_id": "SUBJECT-R007-LEDGER",
+      "byte_length": 2592915,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+      "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+      "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+    },
+    {
+      "binding_id": "PRE-R007-EVIDENCE",
+      "byte_length": 93206,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r007/evidence.json",
+      "sha256": "a6405eefbf37565e699e8fdfc4e886716466f7b8497f1f3e01f3700f1c69e580",
+      "subject_role": "R007_EVIDENCE_PREDECESSOR"
+    },
+    {
+      "binding_id": "PRE-R007-RECEIPT",
+      "byte_length": 23576,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r007.json",
+      "sha256": "4ac5c0c136b31ba1e29b9fd7f179041712f8bb6ca15bd96a20b53c69ca362f2d",
+      "subject_role": "R007_CHECK_RECEIPT_PREDECESSOR"
+    }
+  ],
+  "subject_claim_schema": {
+    "alias_mapping": [
+      {
+        "left_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+        "required_rowwise_equality": true,
+        "right_path": "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+        "semantics": "EXPLICIT_CURRENT_SCOPE_N_A_CLOSURE"
+      },
+      {
+        "credit": "NONE",
+        "legacy_path": "/records/*/artifact_closure/completion_claimed",
+        "required_true_count": 0,
+        "semantics": "DEPRECATED_AMBIGUOUS_ALWAYS_FALSE"
+      },
+      {
+        "canonical_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "legacy_path": "/records/*/claim_boundary/artifact_completion_claimed",
+        "required_rowwise_equality": true,
+        "required_true_count": 0,
+        "semantics": "GLOBAL_UNQUALIFIED_COMPLETION"
+      },
+      {
+        "left_path": "/records/*/artifact_closure/global_artifact_completion_claimed",
+        "required_rowwise_equality": true,
+        "required_true_count": 0,
+        "right_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "semantics": "GLOBAL_UNQUALIFIED_COMPLETION"
+      }
+    ],
+    "definitions": {
+      "/artifact_closure/completion_claimed": "Deprecated ambiguous legacy field. It is always false for all exact257 rows and grants no current-scope or global credit.",
+      "/artifact_closure/current_scope_n_a_closure_claimed": "Canonical explicit current-scope N/A closure claim. True only for exact2 CLOSED_N_A_FOR_CURRENT_SCOPE rows.",
+      "/artifact_closure/global_artifact_completion_claimed": "Canonical global/unqualified completion field. It is false for all exact257 rows.",
+      "/claim_boundary/artifact_completion_claimed": "Legacy global/unqualified completion field. It aliases claim_boundary.global_artifact_completion_claimed and is false for all exact257 rows.",
+      "/claim_boundary/current_scope_n_a_closure_claimed": "Canonical explicit claim-boundary mirror of artifact_closure.current_scope_n_a_closure_claimed. Rowwise equality is mandatory.",
+      "/claim_boundary/global_artifact_completion_claimed": "Canonical claim-boundary global/unqualified completion field. It is false for all exact257 rows."
+    },
+    "schema_id": "walksafe.exact257.claim-semantics.v3"
+  },
+  "subject_ledger_integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "8ae952bde104a821db1d5aa17f6737ce6a27daeb74ba45232fac7078820aa379",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 1807692,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json"
+  },
+  "wrapper_semantics": "ADD_ONLY_RECEIPT_COVERAGE_CORRECTION_NO_LEDGER_REPLICATION_OR_MUTATION"
+}

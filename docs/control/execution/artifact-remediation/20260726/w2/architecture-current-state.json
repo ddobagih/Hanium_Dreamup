@@ -1,0 +1,1917 @@
+{
+  "schema_version": "walksafe.artifact-remediation-architecture-current-state.v2",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W2-ARCHITECTURE-CURRENT-STATE-20260726-001",
+  "prepared_on": "2026-07-26",
+  "source_commit": null,
+  "snapshot_binding": "DIRTY_WORKTREE_EXACT_PATH_SHA256",
+  "status": "CURRENT_STATE_SUPPLEMENT_READY_FOR_W2_REVIEW",
+  "scope": {
+    "wave_id": "W2",
+    "work_package": "W2-DES-ARCH",
+    "artifact_ids": [
+      "DLV-DES-01",
+      "DLV-DES-02",
+      "DLV-DES-03",
+      "DLV-DES-04",
+      "DLV-DES-05",
+      "DLV-DES-06",
+      "DLV-DES-07",
+      "DLV-DES-08"
+    ],
+    "artifact_count": 8,
+    "artifact_id_set_sha256": "8c8750d63208d33c01d283db79d889148b67fbffc6e57ec587dd77d1b0bdca73",
+    "exact_expected_set": true,
+    "predecessor_classification": "INTERNAL_GAP",
+    "update_mode": "ADD_ONLY_SUCCESSOR_SUPPLEMENT",
+    "modified_predecessor_files": false,
+    "gap_disposition_count": 8,
+    "gap_disposition_rule": "EXACTLY_ONE_OF_NO_OPEN_GAP_OR_NONEMPTY_GAP_IDS_PER_ARTIFACT"
+  },
+  "authority_boundary": {
+    "purpose": "Close the current-content gap for DES-01 through DES-08 without rewriting the 2026-07-21/22 immutable baseline and approval chain.",
+    "source_commit_null_reason": "This supplement binds the current shared dirty-worktree bytes by exact path and SHA-256; no commit identity is asserted.",
+    "artifact_approval_claimed": false,
+    "separate_architecture_reapproval_claimed": false,
+    "formal_test_completion_claimed": false,
+    "deployment_completion_claimed": false,
+    "release_authorization_claimed": false,
+    "predecessor_preservation": [
+      {
+        "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+        "observed_file_sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b",
+        "mutation_performed": false
+      },
+      {
+        "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "observed_file_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+        "mutation_performed": false
+      },
+      {
+        "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+        "observed_file_sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+        "mutation_performed": false
+      }
+    ]
+  },
+  "artifact_coverage": [
+    {
+      "artifact_id": "DLV-DES-01",
+      "title": "SDD(Software Design Description)",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "architecture_current_state",
+        "runtime_flows",
+        "data_security_error_references",
+        "requirements_and_decision_trace"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-007",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-011"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-02",
+      "title": "시스템 컨텍스트 다이어그램",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "system_context",
+        "actors_and_external_systems",
+        "protocol_and_trust_boundaries",
+        "environment_differences"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-009"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-03",
+      "title": "구성요소·모듈 구조",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "component_inventory",
+        "dependency_directions",
+        "deployment_units",
+        "source_bindings"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-011"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-04",
+      "title": "런타임·시퀀스 흐름",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "runtime_flows",
+        "fp035_current_flow",
+        "admin_and_gateway_flow",
+        "failure_and_cancellation"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-010"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-05",
+      "title": "배포 아키텍처",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "deployment_topology",
+        "environment_targets",
+        "unresolved_deployment_values",
+        "observability_and_failure_boundaries"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-010",
+          "W2-ARCH-GAP-011"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-06",
+      "title": "ADR(Architecture Decision Record)",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "decision_authority",
+        "architecture_decision_observations",
+        "alternatives_and_open_decisions",
+        "verification_tracking"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-007",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-010"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-07",
+      "title": "기술 스택·버전 선정 근거",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "technology_stack",
+        "version_pinning",
+        "support_and_license_risks",
+        "withdrawal_conditions"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-007",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-009"
+        ]
+      }
+    },
+    {
+      "artifact_id": "DLV-DES-08",
+      "title": "SIP(Software Integration Plan)",
+      "coverage_status": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "approval_status": "NOT_CLAIMED",
+      "verification_status": "INTERNAL_CONTENT_INVARIANTS_ONLY",
+      "coverage_sections": [
+        "integration_plan",
+        "mock_to_live_transitions",
+        "acceptance_criteria",
+        "failure_isolation_and_rollback"
+      ],
+      "gap_disposition": {
+        "gap_ids": [
+          "W2-ARCH-GAP-001",
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-007",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-010",
+          "W2-ARCH-GAP-011"
+        ]
+      }
+    }
+  ],
+  "decision_authority": {
+    "current_composite": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "lifecycle_status": "ACTIVE",
+      "composition": "base aligned register 1.0.0 plus exact FP-035 replacement overlay",
+      "base_decision_count": 135,
+      "base_unique_canonical_decision_count": 135,
+      "replacement_count": 1,
+      "effective_decision_count": 135,
+      "effective_unique_canonical_decision_count": 135,
+      "effective_decision_feature_edge_count": 428,
+      "changed_feature_edge_count": 1,
+      "unchanged_feature_edge_count": 427
+    },
+    "fp035_authority_chain": {
+      "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "policy_manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "policy_manifest_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "activation_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT",
+      "precedence": [
+        "COMMITTED_RECEIPT",
+        "POLICY_1.0.1_MANIFEST",
+        "BOUND_ARTIFACT_APPROVAL_POLICY_PHASE_0",
+        "PRE_ACTIVATION_CANDIDATE_SNAPSHOT"
+      ],
+      "historical_candidate_not_effective_interpretation": "PRE_ACTIVATION_SNAPSHOT_ONLY_NOT_CURRENT_POLICY",
+      "separate_decision_register_reapproval_claimed": false
+    },
+    "architecture_decision_observations": [
+      {
+        "id": "ARCH-OBS-FP035-AUTHORITY",
+        "status": "EFFECTIVE_POLICY_DERIVED",
+        "choice": "Use the policy 1.0.1 four-branch original-activity upload rule and fail closed on missing motion/network evidence.",
+        "alternatives": [
+          "pre-activation NOT_EFFECTIVE candidate status",
+          "network-only admission without motion state"
+        ],
+        "alternative_disposition": "The candidate status is historical only; network-only admission is not the current original-activity upload policy.",
+        "consequences": [
+          "movement cancels active upload",
+          "cellular requires explicit opt-in",
+          "offline/other transport fails closed in current code",
+          "persistent encrypted queue remains unimplemented evidence"
+        ],
+        "verification": "22 targeted internal unit tests PASS; formal/device/network verification remains NOT_RUN.",
+        "gap_ids": [
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-004"
+        ]
+      },
+      {
+        "id": "ARCH-OBS-SEPARATE-ANDROID-ROLES",
+        "status": "IMPLEMENTATION_OBSERVED_ADR_REVIEW_OPEN",
+        "choice": "Build user and administrator roles as separate Android application modules and application IDs.",
+        "alternatives": [
+          "single APK with runtime role switching"
+        ],
+        "alternative_disposition": "No formal current alternatives review was found; do not claim rejection or approval.",
+        "consequences": [
+          "separate permissions and release origins",
+          "separate deployment artifacts",
+          "role confusion is reduced but two release surfaces must be controlled"
+        ],
+        "gap_ids": [
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-009"
+        ]
+      },
+      {
+        "id": "ARCH-OBS-DEDICATED-GATEWAY",
+        "status": "IMPLEMENTATION_OBSERVED_ADR_REVIEW_OPEN",
+        "choice": "Use a dedicated Node/TypeScript android-gateway process rather than treating the Next.js web process as the gateway.",
+        "alternatives": [
+          "legacy or generic web BFF",
+          "direct user-app to backend"
+        ],
+        "alternative_disposition": "Current bytes establish the dedicated process; formal architecture approval is not asserted.",
+        "consequences": [
+          "explicit public-route allowlist",
+          "field-session/privacy controls are gateway-owned",
+          "gateway and backend are loopback-coupled by current config"
+        ],
+        "gap_ids": [
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-011"
+        ]
+      },
+      {
+        "id": "ARCH-OPEN-ADMIN-ENTRY-POINT",
+        "status": "OPEN_POLICY_ALIGNMENT_DECISION",
+        "choice": null,
+        "current_observation": "The admin app targets a direct backend HTTPS origin while the user app targets the android gateway; admin operational workflows are disabled.",
+        "required_decision": "Either route administrator server calls through the protected gateway or explicitly approve and verify the exception against FP-040 before operational enablement.",
+        "release_effect": "BLOCKING_FOR_ADMIN_OPERATIONAL_ENABLEMENT_AND_RELEASE",
+        "gap_ids": [
+          "W2-ARCH-GAP-002"
+        ]
+      },
+      {
+        "id": "ARCH-OBS-GATEWAY-BACKEND-COLOCATION",
+        "status": "CONFIGURATION_IMPOSED_REVIEW_OPEN",
+        "choice": "The gateway accepts only backend http://127.0.0.1:8000 and therefore currently requires same-host or same-network-namespace colocation.",
+        "alternatives": [
+          "private remote backend origin with authenticated TLS"
+        ],
+        "alternative_disposition": "Not supported by current config; no production change is approved here.",
+        "consequences": [
+          "simple loopback trust boundary",
+          "gateway and backend scale/failure domains are coupled",
+          "production host/process topology remains unprovisioned"
+        ],
+        "gap_ids": [
+          "W2-ARCH-GAP-009"
+        ]
+      }
+    ]
+  },
+  "system_context": {
+    "system_boundary": "WalkSafe controlled code includes the Android user app, Android admin app, dedicated android-gateway, FastAPI backend, local model adapters/artifacts, database integration, and controlled local voice prototype. TMAP and Android platform services are external dependencies.",
+    "actors_and_external_systems": [
+      {
+        "id": "ACT-PRIORITY-USER",
+        "role": "Pedestrian user operating the Android user app",
+        "trust": "HUMAN_OUTSIDE_SOFTWARE_BOUNDARY"
+      },
+      {
+        "id": "ACT-SINGLE-ADMIN",
+        "role": "Administrator operating the separate admin app",
+        "trust": "PRIVILEGED_HUMAN_EXTERNAL_TO_RUNTIME"
+      },
+      {
+        "id": "ACT-FIELD-OPERATOR",
+        "role": "Controlled field-session operator/device",
+        "trust": "CONDITIONAL_AUTHENTICATED_ACTOR"
+      },
+      {
+        "id": "EXT-ANDROID-PLATFORM",
+        "role": "Camera, location, activity recognition, TTS, speech recognition, network and haptic services",
+        "trust": "DEVICE_PLATFORM_EXTERNAL_DEPENDENCY"
+      },
+      {
+        "id": "EXT-TMAP",
+        "role": "POI search and pedestrian-route provider",
+        "trust": "UNTRUSTED_EXTERNAL_PROVIDER_RESPONSE_VALIDATED"
+      },
+      {
+        "id": "EXT-CLOUD-STORAGE-TARGET",
+        "role": "Policy target for server original-object storage",
+        "trust": "NOT_PROVISIONED_CONFIGURATION_UNDECIDED"
+      },
+      {
+        "id": "EXT-INDEPENDENT-REVIEW",
+        "role": "Required product/security/accessibility/release review parties",
+        "trust": "EXTERNAL_EVIDENCE_PRODUCER_NOT_RUNTIME_SERVICE"
+      }
+    ],
+    "protocol_and_trust_boundaries": [
+      {
+        "boundary_id": "TB-DEVICE-SENSORS-USERAPP",
+        "from": "Android platform sensors/services",
+        "to": "user app",
+        "protocol": "Android platform APIs and in-process callbacks",
+        "sensitive_data": [
+          "camera frames",
+          "microphone/STT",
+          "precise location",
+          "motion and step evidence"
+        ],
+        "control": "runtime permissions, session state, local processing, safety stop"
+      },
+      {
+        "boundary_id": "TB-USERAPP-GATEWAY",
+        "from": "user app",
+        "to": "android-gateway",
+        "protocol": "debug default HTTP loopback; release build requires one exact root HTTPS origin",
+        "control": "gateway route allowlist, field-session authorization, actor assertion, consent/privacy operation checks, no-store responses"
+      },
+      {
+        "boundary_id": "TB-GATEWAY-BACKEND",
+        "from": "android-gateway",
+        "to": "FastAPI backend",
+        "protocol": "exact loopback HTTP http://127.0.0.1:8000 in current config",
+        "control": "gateway token, actor identity/assertion headers, timeout, redirect rejection, request/admission limits"
+      },
+      {
+        "boundary_id": "TB-ADMINAPP-BACKEND",
+        "from": "admin app",
+        "to": "FastAPI backend admin security API",
+        "protocol": "debug HTTP loopback; release build requires one exact root HTTPS origin",
+        "control": "password plus TOTP security workflow; operational workflow flag remains disabled",
+        "known_gap": "This direct path is not the current user-app gateway path and requires FP-040 alignment before operational enablement."
+      },
+      {
+        "boundary_id": "TB-BACKEND-DATABASE",
+        "from": "FastAPI backend",
+        "to": "PostgreSQL/PostGIS",
+        "protocol": "SQLAlchemy/psycopg database connection; local compose exposes PostGIS only on host loopback",
+        "control": "schema migrations and deployment database transport validation"
+      },
+      {
+        "boundary_id": "TB-BACKEND-TMAP",
+        "from": "FastAPI backend",
+        "to": "TMAP",
+        "protocol": "outbound HTTPX request to configured provider URLs with appKey, deadline, byte/count/schema bounds",
+        "control": "server-side secret, timeouts, response size and structure validation, readiness state"
+      },
+      {
+        "boundary_id": "TB-BACKEND-MODEL",
+        "from": "backend detection service",
+        "to": "local model artifacts/Ultralytics adapter",
+        "protocol": "in-process file load and Python calls",
+        "control": "configured artifact paths and readiness checks; promoted production model digest is unresolved"
+      }
+    ],
+    "environment_differences": {
+      "development": "Loopback HTTP defaults are available for user app, admin app, gateway and backend; PostGIS compose is local-only. Availability/running state is not claimed.",
+      "integration": "Target is fixed backend/gateway/DB plus actual Android devices, mock-first TMAP then controlled live TMAP. Hosts, certificates, accounts and fixtures are not yet fixed.",
+      "production": "Android release builds require exact HTTPS origins. Public domains, TLS termination, reverse proxy, private database network, storage/KMS, observability and scaling topology are not provisioned or approved."
+    }
+  },
+  "architecture_current_state": {
+    "design_goals": [
+      "Keep safety-critical camera, hazard and feedback work local enough to fail safe when external services are unavailable.",
+      "Separate user and privileged administrator roles and enforce explicit server entry boundaries.",
+      "Treat original-activity upload as consent-, motion- and transport-gated work that never degrades walking safety.",
+      "Keep external provider secrets in the backend and validate provider responses before returning them to the device.",
+      "Preserve exact evidence boundaries so internal tests cannot be promoted to device, formal, deployment or release claims."
+    ],
+    "constraints": [
+      "No active-walking original upload under effective FP-035.",
+      "Five release gates remain NOT_RUN and unwaived.",
+      "The formal catalog has 279 tests, all NOT_RUN.",
+      "Current gateway-to-backend transport is exact loopback HTTP and not remotely configurable.",
+      "Current compose provisions only PostGIS; backend, gateway, Android artifacts, object storage and reverse proxy are not provisioned by it.",
+      "Admin operational workflows are disabled and the direct admin-to-backend path requires policy alignment."
+    ],
+    "component_inventory": [
+      {
+        "component_id": "CMP-ANDROID-USER",
+        "path": "apps/android/app",
+        "language_runtime": "Kotlin/Android, JVM toolchain 21",
+        "deployment_unit": "APK applicationId kr.co.hanium.dreamup.walksafe",
+        "responsibilities": [
+          "camera/AR and local inference orchestration",
+          "navigation and hazard feedback",
+          "consent/account rights user surfaces",
+          "gateway client",
+          "debug-only original upload admission"
+        ],
+        "provides": [
+          "accessible user interaction",
+          "local safety state and feedback"
+        ],
+        "uses": [
+          "Android platform services",
+          "ARCore/CameraX/LiteRT",
+          "android-gateway"
+        ],
+        "status": "IMPLEMENTED_CURRENT_BYTES_DEVICE_DEPLOYMENT_NOT_ASSERTED"
+      },
+      {
+        "component_id": "CMP-ANDROID-ADMIN",
+        "path": "apps/android/adminapp",
+        "language_runtime": "Kotlin/Android, JVM toolchain 21",
+        "deployment_unit": "APK applicationId kr.co.hanium.dreamup.walksafe.admin",
+        "responsibilities": [
+          "password/TOTP admin security sessions",
+          "reauthentication and recovery controls"
+        ],
+        "provides": [
+          "privileged security-control surface"
+        ],
+        "uses": [
+          "FastAPI backend admin security API directly"
+        ],
+        "status": "SECURITY_CONTROL_ENABLED_OPERATIONS_LOCKED"
+      },
+      {
+        "component_id": "CMP-ANDROID-GATEWAY",
+        "path": "apps/android-gateway",
+        "language_runtime": "Node >=22 <23, TypeScript 6.0.3",
+        "deployment_unit": "separate Node process, default 127.0.0.1:8081",
+        "responsibilities": [
+          "public route allowlist",
+          "field session/walk ledger",
+          "consent/privacy lifecycle",
+          "backend proxy authorization and actor assertion",
+          "upload admission limits"
+        ],
+        "provides": [
+          "/api/field-session",
+          "/api/field-walk",
+          "/api/navigation/walking",
+          "/api/navigation/destinations/search",
+          "/api/reports/v2",
+          "/privacy/rights"
+        ],
+        "uses": [
+          "FastAPI backend exact loopback origin",
+          "filesystem-backed controlled ledgers"
+        ],
+        "status": "IMPLEMENTED_CURRENT_BYTES_NOT_DEPLOYED"
+      },
+      {
+        "component_id": "CMP-BACKEND",
+        "path": "backend/app",
+        "language_runtime": "Python runtime version not pinned; FastAPI/Uvicorn dependencies pinned",
+        "deployment_unit": "ASGI process outside current compose",
+        "responsibilities": [
+          "health/readiness",
+          "uploads and detection",
+          "navigation/TMAP mediation",
+          "reports and storage policy",
+          "Android debug endpoints",
+          "admin security"
+        ],
+        "provides": [
+          "/ready",
+          "/detect and /detect/v2",
+          "/navigation/*",
+          "/reports and /reports/v2",
+          "/android/debug/*",
+          "/admin/security/*"
+        ],
+        "uses": [
+          "PostgreSQL/PostGIS",
+          "filesystem/model artifacts",
+          "TMAP"
+        ],
+        "status": "IMPLEMENTED_CURRENT_BYTES_NOT_DEPLOYED"
+      },
+      {
+        "component_id": "CMP-DATABASE",
+        "path": "docker-compose.yml and backend/alembic",
+        "language_runtime": "PostGIS 16-3.5 image pinned by digest",
+        "deployment_unit": "local compose container with persistent volume",
+        "responsibilities": [
+          "relational, spatial, report and audit state"
+        ],
+        "provides": [
+          "PostgreSQL/PostGIS database"
+        ],
+        "uses": [
+          "local persistent volume"
+        ],
+        "status": "LOCAL_CONFIGURATION_PRESENT_RUNTIME_NOT_ASSERTED"
+      },
+      {
+        "component_id": "CMP-MODEL",
+        "path": "model and backend/app/services/yolo_inference_adapter.py",
+        "language_runtime": "Python; Ultralytics 8.4.48, ONNX 1.21.0, ONNX Runtime 1.26.0",
+        "deployment_unit": "model files loaded into backend process; no separately deployed model service is evidenced",
+        "responsibilities": [
+          "model artifact preparation/registry",
+          "YOLO result normalization"
+        ],
+        "provides": [
+          "detection model artifacts and adapter"
+        ],
+        "uses": [
+          "local files and Python ML libraries"
+        ],
+        "status": "INTERNAL_COMPONENT_PRESENT_PROMOTED_PRODUCTION_ARTIFACT_UNRESOLVED"
+      },
+      {
+        "component_id": "CMP-VOICE-PROTOTYPE",
+        "path": "voice",
+        "language_runtime": "local Python prototype dependency set",
+        "deployment_unit": "separate prototype process if manually started",
+        "responsibilities": [
+          "local voice experimentation"
+        ],
+        "provides": [
+          "prototype-only voice surface"
+        ],
+        "uses": [
+          "local ML/audio dependencies"
+        ],
+        "status": "PROTOTYPE_NOT_PROVEN_IN_PRODUCT_INTEGRATION"
+      },
+      {
+        "component_id": "CMP-WEB-SURFACE",
+        "path": "apps/web",
+        "language_runtime": "Next 16.2.6, React 19.2.6, TypeScript 6.0.3",
+        "deployment_unit": "separate Next.js process if manually started",
+        "responsibilities": [
+          "web surface present in repository"
+        ],
+        "provides": [
+          "web UI"
+        ],
+        "uses": [
+          "its own Next runtime"
+        ],
+        "status": "PRESENT_NOT_ANDROID_GATEWAY_NOT_PRODUCTION_DEPLOYMENT_EVIDENCE"
+      }
+    ],
+    "dependency_directions": [
+      "Android user app -> android-gateway -> backend -> PostgreSQL/PostGIS, local model/files, TMAP.",
+      "Android admin app -> backend admin-security routes directly in current bytes; operational routes remain locked.",
+      "android-gateway is independent from apps/web and is not a Next.js route handler.",
+      "backend owns TMAP credentials/provider calls; Android clients do not receive the server secret.",
+      "model adapter is loaded by backend; no current remote model-service dependency is asserted.",
+      "voice prototype and web surface are not prerequisites for the core Android walking path in this supplement."
+    ],
+    "forbidden_or_unverified_coupling": [
+      "Do not merge user and admin roles into one runtime identity without a new decision and verification.",
+      "Do not bypass gateway controls for user navigation/report traffic.",
+      "Do not treat the direct admin backend path as policy-aligned until FP-040 resolution is recorded.",
+      "Do not expose the current loopback backend transport as a remote cleartext production channel.",
+      "Do not make live TMAP or remote model availability a silent prerequisite for local safety feedback."
+    ],
+    "data_security_error_references": [
+      "docs/deliverables/04-design/interface-and-data-design.md",
+      "docs/deliverables/04-design/security-and-operations-design.md",
+      "backend/app/config.py",
+      "apps/android-gateway/src/backend.ts"
+    ],
+    "requirements_and_decision_trace": [
+      {
+        "feature_ids": [
+          "FP-035",
+          "FP-036",
+          "FP-044",
+          "FP-045"
+        ],
+        "design_ids": [
+          "DLV-DES-01",
+          "DLV-DES-04",
+          "DLV-DES-06",
+          "DLV-DES-08"
+        ],
+        "evidence": "policy 1.0.1, compact decision successor, Android admission code and 22 internal tests"
+      },
+      {
+        "feature_ids": [
+          "FP-040"
+        ],
+        "design_ids": [
+          "DLV-DES-02",
+          "DLV-DES-03",
+          "DLV-DES-05",
+          "DLV-DES-08"
+        ],
+        "evidence": "current gateway and admin paths; direct-admin exception remains open"
+      },
+      {
+        "feature_ids": [
+          "FP-022",
+          "FP-023",
+          "FP-042"
+        ],
+        "design_ids": [
+          "DLV-DES-02",
+          "DLV-DES-04",
+          "DLV-DES-08"
+        ],
+        "evidence": "gateway navigation routes and backend TMAP service"
+      },
+      {
+        "feature_ids": [
+          "FP-047"
+        ],
+        "design_ids": [
+          "DLV-DES-02",
+          "DLV-DES-03",
+          "DLV-DES-05",
+          "DLV-DES-08"
+        ],
+        "evidence": "separate admin security surface and recovery gate boundary"
+      }
+    ]
+  },
+  "runtime_flows": [
+    {
+      "flow_id": "FLOW-CAMERA-HAZARD-FEEDBACK",
+      "sequence": [
+        "user starts controlled walking session",
+        "Android permissions/sensor readiness are evaluated",
+        "camera/AR and local model inputs are processed",
+        "hazard/navigation state is derived",
+        "speech/haptic/UI feedback is emitted"
+      ],
+      "external_calls": "Not required for the core local frame-to-feedback step; navigation and reporting are separate flows.",
+      "failure_behavior": "Missing or untrustworthy safety input leads to feature-specific stop or general safety stop; no success is inferred from stale data.",
+      "sensitive_points": [
+        "camera",
+        "location",
+        "motion",
+        "speech"
+      ],
+      "verification": "Implementation paths exist; actual-device/formal end-to-end result is NOT_RUN.",
+      "gap_ids": [
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-008"
+      ]
+    },
+    {
+      "flow_id": "FLOW-DESTINATION-AND-WALKING-ROUTE",
+      "sequence": [
+        "user app sends destination search or walking route request to gateway",
+        "gateway checks route/method/session/privacy state",
+        "gateway proxies to backend /navigation endpoint",
+        "backend calls configured TMAP provider with server-held key",
+        "backend bounds and normalizes response",
+        "gateway returns no-store response to app"
+      ],
+      "protocols": [
+        "user release target HTTPS",
+        "gateway-to-backend exact loopback HTTP",
+        "backend-to-TMAP configured outbound HTTPX provider connection"
+      ],
+      "failure_behavior": "timeouts, provider errors and invalid/oversized responses become bounded errors; live-provider success is not claimed.",
+      "verification": "Internal code evidence only; live TMAP/device integration NOT_RUN.",
+      "gap_ids": [
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-005"
+      ]
+    },
+    {
+      "flow_id": "FLOW-REPORT",
+      "sequence": [
+        "user app sends purpose-bound report to gateway /api/reports/v2",
+        "gateway performs session/privacy/admission checks",
+        "gateway proxies to backend /reports/v2",
+        "backend applies report policy, duplicate/audit/storage controls",
+        "result is returned through gateway"
+      ],
+      "failure_behavior": "authorization, privacy generation, size, rate and upstream failures fail closed; production object-store commit is not evidenced.",
+      "verification": "Internal implementation only; formal, field and production storage verification NOT_RUN.",
+      "gap_ids": [
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-009"
+      ]
+    },
+    {
+      "flow_id": "FLOW-ADMIN-SECURITY",
+      "sequence": [
+        "admin app uses configured admin API origin",
+        "backend password/TOTP session endpoint authenticates",
+        "state/session/revoke/reauth/recovery operations use /admin/security/*",
+        "operational workflow remains disabled"
+      ],
+      "gateway_involvement": "NONE_IN_CURRENT_ADMINAPP_BUILD_CONFIGURATION",
+      "known_gap": "Resolve protected single-entry policy before operational workflows or release.",
+      "verification": "Internal security code/tests may exist outside this W2 execution; no new formal/device/deployment claim is made.",
+      "gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-010"
+      ]
+    },
+    {
+      "flow_id": "FLOW-FP035-ORIGINAL-ACTIVITY-UPLOAD",
+      "normative_branches": [
+        {
+          "branch": 1,
+          "condition": "walking",
+          "result": "No general activity original is uploaded on any network."
+        },
+        {
+          "branch": 2,
+          "condition": "stationary, explicit cellular opt-in, allowed cellular network, other conditions satisfied",
+          "result": "Cellular upload is permitted."
+        },
+        {
+          "branch": 3,
+          "condition": "stationary without cellular opt-in",
+          "result": "Upload is permitted only on Wi-Fi; cellular is QUEUED_UNTIL_WIFI."
+        },
+        {
+          "branch": 4,
+          "condition": "no allowed network",
+          "result": "Normative policy requires an encrypted pending queue under retention/capacity/deletion rules."
+        }
+      ],
+      "current_implementation": [
+        "Motion state is UNKNOWN, WALKING or STATIONARY; stationary confirmation is 5,000 ms in the current default controller.",
+        "UNKNOWN fails closed, WALKING blocks, Wi-Fi allows, approved cellular allows, non-opted cellular queues until Wi-Fi, OFFLINE/OTHER fails closed.",
+        "Movement or loss of admissible state increments a generation and cancels queued/active debug upload work.",
+        "The upload rule is scoped to original-activity upload and does not disable general authentication or navigation network traffic."
+      ],
+      "implementation_gap": "No persistent encrypted 30-day queue, chunk resume, receipt-bound deletion or whole original-activity pipeline is proven by the bound code. Branch 4 is therefore normative but not implementation-complete.",
+      "executed_internal_evidence": {
+        "tests": 22,
+        "network_policy_tests": 17,
+        "uploader_tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "status": "PASS_INTERNAL_TARGETED_UNIT_ONLY"
+      },
+      "prohibited_inference": "Not formal, actual-device, actual-network, real-socket, field, production or release PASS.",
+      "gap_ids": [
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-006"
+      ]
+    }
+  ],
+  "deployment_topology": {
+    "current_configurable_development_shape": {
+      "status": "CONFIGURATION_PRESENT_RUNTIME_NOT_ASSERTED",
+      "nodes": [
+        "Android user debug APK -> default http://127.0.0.1:8081 gateway origin",
+        "Android admin debug APK -> default http://127.0.0.1:8000 admin API origin",
+        "android-gateway Node process -> exact http://127.0.0.1:8000 backend",
+        "FastAPI backend process -> PostgreSQL/PostGIS, local upload/model paths, configured TMAP",
+        "docker-compose -> PostGIS only, host bind 127.0.0.1:${POSTGRES_PORT:-5432}"
+      ],
+      "limitations": [
+        "physical-device loopback reachability requires an explicit development bridge/topology that is not fixed here",
+        "backend and gateway are not compose services",
+        "no reverse proxy or TLS service is in compose"
+      ],
+      "gap_ids": [
+        "W2-ARCH-GAP-005"
+      ]
+    },
+    "integration_target": {
+      "status": "TARGET_NOT_PROVISIONED",
+      "shape": [
+        "fixed build IDs and exact source hashes",
+        "controlled PostgreSQL/PostGIS instance with migrations",
+        "co-located gateway/backend or an approved transport redesign",
+        "actual supported Android user/admin devices",
+        "mock TMAP first, then live TMAP with controlled credentials",
+        "isolated test accounts, files and audit evidence"
+      ],
+      "unresolved": [
+        "host names and addresses",
+        "device-to-service routing",
+        "TLS certificate and trust installation",
+        "test account/fixture identifiers",
+        "model artifact digest",
+        "live TMAP account/quota"
+      ],
+      "gap_ids": [
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-005"
+      ]
+    },
+    "production_target": {
+      "status": "NOT_PROVISIONED_NOT_APPROVED",
+      "required_shape": [
+        "exact HTTPS origin for user gateway",
+        "exact HTTPS origin or policy-aligned gateway route for admin",
+        "gateway-to-backend protected private transport",
+        "private PostgreSQL/PostGIS",
+        "encrypted original-object storage with retention/deletion evidence",
+        "versioned model artifact",
+        "central logs/metrics/audit without secret or raw-data leakage",
+        "backup/restore and rollback evidence"
+      ],
+      "unresolved": [
+        "public domains",
+        "TLS termination/reverse proxy",
+        "network/firewall rules",
+        "backend/gateway process manager or container images",
+        "database host/TLS/credentials and capacity",
+        "object storage region/bucket/KMS/access rules",
+        "observability endpoints and retention",
+        "scaling and failure domains",
+        "cost measurement",
+        "release artifact signing/distribution"
+      ],
+      "gap_ids": [
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-009",
+        "W2-ARCH-GAP-010",
+        "W2-ARCH-GAP-011"
+      ]
+    },
+    "failure_and_observability_boundaries": [
+      "Gateway or backend failure must not be represented as successful navigation/report/upload.",
+      "TMAP failure isolates destination/route work and must not silently validate stale direction as current.",
+      "Original upload failure or capacity pressure must not block the camera/render/safety feedback path.",
+      "Database/object-store partial commit requires reconciliation evidence before deletion; production evidence is absent.",
+      "Exact metrics, alert thresholds and operational dashboards are unresolved and cannot be claimed from source code alone."
+    ]
+  },
+  "technology_stack": {
+    "entries": [
+      {
+        "area": "Android build",
+        "technology_version": "Android Gradle Plugin 9.1.0; compileSdk/targetSdk 36; minSdk 26; Java/JVM 21",
+        "pinning": "Gradle declarations and strict dependency locking enabled per app module",
+        "support_risk": "Android device/OS support matrix and actual-device compatibility are NOT_RUN",
+        "license_risk": "Third-party Android dependency license inventory and notices are not evidenced"
+      },
+      {
+        "area": "Android user runtime",
+        "technology_version": "ARCore 1.54.0; CameraX 1.6.1; AndroidX Activity 1.7.0/Core 1.18.0/AppCompat 1.7.0; Play Services Location 21.3.0; LiteRT 1.4.0",
+        "pinning": "Exact Gradle coordinates",
+        "support_risk": "AR/device feature availability and vendor lifecycle verification are open",
+        "license_risk": "Distribution/notice compatibility review is open"
+      },
+      {
+        "area": "Android admin runtime",
+        "technology_version": "separate Android application versionName 0.2.0-security, password/TOTP mode",
+        "pinning": "Root AGP plus module build config",
+        "support_risk": "Operational workflows disabled; device recovery drill NOT_RUN",
+        "license_risk": "Dependency notice review is open"
+      },
+      {
+        "area": "Android gateway",
+        "technology_version": "Node >=22 <23; TypeScript 6.0.3; @types/node 22.19.15",
+        "pinning": "package.json exact dev dependency versions; package-lock exists outside this compact binding set",
+        "support_risk": "Node 22 lifecycle and deployment image/process manager not reviewed here",
+        "license_risk": "npm transitive license/SBOM review not evidenced"
+      },
+      {
+        "area": "Backend",
+        "technology_version": "FastAPI 0.128.8; Uvicorn 0.39.0; SQLAlchemy 2.0.49; psycopg 3.2.13; GeoAlchemy2 0.17.1; Alembic 1.16.5; HTTPX 0.28.1; PyOTP 2.10.0",
+        "pinning": "requirements.txt exact versions; Python runtime version itself is not pinned there",
+        "support_risk": "Runtime/base image and production server support policy are unresolved",
+        "license_risk": "Python dependency and transitive license inventory is not evidenced"
+      },
+      {
+        "area": "Database",
+        "technology_version": "postgis/postgis 16-3.5 pinned by image digest",
+        "pinning": "compose image digest and linux/amd64 platform",
+        "support_risk": "ARM portability, managed-service mapping, backup/restore and capacity are unverified",
+        "license_risk": "Image package/extension license notice review is not evidenced"
+      },
+      {
+        "area": "Model",
+        "technology_version": "Ultralytics 8.4.48; ONNX 1.21.0; ONNX Runtime 1.26.0; Hugging Face Hub 1.14.0",
+        "pinning": "exact model requirements versions; promoted artifact digest unresolved",
+        "support_risk": "model/runtime/device compatibility and supported export target are unverified",
+        "license_risk": "Framework, model weights and dataset provenance/distribution rights require explicit review before release"
+      },
+      {
+        "area": "Web repository surface",
+        "technology_version": "Next 16.2.6; React/ReactDOM 19.2.6; TypeScript 6.0.3",
+        "pinning": "exact package.json versions",
+        "support_risk": "Not the Android gateway; production role and support commitment are not established here",
+        "license_risk": "npm transitive license/SBOM review not evidenced"
+      },
+      {
+        "area": "Voice prototype",
+        "technology_version": "FastAPI 0.136.1; faster-whisper 1.2.1; qwen-tts 0.1.1; torch/torchaudio 2.11.0",
+        "pinning": "exact prototype requirements versions",
+        "support_risk": "Product integration, target hardware, latency and packaging are unverified",
+        "license_risk": "Model/dependency use and distribution rights require review"
+      }
+    ],
+    "global_risk_status": {
+      "support_lifecycle_review": "NOT_RUN",
+      "license_inventory_or_sbom": "NOT_EVIDENCED",
+      "license_clearance": "NOT_CLAIMED",
+      "security_update_policy": "NOT_FIXED_IN_THIS_SUPPLEMENT",
+      "withdrawal_conditions": [
+        "unsupported target OS/device",
+        "unresolved critical vulnerability",
+        "license or model-rights incompatibility",
+        "failure of exact build/lock reproduction",
+        "formal/device safety failure"
+      ],
+      "gap_ids": [
+        "W2-ARCH-GAP-007",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-009"
+      ]
+    }
+  },
+  "integration_plan": {
+    "status": "PLAN_READY_EXECUTION_NOT_CLAIMED",
+    "principles": [
+      "bind exact bytes before each stage",
+      "mock before live external dependency",
+      "one trust boundary per gate",
+      "fail closed without silent fallback",
+      "preserve data before rollback",
+      "never promote internal unit results to formal/device/release evidence"
+    ],
+    "stages": [
+      {
+        "order": 0,
+        "stage_id": "SIP-00-AUTHORITY-AND-BUILD-IDENTITY",
+        "targets": [
+          "policy 1.0.1 and compact decision successor",
+          "exact source/build identifiers",
+          "environment variable inventory"
+        ],
+        "environment": "offline control review",
+        "entry": "current path/SHA set is available",
+        "acceptance": [
+          "candidate NOT_EFFECTIVE is treated only as pre-activation history",
+          "base135 + replacement1 = effective135 and edges428",
+          "release build origins and source identity have no silent invalid fallback"
+        ],
+        "rollback": "Stop integration and restore the last known exact path/SHA set; do not rewrite immutable policy/approval records.",
+        "execution_status": "CURRENT_SUPPLEMENT_PREPARED_NOT_FORMAL_REVIEWED",
+        "gap_ids": [
+          "W2-ARCH-GAP-001"
+        ]
+      },
+      {
+        "order": 1,
+        "stage_id": "SIP-01-DATABASE-AND-BACKEND",
+        "targets": [
+          "PostGIS",
+          "Alembic schema",
+          "FastAPI readiness",
+          "local model/file paths"
+        ],
+        "environment": "isolated local/integration backend",
+        "entry": "explicit database credentials and environment are configured; test data is isolated",
+        "acceptance": [
+          "database transport/config validation passes",
+          "migrations and /ready complete against the intended database",
+          "model/file readiness states are explicit",
+          "no production data is used"
+        ],
+        "rollback": "Stop backend writes; use only a tested migration downgrade or a pre-stage isolated snapshot. If neither is evidenced, rebuild the isolated database rather than claiming rollback.",
+        "execution_status": "NOT_RUN_BY_W2",
+        "gap_ids": [
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-010"
+        ]
+      },
+      {
+        "order": 2,
+        "stage_id": "SIP-02-GATEWAY-BACKEND",
+        "targets": [
+          "dedicated gateway",
+          "exact loopback backend",
+          "public-route allowlist",
+          "session/actor/privacy controls"
+        ],
+        "environment": "same-host integration namespace",
+        "entry": "SIP-01 ready; gateway secrets/ledger paths are isolated",
+        "acceptance": [
+          "only declared routes and methods are reachable",
+          "gateway authorization/actor headers reach backend as designed",
+          "timeouts/redirect rejection/no-store/fail-closed paths are exercised",
+          "backend is not remotely exposed as cleartext"
+        ],
+        "rollback": "Stop gateway, revoke test sessions/secrets, discard isolated ledgers, and return to backend-only stage.",
+        "execution_status": "NOT_RUN_BY_W2",
+        "gap_ids": [
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-005",
+          "W2-ARCH-GAP-006"
+        ]
+      },
+      {
+        "order": 3,
+        "stage_id": "SIP-03-USER-APP-AND-FP035",
+        "targets": [
+          "user APK",
+          "gateway client",
+          "motion/transport upload admission",
+          "cancel-on-movement"
+        ],
+        "environment": "emulator/unit first, then actual supported device and controlled Wi-Fi/cellular",
+        "entry": "SIP-02 ready; consent and network fixtures are defined",
+        "acceptance": [
+          "four normative branches map to observable states",
+          "movement stops queued/in-flight new transfer work",
+          "general auth/navigation traffic is not incorrectly blocked",
+          "persistent encrypted queue and receipt deletion are either implemented/tested or explicitly remain blocked"
+        ],
+        "rollback": "Disable original upload and cancel active work; preserve or quarantine data under the approved retention rule; never fall back to uploading while walking.",
+        "execution_status": "22_INTERNAL_UNIT_PASS_DEVICE_NETWORK_PERSISTENT_QUEUE_NOT_RUN",
+        "gap_ids": [
+          "W2-ARCH-GAP-003",
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-006"
+        ]
+      },
+      {
+        "order": 4,
+        "stage_id": "SIP-04-TMAP-MOCK-TO-LIVE",
+        "targets": [
+          "destination search",
+          "walking route",
+          "provider readiness and error mapping"
+        ],
+        "environment": "deterministic mock, then controlled live-provider account",
+        "entry": "SIP-03 core client/gateway path ready; provider key/quota/cost owner assigned",
+        "acceptance": [
+          "mock schema/limit/timeout cases pass",
+          "live key and endpoint readiness pass without exposing key",
+          "route/POI responses are bounded and normalized",
+          "failure produces safe navigation limitation rather than fabricated route"
+        ],
+        "rollback": "Disable live-provider mode, revoke/rotate test key if exposed, return to deterministic mock; do not claim live route availability.",
+        "execution_status": "NOT_RUN_BY_W2",
+        "gap_ids": [
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-005"
+        ]
+      },
+      {
+        "order": 5,
+        "stage_id": "SIP-05-ADMIN-SECURITY-AND-ENTRY-ALIGNMENT",
+        "targets": [
+          "admin APK",
+          "password/TOTP sessions",
+          "reauth/revoke/recovery",
+          "FP-040 entry decision"
+        ],
+        "environment": "isolated admin device/account and backend",
+        "entry": "SIP-02 ready; recovery evidence owner and test account are assigned",
+        "acceptance": [
+          "direct path exception is resolved or admin traffic is gateway-routed",
+          "high-risk security actions and revoke/recovery are verified",
+          "operational workflows stay locked until evidence is complete",
+          "lost-admin-device recovery drill is recorded"
+        ],
+        "rollback": "Keep operational workflows disabled, revoke sessions, freeze high-risk actions and return to the last verified security-control build.",
+        "execution_status": "SECURITY_CODE_PRESENT_ENTRY_ALIGNMENT_AND_RECOVERY_DRILL_OPEN",
+        "gap_ids": [
+          "W2-ARCH-GAP-002",
+          "W2-ARCH-GAP-006",
+          "W2-ARCH-GAP-010"
+        ]
+      },
+      {
+        "order": 6,
+        "stage_id": "SIP-06-FULL-SYSTEM-FORMAL-AND-RELEASE",
+        "targets": [
+          "fixed Android/backend/gateway/model/DB/config bundle",
+          "actual devices/users/accessibility/network/field",
+          "formal catalog",
+          "deployment and rollback"
+        ],
+        "environment": "controlled field/test environment before any production deployment",
+        "entry": "SIP-01 through SIP-05 accepted with exact evidence; external prerequisites are available",
+        "acceptance": [
+          "279 formal tests executed with approved results",
+          "five release gates closed or explicitly approved by valid authority; none is silently waived",
+          "actual-device/user/TalkBack/network/socket/PostGIS/TMAP/rollback evidence is complete",
+          "independent reviews and release decision are recorded"
+        ],
+        "rollback": "Block new sessions/releases, preserve evidence and data, revert only components with proven data-safe rollback, otherwise hold safe-stop and prepare a corrected build.",
+        "execution_status": "NOT_RUN_RELEASE_NOT_ELIGIBLE",
+        "gap_ids": [
+          "W2-ARCH-GAP-004",
+          "W2-ARCH-GAP-007",
+          "W2-ARCH-GAP-008",
+          "W2-ARCH-GAP-009",
+          "W2-ARCH-GAP-010",
+          "W2-ARCH-GAP-011"
+        ]
+      }
+    ]
+  },
+  "verification_boundary": {
+    "w2_local_document_checks": "PASS_EXACT8_SOURCE_SHA_GAP_GRAPH_AND_FINGERPRINT",
+    "fp035_internal_targeted_unit": {
+      "tests": 22,
+      "status": "PASS_INTERNAL_TARGETED_UNIT_ONLY",
+      "network_policy": 17,
+      "uploader": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "formal_tests": {
+      "count": 279,
+      "status": "NOT_RUN",
+      "pass_claimed": false,
+      "gap_ids": [
+        "W2-ARCH-GAP-004"
+      ]
+    },
+    "release_gates": {
+      "count": 5,
+      "status": "NOT_RUN",
+      "waived": false,
+      "gap_ids": [
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-009",
+        "W2-ARCH-GAP-010"
+      ]
+    },
+    "actual_device_user_talkback_network_socket_field_postgis_tmap_production": "NOT_RUN_OR_OPEN",
+    "w2_independent_review": "OPEN_TRACKED_BY_W2-ARCH-GAP-001",
+    "release_status": "NOT_ELIGIBLE",
+    "release_status_gap_ids": [
+      "W2-ARCH-GAP-004",
+      "W2-ARCH-GAP-006",
+      "W2-ARCH-GAP-008",
+      "W2-ARCH-GAP-009",
+      "W2-ARCH-GAP-010"
+    ]
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "allowed_claims": [
+    "The add-only W2 architecture supplement covers exactly DLV-DES-01 through DLV-DES-08.",
+    "Current repository bytes contain separate Android user/admin modules, a dedicated Node gateway, a FastAPI backend, PostGIS configuration, local model integration and prototype/web surfaces as described.",
+    "Policy 1.0.1 and the compact decision successor make FP-035 effective; the pre-activation NOT_EFFECTIVE candidate status is historical only.",
+    "The current FP-035 admission/cancellation implementation has 22 targeted internal unit tests with zero failures/errors/skips.",
+    "Deployment and integration targets, known code/policy gaps and unresolved environment values are explicitly recorded."
+  ],
+  "prohibited_claims": [
+    "That this supplement modifies or replaces an immutable 2026-07-21/22 baseline or approval record.",
+    "That DES-01 through DES-08 have received formal artifact approval or independent review by this file alone.",
+    "That the entire FP-035 normative queue/retention/deletion contract is implemented.",
+    "That 279 formal tests, actual-device/user/TalkBack/network/socket/field/PostGIS/live-TMAP tests have run or passed.",
+    "That any production domain, TLS, reverse proxy, database, object store, model, observability or deployment is provisioned.",
+    "That third-party software/model/data licenses or support lifecycles are cleared.",
+    "That release gates are waived or that the product is eligible for release."
+  ],
+  "source_binding_summary": {
+    "source_count": 42,
+    "source_path_set_sha256": "696d48b8ae6c46e10d3a2b9918aa0d1a28006638dfd8a979292be2698c09fa9f",
+    "source_path_sha256_set_sha256": "982a4d4c6727f738dbc97b479518348cc00b42d560ce1c92fb0d54e4a5b9a5be",
+    "all_paths_required": true,
+    "all_sha256_required_to_match": true
+  },
+  "source_bindings": [
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android-gateway/package.json",
+      "sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/server.ts",
+      "sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/backend.ts",
+      "sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/config.ts",
+      "sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/routes.ts",
+      "sha256": "3a6c1c6f84aeb855140c1dc8bdbb7fac624aac299231d7bccd34423078e7bc4a",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/adminapp/build.gradle.kts",
+      "sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/adminapp/src/main/AndroidManifest.xml",
+      "sha256": "064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/app/build.gradle.kts",
+      "sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "INTERNAL_TEST_EVIDENCE",
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.debuglog.HttpMetadataLogUploaderTest.xml",
+      "sha256": "598a385aaa90102d45e2cad83e9dd73d9e45ca71c27093fd741de33e9e178512",
+      "allowed_claim": "Targeted FP-035 internal unit test source or bound executed JUnit result.",
+      "prohibited_claim": "Formal, device, live-network, real-socket, field, production, or release PASS."
+    },
+    {
+      "role": "INTERNAL_TEST_EVIDENCE",
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicyTest.xml",
+      "sha256": "99536a7a7037559184cee253795aa9552bd21fca2bb82f4570a384bbc991b525",
+      "allowed_claim": "Targeted FP-035 internal unit test source or bound executed JUnit result.",
+      "prohibited_claim": "Formal, device, live-network, real-socket, field, production, or release PASS."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpFrameCaptureUploader.kt",
+      "sha256": "acab6de2a6f30be1ed35783eec811b3bf0adf02063f238738b2b30a9aa4caddb",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploader.kt",
+      "sha256": "7bf041afd2a6b19686c948f467c7d04dcd1aa828559b089462d87421094fb84f",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "INTERNAL_TEST_EVIDENCE",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploaderTest.kt",
+      "sha256": "3e2981c8195a4fd0e76c512ba1dd745f4b8378e5864c9e26c03ab3910c1be118",
+      "allowed_claim": "Targeted FP-035 internal unit test source or bound executed JUnit result.",
+      "prohibited_claim": "Formal, device, live-network, real-socket, field, production, or release PASS."
+    },
+    {
+      "role": "INTERNAL_TEST_EVIDENCE",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6",
+      "allowed_claim": "Targeted FP-035 internal unit test source or bound executed JUnit result.",
+      "prohibited_claim": "Formal, device, live-network, real-socket, field, production, or release PASS."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/build.gradle.kts",
+      "sha256": "20485875f2123b6dfa69bdb228a06890f440c46c5443bf68b936531fa2b0df28",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/android/settings.gradle.kts",
+      "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "apps/web/package.json",
+      "sha256": "323527f9f8c6a97a534b0fae495ac57a91db6d1e1e4b03edc5b18d066fe8c513",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "backend/app/config.py",
+      "sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "backend/app/database.py",
+      "sha256": "a67304aadd42e976794918571f900b19195975b0ab2058d214edcd77b977efca",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "backend/app/main.py",
+      "sha256": "4840f7b46ae202f9d433427a6e8f1f04df4296e6ac8eb23ec2cdcf2196e17eb2",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "backend/app/services/tmap_pedestrian.py",
+      "sha256": "369eaee6d42be77965e77734a5eb94572bbdd8d71836d90f6091cc402347cd06",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "CURRENT_IMPLEMENTATION_SOURCE",
+      "path": "backend/app/services/yolo_inference_adapter.py",
+      "sha256": "631f61f18a179ffdb9378c460767c9037f8d97423ab8d0ec39906a451e37925f",
+      "allowed_claim": "Current implementation bytes supporting the described internal topology or flow.",
+      "prohibited_claim": "Whole-product conformance, formal verification, production deployment, or release readiness."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "backend/requirements.txt",
+      "sha256": "a54ae7931a13504b1be671c645832b422d79320f68fce3fd580d5f94bfa51779",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "docker-compose.yml",
+      "sha256": "d3ca3c4caf272919712ee21ce8ae59c14894bff8f3270596a06c8601a2df6de5",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+      "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+      "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/execution/artifact-audits/20260726/technical-audit.json",
+      "sha256": "daa9d258d9baea8cac9e82b65927b805b805b0dc4977aaa040098500886af856",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "CONTROL_AND_BOUNDARY_SOURCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "sha256": "755e341c712e755540f95f97f3936cca8da2cc5bccf220a292e593358f02a1f8",
+      "allowed_claim": "Current control authority, audit boundary, or executed internal-scope evidence exactly as recorded.",
+      "prohibited_claim": "New approval, formal-test completion, deployment completion, or release authorization beyond the record."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/04-design/interface-and-data-design.md",
+      "sha256": "c35f6190f9488fcc4f7e8b653a37742a11ae463ba782c088dc3c7c85e0486686",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "sha256": "acd97ac8c0c77dcb745812754f9d1e2dbd63e31c7f16aca0e214531146cf2362",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/04-design/software-architecture.md",
+      "sha256": "91b5e2757f9a051e2532ecdddf86068d4a221a58cbf4b40613b750a8d8967f9d",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "PREDECESSOR_GAP_SOURCE",
+      "path": "docs/deliverables/05-implementation/software-integration-report.md",
+      "sha256": "678925c5b7f15e069e08f339f168a1fefbf57525866c7b1d30093bc76b770d45",
+      "allowed_claim": "Predecessor draft, trace, inventory, and integration-gap input used non-destructively.",
+      "prohibited_claim": "That the predecessor draft is current, approved, baselined, or complete."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "model/requirements.txt",
+      "sha256": "f1ed492e19e1a98827b2c32756862f980ca84ef19263d6158af9b000d138e310",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    },
+    {
+      "role": "MODULE_AND_DEPENDENCY_MANIFEST",
+      "path": "voice/requirements.txt",
+      "sha256": "9d95b3dfcb973c4017c5f3d90d823de43dac6e46d1e08bb3fc4454a567e50884",
+      "allowed_claim": "Current declared module, build, dependency, permission, or local deployment configuration bytes.",
+      "prohibited_claim": "Runtime availability, production deployment, support-lifecycle clearance, or license clearance."
+    }
+  ],
+  "open_gaps": [
+    {
+      "gap_id": "W2-ARCH-GAP-001",
+      "status": "OPEN",
+      "item": "W2 DES-01~08 current-state supplement independent review and wave-level disposition",
+      "owner_roles": [
+        "기술책임자",
+        "독립기술검토자",
+        "QA책임자"
+      ],
+      "target_wave": "W2",
+      "closure_condition": "The W2 independent review records zero blocking/major findings or all such findings are corrected, and validation/status-delta evidence binds exactly DES-01 through DES-08 without approval overclaim.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-002",
+      "status": "OPEN",
+      "item": "Admin direct-backend path versus FP-040 protected single entry",
+      "owner_roles": [
+        "기술책임자",
+        "보안·개인정보책임자",
+        "Android 관리자 앱 책임자",
+        "게이트웨이 책임자",
+        "백엔드 책임자"
+      ],
+      "target_wave": "W3",
+      "closure_condition": "A protected single-entry implementation or an explicitly approved exception is represented in current code/manifests, with admin session/high-risk-action tests and no operational workflow enablement before the boundary passes.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-003",
+      "status": "OPEN",
+      "item": "FP-035 persistent encrypted queue, chunk/resume, capacity-state and receipt-bound deletion implementation",
+      "owner_roles": [
+        "Android 사용자 앱 책임자",
+        "백엔드 책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "target_wave": "W3",
+      "closure_condition": "Current implementation and manifest evidence covers encrypted persistent retention, byte/capacity bounds, restart-safe chunk/resume, server commit/hash receipt, deletion and movement cancellation without weakening the four effective policy branches.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-004",
+      "status": "OPEN",
+      "item": "279 formal tests and actual-device/user/TalkBack/network/socket/field/PostGIS end-to-end execution",
+      "owner_roles": [
+        "QA책임자",
+        "Android 사용자 앱 책임자",
+        "백엔드 책임자",
+        "기술책임자"
+      ],
+      "target_wave": "W4",
+      "closure_condition": "The fixed source/build/config bundle has reproducible formal results for all 279 catalog entries and the required actual-device, accessibility, live-network/socket, field and PostGIS paths, with failures retained rather than promoted to PASS.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-005",
+      "status": "OPEN",
+      "item": "Repeatable integration hosts, device routing, accounts/fixtures and mock-to-live TMAP evidence",
+      "owner_roles": [
+        "QA책임자",
+        "운영책임자",
+        "백엔드 책임자",
+        "Android 사용자 앱 책임자"
+      ],
+      "target_wave": "W4",
+      "closure_condition": "An isolated integration environment record fixes hosts, device routing, certificates, accounts, fixtures and build identities; mock TMAP precedes controlled live TMAP with key/quota/readiness/error evidence.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-006",
+      "status": "OPEN",
+      "item": "Security/privacy trust-boundary controls and raw-collection independent review preparation",
+      "owner_roles": [
+        "보안·개인정보책임자",
+        "기술책임자",
+        "독립기술검토자"
+      ],
+      "target_wave": "W5",
+      "closure_condition": "Threat/privacy/access-control records cover user, admin, gateway, backend, database, model, TMAP and original-data boundaries; raw-collection notice/consent/rights review inputs are complete while external approval remains separately bounded.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-007",
+      "status": "OPEN",
+      "item": "AI/ML data, model-weight and dataset provenance/rights baseline",
+      "owner_roles": [
+        "AI/ML책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "target_wave": "W6",
+      "closure_condition": "Dataset sources, consent/use rights, preprocessing/splits, experiment linkage, model-weight provenance and distribution constraints are bound to exact artifacts without asserting unreviewed license clearance.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-008",
+      "status": "OPEN",
+      "item": "Promoted model artifact/digest, PT-TFLite equivalence, device performance and safe rollback evidence",
+      "owner_roles": [
+        "AI/ML책임자",
+        "QA책임자",
+        "Android 사용자 앱 책임자",
+        "릴리스책임자"
+      ],
+      "target_wave": "W7",
+      "closure_condition": "The promoted model is versioned and digest-bound, conversion/equivalence and threshold evidence is reproducible, supported-device performance is measured, and rollback or safe-stop behavior is proven.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-009",
+      "status": "OPEN",
+      "item": "Production domains/TLS/reverse proxy/firewall, service packaging, DB/object-store/KMS topology and third-party release inventory",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "릴리스책임자",
+        "기술책임자"
+      ],
+      "target_wave": "W8",
+      "closure_condition": "The release candidate package fixes HTTPS domains, TLS/proxy/firewall, gateway/backend packaging, private DB, encrypted object storage/KMS and dependency/SBOM/notices, with provisioned-test evidence and no production-complete overclaim.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-010",
+      "status": "OPEN",
+      "item": "Backup/restore, data-safe deployment rollback and single-admin recovery drill evidence",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "릴리스책임자",
+        "QA책임자"
+      ],
+      "target_wave": "W8",
+      "closure_condition": "A fixed candidate demonstrates backup completeness, isolated restore, migration/data reconciliation, component rollback boundaries, session revocation/high-risk freeze and the lost-admin-device recovery drill.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ]
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-011",
+      "status": "OPEN",
+      "item": "Operational structured logging, metrics/traces, correlation, alert ownership and retention thresholds",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "target_wave": "W9",
+      "closure_condition": "Operations evidence defines and exercises first-party admin/gateway/backend/device telemetry, correlation, redaction, sampling, dashboards, alerts, retention and handover/closure behavior without raw-data or secret leakage.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ]
+    }
+  ],
+  "gap_registry_summary": {
+    "gap_count": 11,
+    "unique_gap_count": 11,
+    "artifact_disposition_count": 8,
+    "orphan_gap_count": 0,
+    "duplicate_gap_id_count": 0,
+    "empty_owner_roles_count": 0,
+    "empty_closure_condition_count": 0,
+    "empty_expected_evidence_paths_count": 0,
+    "allowed_target_waves": [
+      "W2",
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W8",
+      "W9"
+    ],
+    "target_wave_plan_binding": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json"
+  },
+  "integrity": {
+    "artifact_type_count": 8,
+    "artifact_type_unique_count": 8,
+    "artifact_id_set_sha256": "8c8750d63208d33c01d283db79d889148b67fbffc6e57ec587dd77d1b0bdca73",
+    "source_binding_count": 42,
+    "source_path_sha256_set": "982a4d4c6727f738dbc97b479518348cc00b42d560ce1c92fb0d54e4a5b9a5be",
+    "gap_count": 11,
+    "gap_unique_count": 11,
+    "gap_orphan_count": 0,
+    "gap_duplicate_count": 0,
+    "gap_empty_expected_evidence_count": 0,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, sort_keys=true, separators=(comma,colon), ensure_ascii=false, trailing LF, content_fingerprint.value=null",
+      "value": "7b6ba4c286d54fdc8abaa7fa4ddb87f6453fead47eb479a64e91c895fa463327"
+    }
+  }
+}

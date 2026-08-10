@@ -1,0 +1,150 @@
+{
+  "schema_version": "walksafe.discovery-evidence-register.v1",
+  "metadata": {
+    "title": "WalkSafe 발견 근거 원장",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "DSC-01",
+      "DSC-02",
+      "DSC-03",
+      "DSC-04",
+      "DSC-05",
+      "DSC-06",
+      "DSC-07",
+      "DSC-08",
+      "DSC-09"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "evidence": [
+    {
+      "evidence_id": "DSC-EVD-001",
+      "kind": "APPROVED_POLICY_BASELINE",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be",
+      "adoption_trust": "A",
+      "allowed_use": "문제·사용자·제품범위·기능정책의 직접 입력"
+    },
+    {
+      "evidence_id": "DSC-EVD-002",
+      "kind": "CURRENT_IMPLEMENTATION_CANDIDATE",
+      "paths": [
+        "apps/android",
+        "backend",
+        "model",
+        "voice"
+      ],
+      "adoption_trust": "CANDIDATE",
+      "allowed_use": "PoC 가능성·현재 사실 후보; 목표 정책이나 완료 증거로 단독 사용 금지"
+    },
+    {
+      "evidence_id": "DSC-EVD-003",
+      "kind": "LEGACY_HISTORY",
+      "paths": [
+        "apps/web",
+        "docs/submission"
+      ],
+      "adoption_trust": "HISTORY",
+      "allowed_use": "배경·비교 참고; Android 정식 제품의 완료 근거로 금지"
+    }
+  ],
+  "research_status": {
+    "DSC-03": "DRAFT_PLAN_EXECUTION_NOT_RUN",
+    "DSC-04": "PLANNED_NOT_RUN_NO_RESEARCH_RESULT_CLAIMED",
+    "DSC-05": "DRAFT_POLICY_PROFILE_ONLY_NOT_RESEARCH_PERSONA",
+    "DSC-07": "PLANNED_NOT_RUN",
+    "DSC-09": "CANDIDATE_EVIDENCE_NOT_REVALIDATED_AFTER_POLICY_BASELINE",
+    "participant_count": 0,
+    "interview_count": 0,
+    "usability_session_count": 0
+  },
+  "research_plan": {
+    "owner": "김민호",
+    "reviewers_required_before_execution": [
+      "접근성·안전책임자",
+      "보안·개인정보책임자"
+    ],
+    "participant_plan": {
+      "total_target": 6,
+      "blind_minimum": 3,
+      "low_vision_minimum": 3,
+      "smartphone_novice_representation_required": true,
+      "planning_value_not_actual_count": true
+    },
+    "phase_1": "실내·폐쇄 통제공간에서 안내문 이해, 화면읽기, 음성명령, 오류·정지, 장착과 동의 이해를 관찰",
+    "phase_2": "WS-21 안전계획과 관련 gate 승인 뒤 안전요원 동행 통제 보도 시험",
+    "schedule": "문서·시험계획 승인과 참여자 동의 확보 뒤; 확정 날짜 없음",
+    "analysis": [
+      "과업 성공률",
+      "도움 요청·오류·안전정지 빈도",
+      "안내 이해도",
+      "주제별 정성 코딩",
+      "전맹·저시력 결과 분리"
+    ],
+    "execution_status": "NOT_RUN"
+  },
+  "hypotheses": [
+    {
+      "hypothesis_id": "HYP-001",
+      "type": "USABILITY",
+      "statement": "전맹·저시력 사용자가 화면을 계속 보지 않고 핵심 흐름을 수행할 수 있다.",
+      "risk": "필수 흐름 접근 불가",
+      "sample": "계획 6명, 전맹·저시력 각 최소 3명",
+      "pass_fail_rule": "TST-15 사전 승인 protocol에서 확정",
+      "owner": "김민호",
+      "due_condition": "대상 사용자 시험 전",
+      "result": "NOT_RUN"
+    },
+    {
+      "hypothesis_id": "HYP-002",
+      "type": "SAFETY",
+      "statement": "가슴·목걸이형 장착과 위험안내가 통제된 보행에서 위험한 행동을 유발하지 않는다.",
+      "risk": "오안내·지연으로 인한 위해",
+      "sample": "지원기기·체형·환경 조합",
+      "pass_fail_rule": "WS-07·08·21 사전 승인 protocol에서 확정",
+      "owner": "김민호",
+      "due_condition": "현장시험 전",
+      "result": "NOT_RUN"
+    },
+    {
+      "hypothesis_id": "HYP-003",
+      "type": "OPERATIONS",
+      "statement": "한 명의 관리자가 평일 09~18 범위에서 신고·장애·복구를 통제할 수 있다.",
+      "risk": "관리자 부재·계정분실 때 고위험 작업 불가",
+      "sample": "복구훈련 1회와 운영 시나리오",
+      "pass_fail_rule": "GATE-SINGLE-ADMIN-RECOVERY-DRILL 완료",
+      "owner": "김민호",
+      "due_condition": "실제 사용자시험 또는 배포 전",
+      "result": "NOT_RUN"
+    }
+  ],
+  "competitor_research": {
+    "status": "NOT_RUN",
+    "comparison_dimensions": [
+      "대상 사용자",
+      "안전 고지",
+      "오프라인",
+      "접근성",
+      "개인정보",
+      "가격"
+    ],
+    "result_count": 0
+  },
+  "poc": {
+    "status": "NOT_REVALIDATED_AFTER_POLICY_BASELINE",
+    "candidate_paths": [
+      "apps/android",
+      "backend",
+      "model",
+      "voice"
+    ],
+    "completion_claimed": false
+  }
+}

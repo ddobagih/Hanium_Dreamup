@@ -1,0 +1,40 @@
+{
+  "schema_version": "walksafe.release-evidence-template.v1",
+  "metadata": {
+    "title": "릴리스 증거 instance 템플릿",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "template_only": true,
+  "is_live_evidence": false,
+  "target_artifact_type_ids": [
+    "REL-03",
+    "REL-04",
+    "REL-05",
+    "REL-06",
+    "REL-07",
+    "REL-08",
+    "REL-09"
+  ],
+  "activation": "명명된 release 후보와 실제 artifact가 생성된 뒤 새 파일로 복사해 사용",
+  "release_id": null,
+  "version_description": null,
+  "source_commit": null,
+  "source_tag": null,
+  "artifacts": [],
+  "signatures": [],
+  "sbom": null,
+  "provenance": null,
+  "release_notes": null,
+  "execution_status": "NOT_RUN",
+  "approval_status": "NOT_APPROVED",
+  "evidence_ids": [],
+  "storage_rule": "민감·서명 원본은 Git 밖 통제 저장소에 두고 ID·SHA-256·권한·보존기간만 연결"
+}

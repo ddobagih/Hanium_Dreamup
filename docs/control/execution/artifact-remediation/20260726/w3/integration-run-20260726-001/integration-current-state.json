@@ -1,0 +1,386 @@
+{
+  "artifact_dispositions": [
+    {
+      "artifact_type_id": "DLV-DEV-21",
+      "disposition": "PARTIAL_INTERNAL_INTEGRATION_PASS",
+      "prior_classification": "INTERNAL_GAP",
+      "reason": "Gateway and both Android unit commands passed and internal OpenAPI/PostGIS evidence is bound, but backend current-subject reuse was prohibited and cross-process, actual-device, TMAP and production integration remain NOT_RUN.",
+      "recommended_classification": "INTERNAL_GAP"
+    }
+  ],
+  "artifact_type_id": "DLV-DEV-21",
+  "baseline_requirement": {
+    "boundary": "NO_EXTERNAL_GATE_RECORDED",
+    "prior_classification": "INTERNAL_GAP",
+    "reason": "Android·backend·model·외부 서비스의 승인 형상 통합 실행은 0건이다.",
+    "required_action": "동일 release generation에서 contract·DB·실기기 통합을 실행하고 결함·판정을 기록한다."
+  },
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "cross_process_network_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "command_evidence": [
+    {
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "command_id": "gateway-npm-test",
+      "cwd": "apps/android-gateway",
+      "end": "2026-07-26T16:20:43.244388553Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.log",
+      "log_sha256": "00bb601dc150b5004e1792d160237cbdd1f2c9dafdbf9558e15d9faea8bd0ab2",
+      "node_test_counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 62,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 62,
+        "todo": 0
+      },
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json",
+      "receipt_sha256": "79cae4f38d8ccd990aa99b1f15a0a80ca40838e868d9e41cc5e2e02b2901ab6d",
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 264668,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:20:41.21038874Z",
+      "status": "PASS",
+      "tool": {
+        "node": "v22.22.1",
+        "npm": "9.2.0"
+      }
+    },
+    {
+      "argv": [
+        "./gradlew",
+        ":app:testDebugUnitTest",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=1"
+      ],
+      "command_id": "android-user-unit",
+      "cwd": "apps/android",
+      "end": "2026-07-26T16:21:26.407476613Z",
+      "exit_code": 0,
+      "junit_counts": {
+        "errors": 0,
+        "failures": 0,
+        "passed": 728,
+        "skipped": 0,
+        "tests": 728,
+        "xml_files": 95
+      },
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-user-unit.log",
+      "log_sha256": "c64f2cbb73ac74ed60dc528fa02fd1d2cf3e7da5938f34e8d0c83924a18231e6",
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-user-unit.json",
+      "receipt_sha256": "e4d0a386bdfc7863045f4b73b0c6175a1dfd183bcad16c33006f286845da5420",
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 638184,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:21:13.670833432Z",
+      "status": "PASS",
+      "tool": {
+        "gradle_wrapper": "./gradlew",
+        "java": "openjdk version \"21.0.11\" 2026-04-21"
+      }
+    },
+    {
+      "argv": [
+        "./gradlew",
+        ":adminapp:testDebugUnitTest",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=1"
+      ],
+      "command_id": "android-admin-unit",
+      "cwd": "apps/android",
+      "end": "2026-07-26T16:21:49.982046190Z",
+      "exit_code": 0,
+      "junit_counts": {
+        "errors": 0,
+        "failures": 0,
+        "passed": 38,
+        "skipped": 0,
+        "tests": 38,
+        "xml_files": 6
+      },
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/android-admin-unit.log",
+      "log_sha256": "b03bf76161733ca1d998fdd8583a4219591d5ddd78006173173863cd8327396e",
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-admin-unit.json",
+      "receipt_sha256": "695de382418e5f9f25d55e29d9a0dd9e52c4d1f18d43c9dd44970654997e910b",
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 620664,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:21:45.817963032Z",
+      "status": "PASS",
+      "tool": {
+        "gradle_wrapper": "./gradlew",
+        "java": "openjdk version \"21.0.11\" 2026-04-21"
+      }
+    }
+  ],
+  "coverage_matrix": [
+    {
+      "actual_device": "NOT_RUN",
+      "component_id": "ANDROID_USER_APP",
+      "cross_process_network": "NOT_RUN",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-user-unit.json"
+      ],
+      "internal_result": "PASS_INTERNAL_UNIT_COMMAND",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "component_scope": "user",
+        "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+        "current_mismatch_count": 0,
+        "module_id": "app",
+        "path_count": 208,
+        "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782"
+      },
+      "tmap": "NOT_RUN"
+    },
+    {
+      "actual_device": "NOT_RUN",
+      "component_id": "ANDROID_ADMIN_APP",
+      "cross_process_network": "NOT_RUN",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/android-admin-unit.json"
+      ],
+      "internal_result": "PASS_INTERNAL_UNIT_COMMAND",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "component_scope": "admin",
+        "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+        "current_mismatch_count": 0,
+        "module_id": "adminapp",
+        "path_count": 25,
+        "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f"
+      },
+      "tmap": "NOT_APPLICABLE_DIRECT"
+    },
+    {
+      "actual_device": "NOT_RUN",
+      "component_id": "ANDROID_GATEWAY",
+      "cross_process_network": "NOT_RUN",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json"
+      ],
+      "internal_result": "PASS_INTERNAL_NODE_TEST",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "component_scope": "gateway",
+        "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+        "current_mismatch_count": 0,
+        "module_id": "android-gateway",
+        "path_count": 26,
+        "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3"
+      },
+      "tmap": "NOT_RUN"
+    },
+    {
+      "actual_device": "NOT_APPLICABLE_DIRECT",
+      "component_id": "BACKEND",
+      "cross_process_network": "NOT_RUN",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json#/reuse_records/2"
+      ],
+      "internal_result": "NOT_RUN_REUSE_PROHIBITED",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "component_scope": "backend",
+        "content_set_sha256": "7b0ade319b3ec511e7813f018d88e7636f60ee51f69ac7fb721294bc4f62e492",
+        "current_mismatch_count": 0,
+        "current_payload_equal_to_evidence002": true,
+        "module_id": "backend",
+        "path_count": 79,
+        "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+        "subject_content_fingerprint": "110a8cf97c5cb0af4b2b8cbeb059eba37c4bf321535642d38333990a84bef3ac"
+      },
+      "tmap": "NOT_RUN"
+    },
+    {
+      "actual_device": "NOT_APPLICABLE",
+      "component_id": "POSTGRES_POSTGIS",
+      "cross_process_network": "NOT_RUN_WITH_APPLICATION",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json#/reuse_records/1"
+      ],
+      "internal_result": "PASS_INTERNAL_EPHEMERAL_MIGRATION_ROUNDTRIP_REUSED",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "aux_run": "aux-execution-20260726-003"
+      },
+      "tmap": "NOT_APPLICABLE"
+    },
+    {
+      "actual_device": "NOT_APPLICABLE",
+      "component_id": "OPENAPI_CONTRACT",
+      "cross_process_network": "NOT_RUN",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json#/reuse_records/0"
+      ],
+      "internal_result": "PASS_INTERNAL_DETERMINISTIC_BYTE_IDENTICAL_REUSED",
+      "production": "NOT_RUN",
+      "source_binding": {
+        "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b"
+      },
+      "tmap": "NOT_APPLICABLE"
+    }
+  ],
+  "document_id": "WALKSAFE-W3-DEV21-INTEGRATION-CURRENT-STATE-20260726-001",
+  "execution_run": {
+    "execution_mode": "SERIAL_SINGLE_HEAVY_PROCESS",
+    "internal_result": "PARTIAL_INTERNAL_INTEGRATION_PASS",
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001",
+    "required_command_count": 3,
+    "required_command_fail_count": 0,
+    "required_command_pass_count": 3,
+    "run_id": "integration-run-20260726-001"
+  },
+  "integrity": {
+    "artifact_disposition_count": 1,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "86d04223d915fe2323aec8743863e8cc61c8e9402c225ff094d969576a2e0ebf"
+    },
+    "coverage_component_count": 6,
+    "coverage_component_id_set": [
+      "ANDROID_USER_APP",
+      "ANDROID_ADMIN_APP",
+      "ANDROID_GATEWAY",
+      "BACKEND",
+      "POSTGRES_POSTGIS",
+      "OPENAPI_CONTRACT"
+    ],
+    "open_gap_count": 4,
+    "open_gap_id_set": [
+      "W3-DEV21-GAP-001",
+      "W3-DEV21-GAP-002",
+      "W3-DEV21-GAP-003",
+      "W3-DEV21-GAP-004"
+    ],
+    "required_command_receipt_count": 3
+  },
+  "open_gaps": [
+    {
+      "closure_condition": "Run the backend internal suite on the exact evidence002 backend subject (or create an explicit identical subject bridge) and record command/log/result hashes with zero failures.",
+      "gap_id": "W3-DEV21-GAP-001",
+      "owner": "Backend owner",
+      "required_evidence": [
+        "current backend subject path/content SHA",
+        "fresh backend command receipt",
+        "raw log SHA",
+        "test counts"
+      ],
+      "scope": "Fresh backend internal verification against a directly bound evidence002 backend subject.",
+      "status": "OPEN",
+      "target_wave": "W4"
+    },
+    {
+      "closure_condition": "Execute gateway-to-backend-to-ephemeral-PostGIS requests in one bound release generation and produce zero unexplained contract/database mismatches.",
+      "gap_id": "W3-DEV21-GAP-002",
+      "owner": "Integration test owner",
+      "required_evidence": [
+        "process startup receipts",
+        "request/response contract trace",
+        "database state assertions",
+        "defect and retest record"
+      ],
+      "scope": "Cross-process Android gateway, backend and PostGIS integration under the canonical contract.",
+      "status": "OPEN",
+      "target_wave": "W4"
+    },
+    {
+      "closure_condition": "Execute approved-device user/admin scenarios including real network and TMAP behavior; bind device/build/config/log identities and defect dispositions.",
+      "gap_id": "W3-DEV21-GAP-003",
+      "owner": "Android device and field-test owner",
+      "required_evidence": [
+        "device/build identifiers",
+        "TMAP and network receipts",
+        "actual-device test results",
+        "defect and retest record"
+      ],
+      "scope": "Actual user/admin devices, network transitions and TMAP integration.",
+      "status": "OPEN",
+      "target_wave": "W4"
+    },
+    {
+      "closure_condition": "Bind signing assessment, deployment/rollback rehearsal and release-generation identities without waiving the five gates.",
+      "gap_id": "W3-DEV21-GAP-004",
+      "owner": "Release and operations owner",
+      "required_evidence": [
+        "signing assessment",
+        "deployment receipt",
+        "rollback receipt",
+        "release-generation manifest",
+        "gate dispositions"
+      ],
+      "scope": "Production-shape deployment, signing and rollback package.",
+      "status": "OPEN",
+      "target_wave": "W8"
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "schema_version": "walksafe.w3-dev21-integration-current-state.v1",
+  "source_commit": null,
+  "source_subject_bindings": {
+    "evidence002_source_content_set_sha256": "976ba4d9cec00fdc56891f06e8927c34d9686cbb460dc9b88f5ac678afba3bcf",
+    "module_bindings": {
+      "admin_android": {
+        "component_scope": "admin",
+        "content_set_sha256": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+        "current_mismatch_count": 0,
+        "module_id": "adminapp",
+        "path_count": 25,
+        "path_set_sha256": "26e0d5ea240d96dd39cb2dea33bdc13371490e0a5666740bd48464bdad4bdf2f"
+      },
+      "backend": {
+        "component_scope": "backend",
+        "content_set_sha256": "7b0ade319b3ec511e7813f018d88e7636f60ee51f69ac7fb721294bc4f62e492",
+        "current_mismatch_count": 0,
+        "current_payload_equal_to_evidence002": true,
+        "module_id": "backend",
+        "path_count": 79,
+        "path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+        "subject_content_fingerprint": "110a8cf97c5cb0af4b2b8cbeb059eba37c4bf321535642d38333990a84bef3ac"
+      },
+      "gateway": {
+        "component_scope": "gateway",
+        "content_set_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+        "current_mismatch_count": 0,
+        "module_id": "android-gateway",
+        "path_count": 26,
+        "path_set_sha256": "43beab4c4f6a737511e65afc3195a49807197fa0a5d1272c3d64e6719503e8b3"
+      },
+      "user_android": {
+        "component_scope": "user",
+        "content_set_sha256": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585",
+        "current_mismatch_count": 0,
+        "module_id": "app",
+        "path_count": 208,
+        "path_set_sha256": "ccdbe23bdcb7323b803a73073d2dd5718572f7e8ac1457b3f3e3a8521558f782"
+      }
+    },
+    "reuse_receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json",
+    "reuse_receipt_sha256": "1b49bcb2b682efb3f716c053fdded26cafdb69fdadd7a91d8e3abbe5423b8c53"
+  },
+  "wave_id": "W3",
+  "wave_snapshot_date": "2026-07-26",
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS"
+}

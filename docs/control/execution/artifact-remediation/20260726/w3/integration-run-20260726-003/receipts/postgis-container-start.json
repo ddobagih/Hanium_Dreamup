@@ -1,0 +1,52 @@
+{
+  "argv": [
+    "docker",
+    "run",
+    "--detach",
+    "--pull=never",
+    "--name",
+    "walksafe-w3-dev21-003-1785084422817139005",
+    "--env-file",
+    "<REDACTED_TEMP_SECRET_FILE>",
+    "--tmpfs",
+    "/var/lib/postgresql/data:rw,noexec,nosuid,size=512m",
+    "--publish",
+    "127.0.0.1::5432",
+    "postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4"
+  ],
+  "command_id": "postgis-container-start",
+  "cwd": ".",
+  "end": "2026-07-26T16:47:02.932798513Z",
+  "environment_constraints": {
+    "database_name": "walksafe_dev21_test_003",
+    "loopback_port": 32771,
+    "secret_redacted": true,
+    "single_use_database": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "8b33162077c3b8fdaf45dff2097e19a108a97dc255d0b5eb058a1fb9be1af7fa"
+    }
+  },
+  "log_path": "logs/postgis-container-start.log",
+  "log_sha256": "0b21bb7586b8ebe9a3df070544be587d044a646d023a169b378ceb7cdca762c0",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 28880,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-dev21-command-receipt.v3",
+  "start": "2026-07-26T16:47:02.850448411Z",
+  "status": "PASS",
+  "subject_binding": {
+    "content_fingerprint": "e608f182d179c8d59c2d012ad847a3c8251175cbabcb3fbc8c9462512cdd4720",
+    "content_set_sha256": "de4853de5fde719b9ca3fbf8cc66a79279b384a98638cba1e7fae6791c8b0de2"
+  },
+  "time_log_path": "logs/postgis-container-start.time",
+  "time_log_sha256": "fada997b586c98a04c5f3f06c5fd94ed34b65be7da425f4b9523e7235ba857c3",
+  "tool": {
+    "runtime": "docker"
+  }
+}

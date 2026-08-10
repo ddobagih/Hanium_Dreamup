@@ -1,0 +1,73 @@
+# DRAFT_DEPLOYMENT_EXAMPLE — NOT_APPLIED.
+# Do not install, enable, or start without a separately reviewed deployment.
+# Prerequisites: locked Node v22.23.1 at /usr/bin/node, a built
+# apps/android-gateway/dist,
+# dedicated non-login walksafe-android-gateway user/group, and a root-owned
+# /etc/walksafe/android-gateway.env with mode 0600 plus a root-owned,
+# service-group-readable state keyring with mode 0640.
+
+[Unit]
+Description=WalkSafe Android API Gateway (draft, single process)
+Requires=walksafe-backend.service
+After=network-online.target walksafe-backend.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=walksafe-android-gateway
+Group=walksafe-android-gateway
+WorkingDirectory=/srv/walksafe/apps/android-gateway
+EnvironmentFile=/etc/walksafe/android-gateway.env
+RuntimeDirectory=walksafe-android-gateway
+RuntimeDirectoryMode=0700
+StateDirectory=walksafe/android-gateway
+StateDirectoryMode=0700
+UMask=0077
+
+# The package `start` script has the same `node dist/server.js` contract. The
+# unit invokes Node directly to avoid an npm supervisor process. Do not wrap it
+# in cluster, pm2, or a multi-worker runner; login admission and file-backed
+# rate-limit state require one process.
+ExecStart=/usr/bin/node /srv/walksafe/apps/android-gateway/dist/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=30s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+KillMode=mixed
+
+LimitCORE=0
+LimitNOFILE=4096
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# The Gateway may communicate only over loopback: nginx -> 127.0.0.1:8081 and
+# Gateway -> protected backend 127.0.0.1:8000. The backend must not be public.
+IPAddressDeny=any
+IPAddressAllow=localhost
+ReadOnlyPaths=/etc/walksafe/android-gateway-state-keyring.json
+ReadWritePaths=/var/lib/walksafe/android-gateway /run/walksafe-android-gateway
+
+[Install]
+WantedBy=multi-user.target

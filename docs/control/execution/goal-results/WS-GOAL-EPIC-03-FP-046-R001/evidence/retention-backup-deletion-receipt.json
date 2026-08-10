@@ -1,0 +1,81 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_personal_data_deletion_status": "NOT_RUN",
+    "actual_rights_request_status": "NOT_RUN",
+    "actual_user_or_guardian_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_processor_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_backup_restore_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-046-01",
+      "TC-FP-046-02",
+      "TC-FP-046-03",
+      "TC-FP-046-04",
+      "TC-FP-046-05"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP046_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "credit_scope": "INTERNAL_ONLY",
+  "document_id": "WS-FP046-RETENTION_BACKUP_DELETION-RECEIPT-20260810-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+  "implementation_content_set_sha256": "534b7a1badec395c3653181658b2a21e381121cc12787e8d23a97c282ac8d76f",
+  "lane_id": "RETENTION_BACKUP_DELETION",
+  "observation": {
+    "command": ".venv/bin/python -m pytest -p no:cacheprovider -q tests/test_report_retention_operational_safety.py tests/test_report_retention_encrypted_objects.py tests/test_walksafe_backup_integrity.py",
+    "ended_at": "2026-08-10T06:54:21+09:00",
+    "evidence_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "credit_scope": "INTERNAL_ONLY",
+      "deployment_status": "NOT_RUN",
+      "evidence_kind": "REPOSITORY_INTERNAL_AUTOMATED_CHECK",
+      "external_status": "NOT_RUN",
+      "formal_test_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "exit_code": 0,
+    "lane_id": "RETENTION_BACKUP_DELETION",
+    "metrics": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 92,
+      "result_format": "INTERNAL_TEST_SUMMARY_V1",
+      "skipped": 0
+    },
+    "raw_output_byte_length": 421,
+    "raw_output_sha256": "d180f97a6cdc87306f7b320556802ee9f81529c78ab8070c3c370ef744771c85",
+    "schema_version": "walksafe.fp046-internal-lane-observation.v1",
+    "started_at": "2026-08-10T06:54:15+09:00",
+    "status": "PASS"
+  },
+  "raw_output_binding": {
+    "byte_length": 421,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/logs/retention-backup-deletion.log",
+    "sha256": "d180f97a6cdc87306f7b320556802ee9f81529c78ab8070c3c370ef744771c85"
+  },
+  "receipt_content_sha256": "4e7171a998bd41a1e90d201af6301517d33daeb3c00f954e3b7286cdc27dde0e",
+  "schema_version": "walksafe.fp046-internal-lane-receipt.v1",
+  "start_gate_binding": {
+    "byte_length": 11321,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005",
+    "event_sequence": 53,
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005/implementation-start-gate-receipt.json",
+    "repository_state_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005/09-REPOSITORY_STATE.log",
+    "repository_state_sha256": "f46e42faf5e824322036713759954bb38277cdf9a3f66752e79459164f6e9087",
+    "role": "FP046_EXACT9_START_GATE",
+    "sha256": "ec17d2ad7f9a1216a9f0174588fe39e3411e9a9757c2dce6b3db48915978801e"
+  },
+  "status": "PASS",
+  "title": "Retention, backup and deletion-tombstone boundary"
+}

@@ -1,0 +1,78 @@
+{
+  "auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-005",
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "common_subject_fingerprint": {
+    "algorithm": "SHA-256",
+    "basis": "canonical aux005 current evidence + reuse + executed logs",
+    "value": "00781d4b26ca8d8b854d61af5d6684780e193e3d54c20d9c57a53ad19c7360d3"
+  },
+  "inputs": {
+    "cyclonedx_document": {
+      "bytes": 815731,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+    },
+    "cyclonedx_jsf_schema": {
+      "bytes": 8058,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-jsf-0.82.schema.json",
+      "sha256": "8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae"
+    },
+    "cyclonedx_schema": {
+      "bytes": 252625,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-1.6.schema.json",
+      "sha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93"
+    },
+    "spdx_document": {
+      "bytes": 907864,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+      "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e"
+    },
+    "spdx_schema": {
+      "bytes": 45312,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/spdx-2.3.schema.json",
+      "sha256": "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
+    }
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "b6daea5a1b3384a87a5267d4585244ac490cb4f60aeea2ad00b0a0aba4fb40a9"
+    }
+  },
+  "registry": {
+    "local_schema_count": 3,
+    "network_used": false
+  },
+  "schema_version": "walksafe.w3-aux-sbom-validation.v3",
+  "summary": {
+    "all_passed": true,
+    "cyclonedx_status": "PASS",
+    "spdx_status": "PASS"
+  },
+  "validations": {
+    "CycloneDX-1.6": {
+      "error_count": 0,
+      "errors": [],
+      "status": "PASS"
+    },
+    "SPDX-2.3": {
+      "error_count": 0,
+      "errors": [],
+      "status": "PASS"
+    }
+  },
+  "validator": {
+    "distribution": "jsonschema",
+    "runtime": "uv run --no-project --offline --with jsonschema==4.25.1",
+    "version": "4.25.1"
+  }
+}

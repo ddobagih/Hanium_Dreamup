@@ -1,0 +1,407 @@
+{
+  "schema_version": "walksafe.artifact-remediation-implementation-receipt.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W1-IMPLEMENTATION-RECEIPT-20260726-001",
+  "prepared_on": "2026-07-26",
+  "status": "COMPLETED_INTERNAL_REMEDIATION_ONLY",
+  "result": "PASS",
+  "document_family": {
+    "paths": {
+      "artifact_status_delta": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "validation_summary": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "implementation_receipt": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json"
+    },
+    "binding_dag": {
+      "order": [
+        "artifact_status_delta",
+        "validation_summary",
+        "implementation_receipt"
+      ],
+      "hash_edges": [
+        "validation_summary -> artifact_status_delta",
+        "implementation_receipt -> artifact_status_delta",
+        "implementation_receipt -> validation_summary"
+      ],
+      "forward_references": "PATH_ONLY",
+      "cycle_status": "ACYCLIC"
+    },
+    "role": "TERMINAL_BINDS_DELTA_AND_VALIDATION"
+  },
+  "completion_scope": {
+    "wave_id": "W1",
+    "title": "관리·요구사항·의사결정 기준선 정합화",
+    "artifact_count": 18,
+    "exact_artifact_ids": [
+      "DLV-DOC-01",
+      "DLV-DOC-05",
+      "DLV-DSC-03",
+      "DLV-DSC-07",
+      "DLV-DSC-09",
+      "DLV-DSC-14",
+      "DLV-MGT-06",
+      "DLV-MGT-07",
+      "DLV-MGT-14",
+      "DLV-MGT-15",
+      "DLV-MGT-16",
+      "DLV-MGT-17",
+      "DLV-REQ-03",
+      "DLV-REQ-06",
+      "DLV-REQ-16",
+      "DLV-REQ-17",
+      "DLV-REQ-18",
+      "DLV-REQ-19"
+    ],
+    "internal_remediation_completed": true,
+    "formal_product_release_completion_claimed": false
+  },
+  "source_bindings": [
+    {
+      "role": "FP035_ANDROID_JUNIT_XML",
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.debuglog.HttpMetadataLogUploaderTest.xml",
+      "sha256": "598a385aaa90102d45e2cad83e9dd73d9e45ca71c27093fd741de33e9e178512",
+      "byte_count": 1225,
+      "allowed_claim": "Executed targeted internal Android JUnit suite result.",
+      "prohibited_claim": "Formal, device, network, socket, field or release PASS."
+    },
+    {
+      "role": "FP035_ANDROID_JUNIT_XML",
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicyTest.xml",
+      "sha256": "99536a7a7037559184cee253795aa9552bd21fca2bb82f4570a384bbc991b525",
+      "byte_count": 3293,
+      "allowed_claim": "Executed targeted internal Android JUnit suite result.",
+      "prohibited_claim": "Formal, device, network, socket, field or release PASS."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpFrameCaptureUploader.kt",
+      "sha256": "acab6de2a6f30be1ed35783eec811b3bf0adf02063f238738b2b30a9aa4caddb",
+      "byte_count": 5056,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploader.kt",
+      "sha256": "7bf041afd2a6b19686c948f467c7d04dcd1aa828559b089462d87421094fb84f",
+      "byte_count": 6839,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43",
+      "byte_count": 708148,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/debuglog/FrameCaptureUploader.kt",
+      "sha256": "84023098b0d5401f97ae634c712124a912b8cedec7672e89c26fb89cc863575f",
+      "byte_count": 399,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/debuglog/MetadataLogUploader.kt",
+      "sha256": "00e724c9a66f1e7b5b9d741b70831b38e430ceb80a65f7c29cc0631dfc45cc39",
+      "byte_count": 707,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "sha256": "489b16b47928ddc4a67d29c4526ecd6afae179ba7a9884e748e25481f0b905f9",
+      "byte_count": 4176,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+      "byte_count": 12485,
+      "allowed_claim": "Current FP-035 internal implementation source bytes.",
+      "prohibited_claim": "Whole-product, production or release conformance."
+    },
+    {
+      "role": "FP035_ANDROID_TEST_SOURCE",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploaderTest.kt",
+      "sha256": "3e2981c8195a4fd0e76c512ba1dd745f4b8378e5864c9e26c03ab3910c1be118",
+      "byte_count": 7987,
+      "allowed_claim": "Targeted FP-035 Android test source.",
+      "prohibited_claim": "PASS without executed result XML."
+    },
+    {
+      "role": "FP035_ANDROID_TEST_SOURCE",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6",
+      "byte_count": 16734,
+      "allowed_claim": "Targeted FP-035 Android test source.",
+      "prohibited_claim": "PASS without executed result XML."
+    },
+    {
+      "role": "CONTROL_README",
+      "path": "docs/control/decision-interview/README.md",
+      "sha256": "1c06ab337a8e1a9d21324bab9ae926757c4f5df750379ebcc907e193d8127317",
+      "byte_count": 21848,
+      "allowed_claim": "Current operator guidance and compact-successor pointer.",
+      "prohibited_claim": "Policy reapproval or implementation completion."
+    },
+    {
+      "role": "COMPACT_DECISION_SUCCESSOR",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "byte_count": 10001,
+      "allowed_claim": "Policy 1.0.1 composite authority with 135 effective decisions and 428 edges.",
+      "prohibited_claim": "Separate reapproval, implementation conformance or release eligibility."
+    },
+    {
+      "role": "AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+      "byte_count": 229471,
+      "allowed_claim": "Immutable 257-type factual audit and 59/123/39/36 counts.",
+      "prohibited_claim": "Retroactive mutation, approval or execution completion."
+    },
+    {
+      "role": "WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "byte_count": 56499,
+      "allowed_claim": "W1 exact 18-type scope, dependencies and acceptance boundary.",
+      "prohibited_claim": "That planned waves are executed or approved."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/dsc-current-state.json",
+      "sha256": "776cceea0d5505c83b915ea7848f252a314ebc03ba9798f7191bf60012a5c39a",
+      "byte_count": 32926,
+      "allowed_claim": "Final add-only W1 current-state structured evidence.",
+      "prohibited_claim": "Mutation of predecessor canonical artifacts or formal completion."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/dsc-current-state.md",
+      "sha256": "b844e22407b078517c5a3dc9eed0f2caecf40492743c38bd2a4df2e73f52f134",
+      "byte_count": 9180,
+      "allowed_claim": "Human-readable rendering of the paired final current-state record.",
+      "prohibited_claim": "Authority beyond its paired JSON and bound sources."
+    },
+    {
+      "role": "FINAL_INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/independent-review.md",
+      "sha256": "a066e09283c710642efa48e21ee425ec36647e8c112baf3bb6d7fd18a987148d",
+      "byte_count": 11486,
+      "allowed_claim": "Final W1 artifact review APPROVED with artifact and technical findings 0/0/0.",
+      "prohibited_claim": "Formal artifact approval, formal test PASS or release authorization."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/mgt-current-state.json",
+      "sha256": "fc2fa5610353f45cc78ee83428f0dc5f3cb2368eb309616133925033e99f41e0",
+      "byte_count": 36697,
+      "allowed_claim": "Final add-only W1 current-state structured evidence.",
+      "prohibited_claim": "Mutation of predecessor canonical artifacts or formal completion."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/mgt-current-state.md",
+      "sha256": "0777dc2d70099fcd9045b32ff0c780d9a4f4ec232b837d1ea1b108d83decee65",
+      "byte_count": 8949,
+      "allowed_claim": "Human-readable rendering of the paired final current-state record.",
+      "prohibited_claim": "Authority beyond its paired JSON and bound sources."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+      "sha256": "615f35910cb1fffab6284aee456e562e6d21e75671f225bd9f06868ad0785dce",
+      "byte_count": 588435,
+      "allowed_claim": "Final add-only W1 current-state structured evidence.",
+      "prohibited_claim": "Mutation of predecessor canonical artifacts or formal completion."
+    },
+    {
+      "role": "FINAL_DOMAIN_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.md",
+      "sha256": "a5af580c5e2761b68eb892a255c0be156d2e0da8e01ef78430d84a00b27079a7",
+      "byte_count": 13254,
+      "allowed_claim": "Human-readable rendering of the paired final current-state record.",
+      "prohibited_claim": "Authority beyond its paired JSON and bound sources."
+    },
+    {
+      "role": "CONTROL_VALIDATOR",
+      "path": "scripts/validate_walksafe_formal_deliverables_0_6.py",
+      "sha256": "114c98e6f02e5ec867092cbf5cf691fd230b26cf1a67a1c37c6c05caf6027957",
+      "byte_count": 81298,
+      "allowed_claim": "Control invariant implementation used by the executed nine-test suite.",
+      "prohibited_claim": "PASS without the bound execution result."
+    },
+    {
+      "role": "CONTROL_VALIDATOR_TEST",
+      "path": "tests/test_walksafe_formal_deliverables_0_6.py",
+      "sha256": "5517f5a21b3754f265b0b792031efae8ffb74c941717e8a974272b5ef14c6960",
+      "byte_count": 10401,
+      "allowed_claim": "Nine control test definitions bound to this integration.",
+      "prohibited_claim": "Formal/product/release test completion."
+    }
+  ],
+  "backward_bindings": [
+    {
+      "role": "ARTIFACT_STATUS_DELTA",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "file_sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+      "content_fingerprint_sha256": "862819c00530f5f154624f37ce81559195911a6ebbc1a6047b27c2e425ae6c3d"
+    },
+    {
+      "role": "VALIDATION_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "file_sha256": "755e341c712e755540f95f97f3936cca8da2cc5bccf220a292e593358f02a1f8",
+      "content_fingerprint_sha256": "5d83a046283c9e6a477bd53dfab68680a8198f2a6117faa49c7e7f37c82db423"
+    }
+  ],
+  "classification_projection": {
+    "baseline": {
+      "OK": 59,
+      "INTERNAL_GAP": 123,
+      "EXTERNAL": 39,
+      "N/A_CANDIDATE": 36
+    },
+    "delta": {
+      "OK": 16,
+      "INTERNAL_GAP": -18,
+      "EXTERNAL": 2,
+      "N/A_CANDIDATE": 0
+    },
+    "post_w1": {
+      "OK": 75,
+      "INTERNAL_GAP": 105,
+      "EXTERNAL": 41,
+      "N/A_CANDIDATE": 36
+    },
+    "total": 257
+  },
+  "approval_and_baseline_boundary": {
+    "status": "UNCHANGED",
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "new_formal_approval_claimed": false,
+    "new_artifact_content_baseline_claimed": false
+  },
+  "source_snapshot": {
+    "source_commit": null,
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "dirty_worktree": true,
+    "whole_repository_frozen": false,
+    "commit_attribution_claimed": false
+  },
+  "policy_and_decision_authority": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "policy_version": "1.0.1",
+    "policy_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT",
+    "effective_decision_count": 135,
+    "effective_unique_decision_count": 135,
+    "effective_decision_feature_edge_count": 428
+  },
+  "verification_results": {
+    "control_validator": {
+      "status": "PASS",
+      "test_count": 9,
+      "scope": "CONTROL_INVARIANTS_ONLY"
+    },
+    "fp035_android_internal": {
+      "status": "PASS_INTERNAL_TARGETED_UNIT_ONLY",
+      "test_count": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "technical_review": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0,
+      "status": "APPROVED_INTERNAL_SCOPE"
+    },
+    "artifact_review": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0,
+      "status": "APPROVED_TO_MATERIALIZE_W1_DELTA"
+    },
+    "formal_tests": {
+      "count": 279,
+      "status": "NOT_RUN",
+      "pass_claimed": false
+    }
+  },
+  "remaining_gates": {
+    "count": 5,
+    "waived_count": 0,
+    "all_unwaived": true,
+    "items": [
+      {
+        "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-CLOUD-COST-MEASUREMENT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ]
+  },
+  "release": {
+    "status": "NOT_ELIGIBLE",
+    "deployment_completion_claimed": false
+  },
+  "external_boundaries": {
+    "artifact_ids": [
+      "DLV-DSC-07",
+      "DLV-DSC-09"
+    ],
+    "count": 2,
+    "status": "OPEN",
+    "completion_claimed": false
+  },
+  "claim_boundary": {
+    "allowed": [
+      "W1 internal remediation records and current artifact-conformance projection are complete.",
+      "OK 16 and EXTERNAL 2 may be materialized as an add-only audit projection."
+    ],
+    "prohibited": [
+      "Formal artifact approval or baseline mutation.",
+      "Formal/product/device/external/production verification completion.",
+      "Release eligibility, gate waiver or clean-commit attribution."
+    ]
+  },
+  "integration_validation": {
+    "all_three_json_parse": true,
+    "all_three_content_fingerprints_recompute": true,
+    "exact_set_status": "PASS",
+    "projection_arithmetic_status": "PASS",
+    "hash_dag_status": "ACYCLIC"
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, recursively sorted keys, compact separators, no Unicode ASCII escaping, one trailing LF",
+    "excluded_field": "content_fingerprint",
+    "sha256": "a46a58b00d9122afbdda79611f1c21f8f78aa040dd01cd871732b7e6c58ca994"
+  }
+}

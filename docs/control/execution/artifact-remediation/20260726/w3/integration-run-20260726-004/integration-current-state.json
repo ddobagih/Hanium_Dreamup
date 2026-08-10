@@ -1,0 +1,188 @@
+{
+  "artifact_dispositions": [
+    {
+      "approval_claimed": false,
+      "artifact_type_id": "DLV-DEV-21",
+      "disposition": "INTERNAL_INTEGRATION_PASS_WITH_EXTERNAL_BOUNDARIES",
+      "ok_recommended": true,
+      "prior_classification": "INTERNAL_GAP",
+      "reason": "Current backend DB-free and fresh PostGIS tests pass, including two sequential exact-node executions on one DB; unchanged gateway and Android module evidence plus deterministic OpenAPI are bound. Remaining work is explicitly external/formal/release boundary.",
+      "recommended_classification": "OK"
+    }
+  ],
+  "artifact_type_id": "DLV-DEV-21",
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "cross_process_android_gateway_backend": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "coverage_matrix": [
+    {
+      "component_id": "ANDROID_USER_APP",
+      "cross_process": "NOT_RUN",
+      "device": "NOT_RUN",
+      "production": "NOT_RUN",
+      "result": "PASS_INTERNAL_UNIT_REUSED_UNCHANGED_SOURCE",
+      "tests": 728,
+      "tmap": "NOT_RUN"
+    },
+    {
+      "component_id": "ANDROID_ADMIN_APP",
+      "cross_process": "NOT_RUN",
+      "device": "NOT_RUN",
+      "production": "NOT_RUN",
+      "result": "PASS_INTERNAL_UNIT_REUSED_UNCHANGED_SOURCE",
+      "tests": 38,
+      "tmap": "N/A_DIRECT"
+    },
+    {
+      "component_id": "ANDROID_GATEWAY",
+      "cross_process": "NOT_RUN",
+      "device": "NOT_RUN",
+      "production": "NOT_RUN",
+      "result": "PASS_INTERNAL_NODE_REUSED_UNCHANGED_SOURCE",
+      "tests": 62,
+      "tmap": "NOT_RUN"
+    },
+    {
+      "component_id": "BACKEND",
+      "cross_process": "NOT_RUN",
+      "dbfree_passed": 33,
+      "postgres_run_passed": 2,
+      "production": "NOT_RUN",
+      "result": "PASS_CURRENT_SOURCE_DBFREE_AND_POSTGRES_REPEAT",
+      "tmap": "NOT_RUN"
+    },
+    {
+      "cleanup": "PASS",
+      "component_id": "POSTGRES_POSTGIS",
+      "cross_process": "NOT_RUN_WITH_APPLICATION",
+      "database_name": "walksafe_dev21_test_004",
+      "production": "NOT_RUN",
+      "result": "PASS_PREFLIGHT_MIGRATION_SCHEMA_AND_REPEATABILITY",
+      "single_use": true
+    },
+    {
+      "component_id": "OPENAPI_CONTRACT",
+      "cross_process": "NOT_RUN",
+      "production": "NOT_RUN",
+      "result": "PASS_INTERNAL_DETERMINISTIC_BYTE_IDENTICAL_REUSED",
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b"
+    }
+  ],
+  "document_id": "WALKSAFE-W3-DEV21-INTEGRATION-CURRENT-STATE-20260726-004",
+  "execution_summary_binding": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+    "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+  },
+  "integrity": {
+    "artifact_disposition_count": 1,
+    "command_receipt_count": 11,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "101e565547945a56c938b9f27b71beff4dac450e0352db978bf0a147a428bbe1"
+    },
+    "coverage_component_count": 6,
+    "failed_command_count": 0,
+    "not_run_internal_command_count": 0,
+    "open_gap_count": 3,
+    "resolved_gap_count": 4
+  },
+  "open_gaps": [
+    {
+      "closure_condition": "Run actual Android→Gateway→Backend→PostGIS cross-process traffic in one bound generation.",
+      "gap_id": "W3-DEV21-GAP-002",
+      "owner": "Integration test owner",
+      "required_evidence": [
+        "process identities",
+        "request/response trace",
+        "database assertions",
+        "defect/retest record"
+      ],
+      "status": "OPEN_EXTERNAL_BOUNDARY",
+      "target_wave": "W4"
+    },
+    {
+      "closure_condition": "Run approved user/admin devices with actual network transitions and TMAP.",
+      "gap_id": "W3-DEV21-GAP-003",
+      "owner": "Android device and field owner",
+      "required_evidence": [
+        "device/build IDs",
+        "network/TMAP receipts",
+        "actual-device results"
+      ],
+      "status": "OPEN_EXTERNAL_BOUNDARY",
+      "target_wave": "W4"
+    },
+    {
+      "closure_condition": "Complete signing assessment, production-shape deploy/rollback and release-generation binding without gate waiver.",
+      "gap_id": "W3-DEV21-GAP-004",
+      "owner": "Release and operations owner",
+      "required_evidence": [
+        "signing assessment",
+        "deploy/rollback receipts",
+        "release manifest",
+        "gate dispositions"
+      ],
+      "status": "OPEN_EXTERNAL_BOUNDARY",
+      "target_wave": "W8"
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "resolved_gaps": [
+    {
+      "basis": "Current backend DB-free suite 33 PASS.",
+      "gap_id": "W3-DEV21-GAP-001",
+      "status": "RESOLVED_INTERNAL"
+    },
+    {
+      "basis": "Fresh migrated PostGIS exact node passes ORM schema parity.",
+      "gap_id": "W3-DEV21-GAP-005",
+      "status": "RESOLVED_INTERNAL"
+    },
+    {
+      "basis": "Exact PostgreSQL node passed twice sequentially on the same single-use migrated DB, establishing reconfirmation cleanup repeatability.",
+      "gap_id": "W3-DEV21-GAP-006",
+      "status": "RESOLVED_INTERNAL"
+    },
+    {
+      "basis": "Stale harness binding corrected; both exact PostgreSQL runs pass.",
+      "gap_id": "W3-DEV21-GAP-007",
+      "status": "RESOLVED_INTERNAL"
+    }
+  ],
+  "schema_version": "walksafe.w3-dev21-integration-current-state.v4",
+  "source_binding": {
+    "backend_content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712",
+    "backend_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+    "backend_path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+    "backend_subject_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+    "backend_subject_raw_sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc",
+    "binding_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-source-binding.json",
+    "binding_sha256": "c44d64f3aa4ae825a81ff8e2925bf5bfaa36624826d82e35426fafab04c75e90",
+    "source_sha256": {
+      "backend/app/models.py": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+      "backend/tests/conftest.py": "2859741708f6bd0fc4d50dc27531cd8459165cb336beaa2a49bdfe0b2390e298",
+      "backend/tests/test_admin_security.py": "dff5dca5557201cd33601f49001ddec94bb0f75cd441058a5779a5dd2411b493"
+    },
+    "unchanged_modules": {
+      "adminapp": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "android-gateway": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "app": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585"
+    }
+  },
+  "source_commit": null,
+  "wave_id": "W3",
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS"
+}

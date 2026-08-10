@@ -1,0 +1,600 @@
+{
+  "artifact_records": [
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-DEV-17",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "REQUIRED_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NOT_REQUIRED_FOR_SUBMISSION_CONTENT; ANY_LATER_EXECUTION_CLAIM_REQUIRES_A_SEPARATE_RECEIPT"
+      },
+      "next_gate": "COMPLETE_AND_RECORD_CONTENT_TRACE_REVIEW_THEN_OBTAIN_DESIGNATED_APPROVAL",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "CONTENT_REVIEW_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-DEV-21",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "CONTENT_BASELINE_ACCEPTANCE_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "REQUIRED_FOR_EXECUTION_COMPLETION_NOT_RUN"
+      },
+      "next_gate": "ACCEPT_CONTENT_BASELINE_THEN_RUN_AND_BIND_THE_APPLICABLE_REAL_EVENT",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "RUN_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-TST-18",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "DATED_AS_OF_RECONCILIATION_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NO_QUALIFYING_APPEND_ONLY_EVENT_BOUND; ABSENT_EVENT_IS_NOT_COMPLETION"
+      },
+      "next_gate": "RECONCILE_CURRENT_AUTHORITATIVE_SOURCES_AND_RECORD_DATED_STATE_OR_REAL_EVENT_ROWS",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "AS_OF_RECONCILIATION_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-TST-19",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "DATED_AS_OF_RECONCILIATION_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NO_QUALIFYING_APPEND_ONLY_EVENT_BOUND; ABSENT_EVENT_IS_NOT_COMPLETION"
+      },
+      "next_gate": "RECONCILE_CURRENT_AUTHORITATIVE_SOURCES_AND_RECORD_DATED_STATE_OR_REAL_EVENT_ROWS",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "AS_OF_RECONCILIATION_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-TST-20",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "CONTENT_BASELINE_ACCEPTANCE_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "REQUIRED_FOR_EXECUTION_COMPLETION_NOT_RUN"
+      },
+      "next_gate": "ACCEPT_CONTENT_BASELINE_THEN_RUN_AND_BIND_THE_APPLICABLE_REAL_EVENT",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "RUN_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-TST-21",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "DATED_AS_OF_RECONCILIATION_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NO_QUALIFYING_APPEND_ONLY_EVENT_BOUND; ABSENT_EVENT_IS_NOT_COMPLETION"
+      },
+      "next_gate": "RECONCILE_CURRENT_AUTHORITATIVE_SOURCES_AND_RECORD_DATED_STATE_OR_REAL_EVENT_ROWS",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "AS_OF_RECONCILIATION_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-REL-15",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "CONTENT_BASELINE_ACCEPTANCE_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "REQUIRED_FOR_EXECUTION_COMPLETION_NOT_RUN"
+      },
+      "next_gate": "ACCEPT_CONTENT_BASELINE_THEN_RUN_AND_BIND_THE_APPLICABLE_REAL_EVENT",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "RUN_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-REL-16",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "REQUIRED_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NOT_REQUIRED_FOR_SUBMISSION_CONTENT; ANY_LATER_EXECUTION_CLAIM_REQUIRES_A_SEPARATE_RECEIPT"
+      },
+      "next_gate": "COMPLETE_AND_RECORD_CONTENT_TRACE_REVIEW_THEN_OBTAIN_DESIGNATED_APPROVAL",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "CONTENT_REVIEW_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-REL-18",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "REQUIRED_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NOT_REQUIRED_FOR_SUBMISSION_CONTENT; ANY_LATER_EXECUTION_CLAIM_REQUIRES_A_SEPARATE_RECEIPT"
+      },
+      "next_gate": "COMPLETE_AND_RECORD_CONTENT_TRACE_REVIEW_THEN_OBTAIN_DESIGNATED_APPROVAL",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "CONTENT_REVIEW_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-REL-19",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "REQUIRED_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NOT_REQUIRED_FOR_SUBMISSION_CONTENT; ANY_LATER_EXECUTION_CLAIM_REQUIRES_A_SEPARATE_RECEIPT"
+      },
+      "next_gate": "COMPLETE_AND_RECORD_CONTENT_TRACE_REVIEW_THEN_OBTAIN_DESIGNATED_APPROVAL",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "CONTENT_REVIEW_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    },
+    {
+      "approval_axis": {
+        "approval_count": 0,
+        "state": "NOT_APPROVED"
+      },
+      "artifact_id": "DLV-REL-22",
+      "completion_claimed": false,
+      "content_or_reconciliation_axis": {
+        "state": "REQUIRED_NOT_RECORDED"
+      },
+      "event_axis": {
+        "actual_qualifying_event_count": 0,
+        "state": "NOT_REQUIRED_FOR_SUBMISSION_CONTENT; ANY_LATER_EXECUTION_CLAIM_REQUIRES_A_SEPARATE_RECEIPT"
+      },
+      "next_gate": "COMPLETE_AND_RECORD_CONTENT_TRACE_REVIEW_THEN_OBTAIN_DESIGNATED_APPROVAL",
+      "queue_axis": {
+        "interpretation": "READY_TO_WORK_OR_REVIEW_NOT_COMPLETE",
+        "open": true,
+        "state": "INTERNAL_READY"
+      },
+      "readiness_class": "CONTENT_REVIEW_REQUIRED",
+      "release_axis": {
+        "eligible_count": 0,
+        "state": "NOT_ELIGIBLE"
+      },
+      "supporting_validation_closes_artifact": false
+    }
+  ],
+  "captured_at": "2026-07-28T00:20:04+09:00",
+  "classification": {
+    "AS_OF_RECONCILIATION_REQUIRED": [
+      "DLV-TST-18",
+      "DLV-TST-19",
+      "DLV-TST-21"
+    ],
+    "CONTENT_REVIEW_REQUIRED": [
+      "DLV-DEV-17",
+      "DLV-REL-16",
+      "DLV-REL-18",
+      "DLV-REL-19",
+      "DLV-REL-22"
+    ],
+    "RUN_REQUIRED": [
+      "DLV-DEV-21",
+      "DLV-TST-20",
+      "DLV-REL-15"
+    ]
+  },
+  "counts": {
+    "actual_qualifying_integration_or_rollback_events": 0,
+    "approvals_recorded": 0,
+    "as_of_reconciliation_required": 3,
+    "as_of_reconciliations_completed": 0,
+    "completion_claimed": 0,
+    "content_acceptances_recorded": 0,
+    "content_review_required": 5,
+    "exact_artifacts": 11,
+    "formal279_executed": 0,
+    "release_eligible": 0,
+    "run_required": 3,
+    "supporting_checks_blocked_environment": 1,
+    "supporting_checks_pass": 7,
+    "unique_artifacts": 11
+  },
+  "decision": {
+    "approval_claimed": false,
+    "canonical_mutation_disposition": "NO_CANONICAL_OR_CODE_MUTATION_PACKET_ONLY",
+    "completion_claimed": false,
+    "exact11_closure_status": "OPEN",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "exact11": [
+    "DLV-DEV-17",
+    "DLV-DEV-21",
+    "DLV-TST-18",
+    "DLV-TST-19",
+    "DLV-TST-20",
+    "DLV-TST-21",
+    "DLV-REL-15",
+    "DLV-REL-16",
+    "DLV-REL-18",
+    "DLV-REL-19",
+    "DLV-REL-22"
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_length": 15568,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; top-level integrity excluded",
+    "self_reference_included": false,
+    "sha256": "439db7241c43022715b9848f6f1497485a6a76ec8f5d3bc1c4c56cd34cbb4dba"
+  },
+  "manifests": {
+    "artifact_records_sha256": "02040b78921a364d1b4b98004481f3e33e6a0665a355fda35473bdc20401e3d5",
+    "classification_sha256": "d790894f837ce5bc82f4e44c4a064992b9ee9f21c3c8930b5c9e4a69a5565528",
+    "exact11_set_sha256": "b3006d8ce2214ccaca713475fd9f55fb842f39baa738949bb71b31d4891fb487",
+    "prohibited_claims_sha256": "10ad75b479822f54e4f16bb47ee504cb16adbaabea10199441689e3f5eb2a3eb",
+    "receipt_observations_sha256": "444fd81362c568f2cab7d1e0c70e15da21ed1f93935b1235013cbeab227b4762",
+    "source_bindings_sha256": "d183860cf571c0a668b05b40053d63529a75842addce1e75552b0513d0f47603",
+    "status_axes_sha256": "dc6980bd14c7a841419e811b10168c2cdc2379c23df1195ccfd0555433ccfa5f"
+  },
+  "packet_id": "WS-PHASE1-READY-QUALITY-RELEASE-20260728-001",
+  "prohibited_claims": [
+    "EXACT11_COMPLETE",
+    "CONTENT_ACCEPTED",
+    "AS_OF_RECONCILIATION_COMPLETE",
+    "QUALIFYING_INTEGRATION_EVENT_COMPLETED",
+    "QUALIFYING_ROLLBACK_EVENT_COMPLETED",
+    "FORMAL279_EXECUTED_OR_PASSED",
+    "OWNER_OR_QA_APPROVAL_OBTAINED",
+    "RELEASE_ELIGIBLE",
+    "PRODUCTION_DEPLOYED",
+    "SUPPORTING_TEST_PASS_EQUALS_ARTIFACT_CLOSURE",
+    "HISTORICAL_FAILURE_ERASED"
+  ],
+  "queue_semantic_guard": {
+    "approval_equivalence": false,
+    "completion_equivalence": false,
+    "open_artifact_count": 11,
+    "queue_state": "INTERNAL_READY",
+    "release_equivalence": false
+  },
+  "run_id": "run-20260727-001",
+  "schema_version": "walksafe.phase1-ready-quality-release-evidence.v1",
+  "scope": {
+    "artifact_count": 11,
+    "canonical_documents_modified": false,
+    "code_modified": false,
+    "packet_only": true,
+    "validation_scope": "JSON_PARSE_EXACT_SET_COUNT_SOURCE_BYTES_SHA256_AND_NON_SELF_INTEGRITY_ONLY",
+    "wave": "PHASE1_W6_READY_QUALITY_RELEASE_EXACT11"
+  },
+  "source_bindings": [
+    {
+      "bytes": 1111436,
+      "capture_basis": "FIXED_PHASE1_QUEUE_BINDING",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-artifact-action-queue.json",
+      "role": "AUTHORITATIVE_PHASE1_ACTION_QUEUE",
+      "sha256": "75a718d23b81e234c7542426301b36a3cf1e9b406fb2348ceee928e18bdb043b"
+    },
+    {
+      "bytes": 2048,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+      "role": "FORMAL279_NOT_RUN_NEGATIVE_CONTROL_RECEIPT",
+      "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d"
+    },
+    {
+      "bytes": 1748,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-light-available-checks-receipt.json",
+      "role": "CURRENT_LIGHT_AVAILABLE_CHECKS_RECEIPT",
+      "sha256": "8cee9f0a390d79cf644146f596bd2b71a9901d4dd09d606eac64b3dde122ef92"
+    },
+    {
+      "bytes": 668,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-receipt.json",
+      "role": "CURRENT_ANDROID_TARGETED_RECEIPT",
+      "sha256": "e26bcddb987e44b5d920d67e29e621cdb49d3bfa0e77152614078b970c625111"
+    },
+    {
+      "bytes": 688,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-receipt.json",
+      "role": "CURRENT_ANDROID_FULL_UNIT_RECEIPT",
+      "sha256": "94b0eafea6345122971afa44dc61d8281646cdabc294bff8ef1b48efac961d97"
+    },
+    {
+      "bytes": 682,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4-receipt.json",
+      "role": "CURRENT_ANDROID_REGRESSION_CLUSTER_RECEIPT",
+      "sha256": "d31570d79744860fd7131c6b0afa56b4072eb58edee291f9574efb2c70f5be7d"
+    },
+    {
+      "bytes": 530,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4-receipt.json",
+      "role": "CURRENT_ANDROID_LINT_RECEIPT",
+      "sha256": "5d9cf1b4313b49f7440a365111f9745316c233004193459ff9db3f7fa2aed873"
+    },
+    {
+      "bytes": 689,
+      "capture_basis": "PHYSICAL_RECEIPT_BYTES_PRESERVED_AS_FAILURE_HISTORY",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-attempt1-receipt.json",
+      "role": "HISTORICAL_FAILED_ANDROID_FULL_UNIT_ATTEMPT_RECEIPT",
+      "sha256": "cfc1a8b7bc981e3e051e6c3807cb577404d49ddcddcc54eb15d09b20b64d57bb"
+    }
+  ],
+  "status_axes": {
+    "approval_axis": {
+      "approval_count": 0,
+      "status": "NOT_APPROVED"
+    },
+    "content_or_reconciliation_axis": {
+      "as_of_reconciliation_required": {
+        "artifact_ids": [
+          "DLV-TST-18",
+          "DLV-TST-19",
+          "DLV-TST-21"
+        ],
+        "completed_count": 0,
+        "count": 3
+      },
+      "content_review_required": {
+        "accepted_count": 0,
+        "artifact_ids": [
+          "DLV-DEV-17",
+          "DLV-REL-16",
+          "DLV-REL-18",
+          "DLV-REL-19",
+          "DLV-REL-22"
+        ],
+        "count": 5
+      },
+      "run_required": {
+        "accepted_content_baseline_count": 0,
+        "artifact_ids": [
+          "DLV-DEV-21",
+          "DLV-TST-20",
+          "DLV-REL-15"
+        ],
+        "count": 3
+      }
+    },
+    "event_axis": {
+      "actual_qualifying_integration_or_rollback_event_count": 0,
+      "formal279_execution_count": 0,
+      "formal279_status": "NOT_RUN"
+    },
+    "queue_axis": {
+      "internal_ready_count": 11,
+      "meaning": "AUTHORIZED_AND_READY_FOR_WORK; NOT_A_COMPLETION_OR_APPROVAL_STATE",
+      "open_count": 11
+    },
+    "release_axis": {
+      "release_eligible_count": 0,
+      "status": "NOT_ELIGIBLE"
+    }
+  },
+  "supporting_validation_boundary": {
+    "current_receipt_observations": [
+      {
+        "closure_effect_on_exact11": "SUPPORTING_ONLY_NONE",
+        "observations": [
+          {
+            "check": "web_lint",
+            "result": "PASS"
+          },
+          {
+            "check": "web_typecheck",
+            "result": "PASS"
+          },
+          {
+            "check": "gateway_typecheck",
+            "result": "PASS"
+          },
+          {
+            "check": "openapi_check",
+            "reason": "ModuleNotFoundError: fastapi; dependency installation intentionally not performed",
+            "result": "BLOCKED_ENVIRONMENT"
+          }
+        ],
+        "receipt_role": "CURRENT_LIGHT_AVAILABLE_CHECKS_RECEIPT"
+      },
+      {
+        "closure_effect_on_exact11": "SUPPORTING_ONLY_NONE",
+        "errors": 0,
+        "failures": 0,
+        "receipt_role": "CURRENT_ANDROID_TARGETED_RECEIPT",
+        "result": "PASS",
+        "tests": 82
+      },
+      {
+        "closure_effect_on_exact11": "SUPPORTING_ONLY_NONE",
+        "errors": 0,
+        "failures": 0,
+        "receipt_role": "CURRENT_ANDROID_FULL_UNIT_RECEIPT",
+        "result": "PASS",
+        "tests": 759
+      },
+      {
+        "closure_effect_on_exact11": "SUPPORTING_ONLY_NONE",
+        "errors": 0,
+        "failures": 0,
+        "receipt_role": "CURRENT_ANDROID_REGRESSION_CLUSTER_RECEIPT",
+        "result": "PASS",
+        "tests": 45
+      },
+      {
+        "closure_effect_on_exact11": "SUPPORTING_ONLY_NONE",
+        "receipt_role": "CURRENT_ANDROID_LINT_RECEIPT",
+        "result": "PASS"
+      },
+      {
+        "closure_effect_on_exact11": "NONE",
+        "erased_or_reclassified_as_pass": false,
+        "failures": 18,
+        "receipt_role": "HISTORICAL_FAILED_ANDROID_FULL_UNIT_ATTEMPT_RECEIPT",
+        "result": "FAIL_HISTORY_PRESERVED",
+        "superseded_for_current_code_result_by": "CURRENT_ANDROID_FULL_UNIT_RECEIPT",
+        "tests": 759
+      },
+      {
+        "approval_status": "NOT_APPROVED",
+        "closure_effect_on_exact11": "NONE",
+        "formal_test_credit": false,
+        "formal_test_status": "NOT_RUN",
+        "receipt_role": "FORMAL279_NOT_RUN_NEGATIVE_CONTROL_RECEIPT",
+        "release_status": "NOT_ELIGIBLE"
+      }
+    ],
+    "interpretation": "PASS receipts support current code quality only and do not satisfy exact11 content, reconciliation, real-event, approval, or release predicates.",
+    "receipt_log_binding_policy": "Each receipt internal log path/SHA is preserved as a receipt claim; this packet physically binds the receipt file bytes/SHA and does not restate a fresh log verification."
+  },
+  "verification": {
+    "build_performed": false,
+    "classification_partition_status": "PASS",
+    "exact11_count_status": "PASS",
+    "exact11_unique_set_status": "PASS",
+    "git_operation_performed": false,
+    "independent_review_status": "NOT_RUN",
+    "json_parse_status": "PASS_AT_MATERIALIZATION",
+    "non_self_integrity_status": "PASS_AT_MATERIALIZATION",
+    "source_binding_fields_status": "PASS",
+    "test_performed": false
+  }
+}

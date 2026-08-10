@@ -1,0 +1,24 @@
+Command exited with non-zero status 1
+	Command being timed: "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64 scan source --format json --all-packages --verbosity info --output-file /home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca-report.json --sbom /home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/walksafe.cdx.json"
+	User time (seconds): 0.17
+	System time (seconds): 0.02
+	Percent of CPU this job got: 8%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:02.39
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 72536
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 10927
+	Voluntary context switches: 5780
+	Involuntary context switches: 36
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 3376
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 1

@@ -1,0 +1,8 @@
+
+> walksafe-android-gateway@0.1.0 build
+> npm run clean && tsc
+
+
+> walksafe-android-gateway@0.1.0 clean
+> node --input-type=module --eval "import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })"
+

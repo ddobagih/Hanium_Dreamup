@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WalkSafe(워크세이프)</string>
+    <string name="walk_safety_preparing">안전 안내 준비 중</string>
+    <string name="walk_safety_active">안전 안내 실행 중\n카메라 화면을 유지하고 음성·진동 안내를 확인하세요.</string>
+    <string name="walk_safety_paused">안전 안내 일시중지\n자동으로 재개하지 않습니다. 명시적으로 재개해 주세요.</string>
+    <string name="walk_safety_stopped">안전 중지\n안전한 장소에서 기기 상태를 다시 확인하세요.</string>
+    <string name="walk_exit_confirmation_title">보행 안내를 종료할까요?</string>
+    <string name="walk_exit_confirmation_message">뒤로가기를 눌러 보행 안내와 모든 출력을 일시중지했습니다. 종료하지 않으면 명시적으로 다시 재개해야 합니다.</string>
+    <string name="walk_exit_confirmation_positive">종료</string>
+    <string name="walk_exit_confirmation_negative">일시중지 유지</string>
+</resources>

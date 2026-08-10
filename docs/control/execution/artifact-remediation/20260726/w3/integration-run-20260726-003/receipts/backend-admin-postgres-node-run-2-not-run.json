@@ -1,0 +1,43 @@
+{
+  "argv": [
+    "env",
+    "DATABASE_URL=UNSET",
+    "WALKSAFE_TEST_DATABASE_URL=<REDACTED>",
+    "uv",
+    "run",
+    "--no-project",
+    "<EXACT_UV_ADMIN_RUNTIME>",
+    "python",
+    "-m",
+    "pytest",
+    "-p",
+    "no:cacheprovider",
+    "-q",
+    "backend/tests/test_admin_security.py::test_postgres_admin_security_full_recovery_and_high_risk_path"
+  ],
+  "blocking_command_id": "backend-admin-postgres-node-run-1",
+  "claim_boundary": "No cleanup repeatability result is claimed.",
+  "command_id": "backend-admin-postgres-node-run-2",
+  "cwd": ".",
+  "end": null,
+  "exit_code": null,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "55dadb086a7c838ee5bcb23d805c97d12873589f68bfd0e952b51c79102e366f"
+    }
+  },
+  "log_path": null,
+  "log_sha256": null,
+  "planned_repeat_ordinal": 2,
+  "resource_peak": null,
+  "retry_count": 0,
+  "schema_version": "walksafe.w3-dev21-command-receipt.v3",
+  "start": null,
+  "status": "NOT_RUN_BLOCKED_BY_RUN_1_FAILURE",
+  "subject_binding": {
+    "content_fingerprint": "e608f182d179c8d59c2d012ad847a3c8251175cbabcb3fbc8c9462512cdd4720",
+    "content_set_sha256": "de4853de5fde719b9ca3fbf8cc66a79279b384a98638cba1e7fae6791c8b0de2"
+  }
+}

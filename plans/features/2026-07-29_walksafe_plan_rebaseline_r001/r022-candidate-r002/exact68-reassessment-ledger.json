@@ -1,0 +1,3980 @@
+{
+  "schema_version": "walksafe.plan-rebaseline.exact68-reassessment-ledger.v1",
+  "metadata": {
+    "ledger_id": "WS-WALKSAFE-EXACT68-REASSESSMENT-20260730-R002",
+    "version": "1.1.0",
+    "prepared_at": "2026-07-30T04:05:00+09:00",
+    "status": "REVIEWED_STAGED_NOT_CANONICAL"
+  },
+  "purpose": "현재 dirty worktree의 68개 정책↔Gap 쌍을 빠짐없이 재검토하고, r022 후보 assessment hash와 live evidence를 결속한다.",
+  "source_gap": {
+    "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+    "file_sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+    "bytes": 488160,
+    "report_content_sha256": "7a95ef698b79bf223e0432807de2d3d75019e02648eb51211f1be3ce7cd874cf"
+  },
+  "mapping_projection": [
+    {
+      "source_policy_id": "FP-001",
+      "gap_id": "GAP-010"
+    },
+    {
+      "source_policy_id": "FP-002",
+      "gap_id": "GAP-011"
+    },
+    {
+      "source_policy_id": "FP-003",
+      "gap_id": "GAP-012"
+    },
+    {
+      "source_policy_id": "FP-004",
+      "gap_id": "GAP-013"
+    },
+    {
+      "source_policy_id": "FP-005",
+      "gap_id": "GAP-014"
+    },
+    {
+      "source_policy_id": "FP-006",
+      "gap_id": "GAP-015"
+    },
+    {
+      "source_policy_id": "FP-007",
+      "gap_id": "GAP-016"
+    },
+    {
+      "source_policy_id": "FP-008",
+      "gap_id": "GAP-017"
+    },
+    {
+      "source_policy_id": "FP-009",
+      "gap_id": "GAP-018"
+    },
+    {
+      "source_policy_id": "FP-010",
+      "gap_id": "GAP-019"
+    },
+    {
+      "source_policy_id": "FP-011",
+      "gap_id": "GAP-020"
+    },
+    {
+      "source_policy_id": "FP-012",
+      "gap_id": "GAP-021"
+    },
+    {
+      "source_policy_id": "FP-013",
+      "gap_id": "GAP-022"
+    },
+    {
+      "source_policy_id": "FP-014",
+      "gap_id": "GAP-023"
+    },
+    {
+      "source_policy_id": "FP-015",
+      "gap_id": "GAP-024"
+    },
+    {
+      "source_policy_id": "FP-016",
+      "gap_id": "GAP-025"
+    },
+    {
+      "source_policy_id": "FP-017",
+      "gap_id": "GAP-026"
+    },
+    {
+      "source_policy_id": "FP-018",
+      "gap_id": "GAP-027"
+    },
+    {
+      "source_policy_id": "FP-019",
+      "gap_id": "GAP-028"
+    },
+    {
+      "source_policy_id": "FP-020",
+      "gap_id": "GAP-029"
+    },
+    {
+      "source_policy_id": "FP-021",
+      "gap_id": "GAP-030"
+    },
+    {
+      "source_policy_id": "FP-022",
+      "gap_id": "GAP-031"
+    },
+    {
+      "source_policy_id": "FP-023",
+      "gap_id": "GAP-032"
+    },
+    {
+      "source_policy_id": "FP-024",
+      "gap_id": "GAP-033"
+    },
+    {
+      "source_policy_id": "FP-025",
+      "gap_id": "GAP-034"
+    },
+    {
+      "source_policy_id": "FP-026",
+      "gap_id": "GAP-035"
+    },
+    {
+      "source_policy_id": "FP-027",
+      "gap_id": "GAP-036"
+    },
+    {
+      "source_policy_id": "FP-028",
+      "gap_id": "GAP-037"
+    },
+    {
+      "source_policy_id": "FP-029",
+      "gap_id": "GAP-038"
+    },
+    {
+      "source_policy_id": "FP-030",
+      "gap_id": "GAP-039"
+    },
+    {
+      "source_policy_id": "FP-031",
+      "gap_id": "GAP-040"
+    },
+    {
+      "source_policy_id": "FP-032",
+      "gap_id": "GAP-041"
+    },
+    {
+      "source_policy_id": "FP-033",
+      "gap_id": "GAP-042"
+    },
+    {
+      "source_policy_id": "FP-034",
+      "gap_id": "GAP-043"
+    },
+    {
+      "source_policy_id": "FP-035",
+      "gap_id": "GAP-044"
+    },
+    {
+      "source_policy_id": "FP-036",
+      "gap_id": "GAP-045"
+    },
+    {
+      "source_policy_id": "FP-037",
+      "gap_id": "GAP-046"
+    },
+    {
+      "source_policy_id": "FP-038",
+      "gap_id": "GAP-047"
+    },
+    {
+      "source_policy_id": "FP-039",
+      "gap_id": "GAP-048"
+    },
+    {
+      "source_policy_id": "FP-040",
+      "gap_id": "GAP-049"
+    },
+    {
+      "source_policy_id": "FP-041",
+      "gap_id": "GAP-050"
+    },
+    {
+      "source_policy_id": "FP-042",
+      "gap_id": "GAP-051"
+    },
+    {
+      "source_policy_id": "FP-043",
+      "gap_id": "GAP-052"
+    },
+    {
+      "source_policy_id": "FP-044",
+      "gap_id": "GAP-053"
+    },
+    {
+      "source_policy_id": "FP-045",
+      "gap_id": "GAP-054"
+    },
+    {
+      "source_policy_id": "FP-046",
+      "gap_id": "GAP-055"
+    },
+    {
+      "source_policy_id": "FP-047",
+      "gap_id": "GAP-056"
+    },
+    {
+      "source_policy_id": "FP-048",
+      "gap_id": "GAP-057"
+    },
+    {
+      "source_policy_id": "FP-049",
+      "gap_id": "GAP-058"
+    },
+    {
+      "source_policy_id": "FP-050",
+      "gap_id": "GAP-059"
+    },
+    {
+      "source_policy_id": "FP-051",
+      "gap_id": "GAP-060"
+    },
+    {
+      "source_policy_id": "FP-052",
+      "gap_id": "GAP-061"
+    },
+    {
+      "source_policy_id": "FP-053",
+      "gap_id": "GAP-062"
+    },
+    {
+      "source_policy_id": "FP-054",
+      "gap_id": "GAP-063"
+    },
+    {
+      "source_policy_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "gap_id": "GAP-067"
+    },
+    {
+      "source_policy_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "gap_id": "GAP-064"
+    },
+    {
+      "source_policy_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "gap_id": "GAP-066"
+    },
+    {
+      "source_policy_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "gap_id": "GAP-065"
+    },
+    {
+      "source_policy_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "gap_id": "GAP-068"
+    },
+    {
+      "source_policy_id": "NPC-AUTO-REPORT",
+      "gap_id": "GAP-005"
+    },
+    {
+      "source_policy_id": "NPC-DATA-LIFECYCLE",
+      "gap_id": "GAP-002"
+    },
+    {
+      "source_policy_id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "gap_id": "GAP-007"
+    },
+    {
+      "source_policy_id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "gap_id": "GAP-006"
+    },
+    {
+      "source_policy_id": "NPC-PHONE-QUEUE-CAPACITY",
+      "gap_id": "GAP-004"
+    },
+    {
+      "source_policy_id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "gap_id": "GAP-001"
+    },
+    {
+      "source_policy_id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "gap_id": "GAP-009"
+    },
+    {
+      "source_policy_id": "NPC-SERVER-STORAGE-CAPACITY",
+      "gap_id": "GAP-003"
+    },
+    {
+      "source_policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "gap_id": "GAP-008"
+    }
+  ],
+  "mapping_sha256": "3423815d07d130ab85c6729733b26c7061ae13f63b4f344dfecdc1c47c4f80b5",
+  "hard_dependency_projection": [
+    {
+      "from": "WS-GOAL-EPIC-01",
+      "to": "WS-GOAL-EPIC-02",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-01",
+      "to": "WS-GOAL-EPIC-03",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-04",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-05",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-06",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-07",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-07",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-04",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-05",
+      "to": "WS-GOAL-EPIC-10",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-05",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-06",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-10",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-08",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-08",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-09",
+      "to": "WS-GOAL-EPIC-11",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-09",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-10",
+      "to": "WS-GOAL-EPIC-11",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-10",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-11",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    }
+  ],
+  "hard_dependency_sha256": "f57daf2de778e697b1983a1271d2bc5902b0f9e581982b1cb4e3d2349ca86535",
+  "evidence_snapshot": {
+    "scope_kind": "EXACT68_LIVE_EVIDENCE_CURRENT_WORKTREE",
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "file_count": 69,
+    "path_set_sha256": "0df023efdce91392592eb4cdc1ef4f8154efd4063e2d2c9c5d5a887deca40b8d",
+    "content_set_sha256": "c020e4c30a787aeac4c5c219c2bbc869051b5c5cd9e3d02917f6933bb5b333fd",
+    "files": [
+      {
+        "path": ".github/workflows/android-device-acceptance.yml",
+        "sha256": "14f8beb528b4f2337fcd646cbdf651658396b3f416e972d0f6fda90722016810",
+        "bytes": 10624,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-059"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/backend.ts",
+        "sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81",
+        "bytes": 15559,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-051"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/field-long-session.ts",
+        "sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be",
+        "bytes": 34354,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-020"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/field-walk-ledger.ts",
+        "sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d",
+        "bytes": 28944,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-021"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/integrated-consent.ts",
+        "sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+        "bytes": 35378,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-022"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/privacy-rights.ts",
+        "sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+        "bytes": 44699,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-002",
+          "GAP-055"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/routes.ts",
+        "sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+        "bytes": 30206,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-002",
+          "GAP-049",
+          "GAP-055"
+        ]
+      },
+      {
+        "path": "apps/android-gateway/src/telemetry.ts",
+        "sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96",
+        "bytes": 2345,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-061"
+        ]
+      },
+      {
+        "path": "apps/android/adminapp/build.gradle.kts",
+        "sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+        "bytes": 3325,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-008",
+          "GAP-016"
+        ]
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+        "sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+        "bytes": 19867,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-017",
+          "GAP-042"
+        ]
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+        "sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101",
+        "bytes": 4261,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-008",
+          "GAP-012",
+          "GAP-017"
+        ]
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+        "sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+        "bytes": 18158,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-008",
+          "GAP-017",
+          "GAP-061"
+        ]
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+        "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0",
+        "bytes": 3229,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-061"
+        ]
+      },
+      {
+        "path": "apps/android/app/build.gradle.kts",
+        "sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+        "bytes": 4652,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-016",
+          "GAP-060"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+        "bytes": 5508,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-028",
+          "GAP-030"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+        "bytes": 757627,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-004",
+          "GAP-005",
+          "GAP-006",
+          "GAP-021",
+          "GAP-023",
+          "GAP-025",
+          "GAP-028",
+          "GAP-030",
+          "GAP-032",
+          "GAP-034",
+          "GAP-036",
+          "GAP-037",
+          "GAP-038",
+          "GAP-039",
+          "GAP-040",
+          "GAP-041",
+          "GAP-044",
+          "GAP-052",
+          "GAP-053",
+          "GAP-054"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicy.kt",
+        "sha256": "7167923da755beef5a36337cc47b536213710a02a7c8fc4693a04977c5db6469",
+        "bytes": 13462,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-029"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
+        "sha256": "20ae1ba97349599fefb9e2b0e214f05c9fad123430341134d834a2eadf00be94",
+        "bytes": 7618,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-034"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+        "sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+        "bytes": 5353,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-052",
+          "GAP-054"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+        "sha256": "6e7dbed28a7eca1b2322179e26492bff6bef73bd64fb41b2c0453d929f019521",
+        "bytes": 3717,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-018"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicy.kt",
+        "sha256": "0005c18a68edc1cccbe8e5b5716fb883f9c38ef7fb7c343c757b3d91e4e15d95",
+        "bytes": 7593,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-030"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicy.kt",
+        "sha256": "bdf694e8fea4448ce04f284e8727765cc706bca07ac092bcabebb7d00cd1ed1a",
+        "bytes": 18013,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-015"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "sha256": "8ecb306453a80763db0caba8d5665a4403d836ee8ed757d4fdb2b106b9c2cfec",
+        "bytes": 7129,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-010",
+          "GAP-016"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+        "sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+        "bytes": 42238,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-036",
+          "GAP-052"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicy.kt",
+        "sha256": "4620484885c1a970f6e59eccf18922a6b50c21af6c2a30669ad09460f6cef6e6",
+        "bytes": 15820,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-036"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+        "sha256": "6327b1a28a595b0c7d35a75493f77a59edb6a25d1374d5d5d277b33374ad8de0",
+        "bytes": 34515,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-001"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TfliteAndroidFrameDetector.kt",
+        "sha256": "ebe6e558f11b6553e6311e9e9069ecaf84a034ccdaafb986c42d14787f8b02c5",
+        "bytes": 17632,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-028"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+        "sha256": "b1e03d8135f86b54a097e3a0656a72ad71e24b3fce930973be7acd6acc4e5d0d",
+        "bytes": 8639,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-035"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+        "sha256": "4036a758c8cc0443e8b62c5cdddeeaa4029595da61c6368402bf54b0091d45c3",
+        "bytes": 18887,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-007",
+          "GAP-031"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+        "sha256": "086ba1f5272b4e040c7080961093ee45e88722fbba05ef8900d2b87ceeaecb2b",
+        "bytes": 6458,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-033"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+        "sha256": "d4fed81cd6f7857088213bfeba9ce9b08f9519bf5540dd30df56f8344a01fd25",
+        "bytes": 10523,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-002"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+        "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+        "bytes": 12485,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-004",
+          "GAP-044",
+          "GAP-053"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+        "sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89",
+        "bytes": 8994,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-002",
+          "GAP-055"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt",
+        "sha256": "d1dc0ac5c46b3901982979d94149871d704e7686006191ed74fb886f488f2d12",
+        "bytes": 27301,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-021"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+        "sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+        "bytes": 8917,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-004",
+          "GAP-005",
+          "GAP-040",
+          "GAP-041",
+          "GAP-044",
+          "GAP-053",
+          "GAP-064"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicy.kt",
+        "sha256": "6dbb8871a1365546351e4201ae36c6aebda99453a356ae2e3ff31b1ef2cdd875",
+        "bytes": 7540,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-040"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicy.kt",
+        "sha256": "544719a304f4cc4b5511e155aba1273c920f896a1e76dc26f99748d6ba82959a",
+        "bytes": 26984,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-019"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+        "sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9",
+        "bytes": 18732,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-022"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/OfficialEnvironmentPolicy.kt",
+        "sha256": "193a25cb8cf43ad799a9e4db40ab306be54cbe5483fffd6d13d14a84d116d681",
+        "bytes": 14757,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-014"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+        "sha256": "cbf728e983e238fa1f56372c05770219050bd8466a8ee1bba67951580f3d237f",
+        "bytes": 9513,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-006",
+          "GAP-023"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicy.kt",
+        "sha256": "4284c2f588eae54d46c668c0145b98b0e08b7904fda846a7a2245d0e02b6c1a9",
+        "bytes": 17228,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-013"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+        "sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7",
+        "bytes": 13324,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-002",
+          "GAP-024"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+        "sha256": "9a03adf36c97b198e143637b51c0f2310d1d57c785d486d8097c31650cdd30d9",
+        "bytes": 15200,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-026",
+          "GAP-027"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/release/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugFrameCaptureUploaderFactory.kt",
+        "sha256": "222a38f474da55f1c5095f82279613fa7afc610c8fde00bf32ac43835290ad84",
+        "bytes": 206,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-043",
+          "GAP-044"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "sha256": "00343190f9b2145303e375405bc41f23d19ae79aafef98940ac0b236943e9d87",
+        "bytes": 26105,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-037"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+        "sha256": "1adfa0cf064c0cec0d0e41a3da88478cc633e88e3e3923c1cc510ba48ad0977f",
+        "bytes": 8754,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-025"
+        ]
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+        "sha256": "fc734bbaa57568858761b32657ecdeb45e935af6a3a1a03496ffe685f4f56803",
+        "bytes": 16310,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-039"
+        ]
+      },
+      {
+        "path": "apps/android/settings.gradle.kts",
+        "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+        "bytes": 356,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-016"
+        ]
+      },
+      {
+        "path": "backend/app/api/health.py",
+        "sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+        "bytes": 12501,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-009",
+          "GAP-065"
+        ]
+      },
+      {
+        "path": "backend/app/api/reports.py",
+        "sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+        "bytes": 79611,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-041",
+          "GAP-042",
+          "GAP-045",
+          "GAP-049",
+          "GAP-063"
+        ]
+      },
+      {
+        "path": "backend/app/services/admin_security.py",
+        "sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+        "bytes": 74728,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-008",
+          "GAP-049"
+        ]
+      },
+      {
+        "path": "backend/app/services/report_storage.py",
+        "sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+        "bytes": 6132,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-003",
+          "GAP-041",
+          "GAP-045",
+          "GAP-050"
+        ]
+      },
+      {
+        "path": "configs/walksafe_product_boundary_20260722.json",
+        "sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+        "bytes": 11227,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-008",
+          "GAP-011"
+        ]
+      },
+      {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-effective-candidate.json",
+        "sha256": "7d96d66a856409e878127bfc049ee4847fee4ad82c2f15ba93add8923c330bc7",
+        "bytes": 273607,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-063"
+        ]
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675",
+        "bytes": 97289,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-066"
+        ]
+      },
+      {
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+        "sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+        "bytes": 6291,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-056"
+        ]
+      },
+      {
+        "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+        "sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+        "bytes": 8223,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-068"
+        ]
+      },
+      {
+        "path": "docs/deliverables/06-testing/test-quality-report.md",
+        "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+        "bytes": 3279,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-058"
+        ]
+      },
+      {
+        "path": "docs/deliverables/07-security/security-verification-evidence.md",
+        "sha256": "0b7cc90532f8a279416b0647e5fb154618d377689faf3a38052555ceef205a02",
+        "bytes": 21114,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-057"
+        ]
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+        "bytes": 22070,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-028",
+          "GAP-030",
+          "GAP-046",
+          "GAP-048"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/operator-guide.md",
+        "sha256": "a223cc805f0b27bd82e8f3d94476886165f98a8f4d526824f3b0f08c3473092d",
+        "bytes": 40118,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-061"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/recovery-plan.md",
+        "sha256": "7b7cf6a02488bd7c90671895dd814e21c729fddd26fd27b321306b73b450982c",
+        "bytes": 19976,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-062"
+        ]
+      },
+      {
+        "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+        "sha256": "0a951150201dbaa13e88c326f308fabc07486e018a8f7bdd38392c90438e9377",
+        "bytes": 32049,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-062",
+          "GAP-067"
+        ]
+      },
+      {
+        "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+        "sha256": "dbb9cc1d5a72208dc987d675518a07e39230b69f5c6cf1d67795efb1e7ed5c6a",
+        "bytes": 37040,
+        "git_status": "??",
+        "gap_ids": [
+          "GAP-063"
+        ]
+      },
+      {
+        "path": "scripts/backup_walksafe_data_20260711.sh",
+        "sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+        "bytes": 22315,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-062",
+          "GAP-063"
+        ]
+      },
+      {
+        "path": "scripts/check_report_retention_dry_run.py",
+        "sha256": "c20efd03308a3ccdbd69ad2a4c608a35a3f4024141fbf4a9b1bfbad34b95f4eb",
+        "bytes": 105968,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-045"
+        ]
+      },
+      {
+        "path": "scripts/prune_walksafe_backups_20260711.py",
+        "sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+        "bytes": 5755,
+        "git_status": " M",
+        "gap_ids": [
+          "GAP-062"
+        ]
+      },
+      {
+        "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+        "bytes": 47092,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-062"
+        ]
+      },
+      {
+        "path": "scripts/walksafe_dataset_integrity.py",
+        "sha256": "16b31b59bff320d00267d826a1d78ff2e156f8f4f958f2efb078e61be20b3891",
+        "bytes": 5657,
+        "git_status": "  ",
+        "gap_ids": [
+          "GAP-047"
+        ]
+      }
+    ],
+    "snapshot_sha256": "497a32980c4c97724253717152e4d0fc5de399c3b6c3a3127088ee4eb83b87ae"
+  },
+  "review_contract": {
+    "reviewed_gap_count": 68,
+    "changed_gap_count": 31,
+    "carried_forward_gap_count": 37,
+    "status_changed_gap_count": 8,
+    "test_source_is_not_test_execution": true,
+    "negative_claims_require_current_evidence": true,
+    "implemented_claim_allowed": false,
+    "decision_dispositions": [
+      "KEEP",
+      "REASSESS_UP",
+      "REASSESS_DOWN",
+      "TEXT_FIX",
+      "NEEDS_EVIDENCE"
+    ]
+  },
+  "records": [
+    {
+      "gap_id": "GAP-001",
+      "source_policy_id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "769f85f11f384a4efbf6bf472fd0c001daaa228303476c5a63d401d3a57b1b85",
+      "candidate_assessment_sha256": "769f85f11f384a4efbf6bf472fd0c001daaa228303476c5a63d401d3a57b1b85",
+      "decision_reason": "release logger와 frame uploader가 noop이고 승인 원자료 수집 경로가 없다.",
+      "internal_residual": "승인된 영상·음성·정확 위치·센서·경로·신고·성능 원본 자료 구조와 암호화 수집, 수신확인서, 보존·삭제 자동 처리 작업을 구현한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-RAW-ORIGINAL-COLLECTION-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+          "file_sha256": "6327b1a28a595b0c7d35a75493f77a59edb6a25d1374d5d5d277b33374ad8de0",
+          "bytes": 34515,
+          "git_status": " M",
+          "symbol_or_test": "FieldRuntimeSnapshot; NoopFieldSessionLog",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "release 원자료를 제외하고 noop logging 경계를 둔다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-002",
+      "source_policy_id": "NPC-DATA-LIFECYCLE",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "a91b2a84946cab71c7f6b489f7ce6f50dbe5a416eb95498f708913868416dd69",
+      "candidate_assessment_sha256": "2bc3dcbe6e10bee7f509b5c7793c05a64d814bb9de8a8f3273e5ab57da5adfba",
+      "decision_reason": "삭제 상태 구현은 있으나 Android와 Gateway wire contract가 불일치하고 Gateway 원장은 concrete deletion effect 대신 EXTERNAL_PENDING 외부 transition 경계에 머문다.",
+      "internal_residual": "Android와 Gateway 삭제 wire contract를 하나로 통합하고 저장소별 보존·삭제 worker, 재시도, 영수증과 backup tombstone 재적용을 연결한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-DATA-LIFECYCLE-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+          "file_sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7",
+          "bytes": 13324,
+          "git_status": "??",
+          "symbol_or_test": "DeletionInventoryItem; AccountDeletionStateMachine",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android의 9개 삭제 항목과 상태기계를 정의한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+          "file_sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89",
+          "bytes": 8994,
+          "git_status": "??",
+          "symbol_or_test": "requestDeletionCall; validatedAccountDeletionStatusOrNull",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android 삭제 wire shape를 정의한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+          "file_sha256": "d4fed81cd6f7857088213bfeba9ce9b08f9519bf5540dd30df56f8344a01fd25",
+          "bytes": 10523,
+          "git_status": "??",
+          "symbol_or_test": "CONSENT_CONTROL_SECRET_HEADER; x-walksafe-consent-control-secret",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android 삭제 client가 재사용하는 consent-control secret literal을 정의한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android-gateway/src/privacy-rights.ts",
+          "file_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+          "bytes": 44699,
+          "git_status": "??",
+          "symbol_or_test": "parseAccountDeletionRequest; EXTERNAL_PENDING; transitionAccountDeletionItem",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Gateway wire shape와 외부 evidence 기반 item transition 원장을 정의한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android-gateway/src/routes.ts",
+          "file_sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+          "bytes": 30206,
+          "git_status": "??",
+          "symbol_or_test": "accountDeletionControl; ACCOUNT_DELETION_SECRET_HEADER",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Gateway의 별도 secret·query·request 경계를 강제한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-003",
+      "source_policy_id": "NPC-SERVER-STORAGE-CAPACITY",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "55fbaa072bba0bb65f71b18605a7c202182866bd7e9013ac9af5505d70417fbb",
+      "candidate_assessment_sha256": "55fbaa072bba0bb65f71b18605a7c202182866bd7e9013ac9af5505d70417fbb",
+      "decision_reason": "리포트 저장과 readiness에 원본 용량·비용·70/85/95/100 상태 경로가 없다.",
+      "internal_residual": "원본 대용량 파일 저장소와 데이터베이스 메타데이터를 분리하고 70/85/95/100% 용량정책, 백업·복원·비용 측정과 단말 동기화를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-SERVER-STORAGE-CAPACITY-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "git_status": "  ",
+          "symbol_or_test": "stage_report_image; reconcile_pending_report_writes",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "로컬 신고 파일 journal이며 원본 object-store 용량정책은 아니다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-004",
+      "source_policy_id": "NPC-PHONE-QUEUE-CAPACITY",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "0bfc49f76ceb90fc75b2cb74bdadd94fae01bcecdb7f9c81e398995631379d67",
+      "candidate_assessment_sha256": "1a4bcc663a85b6e1513f65824e25e7161ddaad67ebf4321e3bf69b9ad7d0a59f",
+      "decision_reason": "망 분기는 존재하지만 durable byte queue는 비활성이고 store는 cleanup-only다.",
+      "internal_residual": "암호화 durable payload queue, 실제 byte 상한, 우선순위 eviction·hold, 재부팅 worker와 서버 ACK 뒤 삭제를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-PHONE-QUEUE-CAPACITY-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "file_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+          "bytes": 12485,
+          "git_status": "??",
+          "symbol_or_test": "AndroidNetworkTransferPolicy.isAllowed",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Wi-Fi·이동통신망·offline 전송 분기를 판정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "PERSISTENT_REPORT_QUEUE_ENABLED = false",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "제품 흐름에서 persistent report queue를 명시적으로 비활성화한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "purgeAllWithoutLoading",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "이미 비활성인 legacy queue의 ciphertext와 key를 load하지 않고 purge한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-005",
+      "source_policy_id": "NPC-AUTO-REPORT",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "83410800ae513762d98c05a17481a128b00b2e066c6b18791e5cca1849142685",
+      "candidate_assessment_sha256": "26969f235a31690d00d41e3c188cee43a2b773d75ac5f17c5033c864205ea7d8",
+      "decision_reason": "영속 동의 진전과 별개로 활성 보행 direct upload가 후보 정책과 반대다.",
+      "internal_residual": "활성 보행 direct upload를 제거하고 종료 후 암호화 durable queue, 고정 신고 ID, 상태조회·수신확인·삭제 lifecycle로 전환한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-AUTO-REPORT-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "applyIntegratedConsentConfirmation; processReportCandidate; reportUploader.uploadCall; isReportUploadTerminalCurrent",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "server consent receipt를 영속화하지만 활성 보행에서 신고 payload를 직접 전송한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "purgeAllWithoutLoading",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "후보 정책이 요구하는 암호화 영속 queue는 비활성이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-006",
+      "source_policy_id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "457a35f2ba0694684e49c4587676d03c1870d642ffafc5db1bdbc0dbbcb2721d",
+      "candidate_assessment_sha256": "5d4ac1772828e93295ea42e4e523634f0c39c2d06d61e930381e388bfb953b60",
+      "decision_reason": "상태 분리와 권한별 중단은 구현됐으나 실제 lifecycle·운영·정식 증거는 없다.",
+      "internal_residual": "권한·세션 구현을 운영 privacy-rights 경로와 현재 evidence binding에 연결하고 승인 기기 lifecycle 검증을 준비한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-PERMISSION-SESSION-LIFECYCLE-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+          "file_sha256": "cbf728e983e238fa1f56372c05770219050bd8466a8ee1bba67951580f3d237f",
+          "bytes": 9513,
+          "git_status": "??",
+          "symbol_or_test": "PermissionSessionPolicy; PermissionDependencyPolicy.evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "인증·동의·권한을 분리하고 기능별 중단을 판정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "applyObservedPermissionStateChange; enterPermissionRecoveryBarrier",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "카메라·위치 권한 상실을 runtime 중단·안전정지 경계에 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-007",
+      "source_policy_id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "648192e2b09b444af12faf0e351a8aa0bfd7b4a13cf367929ddf2e75a8e4b9a3",
+      "candidate_assessment_sha256": "648192e2b09b444af12faf0e351a8aa0bfd7b4a13cf367929ddf2e75a8e4b9a3",
+      "decision_reason": "자동 도착과 사용자 선택 없는 reroute가 승인 정책과 반대다.",
+      "internal_residual": "TMAP 경로, GPS, 진행방향, 보폭의 책임을 분리하고 도착은 사용자 확인으로, 이탈은 승인된 10단계 선택 흐름으로 구현한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-NAVIGATION-ROUTE-DIRECTION-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+          "file_sha256": "4036a758c8cc0443e8b62c5cdddeeaa4029595da61c6368402bf54b0091d45c3",
+          "bytes": 18887,
+          "git_status": " M",
+          "symbol_or_test": "RouteNavigator.update",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "위치 표본으로 자동 도착과 reroute를 판정한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-008",
+      "source_policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "r021_status": "MISSING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "2e9cf7c816b9fa96e80c2db871a6aea3cac7b5e25f2234ad11bfd329ea14715b",
+      "candidate_assessment_sha256": "ef57d6fa42983cc4656bbd8821bd2ed2c65fc154023a18215be01998c2e43255",
+      "decision_reason": "별도 admin app과 인증·복구 코어가 생겼으나 production provisioning과 실제 drill은 없다.",
+      "internal_residual": "production 관리자·복구재료를 provision하고 휴대전화 밖 암호화 custody와 action-bound 운영 recovery workflow를 연결한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-SINGLE-ADMIN-RECOVERY-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/build.gradle.kts",
+          "file_sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+          "bytes": 3325,
+          "git_status": "??",
+          "symbol_or_test": "applicationId = \"kr.co.hanium.dreamup.walksafe.admin\"",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "사용자 앱과 다른 관리자 applicationId를 지정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+          "file_sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+          "bytes": 18158,
+          "git_status": "??",
+          "symbol_or_test": "login; revokeSession; startRecovery; completeRecovery",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "별도 관리자 인증·세션폐기·복구 코어가 있다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+          "file_sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101",
+          "bytes": 4261,
+          "git_status": "??",
+          "symbol_or_test": "evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "복구 상태·만료·작업 binding 오류를 fail-closed한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/services/admin_security.py",
+          "file_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+          "bytes": 74728,
+          "git_status": "??",
+          "symbol_or_test": "AdminSecurityService; _authorize_admin_bearer; authorize_high_risk_bearer",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "password+TOTP, device-bound session과 재확인 replay 경계를 서버에서 강제한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "configs/walksafe_product_boundary_20260722.json",
+          "file_sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+          "bytes": 11227,
+          "git_status": "??",
+          "symbol_or_test": "/release_control/release_eligibility; /release_control/remaining_gates; /products/admin_android_app/signing/configuration_state; /products/admin_android_app/session/implementation_state; /products/admin_android_app/recovery/material; /products/admin_android_app/recovery/formal_phone_loss_drill_status",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "관리자 signing은 미구성, session은 provisioning·정식시험 대기, off-phone recovery material은 계약뿐이며 실제 drill은 NOT_RUN이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-009",
+      "source_policy_id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "a35ab0d96b66a5b99bbbb05d8c91849feb1a5191e16d0b7e66704e2ddeb9be9e",
+      "candidate_assessment_sha256": "a35ab0d96b66a5b99bbbb05d8c91849feb1a5191e16d0b7e66704e2ddeb9be9e",
+      "decision_reason": "capacity version·observed_at·TTL API와 Android 동기화 경로가 없다.",
+      "internal_residual": "원본 대용량 파일 저장소와 데이터베이스 메타데이터를 분리하고 70/85/95/100% 용량정책, 백업·복원·비용 측정과 단말 동기화를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-NPC-SERVER-CAPACITY-STATE-SYNC-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/api/health.py",
+          "file_sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+          "bytes": 12501,
+          "git_status": " M",
+          "symbol_or_test": "create_router",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "generic readiness만 있고 capacity version·TTL 계약은 없다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-010",
+      "source_policy_id": "FP-001",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "51699fed78bc31dd6cc213122126108320b069c104e0d766f987b8d80018151a",
+      "candidate_assessment_sha256": "51699fed78bc31dd6cc213122126108320b069c104e0d766f987b8d80018151a",
+      "decision_reason": "제품 목적·안전 경계와 로컬 안내 코드는 있으나 실기기·사용자·정식 검증이 없다.",
+      "internal_residual": "실제 Android 기기에서 목적지 없는 ARCore metric과 CameraX 제한 모드를 각각 실행하고 대상 사용자 접근성 확인과 TC-FP-001-01~04 원자료·결함 연결을 남긴다.",
+      "external_residual": "연결 정식 시험 TC-FP-001-01, TC-FP-001-02, TC-FP-001-03, TC-FP-001-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+          "file_sha256": "8ecb306453a80763db0caba8d5665a4403d836ee8ed757d4fdb2b106b9c2cfec",
+          "bytes": 7129,
+          "git_status": "??",
+          "symbol_or_test": "WALKSAFE_PRODUCT_PURPOSE_STATEMENT_KO; WalkSafeStartupCapabilityResolver",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "제품 목적과 startup 안전 capability를 정의한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-011",
+      "source_policy_id": "FP-002",
+      "r021_status": "EVIDENCE_MISSING",
+      "candidate_status": "EVIDENCE_MISSING",
+      "decision_disposition": "NEEDS_EVIDENCE",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "c550b884021c7af9c61f3118b2c3edd054534eaef1ad795166587bdfd136e4af",
+      "candidate_assessment_sha256": "c550b884021c7af9c61f3118b2c3edd054534eaef1ad795166587bdfd136e4af",
+      "decision_reason": "stage·immutable bundle 규칙은 있으나 승인 RC가 없고 formal 0/279, gate 5개가 NOT_RUN이다.",
+      "internal_residual": "시연, 제한된 사용자시험, 정식 공개의 세 단계를 나누고 단계마다 시작·종료 조건을 정한다. 같은 앱·서버·모델·설정 묶음으로 시험한 기록과 승인 없이는 다음 단계로 넘어가지 못하게 한다.",
+      "external_residual": "연결 정식 시험 TC-FP-002-01, TC-FP-002-02, TC-FP-002-03, TC-FP-002-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "configs/walksafe_product_boundary_20260722.json",
+          "file_sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+          "bytes": 11227,
+          "git_status": "??",
+          "symbol_or_test": "/release_control",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "단계·배포 경계는 닫혀 있고 promotion은 승인되지 않았다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-012",
+      "source_policy_id": "FP-003",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "0164e054772d27f07a16ea76537282d024664e32433d464155365da4ca48216b",
+      "candidate_assessment_sha256": "0164e054772d27f07a16ea76537282d024664e32433d464155365da4ca48216b",
+      "decision_reason": "관리자 인증·폐기·복구 코어는 있으나 운영 workflow·custody·배포·drill이 남아 있다.",
+      "internal_residual": "운영 관리자 자격정보와 외부 복구수단을 비밀관리 절차로 프로비저닝하고, 서버키·서명키·복구자료를 휴대전화 밖에 암호화 보관해 복원을 확인한다. 고정 형상과 실제 등록 기기로 분실 복구훈련과 연결 정식 시험을 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-003-01, TC-FP-003-02, TC-FP-003-03, TC-FP-003-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+          "file_sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101",
+          "bytes": 4261,
+          "git_status": "??",
+          "symbol_or_test": "evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "관리자 고위험 작업을 재인증·복구 상태로 제한한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-013",
+      "source_policy_id": "FP-004",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "8aaac2ba6ae17ce6a2929d995c392ebed525efccdf64eaf13024e53598531dbd",
+      "candidate_assessment_sha256": "8aaac2ba6ae17ce6a2929d995c392ebed525efccdf64eaf13024e53598531dbd",
+      "decision_reason": "우선 사용자 정책 reducer는 있으나 guardian provider와 사용자·실기기 검증이 없다.",
+      "internal_residual": "승인된 참여자·실제 기기·보호자 확인 공급자 환경에서 TC-FP-004-01~04와 접근성 관찰시험을 실행하고 정식 검증 Workstream에 원자료를 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-004-01, TC-FP-004-02, TC-FP-004-03, TC-FP-004-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicy.kt",
+          "file_sha256": "4284c2f588eae54d46c668c0145b98b0e08b7904fda846a7a2245d0e02b6c1a9",
+          "bytes": 17228,
+          "git_status": "??",
+          "symbol_or_test": "PriorityUserOnboardingPolicy.evaluate; PriorityUserPracticeLifecycle.perform",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "우선 사용자 onboarding reducer와 실습 lifecycle이 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-014",
+      "source_policy_id": "FP-005",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "835bef228c4add890f31f9a2db17dfb5b9f8b07032ae0001e461bb01a5f8984b",
+      "candidate_assessment_sha256": "835bef228c4add890f31f9a2db17dfb5b9f8b07032ae0001e461bb01a5f8984b",
+      "decision_reason": "환경 안전 상태기계는 있으나 실제 측정 입력과 승인 production profile이 없다.",
+      "internal_residual": "production Activity에 실제 밝기·가림·흔들림·장착 raw population과 독립 CameraX 품질 사전점검을 연결한다. 이후 승인된 생산 프로필과 환경별 현장·실제 사용자·실기기 조건에서 TC-FP-005-01~04를 실행하고 원자료와 승인 기록을 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-005-01, TC-FP-005-02, TC-FP-005-03, TC-FP-005-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/OfficialEnvironmentPolicy.kt",
+          "file_sha256": "193a25cb8cf43ad799a9e4db40ab306be54cbe5483fffd6d13d14a84d116d681",
+          "bytes": 14757,
+          "git_status": "??",
+          "symbol_or_test": "OfficialEnvironmentPolicy.assess; OfficialEnvironmentRuntimeGuard",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "production profile은 없고 환경 상태를 fail-close한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-015",
+      "source_policy_id": "FP-006",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "0d43e296f93f31d8ba0083e243c9237bf6d30c65f6328072bae8ac76d5d9da37",
+      "candidate_assessment_sha256": "0d43e296f93f31d8ba0083e243c9237bf6d30c65f6328072bae8ac76d5d9da37",
+      "decision_reason": "장착 정책 골격은 있으나 실측 기반 생산 기준과 실제 관측값이 없다.",
+      "internal_residual": "여러 체형·Android 기기·가슴형·목걸이형 거치대와 걷기·정지·회전 조건에서 원자료를 수집해 장착 및 카메라 품질 프로필을 승인한다. 이후 실제 생산 입력에 연결하고 TC-FP-006-01~04와 현장·사용자·실기기·출시 Gate를 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-006-01, TC-FP-006-02, TC-FP-006-03, TC-FP-006-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicy.kt",
+          "file_sha256": "bdf694e8fea4448ce04f284e8727765cc706bca07ac092bcabebb7d00cd1ed1a",
+          "bytes": 18013,
+          "git_status": "??",
+          "symbol_or_test": "PhoneMountingPolicy.assess",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "장착 후보 정책은 있으나 production profile이 비어 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-016",
+      "source_policy_id": "FP-007",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "2a1915141957c6b86987c16f2bb42ec5189cf378b64909293b6203e50efb7bfc",
+      "candidate_assessment_sha256": "45d344472c71b88e718ed3a88c82ddd9db9fc668cd14657d36ac31bd0f9a22f8",
+      "decision_reason": "모듈·제품 ID 분리는 반영해야 하지만 signing·승인기기·배포 증거가 없다.",
+      "internal_residual": "사용자·관리자 앱의 production signing, release identity, 승인 기기 목록과 분리 배포 채널을 완성한다.",
+      "external_residual": "연결 정식 시험 TC-FP-007-01, TC-FP-007-02, TC-FP-007-03, TC-FP-007-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/settings.gradle.kts",
+          "file_sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+          "bytes": 356,
+          "git_status": " M",
+          "symbol_or_test": "include(\":app\"); include(\":adminapp\")",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "사용자와 관리자 Android 모듈을 분리한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/build.gradle.kts",
+          "file_sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+          "bytes": 4652,
+          "git_status": " M",
+          "symbol_or_test": "applicationId = \"kr.co.hanium.dreamup.walksafe\"",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "사용자 앱의 고유 applicationId를 지정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/build.gradle.kts",
+          "file_sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+          "bytes": 3325,
+          "git_status": "??",
+          "symbol_or_test": "applicationId = \"kr.co.hanium.dreamup.walksafe.admin\"",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "관리자 앱의 별도 applicationId를 지정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+          "file_sha256": "8ecb306453a80763db0caba8d5665a4403d836ee8ed757d4fdb2b106b9c2cfec",
+          "bytes": 7129,
+          "git_status": "??",
+          "symbol_or_test": "WalkSafeStartupCapabilityResolver; mayConfirmAndStart; pendingCore; unavailableCore",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "core capability는 fail-closed하되 LIMITED tier의 시작은 허용한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-017",
+      "source_policy_id": "FP-008",
+      "r021_status": "MISSING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "fe3ce342122ad17699fe2d1ebcef08a64a2c3d4d5a786efb88373f08f8068853",
+      "candidate_assessment_sha256": "dfbc3f69940a5d5b8f32c4a8955ac8c3bb2fcd7935da3dc814fec3e380ab8c22",
+      "decision_reason": "별도 admin 제품은 있으나 실제 신고 운영 workflow와 배포가 없어 PARTIAL이 상한이다.",
+      "internal_residual": "관리자 앱의 신고 검수·반려·중복처리, 기관 제출·수신증·상태·감사 workflow와 등록 기기 enforcement를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-008-01, TC-FP-008-02, TC-FP-008-03, TC-FP-008-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+          "file_sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+          "bytes": 19867,
+          "git_status": "??",
+          "symbol_or_test": "onCreate; render",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "보안 workflow는 제공하지만 운영 신고 workflow는 잠겨 있다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+          "file_sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+          "bytes": 18158,
+          "git_status": "??",
+          "symbol_or_test": "login; revokeSession; startRecovery; completeRecovery; consumeHighRiskAuthorization; clearReconfirmation",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "password+TOTP session·폐기·복구를 관리하고 pending 재확인 binding을 판정 전에 선소비한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+          "file_sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101",
+          "bytes": 4261,
+          "git_status": "??",
+          "symbol_or_test": "evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "복구 상태·만료·action·method·path binding mismatch를 fail-closed한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-018",
+      "source_policy_id": "FP-009",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "fb3116ed01ddc7d7422c1ce16740b7b261419fd45accb18e4f16ed4c5ad25d31",
+      "candidate_assessment_sha256": "fb3116ed01ddc7d7422c1ce16740b7b261419fd45accb18e4f16ed4c5ad25d31",
+      "decision_reason": "기기 분류와 legacy 내부 폐쇄는 있으나 승인 기기·외부 폐기 증거가 없다.",
+      "internal_residual": "과거 외부 URL·DNS·Cloudflare 자원의 폐기 또는 접근불가와 기존 설치·캐시 PWA 비활성을 확인하고, 승인 기기 프로필을 등록해 실기기·정식 시험을 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-009-01, TC-FP-009-02, TC-FP-009-03, TC-FP-009-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+          "file_sha256": "6e7dbed28a7eca1b2322179e26492bff6bef73bd64fb41b2c0453d929f019521",
+          "bytes": 3717,
+          "git_status": "??",
+          "symbol_or_test": "WalkSafeApprovedDeviceProfiles.production",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "운영 승인 기기 목록이 비어 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-019",
+      "source_policy_id": "FP-010",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "64a92f5108f54dc9e994cf031b56ea0a6122f6a51e68f2268ee34782bb446be2",
+      "candidate_assessment_sha256": "64a92f5108f54dc9e994cf031b56ea0a6122f6a51e68f2268ee34782bb446be2",
+      "decision_reason": "onboarding 상태기계는 있으나 production evidence verifier와 공급자 연결이 없다.",
+      "internal_residual": "승인된 signup·SMS·guardian 공급자와 운영 자격정보를 프로비저닝하고 실제 계정·TalkBack 사용자·Android 기기에서 실패·재시도·복원 흐름을 검증한다. 이후 TC-FP-010-01~04, 정식 279개와 5개 출시 Gate를 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-010-01, TC-FP-010-02, TC-FP-010-03, TC-FP-010-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicy.kt",
+          "file_sha256": "544719a304f4cc4b5511e155aba1273c920f896a1e76dc26f99748d6ba82959a",
+          "bytes": 26984,
+          "git_status": "??",
+          "symbol_or_test": "FirstRunOnboardingPolicy.productionEvidenceVerifier",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "production evidence verifier가 fail-close한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-020",
+      "source_policy_id": "FP-011",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "c973b984a8781edb116f30be7b94a46a6b32add0100b37578ccdf2e086ff0259",
+      "candidate_assessment_sha256": "c973b984a8781edb116f30be7b94a46a6b32add0100b37578ccdf2e086ff0259",
+      "decision_reason": "장기 세션 코어는 있으나 release 비활성이고 운영 만료·재인증 경계가 미완성이다.",
+      "internal_residual": "승인된 access·idle·absolute 기간과 운영 자격정보·배포 후보를 별도로 결속하고 자동 만료 감시·보호 API 갱신과 민감 계정 변경 재인증을 완성한다. 실제 사용자·Android 기기·네트워크에서 재시작·회전·부분응답을 검증한다. 분실 기기 선택 폐기, 계정 잠금과 보안사고 훈련 뒤 TC-FP-011-01~05, 정식 279개와 5개 출시 Gate를 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-011-01, TC-FP-011-02, TC-FP-011-03, TC-FP-011-04, TC-FP-011-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/field-long-session.ts",
+          "file_sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be",
+          "bytes": 34354,
+          "git_status": "??",
+          "symbol_or_test": "establishFieldLongSession; refreshFieldLongSession; revokeFieldLongSessionDevice",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "장기 세션·회전·기기별 폐기 코어가 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-021",
+      "source_policy_id": "FP-012",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "43449688b1ea30eb1daed513d31ddabdf97f11a1251bf064b5a04cae3110d9dd",
+      "candidate_assessment_sha256": "336b2f6db0c769f322df081816e955317a7d4b9afebc77c5c5a0ebd1f3fdebbe",
+      "decision_reason": "단일 active-walk ledger는 구현됐으나 운영 topology와 실제 다중기기 증거가 없다.",
+      "internal_residual": "field-walk ledger의 운영 lease profile과 배포 topology를 승인하고 multi-host일 때 공유 transactional coordinator로 전환한다.",
+      "external_residual": "연결 정식 시험 TC-FP-012-01, TC-FP-012-02, TC-FP-012-03, TC-FP-012-04, TC-FP-012-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/field-walk-ledger.ts",
+          "file_sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d",
+          "bytes": 28944,
+          "git_status": "??",
+          "symbol_or_test": "commandFieldWalk",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "계정별 단일 active lease와 takeover를 처리한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt",
+          "file_sha256": "d1dc0ac5c46b3901982979d94149871d704e7686006191ed74fb886f488f2d12",
+          "bytes": 27301,
+          "git_status": "??",
+          "symbol_or_test": "GatewayWalkSessionClient; start; takeover; renew; end",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android Gateway client가 lease lifecycle 명령을 전송한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "requestGatewayWalkStart; executeGatewayWalkTakeover; scheduleGatewayWalkRenewal",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android 보행 lifecycle에 start·음성확인 takeover·renew를 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-022",
+      "source_policy_id": "FP-013",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "7ab68184b89f6aacab27f2887f2600f18bf1da00fc8c58a87cc61afbbb9e7e19",
+      "candidate_assessment_sha256": "476faf531a0cc2bdd864efe4c4902f093dd73c19cc37fd3a2b7e6db8b568f4fc",
+      "decision_reason": "Gateway receipt ledger와 Android process-local session은 있으나 실제 disclosure 범위가 정책보다 좁고 외부 승인이 없다.",
+      "internal_residual": "전체 원자료 범주·목적·시점·보존·제공·삭제 고지와 guardian/user receipt를 일치시키고 승인 gate에 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-013-01, TC-FP-013-02, TC-FP-013-03, TC-FP-013-04, TC-FP-013-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+          "file_sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9",
+          "bytes": 18732,
+          "git_status": "??",
+          "symbol_or_test": "IntegratedConsentSession; INTEGRATED_CONSENT_DISCLOSURE_KO",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android process-local 동의·철회 상태와 고지를 구현한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android-gateway/src/integrated-consent.ts",
+          "file_sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+          "bytes": 35378,
+          "git_status": "??",
+          "symbol_or_test": "IntegratedConsentState; recordConsent; receipt_sha256; writeState",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Gateway가 receipt chain을 포함한 동의 event 원장을 원자적으로 영속화한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-023",
+      "source_policy_id": "FP-014",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "2069388db75daba5abb58f8486734181959d101fff09096844e169e8385588c6",
+      "candidate_assessment_sha256": "96bfd633c383ec262b41104f6a7eb67c883f567367ec0f42ba157b164a6f301c",
+      "decision_reason": "권한별 중지·재개 gate는 구현됐으나 실기기·플랫폼 검증이 없다.",
+      "internal_residual": "현재 권한별 중단·재개 gate를 production lifecycle과 승인 permission profile에 결속하고 실제 기기 검증 입력을 준비한다.",
+      "external_residual": "연결 정식 시험 TC-FP-014-01, TC-FP-014-02, TC-FP-014-03은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+          "file_sha256": "cbf728e983e238fa1f56372c05770219050bd8466a8ee1bba67951580f3d237f",
+          "bytes": 9513,
+          "git_status": "??",
+          "symbol_or_test": "PermissionRecoveryGate; PermissionDependencyPolicy",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "권한별 중단과 전체 재검사·명시 재개를 판정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "enterPermissionRecoveryBarrier; resumePermissionRecoveryFromExplicitUserAction",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "권한 상실을 복구 barrier와 명시적 사용자 재개에 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-024",
+      "source_policy_id": "FP-015",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "b2408805142ddc8e8b17f3bf09d962772736c7b89c26817883a0d5033f8c99bb",
+      "candidate_assessment_sha256": "b2408805142ddc8e8b17f3bf09d962772736c7b89c26817883a0d5033f8c99bb",
+      "decision_reason": "삭제 정책·상태 원장은 있으나 실제 저장소 삭제 실행기가 연결되지 않았다.",
+      "internal_residual": "동의 철회나 계정 삭제가 시작되면 해당 수집·자동신고·학습재사용을 즉시 중지하고 휴대전화 미전송 자료를 삭제하며 서버 저장자료 삭제요청과 완료확인을 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-015-01, TC-FP-015-02, TC-FP-015-03, TC-FP-015-04, TC-FP-015-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+          "file_sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7",
+          "bytes": 13324,
+          "git_status": "??",
+          "symbol_or_test": "DeletionInventoryItem; AccountDeletionStateMachine",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "9개 삭제 항목·SLA 상태기계를 정의한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-025",
+      "source_policy_id": "FP-016",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "cde44f2cf31ac47c7dccdc1f5f8e3db5e6d70374d369d56e25ef8cddd2f58758",
+      "candidate_assessment_sha256": "67a95304f6fd4bba5f591e3e0984d90942218d32efefdb8762aa1889aed9745e",
+      "decision_reason": "release 화면 핵심은 있으나 voice-only 전체 흐름과 실제 TalkBack 근거가 없다.",
+      "internal_residual": "release 보행 화면의 필수 조작을 voice-only와 접근 가능한 종료 확인으로 완결하고 실제 TalkBack 검증 경계를 고정한다.",
+      "external_residual": "연결 정식 시험 TC-FP-016-01, TC-FP-016-02, TC-FP-016-03, TC-FP-016-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "walkSafetyOverlay; handleWalkScreenBackPressed; showWalkExitConfirmationDialog",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "release 보행 화면의 읽기 전용 overlay와 뒤로가기 선행 중단·확인을 구현한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+          "file_sha256": "1adfa0cf064c0cec0d0e41a3da88478cc633e88e3e3923c1cc510ba48ad0977f",
+          "bytes": 8754,
+          "git_status": "??",
+          "symbol_or_test": "releaseActiveScreenHidesControlsAndShowsReadOnlySafetyOverlay",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "화면 계약을 검사하는 소스이며 실행 PASS 증거는 아니다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-026",
+      "source_policy_id": "FP-017",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "c66167feda7419657cdfc3b467e27d7a1aaf90ad441b5f17fbf199dd0a52a80e",
+      "candidate_assessment_sha256": "c66167feda7419657cdfc3b467e27d7a1aaf90ad441b5f17fbf199dd0a52a80e",
+      "decision_reason": "lifecycle 충돌은 제거됐지만 시작 readiness 전체 계약과 실기기 증거가 미완성이다.",
+      "internal_residual": "가입·통합동의·운영 인증, 일반 원본수집 동의, 인증된 Gateway 로그인 readiness, 필수 서버, 저장공간·배터리·발열 aggregate를 후속 EPIC-02 작업에서 하나의 초기 시작 판단으로 완결하고 실제 Android 기기의 잠금·홈·통화·앱 전환과 TC-FP-017-01~06을 승인 환경에서 실행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-017-01, TC-FP-017-02, TC-FP-017-03, TC-FP-017-04, TC-FP-017-05, TC-FP-017-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+          "file_sha256": "9a03adf36c97b198e143637b51c0f2310d1d57c785d486d8097c31650cdd30d9",
+          "bytes": 15200,
+          "git_status": "??",
+          "symbol_or_test": "WalkSessionLifecycle.handle",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "background·재검사·명시 재개 lifecycle을 정의한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-027",
+      "source_policy_id": "FP-018",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "0bfd14a34e58732d00b01c7c1a3ec1bd98d5a99fa9f67df1e42738bdcdf07362",
+      "candidate_assessment_sha256": "0bfd14a34e58732d00b01c7c1a3ec1bd98d5a99fa9f67df1e42738bdcdf07362",
+      "decision_reason": "상태·복구 제어는 있으나 정책 전체와 정식 lifecycle 증거가 미완성이다.",
+      "internal_residual": "승인된 실제 기기 환경에서 TC-FP-018-01~06과 lifecycle 복구 시나리오를 실행해 원자료와 결함 연결을 남기고, 정식 검증 Workstream에서 판정을 갱신한다.",
+      "external_residual": "연결 정식 시험 TC-FP-018-01, TC-FP-018-02, TC-FP-018-03, TC-FP-018-04, TC-FP-018-05, TC-FP-018-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+          "file_sha256": "9a03adf36c97b198e143637b51c0f2310d1d57c785d486d8097c31650cdd30d9",
+          "bytes": 15200,
+          "git_status": "??",
+          "symbol_or_test": "WalkSessionSnapshot; WalkSessionLifecycle.handle",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "state·mode·epoch와 복구 전이를 분리한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-028",
+      "source_policy_id": "FP-019",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "7654fe55f2180ac2586ac6e1eb85bc23b729b427865d37b59e355e09c0bacf63",
+      "candidate_assessment_sha256": "ba11748ede0a9818c8b58e1155e355a6f37ac8706b73bc678bceda0773729271",
+      "decision_reason": "detector-depth 연결은 있으나 미승인 모델·threshold의 실제 사용이 정책과 충돌한다.",
+      "internal_residual": "배포 적격 모델·class allowlist·threshold만 안전·신고 경로에 허용하고 관측 연결 불확실성과 terminal failure 계약을 봉인한다.",
+      "external_residual": "연결 정식 시험 TC-FP-019-01, TC-FP-019-02, TC-FP-019-03, TC-FP-019-04, TC-FP-019-05, TC-FP-019-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TfliteAndroidFrameDetector.kt",
+          "file_sha256": "ebe6e558f11b6553e6311e9e9069ecaf84a034ccdaafb986c42d14787f8b02c5",
+          "bytes": 17632,
+          "git_status": "  ",
+          "symbol_or_test": "TfliteAndroidFrameDetector.detect",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "TFLite frame 탐지를 수행한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "onDrawFrame; handleDetectorRuntimeFailure; resolveReportThreshold",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "detector-depth 통합, terminal 안전정지와 runtime class threshold 사용을 연결한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+          "file_sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+          "bytes": 5508,
+          "git_status": "  ",
+          "symbol_or_test": "/primary_model; /models/unified_walksafe/enabled; /models/unified_walksafe/thresholds",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "배포 후보와 class별 threshold가 runtime config에서 활성이다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "file_sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+          "bytes": 22070,
+          "git_status": "??",
+          "symbol_or_test": "/primary_runtime_model_id; /approved_model_count",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "runtime 후보는 있지만 승인 모델 수는 0이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-029",
+      "source_policy_id": "FP-020",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "048bbab84f7cd275cf1c9095ea0b255538f9d98fa1e0abd08555d770892d8824",
+      "candidate_assessment_sha256": "048bbab84f7cd275cf1c9095ea0b255538f9d98fa1e0abd08555d770892d8824",
+      "decision_reason": "WARNING 진동 부재와 STOP 행동문 불일치가 직접적인 정책 반대 동작이다.",
+      "internal_residual": "STOP 문구를 ‘멈추세요. 주변을 확인하세요.’로 고정하고 WARNING 고유 진동, 불확실 후보 무안내, 좌우 추정 지시 금지를 계약시험으로 잠근다.",
+      "external_residual": "연결 정식 시험 TC-FP-020-01, TC-FP-020-02, TC-FP-020-03, TC-FP-020-04, TC-FP-020-05, TC-FP-020-06, TC-FP-020-07, TC-FP-020-08은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicy.kt",
+          "file_sha256": "7167923da755beef5a36337cc47b536213710a02a7c8fc4693a04977c5db6469",
+          "bytes": 13462,
+          "git_status": " M",
+          "symbol_or_test": "MessagePolicy.evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "STOP 문구와 위험 우선순위를 산출한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-030",
+      "source_policy_id": "FP-021",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "4b32f3c753747b27fa17eb2b4e54205cadb33ec68e7e0f8bae1637d85d2f847d",
+      "candidate_assessment_sha256": "855884db439b0a623eba5243e8c6a8ed85278ec1816f1461bb011e95089bfb18",
+      "decision_reason": "품질 gate 일부와 별개로 승인 모델 0건인 후보·낮은 class별 threshold가 runtime에 활성화되어 승인 전 탐지 금지 정책과 충돌한다.",
+      "internal_residual": "production camera 품질·기기 profile과 실제 측정값을 승인 모델·종류별 거리 gate에 결속한다.",
+      "external_residual": "연결 정식 시험 TC-FP-021-01, TC-FP-021-02, TC-FP-021-03, TC-FP-021-04, TC-FP-021-05, TC-FP-021-06, TC-FP-021-07, TC-FP-021-08, TC-FP-021-09은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicy.kt",
+          "file_sha256": "0005c18a68edc1cccbe8e5b5716fb883f9c38ef7fb7c343c757b3d91e4e15d95",
+          "bytes": 7593,
+          "git_status": "??",
+          "symbol_or_test": "CameraFrameQualityPolicy.assess",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "밝기·가림·흔들림·각도 품질을 fail-close한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "observeOfficialEnvironmentCameraFrame; resolveReportThreshold; onDrawFrame",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "일부 품질값은 비어 있고 활성 detector/report 경로가 runtime class threshold를 사용한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+          "file_sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+          "bytes": 5508,
+          "git_status": "  ",
+          "symbol_or_test": "/primary_model; /models/unified_walksafe/enabled; /models/unified_walksafe/thresholds",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "unified 후보가 enabled이고 class별 threshold는 0.15~0.35다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "file_sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+          "bytes": 22070,
+          "git_status": "??",
+          "symbol_or_test": "/primary_runtime_model_id; /approved_model_count",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "runtime 후보는 지정돼 있지만 승인 모델 수는 0이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-031",
+      "source_policy_id": "FP-022",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "3f109999b78dee2c9ac4c7d175a3dd034112151f5303892320736f32484f1871",
+      "candidate_assessment_sha256": "3f109999b78dee2c9ac4c7d175a3dd034112151f5303892320736f32484f1871",
+      "decision_reason": "사용자 확인 전에 자동 도착·길안내 종료가 일어나 정책과 충돌한다.",
+      "internal_residual": "남은 거리는 GPS와 저장 TMAP 경로를 기준으로, 보폭은 보조 검증으로 사용한다. GPS·경로 끝·보폭을 함께 본 뒤 사용자 확인으로 도착을 확정한다.",
+      "external_residual": "연결 정식 시험 TC-FP-022-01, TC-FP-022-02, TC-FP-022-03, TC-FP-022-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+          "file_sha256": "4036a758c8cc0443e8b62c5cdddeeaa4029595da61c6368402bf54b0091d45c3",
+          "bytes": 18887,
+          "git_status": " M",
+          "symbol_or_test": "RouteNavigator.update",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "사용자 확인 전에 arrived 상태를 낼 수 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-032",
+      "source_policy_id": "FP-023",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "1881c89d9adb4d462981672bf1068af92df0c0137434fb326f293343ec210c27",
+      "candidate_assessment_sha256": "1881c89d9adb4d462981672bf1068af92df0c0137434fb326f293343ec210c27",
+      "decision_reason": "이탈 뒤 사용자 선택 전에 자동 TMAP 재요청이 일어나 정책과 충돌한다.",
+      "internal_residual": "경로를 암호화해 종료 또는 24시간까지 보관하고, 이탈 때 회전안내 중지→설명→새 경로/재확인/보행종료 선택의 승인된 10단계를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-023-01, TC-FP-023-02, TC-FP-023-03은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "updateRouteGuidance",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "이탈 시 사용자 선택 없이 route 재요청을 시작한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-033",
+      "source_policy_id": "FP-024",
+      "r021_status": "EVIDENCE_MISSING",
+      "candidate_status": "EVIDENCE_MISSING",
+      "decision_disposition": "NEEDS_EVIDENCE",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "fd74d570dcf078ba4dc17c098e650880df1f6bd2218fd18a857415204b056ddf",
+      "candidate_assessment_sha256": "fd74d570dcf078ba4dc17c098e650880df1f6bd2218fd18a857415204b056ddf",
+      "decision_reason": "후보 구현 방향은 맞지만 승인 모델·환경의 실행 증거가 없다.",
+      "internal_residual": "TMAP 경로를 주 기준으로 유지하면서 휴대전화가 확인한 점자블록은 방향을 확정할 수 있을 때만 보조한다. 손상 점자블록은 경로 지시와 분리해 신고 후보로 처리하고 불확실하면 안내하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-FP-024-01, TC-FP-024-02, TC-FP-024-03, TC-FP-024-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+          "file_sha256": "086ba1f5272b4e040c7080961093ee45e88722fbba05ef8900d2b87ceeaecb2b",
+          "bytes": 6458,
+          "git_status": "  ",
+          "symbol_or_test": "selectCandidate; evaluate",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "불확실·손상 후보는 TMAP 경로로 되돌린다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-034",
+      "source_policy_id": "FP-025",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "4e4330ca9e58d340590b3930d68a01f93ccf55c977935e8f97bcd1ef1c635cf8",
+      "candidate_assessment_sha256": "76c0b932c3511634ff2fb94c79bcab49ee7e15afbf9e9780b630384c135eccba",
+      "decision_reason": "on-device recognition은 있으나 wake-word와 승인 listening lifecycle이 없다.",
+      "internal_residual": "활성 보행 전용 '길라잡이' wake-word, 듣기 시작·종료 cue와 승인 command lifecycle을 on-device recognition에 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-025-01, TC-FP-025-02, TC-FP-025-03, TC-FP-025-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
+          "file_sha256": "20ae1ba97349599fefb9e2b0e214f05c9fad123430341134d834a2eadf00be94",
+          "bytes": 7618,
+          "git_status": "??",
+          "symbol_or_test": "onDeviceSpeechRecognitionAvailable",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "단말 내 음성인식 capability를 검사한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "voiceReportButton; ensureVoicePermissionThenListen; startVoiceCommandRecognition",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "일반 command는 버튼을 눌러 recognizer를 시작하며 호출어 lifecycle은 없다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-035",
+      "source_policy_id": "FP-026",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "ddf151f889e3383acb0d681e1bc0ada56d346bb97439c9a26537f14d2f5bbd5a",
+      "candidate_assessment_sha256": "ddf151f889e3383acb0d681e1bc0ada56d346bb97439c9a26537f14d2f5bbd5a",
+      "decision_reason": "parser는 있으나 pause·resume·end와 비가역 확인 계약이 없다.",
+      "internal_residual": "승인 명령 목록과 상태전이를 모두 구현하고 판단 확실성이 없거나 낮아도 실행하지 않으며 비가역 명령은 음성·Android 화면읽기 기능으로 확인받는다.",
+      "external_residual": "연결 정식 시험 TC-FP-026-01, TC-FP-026-02, TC-FP-026-03, TC-FP-026-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+          "file_sha256": "b1e03d8135f86b54a097e3a0656a72ad71e24b3fce930973be7acd6acc4e5d0d",
+          "bytes": 8639,
+          "git_status": " M",
+          "symbol_or_test": "selectAndroidVoiceAction; parseAndroidVoiceCommand",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "신뢰도·부정어·whitelist로 명령을 고른다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-036",
+      "source_policy_id": "FP-027",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "96cfc4ac0a759fc0bd1b314ef984c2b29e16f0be692154112bc45b37027cf5e1",
+      "candidate_assessment_sha256": "d606fd9c354b0471941c7539ce2790e7e7328887537d935433aca179bde5aa89",
+      "decision_reason": "음성 실패의 안전정지·상태·TalkBack 연결로 기존 충돌은 제거됐지만 전용 actionable 실패 UI·촉각 의미·실기기 근거가 남아 있다.",
+      "internal_residual": "오프라인 TTS 제한 재시도, 실패 화면·진동과 WARNING·중단·STOP별 촉각 의미를 완결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-027-01, TC-FP-027-02, TC-FP-027-03, TC-FP-027-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+          "file_sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+          "bytes": 42238,
+          "git_status": " M",
+          "symbol_or_test": "onInit; failRequiredSpeechRuntime",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "offline 음성 실패를 runtime에 전달한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "handleRuntimeSpeechCapabilityFailure; updateStatus; announceForAccessibility",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "음성 실패를 전체 보행 안전정지와 보이는 상태·TalkBack 안내에 연결한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicy.kt",
+          "file_sha256": "4620484885c1a970f6e59eccf18922a6b50c21af6c2a30669ad09460f6cef6e6",
+          "bytes": 15820,
+          "git_status": " M",
+          "symbol_or_test": "object VibrationPatterns; MessageLevel.STOP; MessageLevel.WARNING",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "STOP만 진동 pattern이 있고 WARNING·CAUTION 등에는 구별되는 pattern이 없다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-037",
+      "source_policy_id": "FP-028",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "b5a25e92bbfeb17dd682d4131424642102ac80395ab64b0032ad9b11edefe9de",
+      "candidate_assessment_sha256": "773fa7b43d609e35d4400e7f6887e07a3d328dae9d4a335bc1ffc88e420ca03a",
+      "decision_reason": "접근성 구현은 진전됐으나 전체 필수 화면과 실제 사용자 증거가 없다.",
+      "internal_residual": "로그인·오류·동의·권한·보행·복구·종료·삭제 화면의 heading, 오류 초점, 읽기·키보드 순서를 완결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-028-01, TC-FP-028-02, TC-FP-028-03, TC-FP-028-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "buildContentView; linkPriorityUserAccessibilityTraversal; updatePriorityUserOnboardingUi",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "heading·48dp 조작·명시적 traversal과 접근성 상태 설명을 구성한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+          "file_sha256": "00343190f9b2145303e375405bc41f23d19ae79aafef98940ac0b236943e9d87",
+          "bytes": 26105,
+          "git_status": " M",
+          "symbol_or_test": "screenReaderModeKeepsRiskHapticAndFallsBackAfterNavigationTtsFailure",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "접근성 형태를 검사하는 소스이며 실제 TalkBack PASS가 아니다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-038",
+      "source_policy_id": "FP-029",
+      "r021_status": "MISSING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "7c5613d547e1139e3070f38cf09faf4ead399077866e72286b25a6e8cac4813b",
+      "candidate_assessment_sha256": "002a7d7709512c536e8884e5fc939efc43c014e2f71181232cbb47b2a4b1a7a9",
+      "decision_reason": "접근 가능한 거부·복구 핵심은 있어 MISSING이 아니지만 모든 장애 통합은 미완성이다.",
+      "internal_residual": "동의·startup·detector 지속 장애를 공통 접근 가능 안전정지 화면과 문제별 종료·설정·재검사·명시 재개 행동으로 통합한다.",
+      "external_residual": "연결 정식 시험 TC-FP-029-01, TC-FP-029-02, TC-FP-029-03, TC-FP-029-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "showPermissionDenialPanel; enterPermissionRecoveryBarrier; disableDetectorAfterRuntimeFailure",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "접근 가능한 거부·복구와 detector 안전정지를 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-039",
+      "source_policy_id": "FP-030",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "1e3a676b1812c1c756d8099bfb2ab8d70046dbcd352f93f385e88d10dc593e94",
+      "candidate_assessment_sha256": "2cc61e75791a20675f3a7d81d8eef76bc513935b5ead6f1384aa3b7e64da99fd",
+      "decision_reason": "우선 사용자 UI는 진전됐으나 전체 화면·스위치·실제 사용자 검증이 없다.",
+      "internal_residual": "전체 사용자 화면의 글자 확대 reflow, 대비, 터치영역, 외부 키보드·스위치 순서와 상태 설명을 완결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-030-01, TC-FP-030-02, TC-FP-030-03, TC-FP-030-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "buildContentView; linkPriorityUserAccessibilityTraversal; updatePriorityUserOnboardingUi",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "font scale·고대비·48dp 조작과 명시적 초점 순서를 구성한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+          "file_sha256": "fc734bbaa57568858761b32657ecdeb45e935af6a3a1a03496ffe685f4f56803",
+          "bytes": 16310,
+          "git_status": "??",
+          "symbol_or_test": "onboardingUsesFlexibleTextHighContrastAndExplicitFocusOrder",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "우선 사용자 UI 형태를 검사하는 소스이며 실행 증거는 아니다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-040",
+      "source_policy_id": "FP-031",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "3561a0e11ae35172b9cf792a68373c13cc53eb6c0ab4709df3c14c2166d1d684",
+      "candidate_assessment_sha256": "585151dbef8f3cff1dc5f04a86d529474a77870f709bb306f40b2dbc87f4e48a",
+      "decision_reason": "후보 gate와 별개로 활성 보행 direct upload가 승인 queue 정책과 충돌한다.",
+      "internal_residual": "반복 관측 후보를 보행 후 암호화 queue로 옮기고 공간 병합·관찰 추가·중지·철회·삭제 정책을 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-031-01, TC-FP-031-02, TC-FP-031-03, TC-FP-031-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicy.kt",
+          "file_sha256": "6dbb8871a1365546351e4201ae36c6aebda99453a356ae2e3ff31b1ef2cdd875",
+          "bytes": 7540,
+          "git_status": "  ",
+          "symbol_or_test": "AndroidReportCandidatePolicy.prepare; isStableAutomaticDetection",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "손상 class·반복 관측·신뢰도·GPS gate를 적용한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "processReportCandidate; reportUploader.uploadCall",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "활성 보행 후보를 영속 queue 전에 직접 upload한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "purgeAllWithoutLoading",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "persistent queue는 비활성이고 legacy 자료만 정리한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-041",
+      "source_policy_id": "FP-032",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "57a7f1d70b424ef753f3419d521add9eb92ede585b6606eb2efcaec14e6e98c8",
+      "candidate_assessment_sha256": "81ec757583598e1cdaeb7d0c1d906c444de985016c20959a288e4a5dae7b1fff",
+      "decision_reason": "retry metadata, backend replay·commit 경계와 별도 파일 reconciliation은 있지만 활성 보행 즉시 upload 구조가 durable-queue 우선 정책과 충돌하고 payload·reboot 복구가 없다.",
+      "internal_residual": "암호화 payload persistence, 재시도·재부팅 간 stable ID, status-first 복구, 30일 만료와 우선순위 drain을 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-032-01, TC-FP-032-02, TC-FP-032-03은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "persistTransientReportAttemptFailure; newStableReportTraceId; processReportCandidate; reportUploader.uploadCall",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "요청 trace와 retry/backoff를 관리하지만 활성 보행에서 payload를 즉시 전송한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "purgeAllWithoutLoading",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "pending metadata가 아니라 legacy queue cleanup-only다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "git_status": " M",
+          "symbol_or_test": "_idempotent_report_replay; _commit_new_report_with_image",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "서버 replay와 image/DB commit 경계를 제공한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "git_status": "  ",
+          "symbol_or_test": "reconcile_pending_report_writes",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "별도 startup 경로가 호출해야 하는 신고 임시파일 reconciliation을 제공한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-042",
+      "source_policy_id": "FP-033",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "6f576d11cefff9deef5a863011c0d646355cc596234ec91cb0990472e9d4a04d",
+      "candidate_assessment_sha256": "cc182aff09bf47706123eaa23112693100234ef1dfb9dfe066ba4d32f4f58cb0",
+      "decision_reason": "별도 adminapp과 backend surface는 있으나 기관 receipt까지의 workflow가 미완성이다.",
+      "internal_residual": "adminapp 신고 목록·상세·기각, 기관 제출·수신증·결과와 사용자 정정 피드백 상태기계를 완결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-033-01, TC-FP-033-02, TC-FP-033-03, TC-FP-033-04, TC-FP-033-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+          "file_sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+          "bytes": 19867,
+          "git_status": "??",
+          "symbol_or_test": "onCreate; render",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "운영 신고 UI는 비활성이다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "git_status": " M",
+          "symbol_or_test": "list_reports; update_report_status; status_history; export_reports",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "backend 신고 조회·상태 이력·기관용 export surface가 존재한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-043",
+      "source_policy_id": "FP-034",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "bdb15cd07c941879538ef7d1059c9f4073896b189b8e3ca7bbe57b48d74ec0ec",
+      "candidate_assessment_sha256": "bdb15cd07c941879538ef7d1059c9f4073896b189b8e3ca7bbe57b48d74ec0ec",
+      "decision_reason": "문서 workflow는 있으나 release 원본 취득 경로는 no-op이다.",
+      "internal_residual": "영상·색상 영상·거리·깊이 정보·음성·음성인식·정확 위치·센서·경로·탐지·신고·성능을 수집 시 압축 원본으로 묶는 보행 1회·구간 자료 구조와 암호화 저장을 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-034-01, TC-FP-034-02, TC-FP-034-03, TC-FP-034-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/release/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugFrameCaptureUploaderFactory.kt",
+          "file_sha256": "222a38f474da55f1c5095f82279613fa7afc610c8fde00bf32ac43835290ad84",
+          "bytes": 206,
+          "git_status": "  ",
+          "symbol_or_test": "DebugFrameCaptureUploaderFactory.create",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "release는 NoopFrameCaptureUploader를 반환한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-044",
+      "source_policy_id": "FP-035",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "2ed736d1811e48a05ba502b5e77353979a6b777a2d6b4b76b1d8c2794b9c4ee1",
+      "candidate_assessment_sha256": "a40c1abe1afc4b1e57b8ca0226176f1c50446f2757cc7bcfe3279625f8b52bcd",
+      "decision_reason": "정지·망 admission 통합은 있으나 release collector·durable queue·receipt lifecycle이 없다.",
+      "internal_residual": "release 원본 collector와 암호화 durable queue, 재부팅 복구, 30일 만료와 chunk hash 수신확인을 현재 admission 경계에 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-035-01, TC-FP-035-02, TC-FP-035-03, TC-FP-035-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "file_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+          "bytes": 12485,
+          "git_status": "??",
+          "symbol_or_test": "AndroidActivityOriginalUploadPolicy.decide; ActivityOriginalUploadAdmissionController.admit",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "정지·망 선택·움직임 재개 취소를 판정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "runIfActivityOriginalUploadAllowed; cancelActivityOriginalUploads",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "정책을 전송 경계에 통합한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/release/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugFrameCaptureUploaderFactory.kt",
+          "file_sha256": "222a38f474da55f1c5095f82279613fa7afc610c8fde00bf32ac43835290ad84",
+          "bytes": 206,
+          "git_status": "  ",
+          "symbol_or_test": "DebugFrameCaptureUploaderFactory.create; NoopFrameCaptureUploader",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "release 원본 frame collector는 no-op이다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "purgeAllWithoutLoading",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "암호화 durable queue 대신 legacy cleanup 경계만 있다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-045",
+      "source_policy_id": "FP-036",
+      "r021_status": "MISSING",
+      "candidate_status": "MISSING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "aa535d242303de931de318b8bae33262b48368f8e7ebb9de49c51db64b98d120",
+      "candidate_assessment_sha256": "68cb195c94d5f74646429987947f114beae170bc6b2c00f9207e32cee9b5e7af",
+      "decision_reason": "신고 journal·retention은 있으나 활동원본 receipt→단말삭제→다중구역 lifecycle은 없다.",
+      "internal_residual": "활동원본 exact ID·크기·SHA receipt 뒤 단말 삭제와 14일·180일·3년·35일 저장구역, 철회·backup 삭제 연쇄를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-036-01, TC-FP-036-02, TC-FP-036-03, TC-FP-036-04, TC-FP-036-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "git_status": " M",
+          "symbol_or_test": "_persist_v2_report; _commit_new_report_with_image",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "신고 image journal과 DB commit 경계를 연결한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "git_status": "  ",
+          "symbol_or_test": "stage_report_image; reconcile_pending_report_writes",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "신고 임시파일 journal과 crash reconciliation을 구현한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "scripts/check_report_retention_dry_run.py",
+          "file_sha256": "c20efd03308a3ccdbd69ad2a4c608a35a3f4024141fbf4a9b1bfbad34b95f4eb",
+          "bytes": 105968,
+          "git_status": " M",
+          "symbol_or_test": "RETENTION_DAYS; retention_bucket; _apply_database_retention_locked",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "신고 active/resolved 180일 retention 실행 경로를 정의한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-046",
+      "source_policy_id": "FP-037",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "2dd7fcfc40e6c59f1d31c685c7a098dc20b97cb7c8451ece98cbb831465f0b34",
+      "candidate_assessment_sha256": "2dd7fcfc40e6c59f1d31c685c7a098dc20b97cb7c8451ece98cbb831465f0b34",
+      "decision_reason": "배포 부적격 모델을 runtime 안전·신고 경로에서 사용해 registry 정책과 충돌한다.",
+      "internal_residual": "후보 모델은 명명된 통제 시연에서만 사용하고 정식 배포본 위험안내·자동신고·기관 반출은 승인 모델·앱·설정 한 묶음일 때만 허용한다.",
+      "external_residual": "연결 정식 시험 TC-FP-037-01, TC-FP-037-02, TC-FP-037-03, TC-FP-037-04, TC-FP-037-05, TC-FP-037-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "file_sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+          "bytes": 22070,
+          "git_status": "??",
+          "symbol_or_test": "/primary_runtime_model_id; /approved_model_count",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "승인 모델은 0이고 runtime 후보는 배포 부적격이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-047",
+      "source_policy_id": "FP-038",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "71158fe05330a1b57ebc1a9cf4a793fd0737d9e6778e3d355dda7f938aaffe40",
+      "candidate_assessment_sha256": "71158fe05330a1b57ebc1a9cf4a793fd0737d9e6778e3d355dda7f938aaffe40",
+      "decision_reason": "기본 integrity 도구는 있으나 승인 재학습·잠긴 독립평가 pipeline이 없다.",
+      "internal_residual": "출처·동의 관리대장과 내용 지문, 촬영 순서가 섞이지 않은 분할, 잠긴 독립시험셋, 독립평가·실폰시험·철회자료 제거를 완료한다.",
+      "external_residual": "연결 정식 시험 TC-FP-038-01, TC-FP-038-02, TC-FP-038-03, TC-FP-038-04, TC-FP-038-05, TC-FP-038-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "scripts/walksafe_dataset_integrity.py",
+          "file_sha256": "16b31b59bff320d00267d826a1d78ff2e156f8f4f958f2efb078e61be20b3891",
+          "bytes": 5657,
+          "git_status": "  ",
+          "symbol_or_test": "verify_content_hashed_manifest",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "파일 hash와 cross-split 중복을 검사한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-048",
+      "source_policy_id": "FP-039",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "5d653a065888f220a998e3390d5f745af3fad5352293d636d53d32dd5d84d5a1",
+      "candidate_assessment_sha256": "5d653a065888f220a998e3390d5f745af3fad5352293d636d53d32dd5d84d5a1",
+      "decision_reason": "known-good generation 없이 자동 legacy fallback을 실행해 rollback 정책과 충돌한다.",
+      "internal_residual": "앱·서버·모델·탐지대상·판단 기준값·설정·데이터베이스 세대를 하나의 서명 구성 목록으로 묶고 승인된 이전 정상 조합으로만 중간 상태 없이 되돌아가도록 구현·훈련한다.",
+      "external_residual": "연결 정식 시험 TC-FP-039-01, TC-FP-039-02, TC-FP-039-03, TC-FP-039-04, TC-FP-039-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "file_sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+          "bytes": 22070,
+          "git_status": "??",
+          "symbol_or_test": "/runtime_artifact_evidence_binding/promotion_rollback_contract",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "known-good rollback anchor가 없고 promotion은 미승인이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-049",
+      "source_policy_id": "FP-040",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "b31a86c712acb44faf0bfcf0830ed4fe997abdbdd15f8b58b8f0f621c260f063",
+      "candidate_assessment_sha256": "65ec6de0deb8ee3c4fda0b1890bd2dc852f7ea86069f59240dbdd9c5c72b062b",
+      "decision_reason": "현재 결속 근거만으로 모든 서버 기능 단일 출입구·모든 write idempotency·예외 승인·workload isolation 완료를 입증할 수 없다.",
+      "internal_residual": "공통 관리자 진입점, 예외 승인, 전 write trace·idempotency와 프로세스 간 안전·대용량 자원 격리를 완성한다.",
+      "external_residual": "연결 정식 시험 TC-FP-040-01, TC-FP-040-02, TC-FP-040-03, TC-FP-040-04, TC-FP-040-05, TC-FP-040-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/routes.ts",
+          "file_sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+          "bytes": 30206,
+          "git_status": "??",
+          "symbol_or_test": "ALLOWED_METHODS; PUBLIC_GATEWAY_ROUTES",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Gateway 운영 경로를 제한한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/services/admin_security.py",
+          "file_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+          "bytes": 74728,
+          "git_status": "??",
+          "symbol_or_test": "ADMIN_APP_KIND; ADMIN_ROLE; ADMIN_AUDIENCE; authorize_admin_protected_work",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "backend 관리자 작업을 app-kind·role·audience·device-bound session으로 검사한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "git_status": " M",
+          "symbol_or_test": "_idempotent_report_replay; _shared_report_write_lock",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "report 경로의 개별 replay와 maintenance write lock을 제공한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-050",
+      "source_policy_id": "FP-041",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "0af49aec5ad5825e77232d0cfbb9064e06c1430faf42e001d29fcdb370d12ee2",
+      "candidate_assessment_sha256": "0af49aec5ad5825e77232d0cfbb9064e06c1430faf42e001d29fcdb370d12ee2",
+      "decision_reason": "local crash reconciliation은 있으나 DB↔암호화 object store 계약은 아니다.",
+      "internal_residual": "계정·동의·신고 메타데이터 데이터베이스와 암호화 열쇠 관리서비스 암호화 대용량 파일 저장소를 분리하고 원본 구성 목록·수신확인서·자료 구조 전환·삭제 완료 표식을 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-041-01, TC-FP-041-02, TC-FP-041-03, TC-FP-041-04, TC-FP-041-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "git_status": "  ",
+          "symbol_or_test": "stage_report_image; reconcile_pending_report_writes",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "로컬 journal 복구를 제공하지만 object store가 아니다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-051",
+      "source_policy_id": "FP-042",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "a4a97b68193dcda01f6b09a6f2847f8d285c2c3eb3c8b2ca212ad8769b875a43",
+      "candidate_assessment_sha256": "a4a97b68193dcda01f6b09a6f2847f8d285c2c3eb3c8b2ca212ad8769b875a43",
+      "decision_reason": "secret·admission 일부는 있으나 durable queue·전 write idempotency·비용 통제가 없다.",
+      "internal_residual": "안전 요청과 대용량 작업의 내구성 자원 분리, 쓰기 idempotency, 일일 사용량·월비용 한도와 초과 대체 안내를 구현·측정한다.",
+      "external_residual": "연결 정식 시험 TC-FP-042-01, TC-FP-042-02, TC-FP-042-03, TC-FP-042-04, TC-FP-042-05, TC-FP-042-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/backend.ts",
+          "file_sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81",
+          "bytes": 15559,
+          "git_status": "??",
+          "symbol_or_test": "acquireImageUploadAdmission",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "in-process rate·동시성 admission을 제공한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-052",
+      "source_policy_id": "FP-043",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "404342822742a243317b4afe49347b6f548fd2b88af5703ce3e9220f69e1d5e3",
+      "candidate_assessment_sha256": "9998dfcc003accee0aeb96890451407caad546d31f75ebd54d5643a76cf35114",
+      "decision_reason": "resource·speech 안전정지는 있으나 전체 failure/recovery matrix가 미완성이다.",
+      "internal_residual": "위치·경로 freshness를 포함한 기능별 failure matrix와 공통 backoff, 안정 회복·사용자 확인·감사 상태기계를 완결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-043-01, TC-FP-043-02, TC-FP-043-03은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+          "file_sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+          "bytes": 5353,
+          "git_status": "??",
+          "symbol_or_test": "AndroidWalkSessionResourceProbe; WalkSessionDeviceResourceSnapshot",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "배터리·저장공간·발열 readiness를 fail-close한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+          "file_sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+          "bytes": 42238,
+          "git_status": " M",
+          "symbol_or_test": "failRequiredSpeechRuntime; notifyOfflineKoreanSpeechUnavailable",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "필수 offline TTS runtime 실패를 MainActivity callback으로 전달한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "applyRuntimeReadinessIfActive; handleRuntimeSpeechCapabilityFailure; enterWalkSessionSafetyStopAndCancelOutputs",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "resource readiness와 필수 speech 실패를 활성 보행 안전정지에 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-053",
+      "source_policy_id": "FP-044",
+      "r021_status": "CONFLICTING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "1db306a542508f1b937b4b529b0ffc96e7909269567d55bb6750b41f97d6eeb1",
+      "candidate_assessment_sha256": "44429b569b6f49652cae435fce1e0d262d7468c737c69505b58a5d84e770a92d",
+      "decision_reason": "망 통제 일부와 별개로 durable queue가 없고 자동 reroute가 정책과 충돌한다.",
+      "internal_residual": "암호화 30일 queue, 실제 capacity·idempotency·reboot worker를 구현하고 사용자 선택 없는 자동 reroute를 제거한다.",
+      "external_residual": "연결 정식 시험 TC-FP-044-01, TC-FP-044-02, TC-FP-044-03, TC-FP-044-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "file_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+          "bytes": 12485,
+          "git_status": "??",
+          "symbol_or_test": "AndroidNetworkTransferPolicy.isAllowed",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "망 종류에 따른 전송 admission을 판정한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "AndroidPendingReportStore",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "persistent queue를 제공하지 않고 legacy 자료를 purge한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "isGatewayNetworkAllowed; updateRouteGuidance; requestRoute",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "망 통제를 연결하지만 off-route에서 사용자 선택 없이 route를 다시 요청한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-054",
+      "source_policy_id": "FP-045",
+      "r021_status": "MISSING",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "08f43a7f2eb0cbb2a9531d88f6929f04b0725c147d9af8f29e2241d569e57e6e",
+      "candidate_assessment_sha256": "014cd9a94ef379bbf3fa687e759dfe974f2654f6e3ebb3db0759ab187d5b05b9",
+      "decision_reason": "resource fail-close가 있어 MISSING은 낡았으나 수치·임계값·열화순서·장시간 증거가 없다.",
+      "internal_residual": "battery consumption·free storage·queue bytes·frame age·detect-to-speech를 계측하고 기기별 경고·정지 임계값과 열화 순서를 승인한다.",
+      "external_residual": "연결 정식 시험 TC-FP-045-01, TC-FP-045-02, TC-FP-045-03, TC-FP-045-04은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+          "file_sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+          "bytes": 5353,
+          "git_status": "??",
+          "symbol_or_test": "AndroidWalkSessionResourceProbe",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "저배터리·저장공간·critical thermal을 관찰한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "git_status": " M",
+          "symbol_or_test": "applyRuntimeReadinessIfActive",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "활성 보행의 resource readiness 상실을 안전정지 경로에 연결한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-055",
+      "source_policy_id": "FP-046",
+      "r021_status": "MISSING",
+      "candidate_status": "CONFLICTING",
+      "decision_disposition": "REASSESS_DOWN",
+      "status_disposition": "REASSESS_DOWN",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "STATUS_AND_TEXT",
+      "r021_assessment_sha256": "dd605aee946cb50df56cf6c8ca61885c4386e5fd7f0c73fc75f8dd8fd9f056cb",
+      "candidate_assessment_sha256": "17b1d17140539fb2459fd74f49a23bef1b57275304e094e559df731b2e344b1c",
+      "decision_reason": "Android와 Gateway 삭제 wire protocol이 직접 불일치해 현재 연결이 동작할 수 없다.",
+      "internal_residual": "Android·Gateway의 header·query·request·status schema를 단일화하고 저장소별 삭제 worker, retry·receipt, 보존·backup tombstone 재적용을 연결한다.",
+      "external_residual": "연결 정식 시험 TC-FP-046-01, TC-FP-046-02, TC-FP-046-03, TC-FP-046-04, TC-FP-046-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+          "file_sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89",
+          "bytes": 8994,
+          "git_status": "??",
+          "symbol_or_test": "requestDeletionCall; fetchDeletionStatusCall",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Android wire shape와 consent-control secret을 사용한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android-gateway/src/privacy-rights.ts",
+          "file_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+          "bytes": 44699,
+          "git_status": "??",
+          "symbol_or_test": "parseAccountDeletionRequest; statusView; EXTERNAL_PENDING; transitionAccountDeletionItem",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "다른 Gateway request/status schema와 외부 evidence transition 원장을 사용한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android-gateway/src/routes.ts",
+          "file_sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+          "bytes": 30206,
+          "git_status": "??",
+          "symbol_or_test": "accountDeletionControl; ACCOUNT_DELETION_SECRET_HEADER",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "별도 account-deletion secret과 정확한 입력 shape를 요구한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-056",
+      "source_policy_id": "FP-047",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "038e224454b590e90dbc580f7b98ae94a75a951a3f3d1111a18a9f81594d34a1",
+      "candidate_assessment_sha256": "038e224454b590e90dbc580f7b98ae94a75a951a3f3d1111a18a9f81594d34a1",
+      "decision_reason": "내부 auth core는 r021에 반영됐고 운영·외부·정식 검증 경계를 넘을 근거가 없다.",
+      "internal_residual": "운영 사용자 기기별 회전 세션과 별도 관리자 추가 인증·고위험 재확인·원격폐기·복구를 계정 기반 역할검사와 감사로그로 통합한다.",
+      "external_residual": "연결 정식 시험 TC-FP-047-01, TC-FP-047-02, TC-FP-047-03, TC-FP-047-04, TC-FP-047-05, TC-FP-047-06, TC-FP-047-07은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+          "file_sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+          "bytes": 6291,
+          "git_status": "??",
+          "symbol_or_test": "/completion_boundary",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "내부 완료와 formal·device·external NOT_RUN 경계를 고정한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-057",
+      "source_policy_id": "FP-048",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "02bb37a4df207a250165aad2cd53bf8905b1427bf62faaf0514494da4b682823",
+      "candidate_assessment_sha256": "02bb37a4df207a250165aad2cd53bf8905b1427bf62faaf0514494da4b682823",
+      "decision_reason": "build·transport 통제 일부는 있으나 저장암호화·KMS·감사·사고대응 검증이 미완성이다.",
+      "internal_residual": "휴대전화·서버 원본·데이터베이스·백업 암호화와 열쇠 분리·회전·감사를 구현하고 실제 배포 TLS·기기 및 독립 보안 검토를 수행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-048-01, TC-FP-048-02, TC-FP-048-03, TC-FP-048-04, TC-FP-048-05, TC-FP-048-06, TC-FP-048-07은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/deliverables/07-security/security-verification-evidence.md",
+          "file_sha256": "0b7cc90532f8a279416b0647e5fb154618d377689faf3a38052555ceef205a02",
+          "bytes": 21114,
+          "git_status": "??",
+          "symbol_or_test": "현재 실행 상태",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "보안 검증 다섯 항목이 Planned/NOT_RUN이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-058",
+      "source_policy_id": "FP-049",
+      "r021_status": "EVIDENCE_MISSING",
+      "candidate_status": "EVIDENCE_MISSING",
+      "decision_disposition": "NEEDS_EVIDENCE",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "1ebbe4f7f12c5e3350f3ba21a4a2a078f10bd63dac863c5922f448214ed36abc",
+      "candidate_assessment_sha256": "1ebbe4f7f12c5e3350f3ba21a4a2a078f10bd63dac863c5922f448214ed36abc",
+      "decision_reason": "동일 immutable RC에 결속된 정식 실행·인수 증거가 없다.",
+      "internal_residual": "하나의 불변 출시 후보 묶음을 지정해 자동·실폰 처음부터 끝까지의 전체 과정·접근성·현장·개인정보·보안 시험을 모두 실행하고 중대결함 0과 5개 확인 관문 종료 뒤 TST-22를 판단한다.",
+      "external_residual": "연결 정식 시험 TC-FP-049-01, TC-FP-049-02, TC-FP-049-03, TC-FP-049-04, TC-FP-049-05, TC-FP-049-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/deliverables/06-testing/test-quality-report.md",
+          "file_sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+          "bytes": 3279,
+          "git_status": "??",
+          "symbol_or_test": "TST-19; 종합판정",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "279건 실행 0, PASS 0, release NOT_ELIGIBLE을 기록한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-059",
+      "source_policy_id": "FP-050",
+      "r021_status": "EVIDENCE_MISSING",
+      "candidate_status": "EVIDENCE_MISSING",
+      "decision_disposition": "NEEDS_EVIDENCE",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "8a846d7effe5110719e1774467291347f6748136a613a65cea0a8ea96092f0bd",
+      "candidate_assessment_sha256": "8a846d7effe5110719e1774467291347f6748136a613a65cea0a8ea96092f0bd",
+      "decision_reason": "좁은 smoke workflow는 전체 성능·현장 사용자 시험 결과가 아니다.",
+      "internal_residual": "지원폰별 전체 기능 동시 장시간 성능·열·배터리·전송 대기함을 측정하고 안전요원·중단계획 아래 목표사용자 현장시험을 수행한다.",
+      "external_residual": "연결 정식 시험 TC-FP-050-01, TC-FP-050-02, TC-FP-050-03, TC-FP-050-04, TC-FP-050-05은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": ".github/workflows/android-device-acceptance.yml",
+          "file_sha256": "14f8beb528b4f2337fcd646cbdf651658396b3f416e972d0f6fda90722016810",
+          "bytes": 10624,
+          "git_status": "  ",
+          "symbol_or_test": "Write acceptance scope summary",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "좁은 smoke 범위이며 제품 인수 인용을 금지한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-060",
+      "source_policy_id": "FP-051",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "398b132e0d792320871787a5e215fb49954a63c65d3e8d6116d2f6b9db801a77",
+      "candidate_assessment_sha256": "398b132e0d792320871787a5e215fb49954a63c65d3e8d6116d2f6b9db801a77",
+      "decision_reason": "build provenance 일부는 있으나 현행 immutable RC와 실제 update·rollback·store 배포가 없다.",
+      "internal_residual": "서명된 불변 정식 배포본 구성 목록, 단계 배포, 활성 보행 중 갱신 연기, 신규 세션 새 보행 긴급 차단과 데이터 무손실 호환 가능한 이전 정상 상태로 되돌리기를 실제로 훈련한다.",
+      "external_residual": "연결 정식 시험 TC-FP-051-01, TC-FP-051-02, TC-FP-051-03, TC-FP-051-04, TC-FP-051-05, TC-FP-051-06, TC-FP-051-07은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/build.gradle.kts",
+          "file_sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+          "bytes": 4652,
+          "git_status": " M",
+          "symbol_or_test": "validateWalkSafeSourceCommit",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "release source commit와 exact HTTPS Gateway origin을 강제한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-061",
+      "source_policy_id": "FP-052",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "ff628746a82c8cc38023114c030e921686ef1be76b08f5ec4b88e557639e6274",
+      "candidate_assessment_sha256": "b9c36f0ffbb1fcd405f0e294c8a46e33b760d42b1a2aa4b72dd4ae23133cafdd",
+      "decision_reason": "telemetry producer는 늘었지만 종단간 모니터링·경보·on-call 운영체계가 없다.",
+      "internal_residual": "영속 telemetry collector·retention, 전 기능 dashboard·metric·trace, 안전·운영 이중 alert·safe-stop과 on-call workflow를 구현한다.",
+      "external_residual": "연결 정식 시험 TC-FP-052-01, TC-FP-052-02, TC-FP-052-03, TC-FP-052-04, TC-FP-052-05, TC-FP-052-06, TC-FP-052-07, TC-FP-052-08은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/telemetry.ts",
+          "file_sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96",
+          "bytes": 2345,
+          "git_status": "??",
+          "symbol_or_test": "recordGatewayFailure; writeGatewayTelemetry",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "Gateway failure telemetry producer와 file sink 격리가 있다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+          "file_sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0",
+          "bytes": 3229,
+          "git_status": "??",
+          "symbol_or_test": "SCHEMA_VERSION; AUTH_FAILED; RECOVERY_START_FAILED; Recorder",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "관리자 인증·복구 결과를 versioned 비밀값 없는 Logcat event로 만든다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+          "file_sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+          "bytes": 18158,
+          "git_status": "??",
+          "symbol_or_test": "telemetry.record; AUTH_SUCCEEDED; RECOVERY_COMPLETE_FAILED",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "관리자 인증·복구 controller가 telemetry producer를 실제 호출한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/10-operations/operator-guide.md",
+          "file_sha256": "a223cc805f0b27bd82e8f3d94476886165f98a8f4d526824f3b0f08c3473092d",
+          "bytes": 40118,
+          "git_status": "??",
+          "symbol_or_test": "OPS-06 운영 대시보드; OPS-07 알림 기준; PLANNED / NOT_RUN",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "운영 정본이 dashboard와 alert를 계획·미실행 상태로 고정한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-062",
+      "source_policy_id": "FP-053",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "274fa4fb8309f0d7ed8a1c7c4164d73a4ff9f0e74e8d34bdaa4fa8458de6b241",
+      "candidate_assessment_sha256": "571d3fc2656fe37d85dd5ad603cb3a72899b5cae2822f086b58640be1d84b457",
+      "decision_reason": "35일 prune·backup 도구는 있으나 자동 운용과 실제 복구 증거가 없다.",
+      "internal_residual": "완전한 암호화 backup bundle과 deletion ledger·key version을 묶고 자동 backup·35일 prune schedule, capacity·cost 계측과 RPO/RTO를 승인한다.",
+      "external_residual": "연결 정식 시험 TC-FP-053-01, TC-FP-053-02, TC-FP-053-03, TC-FP-053-04, TC-FP-053-05, TC-FP-053-06은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "scripts/backup_walksafe_data_20260711.sh",
+          "file_sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+          "bytes": 22315,
+          "git_status": "  ",
+          "symbol_or_test": "gpg --no-options; manifest.json.sig",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "database와 upload backup을 암호화하고 manifest에 서명한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+          "file_sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+          "bytes": 47092,
+          "git_status": "  ",
+          "symbol_or_test": "--verify-inherited-restore; pg_restore --exit-on-error",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "서명·manifest를 검증하고 격리된 target에 restore drill을 수행한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "scripts/prune_walksafe_backups_20260711.py",
+          "file_sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+          "bytes": 5755,
+          "git_status": " M",
+          "symbol_or_test": "plan_backup_prune; apply_backup_prune",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "35일·최소 3개·dry-run prune을 구현한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+          "file_sha256": "0a951150201dbaa13e88c326f308fabc07486e018a8f7bdd38392c90438e9377",
+          "bytes": 32049,
+          "git_status": "??",
+          "symbol_or_test": "/backup_policy/restore_execution_count; /backup_policy/backup_instances; /backup_policy/restore_executions",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "실제 backup instance와 restore execution은 0건이다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/10-operations/recovery-plan.md",
+          "file_sha256": "7b7cf6a02488bd7c90671895dd814e21c729fddd26fd27b321306b73b450982c",
+          "bytes": 19976,
+          "git_status": "??",
+          "symbol_or_test": "OPS-12 RTO·RPO; 미정이다; DRAFT / NOT_APPROVED",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "RPO/RTO는 실측·승인 전 미정이며 현재 계획은 미승인이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-063",
+      "source_policy_id": "FP-054",
+      "r021_status": "PARTIAL",
+      "candidate_status": "PARTIAL",
+      "decision_disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "content_disposition": "TEXT_FIX",
+      "row_delta": "TEXT_ONLY",
+      "r021_assessment_sha256": "39a26196471436d23c26e2e404028eaaef68a29cb01939ae0159019a31ac8e86",
+      "candidate_assessment_sha256": "73c9b3a56a1d4f2b008fd4ce84ec1ed002f0156803535609c012e225a9247980",
+      "decision_reason": "maintenance·종료 schema와 no-rollback forward-fix 정책은 있으나 통합 배포·종료 실행과 승인이 없다.",
+      "internal_residual": "전 계층 drain, 사용자 고지·safe pause, 신규 세션 차단과 pending data 정합, 변경 실패 시 rollback 없는 forward-fix·기능 안전정지, provider·data·key 종료를 통합한다.",
+      "external_residual": "연결 정식 시험 TC-FP-054-01, TC-FP-054-02, TC-FP-054-03, TC-FP-054-04, TC-FP-054-05, TC-FP-054-06, TC-FP-054-07은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "git_status": " M",
+          "symbol_or_test": "_shared_report_write_lock; fcntl.LOCK_SH",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "report write가 maintenance lock의 shared side를 non-blocking으로 획득하고 실패 시 닫힌다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "scripts/backup_walksafe_data_20260711.sh",
+          "file_sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+          "bytes": 22315,
+          "git_status": "  ",
+          "symbol_or_test": "flock --exclusive; maintenance lock",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "backup 경로가 같은 maintenance 경계의 exclusive lock을 획득한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+          "file_sha256": "dbb9cc1d5a72208dc987d675518a07e39230b69f5c6cf1d67795efb1e7ed5c6a",
+          "bytes": 37040,
+          "git_status": "??",
+          "symbol_or_test": "CLS-14 데이터 보존·이관·삭제; CLS-15 계정·키·인프라 정리; CLS-16 서비스 종료·폐기 계획",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "종료 시 data·account·key·provider lifecycle과 NOT_RUN 실행 경계를 구조화한다.",
+          "test_execution_credit": 0
+        },
+        {
+          "path": "docs/control/decision-interview/walksafe-feature-policy-effective-candidate.json",
+          "file_sha256": "7d96d66a856409e878127bfc049ee4847fee4ad82c2f15ba93add8923c330bc7",
+          "bytes": 273607,
+          "git_status": "??",
+          "symbol_or_test": "Delta의 rollback 없이 forward fix가 원본 known-good rollback 답변을 대체한다.",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "정책 후보가 실패 시 rollback 없이 forward-fix와 안전정지를 요구한다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-064",
+      "source_policy_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "r021_status": "BLOCKED",
+      "candidate_status": "BLOCKED",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "72e4e05c7e1d765b60617da02aff5a5b8ea2cc3ae5ea8f1cfa4d5afda22b1f5b",
+      "candidate_assessment_sha256": "72e4e05c7e1d765b60617da02aff5a5b8ea2cc3ae5ea8f1cfa4d5afda22b1f5b",
+      "decision_reason": "암호화 bounded queue와 승인된 실제 byte cap이 없어 gate를 실행할 수 없다.",
+      "internal_residual": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-GATE-PHONE-QUEUE-BYTE-LIMIT-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "git_status": "??",
+          "symbol_or_test": "AndroidPendingReportStore",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "요구 대상 queue는 비활성이고 byte cap이 없다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-065",
+      "source_policy_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "r021_status": "BLOCKED",
+      "candidate_status": "BLOCKED",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "d0f1468e74f457d56b9c0b0b793fd5f3600a7dc179a7432154c144eb726c6acc",
+      "candidate_assessment_sha256": "d0f1468e74f457d56b9c0b0b793fd5f3600a7dc179a7432154c144eb726c6acc",
+      "decision_reason": "정책 숫자는 있으나 서버 용량상태 계약과 단말 전파·차단 동작이 없다.",
+      "internal_residual": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-GATE-SERVER-CAPACITY-STATE-CONTRACT-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/api/health.py",
+          "file_sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+          "bytes": 12501,
+          "git_status": " M",
+          "symbol_or_test": "create_router",
+          "locator_verification": "EXACT_TEXT_PRESENT",
+          "observed_fact": "capacity version·observed_at·TTL 계약이 없다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-066",
+      "source_policy_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "r021_status": "BLOCKED",
+      "candidate_status": "BLOCKED",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "82b72e117d1fa5141bf017f21907f9480247572ee5ff2ab960d000e58c76be79",
+      "candidate_assessment_sha256": "82b72e117d1fa5141bf017f21907f9480247572ee5ff2ab960d000e58c76be79",
+      "decision_reason": "내부 동의 로직은 독립 privacy/legal release review를 대체하지 못한다.",
+      "internal_residual": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-GATE-RAW-COLLECTION-RELEASE-REVIEW-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+          "file_sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675",
+          "bytes": 97289,
+          "git_status": "??",
+          "symbol_or_test": "/authority_boundary",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "독립 법률·개인정보 검토가 pending이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-067",
+      "source_policy_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "r021_status": "BLOCKED",
+      "candidate_status": "BLOCKED",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "393816c9199c302eb54f41993e87829560ed67faaaeb6129f1180ea52e0c3e85",
+      "candidate_assessment_sha256": "393816c9199c302eb54f41993e87829560ed67faaaeb6129f1180ea52e0c3e85",
+      "decision_reason": "정책 예산만 있고 대표 workload·restore의 실제 cloud bill 측정이 없다.",
+      "internal_residual": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-GATE-CLOUD-COST-MEASUREMENT-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+          "file_sha256": "0a951150201dbaa13e88c326f308fabc07486e018a8f7bdd38392c90438e9377",
+          "bytes": 32049,
+          "git_status": "??",
+          "symbol_or_test": "/server_capacity_policy; /remaining_gates",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "30,000원은 정책값이고 실제 비용 gate는 NOT_RUN이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    },
+    {
+      "gap_id": "GAP-068",
+      "source_policy_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "r021_status": "BLOCKED",
+      "candidate_status": "BLOCKED",
+      "decision_disposition": "KEEP",
+      "status_disposition": "KEEP",
+      "content_disposition": "KEEP",
+      "row_delta": "UNCHANGED",
+      "r021_assessment_sha256": "f524685f26eaeca5bf426377dd200a2b0eaa3a0c13161017b5cec63e0d680425",
+      "candidate_assessment_sha256": "f524685f26eaeca5bf426377dd200a2b0eaa3a0c13161017b5cec63e0d680425",
+      "decision_reason": "내부 복구 구현과 절차 초안은 실제 휴대전화 분실 복구훈련을 대체하지 못한다.",
+      "internal_residual": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다.",
+      "external_residual": "연결 정식 시험 TC-GATE-SINGLE-ADMIN-RECOVERY-DRILL-01은 NOT_RUN이며, 실기기·참여자·외부 승인·출시 gate 완료를 주장하지 않는다.",
+      "evidence_locators": [
+        {
+          "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+          "file_sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+          "bytes": 8223,
+          "git_status": "??",
+          "symbol_or_test": "/metadata/status; /release_boundary",
+          "locator_verification": "JSON_POINTER_RESOLVED",
+          "observed_fact": "절차는 DRAFT_PROCEDURE_NOT_EXECUTED이고 gate는 NOT_RUN이다.",
+          "test_execution_credit": 0
+        }
+      ],
+      "formal_test_credit": 0,
+      "actual_device_credit": 0,
+      "external_approval_credit": 0,
+      "release_credit": 0
+    }
+  ],
+  "summary": {
+    "status_counts": {
+      "BLOCKED": 5,
+      "CONFLICTING": 14,
+      "EVIDENCE_MISSING": 4,
+      "MISSING": 6,
+      "PARTIAL": 39
+    },
+    "decision_disposition_counts": {
+      "KEEP": 33,
+      "NEEDS_EVIDENCE": 4,
+      "REASSESS_DOWN": 1,
+      "REASSESS_UP": 7,
+      "TEXT_FIX": 23
+    },
+    "changed_gap_ids": [
+      "GAP-002",
+      "GAP-004",
+      "GAP-005",
+      "GAP-006",
+      "GAP-008",
+      "GAP-016",
+      "GAP-017",
+      "GAP-021",
+      "GAP-022",
+      "GAP-023",
+      "GAP-025",
+      "GAP-028",
+      "GAP-030",
+      "GAP-034",
+      "GAP-036",
+      "GAP-037",
+      "GAP-038",
+      "GAP-039",
+      "GAP-040",
+      "GAP-041",
+      "GAP-042",
+      "GAP-044",
+      "GAP-045",
+      "GAP-049",
+      "GAP-052",
+      "GAP-053",
+      "GAP-054",
+      "GAP-055",
+      "GAP-061",
+      "GAP-062",
+      "GAP-063"
+    ],
+    "carried_forward_gap_ids": [
+      "GAP-001",
+      "GAP-003",
+      "GAP-007",
+      "GAP-009",
+      "GAP-010",
+      "GAP-011",
+      "GAP-012",
+      "GAP-013",
+      "GAP-014",
+      "GAP-015",
+      "GAP-018",
+      "GAP-019",
+      "GAP-020",
+      "GAP-024",
+      "GAP-026",
+      "GAP-027",
+      "GAP-029",
+      "GAP-031",
+      "GAP-032",
+      "GAP-033",
+      "GAP-035",
+      "GAP-043",
+      "GAP-046",
+      "GAP-047",
+      "GAP-048",
+      "GAP-050",
+      "GAP-051",
+      "GAP-056",
+      "GAP-057",
+      "GAP-058",
+      "GAP-059",
+      "GAP-060",
+      "GAP-064",
+      "GAP-065",
+      "GAP-066",
+      "GAP-067",
+      "GAP-068"
+    ],
+    "status_changed_gap_ids": [
+      "GAP-008",
+      "GAP-017",
+      "GAP-036",
+      "GAP-038",
+      "GAP-044",
+      "GAP-052",
+      "GAP-054",
+      "GAP-055"
+    ],
+    "implemented_count": 0,
+    "formal279_pass_count": 0,
+    "actual_device_execution_count": 0,
+    "closed_release_gate_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "authorization_boundary": {
+    "canonical_gap_or_backlog_modified": false,
+    "checkpoint_modified": false,
+    "goal_event_appended": false,
+    "work_item_materialized": false,
+    "product_code_modified_by_this_reassessment": false,
+    "separate_candidate_specific_activation_approval_required": true
+  },
+  "ledger_content_sha256": "8df9a8926d2534b793deacfa72ada221bedb0fa08e1c703c01129dab6a34572c"
+}

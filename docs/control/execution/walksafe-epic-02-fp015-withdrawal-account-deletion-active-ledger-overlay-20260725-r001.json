@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "overlay_id": "WS-EPIC-02-FP015-WITHDRAWAL-ACCOUNT-DELETION-ACTIVE-LEDGER-OVERLAY-20260725-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-25",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-02 FP-015 withdrawal/account-deletion successor overlay"
+  },
+  "authority_boundary": {
+    "predecessor_overlay_preserved": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_product_policy": false,
+    "formal_test_completion_claimed": false,
+    "actual_external_deletion_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "production_deployment_completion_claimed": false,
+    "epic_in_progress_claimed": true,
+    "epic_complete_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": {
+    "predecessor_overlay": {
+      "path": "docs/control/execution/walksafe-epic-02-fp013-integrated-consent-active-ledger-overlay-20260725-r001.json",
+      "bytes": 19652,
+      "sha256": "d6337f2c67cff562bd011032033d5c473b437ca608e3ec811998cf116fd6607c"
+    },
+    "implementation_record": {
+      "name": "fp015_implementation",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/implementation-record.json",
+      "sha256": "696b89c8e95c979e40174cc7e6423fabad54fb137ce6cf75fe4724004f12f8aa"
+    },
+    "verification_result": {
+      "name": "fp015_verification",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/verification-result.json",
+      "sha256": "c56005ea9ecf553caf83f4e7f0c31d6e5e269154aee4a9f5ff7a8d4183682b37"
+    },
+    "implementation_gap": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260725-r017.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260725-017",
+      "file_sha256": "eb155dbec7228882871dea7df76c8e24cfef0fe51be9ec95e7f91c5e5b1e7be0"
+    },
+    "implementation_backlog": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r017.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-017",
+      "file_sha256": "0ca4724ffad40891503c7df1578e4bbb274991276ef852d1dd3b74ca3011dc35"
+    }
+  },
+  "goal_state": {
+    "goal_id": "WS-GOAL-EPIC-02-FP-015-R001",
+    "internal_result": "PARTIAL_IMPLEMENTATION_VERIFIED",
+    "gap_id": "GAP-024",
+    "gap_status": "PARTIAL",
+    "next_source_policy_id": "FP-014",
+    "next_gap_id": "GAP-023"
+  },
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-015-01",
+      "TC-FP-015-02",
+      "TC-FP-015-03",
+      "TC-FP-015-04",
+      "TC-FP-015-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "legal_privacy_review_status": "NOT_RUN",
+    "legal_hold_determination_status": "NOT_RUN",
+    "approved_final_privacy_copy_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_guardian_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "actual_external_storage_deletion_status": "NOT_RUN",
+    "actual_backup_deletion_status": "NOT_RUN",
+    "external_rights_intake_provisioning_status": "NOT_RUN",
+    "deletion_sla_certification_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

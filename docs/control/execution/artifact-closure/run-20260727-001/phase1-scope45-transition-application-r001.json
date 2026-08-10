@@ -1,0 +1,3626 @@
+{
+  "application_id": "WS-PHASE1-SCOPE45-TRANSITION-APPLICATION-20260728-R001",
+  "authority_boundary": {
+    "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+    "authority_externally_verified": false,
+    "cryptographic_signature_present": false,
+    "decision_maker_identity": "김민호",
+    "decision_maker_role": "PROJECT_SCOPE_OWNER",
+    "external_legal_signature_or_release_authorization_created": false,
+    "internal_scope_transition_authorized": true,
+    "owner14_or_attestation_authority_credit_created": false
+  },
+  "compatibility_review": {
+    "credit_rule": "SCOPE_N_A_APPROVED and CLOSED_N_A_FOR_CURRENT_SCOPE are allowed only because both item reviews are PASS; any non-PASS item would instead route to SCOPE_N_A_APPROVAL_REVIEW_PENDING with zero closure credit.",
+    "items": [
+      {
+        "artifact_id": "DLV-DSC-04",
+        "compatibility_basis": [
+          {
+            "locator": "#dsc-04",
+            "observed": "Formal user-research result count is zero; assumptions or developer tests are not represented as target-user results; the artifact is conditional on an actual user-research session.",
+            "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md"
+          },
+          {
+            "locator": "/research_status/DSC-04",
+            "observed": "PLANNED_NOT_RUN_NO_RESEARCH_RESULT_CLAIMED",
+            "path": "docs/deliverables/02-discovery/registers/discovery-evidence.json"
+          },
+          {
+            "locator": "#dsc-05, #dsc-06 and related upstream references",
+            "observed": "Dependent personas and journeys explicitly remain policy profiles or assumptions until DSC-04 evidence exists.",
+            "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md"
+          },
+          {
+            "locator": "DSC-01, DSC-04, DSC-07, MGT-03 -> DSC-11/12/REQ-01 trace",
+            "observed": "The reference is dependency lineage, not a claim that formal research occurred.",
+            "path": "docs/deliverables/02-discovery/product-definition.md"
+          },
+          {
+            "locator": "DSC-02, DSC-04, REQ-02, WS-04, WS-05 upstream trace",
+            "observed": "The trace reference does not assert a user-research result and remains compatible only with the explicit no-result boundary.",
+            "path": "docs/deliverables/03-requirements/system-requirements.md"
+          }
+        ],
+        "contradictory_execution_or_result_claim_count": 0,
+        "decision": "OUT_OF_SCOPE_N_A",
+        "enforced_boundary": "No downstream artifact may claim a formal interview, participant observation, representative persona, research result or consent receipt from DSC-04. Existing requirements and profiles remain policy/assumption-derived and must state that limitation.",
+        "reactivation_trigger": "FORMAL_USER_RESEARCH_IS_APPROVED_OR_ANY_USER_RESEARCH_SESSION_IS_EXECUTED_OR_A_DOWNSTREAM_ACCEPTANCE_CONTRACT_REQUIRES_ACTUAL_USER_RESEARCH_EVIDENCE",
+        "status": "PASS",
+        "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+      },
+      {
+        "artifact_id": "DLV-WS-16",
+        "compatibility_basis": [
+          {
+            "locator": "/scope_rule",
+            "observed": "Android user app and separate Android admin app are current scope; Web/PWA is inactive until WS-16 reapproval.",
+            "path": "docs/deliverables/11-walksafe/registers/acceptance-evidence.json"
+          },
+          {
+            "locator": "#ws-16",
+            "observed": "The subject is specifically PWA installation, offline and update testing and has no execution result.",
+            "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md"
+          },
+          {
+            "locator": "conditional/N/A control rule",
+            "observed": "WS-16 is the conditionally inactive Web/PWA item and must retain rationale and re-review conditions rather than be deleted.",
+            "path": "docs/deliverables/00-control/document-control-manual.md"
+          },
+          {
+            "locator": "current product scope boundary",
+            "observed": "WS-16 Web/PWA testing is inactive until reapproval; current product validation is Android user app plus separate Android admin app.",
+            "path": "docs/deliverables/traceability/formal-7-12-integration-summary.md"
+          },
+          {
+            "locator": "REL-16 downstream WS-16 trace",
+            "observed": "The trace link does not itself activate end-user PWA scope.",
+            "path": "docs/deliverables/09-release/delivery-and-handover.md"
+          }
+        ],
+        "contradictory_execution_or_result_claim_count": 0,
+        "decision": "OUT_OF_SCOPE_N_A",
+        "enforced_boundary": "The N/A applies only to an end-user Web/PWA product and its installation/offline/update test. It does not exclude the Android user product, the separate Android admin product, or an administrative web surface that is not offered as the end-user PWA.",
+        "reactivation_trigger": "END_USER_WEB_OR_PWA_PRODUCT_SCOPE_IS_APPROVED_OR_PWA_MANIFEST_SERVICE_WORKER_OFFLINE_OR_UPDATE_SUPPORT_IS_COMMITTED_FOR_RELEASE",
+        "status": "PASS",
+        "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+      }
+    ],
+    "method": "RESTRICTED_EXACT_ID_AND_CANONICAL_SCOPE_PHRASE_REFERENCE_RECONCILIATION",
+    "search_boundary": {
+      "historical_execution_snapshots_are_not_current_consumers": true,
+      "raw_search_output_persisted": false,
+      "root": "docs/deliverables",
+      "terms": [
+        "DSC-04",
+        "WS-16"
+      ]
+    },
+    "status": "PASS",
+    "summary": {
+      "contradictory_execution_or_result_claim_count": 0,
+      "non_pass_count": 0,
+      "pass_count": 2,
+      "reviewed_item_count": 2,
+      "scope_n_a_approval_eligible_count": 2
+    }
+  },
+  "credit_summary": {
+    "artifact_closure_credit_count": 2,
+    "attestation_credit_count": 0,
+    "claim_boundary": "The two closure credits are current-scope N/A closures only. They do not prove artifact content, execution, formal testing, OWNER14 approval, ATTEST4 acceptance, deployment success or release eligibility.",
+    "content_acceptance_credit_count": 0,
+    "execution_credit_count": 0,
+    "formal_test_credit_count": 0,
+    "in_scope_route_transition_count": 43,
+    "owner14_approval_credit_count": 0,
+    "release_credit_count": 0,
+    "scope_decision_state_exit_credit_count": 45,
+    "scope_n_a_approval_credit_count": 2
+  },
+  "exact_sets": {
+    "partition_validation": {
+      "extra_count": 0,
+      "missing_count": 0,
+      "pairwise_overlap_count": 0,
+      "union_count": 45,
+      "unique_count": 45
+    },
+    "question_groups": {
+      "EXTERNAL49_NA_SCOPE_17": {
+        "fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 222,
+          "count": 17,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "f2f6a141aa6bf9059b578df3c299ea12ebfc3bbe71d1986f301117d211377f3b"
+        },
+        "ids": [
+          "DLV-CLS-02",
+          "DLV-CLS-04",
+          "DLV-CLS-08",
+          "DLV-CLS-10",
+          "DLV-CLS-11",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-OPS-06",
+          "DLV-OPS-11",
+          "DLV-OPS-13",
+          "DLV-OPS-22",
+          "DLV-REL-13",
+          "DLV-REL-20",
+          "DLV-REL-21",
+          "DLV-TST-23",
+          "DLV-WS-21"
+        ]
+      },
+      "HANIUM_VS_RELEASE_SCOPE_22": {
+        "fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 292,
+          "count": 22,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "fb838bc6b8d68c5174e62b2816cbd0f33734a6d9a5a17423e46950a8adfff4ac"
+        },
+        "ids": [
+          "DLV-AIML-18",
+          "DLV-AIML-19",
+          "DLV-AIML-20",
+          "DLV-AIML-25",
+          "DLV-DEV-10",
+          "DLV-DEV-11",
+          "DLV-DEV-13",
+          "DLV-DEV-15",
+          "DLV-OPS-07",
+          "DLV-REL-03",
+          "DLV-REL-04",
+          "DLV-REL-05",
+          "DLV-REL-06",
+          "DLV-REL-07",
+          "DLV-REL-08",
+          "DLV-REL-09",
+          "DLV-SEC-18",
+          "DLV-TST-10",
+          "DLV-TST-12",
+          "DLV-TST-15",
+          "DLV-TST-16",
+          "DLV-TST-17"
+        ]
+      },
+      "NA_SUPPORTED_APPROVAL_6": {
+        "fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 80,
+          "count": 6,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "537f4b7f94da688dc29f4a3a07b390af306be1c26c49dde3111d44dc29c3d4cb"
+        },
+        "ids": [
+          "DLV-AIML-26",
+          "DLV-DSC-04",
+          "DLV-OPS-18",
+          "DLV-REL-14",
+          "DLV-SEC-14",
+          "DLV-WS-16"
+        ]
+      }
+    },
+    "scope45": {
+      "compact_json_array_fingerprint": {
+        "algorithm": "SHA-256",
+        "byte_length": 590,
+        "count": 45,
+        "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+        "sha256": "32288eca0c9f2b09cf133f860511682cff91b692ca0e6889a52938c03b1693ca"
+      },
+      "lf_line_fingerprint": {
+        "algorithm": "SHA-256",
+        "byte_length": 498,
+        "count": 45,
+        "serialization": "LEXICOGRAPHICALLY_SORTED_IDS_JOINED_BY_LF_WITH_FINAL_LF_UTF8",
+        "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+      }
+    },
+    "successor_routes": {
+      "INTERNAL_READY": {
+        "compact_json_array_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 331,
+          "count": 25,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "39a6f66096a2a73735ebb48ee5c86682dd71d803a99d8fef012b13b5012ca810"
+        },
+        "ids": [
+          "DLV-AIML-19",
+          "DLV-AIML-20",
+          "DLV-AIML-25",
+          "DLV-AIML-26",
+          "DLV-CLS-04",
+          "DLV-CLS-08",
+          "DLV-CLS-10",
+          "DLV-CLS-11",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-DEV-10",
+          "DLV-DEV-11",
+          "DLV-DEV-13",
+          "DLV-DEV-15",
+          "DLV-OPS-06",
+          "DLV-OPS-07",
+          "DLV-OPS-11",
+          "DLV-OPS-13",
+          "DLV-OPS-18",
+          "DLV-OPS-22",
+          "DLV-REL-03",
+          "DLV-REL-05",
+          "DLV-REL-09",
+          "DLV-SEC-18"
+        ],
+        "lf_line_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 279,
+          "count": 25,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_IDS_JOINED_BY_LF_WITH_FINAL_LF_UTF8",
+          "sha256": "c952cc7fc5d6c440444ab27e121b463a4db23fc1990b9bdbba38f6421baaf948"
+        }
+      },
+      "INTERNAL_RUN_REQUIRED": {
+        "compact_json_array_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 107,
+          "count": 8,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "52573b8df53ab23b7b048ba7ef91ee279a6c7fd6b5a0426d4ce968ee07f35943"
+        },
+        "ids": [
+          "DLV-AIML-18",
+          "DLV-REL-04",
+          "DLV-REL-06",
+          "DLV-REL-07",
+          "DLV-REL-08",
+          "DLV-TST-12",
+          "DLV-TST-16",
+          "DLV-TST-17"
+        ],
+        "lf_line_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 89,
+          "count": 8,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_IDS_JOINED_BY_LF_WITH_FINAL_LF_UTF8",
+          "sha256": "1febb4a54f98cc64a18bd534868e869b8fcae129b18586c4b925f513598b50ce"
+        }
+      },
+      "REAL_EVENT_PENDING": {
+        "compact_json_array_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 131,
+          "count": 10,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "7abe8df6021bbb97644ceb8501a541a3dca36a302425b50671c032e4d35abb39"
+        },
+        "ids": [
+          "DLV-CLS-02",
+          "DLV-REL-13",
+          "DLV-REL-14",
+          "DLV-REL-20",
+          "DLV-REL-21",
+          "DLV-SEC-14",
+          "DLV-TST-10",
+          "DLV-TST-15",
+          "DLV-TST-23",
+          "DLV-WS-21"
+        ],
+        "lf_line_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 109,
+          "count": 10,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_IDS_JOINED_BY_LF_WITH_FINAL_LF_UTF8",
+          "sha256": "b93d576c544df35562d899f03aa4143c4530cf45c6953d1f4676f024116ff39d"
+        }
+      },
+      "SCOPE_N_A_APPROVED": {
+        "compact_json_array_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 27,
+          "count": 2,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_COMPACT_JSON_ARRAY_PLUS_LF_UTF8",
+          "sha256": "3f60222d38825422b78659683401b6d4bad8e68c3adbd613d404a1d87df265c3"
+        },
+        "ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "lf_line_fingerprint": {
+          "algorithm": "SHA-256",
+          "byte_length": 21,
+          "count": 2,
+          "serialization": "LEXICOGRAPHICALLY_SORTED_IDS_JOINED_BY_LF_WITH_FINAL_LF_UTF8",
+          "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+        }
+      }
+    }
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "d8b05a43d5ed0f106cb23126b0b88bec8bb23b18db2881ed3610e0d1ed2a01cf",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 135759,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length"
+    ],
+    "projection_path": "/",
+    "projection_rule": "SET ALL projection_null_paths TO null, recursively sort keys, compact JSON, append LF, encode UTF-8",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json"
+  },
+  "predecessor_scope_id": "HANIUM_SUBMISSION_AND_DEMO",
+  "prepared_on": "2026-07-28",
+  "queue_counts": {
+    "after": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "after_sum": 257,
+    "before": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 37,
+      "INTERNAL_RUN_REQUIRED": 16,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 11,
+      "SCOPE_DECISION_PENDING": 45
+    },
+    "before_sum": 257,
+    "current_scope_n_a_closed_count": 2,
+    "delta": {
+      "INTERNAL_READY": 25,
+      "INTERNAL_RUN_REQUIRED": 8,
+      "REAL_EVENT_PENDING": 10,
+      "SCOPE_DECISION_PENDING": -45,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "predecessor_open_count": 133,
+    "successor_open_count": 131,
+    "unaffected": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14
+    }
+  },
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.phase1-scope45-transition-application.v1",
+  "scope_effect": {
+    "actual_deployment_and_release_lifecycle_included": true,
+    "application_mode": "ADD_ONLY_SUCCESSOR_ROUTE_AND_CURRENT_SCOPE_N_A_APPLICATION",
+    "canonical_predecessor_ledger_mutated": false,
+    "policy_gate_reopened": false,
+    "release_approved": false,
+    "release_eligibility": "NOT_ELIGIBLE"
+  },
+  "source_bindings": [
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 90089,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+      "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_OUTPUT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-REVIEW-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 6065,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-independent-review-r001.md",
+      "sha256": "b5b1f2be1d79e44e3e17ace9900ebbd1d5f3d19c230cf9fddf76b996b9da7ca7",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_INDEPENDENT_REVIEW",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-CHECK-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 15672,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json",
+      "sha256": "46107c77d4edee70c8181f815b97281c50a0b0752b10c07d28241d3686b3d629",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_CHECK_RECEIPT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "EXACT257-R004-LEDGER",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 2498803,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_OUTPUT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "R003-USER-INPUT-REQUEST",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 22897,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042",
+      "subject_role": "PHASE1_CONSOLIDATED_USER_INPUT_REQUEST_R003",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "R003-DECISION-ITEM-MANIFEST",
+      "binding_kind": "DECLARED_CONTROL_CONTEXT_SHA256",
+      "byte_length": null,
+      "locator": "decision-item manifest SHA-256",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "subject_role": "R003_DECISION_ITEM_MANIFEST_CONTROL_CONTEXT",
+      "verification_basis": "R003_REQUEST_AND_CAPTURE_CHAIN"
+    },
+    {
+      "binding_id": "EXTERNAL-INPUT-READINESS-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 393682,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+      "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4",
+      "subject_role": "EXACT45_SCOPE_DECISION_READINESS_SOURCE",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    }
+  ],
+  "source_chain_status": {
+    "scope_capture_check_count": 16,
+    "scope_capture_check_fail_count": 0,
+    "scope_capture_check_status": "PASS",
+    "scope_capture_review_verdict": "PASS_FOR_CONTROLLED_SCOPE_TRANSITION_INPUT_ONLY",
+    "scope_capture_status": "CAPTURED_PENDING_DOWNSTREAM_COMPATIBILITY_AND_RECEIPT_VALIDATION",
+    "this_application_performs_downstream_route_mapping_and_exact2_compatibility_validation": true
+  },
+  "transition_contract": {
+    "exact_transition_count": 45,
+    "in_scope_count": 43,
+    "in_scope_rule": "Route to the first unmet acceptance-contract stage; do not grant content, execution, owner, attestation, formal-test, closure or release credit.",
+    "n_a_rule": "Only exact2 items with compatibility PASS receive SCOPE_N_A_APPROVED and CLOSED_N_A_FOR_CURRENT_SCOPE; all other scopes remain subject to reactivation.",
+    "out_of_scope_n_a_count": 2,
+    "predecessor_route": "SCOPE_DECISION_PENDING",
+    "route_precedence": [
+      "SCOPE_N_A_APPROVED_IF_EXPLICIT_OUT_OF_SCOPE_AND_COMPATIBILITY_PASS",
+      "REAL_EVENT_PENDING_IF_ACTUAL_EXTERNAL_PARTICIPANT_SIGNATURE_DEPLOYMENT_OR_INDEPENDENT_EVENT_REQUIRED",
+      "INTERNAL_RUN_REQUIRED_IF_NAMED_TECHNICAL_RUN_AND_RAW_OUTPUT_REQUIRED",
+      "INTERNAL_READY_FOR_CONTROLLED_CONTENT_REGISTER_OR_IMPLEMENTATION_CONFORMANCE"
+    ]
+  },
+  "transitions": [
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-AIML-18",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-AIML-18-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Freeze the named candidate model, dataset, split, protocol and environment; run the model-promotion evaluation; retain raw overall and per-class metrics, result, tool versions and hashes for designated review.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-AIML-18]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-AIML-19",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-AIML-19-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Complete the controlled error-taxonomy and safety-response content; activate it after AIML-18 completion or a material field defect, without inventing observed failures.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-AIML-19]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-AIML-20",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-AIML-20-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Complete and review the robustness and safety evaluation definition, conditions, cohorts, perturbations and accepted baseline before a later bound execution.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-AIML-20]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-AIML-25",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-AIML-25-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Complete and approve the privacy-safe monitoring baseline, observable proxies, thresholds, sampling and privacy limits before shared testing or operations.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-AIML-25]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-AIML-26",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-AIML-26-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Complete and review the retraining triggers and the data-approval, split-freeze, experiment, safety-evaluation, deployment and rollback reapproval flow.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-AIML-26]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-02",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-02-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "After final delivery, obtain the designated accepter event and bind authority identity, scope, occurred_at, decision, immutable signed-original locator and hash.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-02]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-04",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-04-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and approve KPI definitions, formulae, baseline, target, measurement protocol and later event predicate before recording any final measurement.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-04]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "REGISTER",
+        "artifact_kind": "CURRENT_STATE_REGISTER",
+        "attestation_credit": 0,
+        "completion_mode": "AS_OF_STATE_WITH_OPTIONAL_EVENTS",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-08",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-08-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Populate the as-of residual-risk register with scenario, exposure, controls, mitigations, monitoring indicators and an identified risk-acceptance owner; do not synthesize acceptance.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-08]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-10",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-10-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and review the operations-handover content for assets, roles, least privilege, verification and revocation before any handover event is claimed.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-10]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-11",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-11-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete the controlled retrospective protocol and participant/approval boundary; conduct and receipt the retrospective only after its closure trigger occurs.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-11]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-14",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-14-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and review the data retention, authority, transfer and deletion plan; bind any later transfer or deletion as a separate event.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-14]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-15",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-15-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete the account, key and infrastructure inventory and each maintain, transfer or dispose decision; bind any later cleanup as a separate event.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-15]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-CLS-16",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-CLS-16-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and approve the service-termination plan covering notice, data rights, alternatives and decommission order; no termination event is currently claimed.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-CLS-16]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-DEV-10",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-DEV-10-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Resolve CI/CD applicability for current modules and bind the resulting controlled pipeline artifact, version, provenance, conformance review and approval.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-DEV-10]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-DEV-11",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-DEV-11-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Define the IaC applicability boundary and, where active, bind state, plan, least-privilege and rollback controls as controlled implementation evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-DEV-11]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-DEV-13",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-DEV-13-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Define sample-data applicability and, where active, bind schema, de-identification and reset controls as controlled implementation evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-DEV-13]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "REGISTER",
+        "artifact_kind": "CURRENT_STATE_REGISTER",
+        "attestation_credit": 0,
+        "completion_mode": "AS_OF_STATE_WITH_OPTIONAL_EVENTS",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-DEV-15",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-DEV-15-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Normalize the as-of change-review register and applicability, reconcile current rows to sources and preserve a dated zero-event statement where applicable.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-DEV-15]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 1,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "The PROJECT_SCOPE_OWNER decision is attributable and the downstream compatibility review is PASS.",
+          "Closure is limited to current-scope applicability and is not content, execution, owner14, formal-test or release credit.",
+          "Preserve rationale, validity and reactivation trigger; reopen when the trigger occurs."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 1
+      },
+      "artifact_id": "DLV-DSC-04",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-DSC-04-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "OUT_OF_SCOPE_N_A",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Preserve the approved current-scope N/A rationale and the no-formal-user-research-result boundary; reactivate before any formal user-research approval or session.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-DSC-04]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "FORMAL_USER_RESEARCH_IS_APPROVED_OR_ANY_USER_RESEARCH_SESSION_IS_EXECUTED_OR_A_DOWNSTREAM_ACCEPTANCE_CONTRACT_REQUIRES_ACTUAL_USER_RESEARCH_EVIDENCE",
+      "scope_n_a_compatibility": {
+        "enforced_boundary": "No downstream artifact may claim a formal interview, participant observation, representative persona, research result or consent receipt from DSC-04. Existing requirements and profiles remain policy/assumption-derived and must state that limitation.",
+        "reactivation_trigger": "FORMAL_USER_RESEARCH_IS_APPROVED_OR_ANY_USER_RESEARCH_SESSION_IS_EXECUTED_OR_A_DOWNSTREAM_ACCEPTANCE_CONTRACT_REQUIRES_ACTUAL_USER_RESEARCH_EVIDENCE",
+        "status": "PASS",
+        "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+      },
+      "successor": {
+        "artifact_closure_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "queue_open": false,
+        "queue_route": "SCOPE_N_A_APPROVED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_WITH_DOWNSTREAM_COMPATIBILITY_PASS"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-06",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-06-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Create and bind the operations dashboard to named metric sources, version and provenance; perform conformance and designated review before acceptance.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-06]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-07",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-07-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Decide and document alerting applicability; where active, bind the alert implementation, thresholds, routes and conformance evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-07]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-11",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-11-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and approve the backup and isolated-restore plan and frozen baseline before performing a separately receipted restore drill.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-11]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-13",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-13-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete and approve the disaster-recovery scenario, safety controls, environment and acceptance criteria before a separately receipted drill.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-13]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "HYBRID_PLAN_AND_EXECUTION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_THEN_SEPARATE_EVENT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-18",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-18-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Prepare and review the incident-postmortem plan/template while the incident register remains empty; create a result only after an actual incident, never synthesize one.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-18]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-OPS-22",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-OPS-22-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Complete the capacity and cost measurement definition, sources, upper bounds and review method before measuring an approved operating environment.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-OPS-22]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-03",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-03-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Name the release version and complete the controlled release-applicability definition and approval boundary.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-03]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-04",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-04-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "After a candidate exists, generate a manifest binding source, build, model and configuration bytes; retain raw output and hashes for review.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-04]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CONTROLLED_ARTIFACT",
+        "artifact_kind": "IMPLEMENTATION_EVIDENCE",
+        "attestation_credit": 0,
+        "completion_mode": "BOUND_ARTIFACT_CONFORMANCE",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-05",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-05-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "After candidate approval, bind commit and tag applicability and the controlled release artifact conformance evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-05]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-06",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-06-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Freeze the approved Android release contract and build the distribution artifact; retain raw build output, environment, result and hashes.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-06]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-07",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-07-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "For the bound release artifact bytes, generate and verify exact hashes and required signatures; retain immutable raw evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-07]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-08",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-08-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "For the bound candidate and supply-chain baseline, generate SBOM and provenance and retain raw tool output, versions, result and hashes.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-08]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-09",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-09-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Complete and approve release notes for the named version using only actual changes, limitations and known risks.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-09]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-13",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-13-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Deploy an approved candidate to the actual approved environment, run immediate smoke checks, and bind environment, occurred_at, raw results and review receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-13]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-14",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-14-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Perform the approved canary or staged-deployment event against a real approved target; bind cohort/scope, occurred_at, metrics, decision and rollback receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-14]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-20",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-20-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "After the handover package is final, obtain the receiving authority event and bind identity, scope, occurred_at, decision, signed original locator and hash.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-20]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-REL-21",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-REL-21-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Have the designated reviewer inspect the actual candidate and bind authority, exact scope, occurred_at, decision, signed original locator and hash.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-REL-21]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-SEC-14",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-SEC-14-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Commission the approved independent penetration test, import the external original by immutable ID and hash, and bind findings, remediation and retest receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-SEC-14]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "CANONICAL_DOCUMENT",
+        "artifact_kind": "PLAN_DEFINITION",
+        "attestation_credit": 0,
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Resolve and review the bound controlled content or implementation artifact.",
+          "Address all required inputs, explicit assumptions/open items, trace and designated approval.",
+          "Do not claim a later execution event from content readiness."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-SEC-18",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-SEC-18-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Complete and approve the vulnerability-disclosure channel, safe-harbor, SLA and coordination policy before public beta.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-SEC-18]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_READY",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-10",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-10-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Prepare and conduct the approved limited-user-test event with attributable participant authority/consent, scope, occurred_at, result and immutable receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-10]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-12",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-12-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Freeze workload, environment and thresholds; run the performance/load procedure; retain raw output, result, tool versions and hashes.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-12]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-15",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-15-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Prepare and conduct the approved participant-based usability/research event with consent, research scope, occurred_at, result and immutable receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-15]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-16",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-16-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "Approve safety controls and fault scope, then run the frozen fault-injection procedure and retain raw detection, alert and recovery evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-16]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Freeze the named procedure, inputs, environment and expected result.",
+          "Actually run it and retain raw output, timestamps, result, tool versions and hashes.",
+          "Satisfy pass criteria and designated review before any execution or closure credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-17",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-17-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-HANIUM_VS_RELEASE_SCOPE",
+        "rationale": "The PROJECT_SCOPE_OWNER included actual deployment and release, so this release-scope item is applicable.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "HANIUM_VS_RELEASE_SCOPE_22"
+      },
+      "next_action": "After rollback procedure approval, run installation, upgrade and rollback against the signed build and retain raw device/build evidence.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_SCOPE_CONFLICT",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-17]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "INTERNAL_RUN_REQUIRED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-TST-23",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-TST-23-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "After TST-22 approval, obtain the designated accepter event and bind identity, authority basis, exact product/version scope, occurred_at, decision and signed-original hash.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-TST-23]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 1,
+        "artifact_form": "GENERATED_EVIDENCE",
+        "artifact_kind": "TEST_OR_TOOL_RESULT",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "The PROJECT_SCOPE_OWNER decision is attributable and the downstream compatibility review is PASS.",
+          "Closure is limited to current-scope applicability and is not content, execution, owner14, formal-test or release credit.",
+          "Preserve rationale, validity and reactivation trigger; reopen when the trigger occurs."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 1
+      },
+      "artifact_id": "DLV-WS-16",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-WS-16-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "OUT_OF_SCOPE_N_A",
+        "question_group_id": "QG-SCOPE-N_A_SUPPORTED",
+        "rationale": "The PROJECT_SCOPE_OWNER explicitly selected this N_A_SUPPORTED item as applicable or excluded it as recorded.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "NA_SUPPORTED_APPROVAL_6"
+      },
+      "next_action": "Preserve the approved end-user Web/PWA-only N/A boundary; keep Android products and the admin web surface in scope; reactivate if an end-user PWA product is approved.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "NA36_N_A_SUPPORTED",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-WS-16]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "N_A_CANDIDATE"
+      },
+      "route_reconsideration_trigger": "END_USER_WEB_OR_PWA_PRODUCT_SCOPE_IS_APPROVED_OR_PWA_MANIFEST_SERVICE_WORKER_OFFLINE_OR_UPDATE_SUPPORT_IS_COMMITTED_FOR_RELEASE",
+      "scope_n_a_compatibility": {
+        "enforced_boundary": "The N/A applies only to an end-user Web/PWA product and its installation/offline/update test. It does not exclude the Android user product, the separate Android admin product, or an administrative web surface that is not offered as the end-user PWA.",
+        "reactivation_trigger": "END_USER_WEB_OR_PWA_PRODUCT_SCOPE_IS_APPROVED_OR_PWA_MANIFEST_SERVICE_WORKER_OFFLINE_OR_UPDATE_SUPPORT_IS_COMMITTED_FOR_RELEASE",
+        "status": "PASS",
+        "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+      },
+      "successor": {
+        "artifact_closure_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "queue_open": false,
+        "queue_route": "SCOPE_N_A_APPROVED",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_WITH_DOWNSTREAM_COMPATIBILITY_PASS"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_REACTIVATION_TRIGGER_OR_SCOPE_BASELINE_SUPERSESSION"
+    },
+    {
+      "acceptance_boundary": {
+        "artifact_closure_credit": 0,
+        "artifact_form": "EXTERNAL_RECORD",
+        "artifact_kind": "EXTERNAL_EVENT_RECORD",
+        "attestation_credit": 0,
+        "completion_mode": "ACTUAL_EXTERNAL_EVENT_AND_RECEIPT",
+        "content_acceptance_credit": 0,
+        "execution_credit": 0,
+        "formal_test_credit": 0,
+        "owner14_approval_credit": 0,
+        "predecessor_contract_binding": "EXACT257-R004-LEDGER",
+        "release_credit": 0,
+        "requirements": [
+          "Complete any required event plan and accepted baseline first.",
+          "The actual deployment, participant, signature or independent-authority event must occur.",
+          "Bind authority identity/basis where applicable, scope, occurred_at, result and immutable receipt hash; review it before credit."
+        ],
+        "scope_decision_state_exit_credit": 1,
+        "scope_n_a_approval_credit": 0
+      },
+      "artifact_id": "DLV-WS-21",
+      "decision": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_externally_verified": false,
+        "capture_binding_id": "USER-SCOPE-CAPTURE-R001",
+        "decided_on": "2026-07-28",
+        "decided_on_precision": "DAY",
+        "decision_id": "WS-SCOPE45-DLV-WS-21-20260728-R001",
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "normalized_decision": "IN_SCOPE",
+        "question_group_id": "QG-SCOPE-N_A_CANDIDATE",
+        "rationale": "The PROJECT_SCOPE_OWNER included every former external N/A candidate in actual deployment and release scope.",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE",
+        "source_group_id": "EXTERNAL49_NA_SCOPE_17"
+      },
+      "next_action": "Before any field test, obtain the participant explanation, withdrawal-right and safety-plan consent event and bind authority, scope, occurred_at and immutable receipt.",
+      "predecessor": {
+        "artifact_closure_status": "OPEN",
+        "phase0_provisional_route": "EXTERNAL49_APPROVED_NA_CANDIDATE",
+        "queue_open": true,
+        "queue_route": "SCOPE_DECISION_PENDING",
+        "recommended_next_route": null,
+        "record_selector": "/records/*[predecessor_phase1_action_queue_record.artifact_type_code=DLV-WS-21]",
+        "scope_decision_status": "PENDING",
+        "source_binding_id": "EXACT257-R004-LEDGER",
+        "source_snapshot_status": "EXTERNAL"
+      },
+      "route_reconsideration_trigger": "PROJECT_SCOPE_OWNER_CHANGES_APPLICABILITY_OR_BOUND_ACCEPTANCE_CONTRACT_IS_SUPERSEDED",
+      "successor": {
+        "artifact_closure_status": "OPEN",
+        "queue_open": true,
+        "queue_route": "REAL_EVENT_PENDING",
+        "release_eligibility": "NOT_ELIGIBLE",
+        "route_transition_kind": "CONTROLLED_SCOPE_DECISION_APPLIED",
+        "scope_decision_status": "APPLIED_TO_NEXT_ACTION_ROUTE"
+      },
+      "supporting_evidence_binding_ids": [
+        "USER-SCOPE-CAPTURE-R001",
+        "USER-SCOPE-CAPTURE-REVIEW-R001",
+        "USER-SCOPE-CAPTURE-CHECK-R001",
+        "EXACT257-R004-LEDGER",
+        "R003-USER-INPUT-REQUEST",
+        "R003-DECISION-ITEM-MANIFEST",
+        "EXTERNAL-INPUT-READINESS-R001"
+      ],
+      "validity": "UNTIL_SCOPE_OR_ACCEPTANCE_CONTRACT_BASELINE_SUPERSESSION"
+    }
+  ]
+}

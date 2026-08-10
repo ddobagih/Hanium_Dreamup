@@ -1,0 +1,78 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_authentication_status": "NOT_RUN",
+    "external_institution_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-008-01",
+      "TC-FP-008-02",
+      "TC-FP-008-03",
+      "TC-FP-008-04"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP008_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP008-ANDROID_ADMINAPP_OFFLINE-RECEIPT-20260803-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "implementation_content_set_sha256": "77a9ec5b6bebce7aa68088e74a7ffb68d5f3d4e2d70484cfc690ace0d1bccae0",
+  "lane_id": "ANDROID_ADMINAPP_OFFLINE",
+  "observation": {
+    "command": "./gradlew --offline :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug --no-daemon --max-workers=1 --rerun-tasks",
+    "ended_at": "2026-08-09T16:37:34+09:00",
+    "evidence_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "evidence_kind": "REPOSITORY_INTERNAL_AUTOMATED_CHECK",
+      "external_status": "NOT_RUN",
+      "formal_test_status": "NOT_RUN",
+      "production_status": "NOT_RUN"
+    },
+    "exit_code": 0,
+    "lane_id": "ANDROID_ADMINAPP_OFFLINE",
+    "metrics": {
+      "apk_byte_length": 921914,
+      "apk_sha256": "9afeb2bc1243603c3022074d9faefe6c647d65be3a9cbbab5f48dccab9b7ed58",
+      "build_status": "SUCCESSFUL",
+      "junit_errors": 0,
+      "junit_failures": 0,
+      "junit_skipped": 0,
+      "junit_tests": 70,
+      "lint_errors": 0,
+      "lint_warnings": 1,
+      "result_format": "GRADLE_ANDROID_SUMMARY_V1",
+      "working_directory": "apps/android"
+    },
+    "raw_output_byte_length": 3708,
+    "raw_output_sha256": "626b9e94120bdf8f58f27f7842fe062406c743ebb5a8c282c0f1a780616905e6",
+    "schema_version": "walksafe.fp008-internal-lane-observation.v1",
+    "started_at": "2026-08-09T16:37:22+09:00",
+    "status": "PASS"
+  },
+  "raw_output_binding": {
+    "byte_length": 3708,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/logs/android-adminapp-offline.log",
+    "sha256": "626b9e94120bdf8f58f27f7842fe062406c743ebb5a8c282c0f1a780616905e6"
+  },
+  "receipt_content_sha256": "71fabc2b5cc62795a401ae0e35335cf86da47db828114cb8dc75f3fe11d90ca3",
+  "resume_gate_binding": {
+    "byte_length": 10245,
+    "event_id": "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+    "event_sequence": 48,
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/implementation-resume-gate-receipt.json",
+    "role": "SEQ48_WORK_SESSION_RESUME_GATE",
+    "sha256": "394c9775c8ed3b2fbdac1b3cf8354ff839006b91998adc8cbbbb7c5f13dd8c5e"
+  },
+  "schema_version": "walksafe.fp008-internal-lane-receipt.v1",
+  "status": "PASS",
+  "title": "Separate Android admin application boundary"
+}

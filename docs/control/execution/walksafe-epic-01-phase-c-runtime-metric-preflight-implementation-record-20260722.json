@@ -1,0 +1,419 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-22",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-01 Phase C 실행 중 미터 거리 사전검사 내부 구현 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_approved_baseline_or_r001_r002": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": false,
+    "claims_formal_test_pass": false,
+    "claims_actual_device_test_pass": false,
+    "claims_production_device_profile_approved": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "artifact_application_receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+    "phase_a_record_id": "WS-EPIC-01-PHASE-A-IMPLEMENTATION-20260722-001",
+    "phase_b_record_id": "WS-EPIC-01-PHASE-B-ADMIN-AUTH-RECOVERY-IMPLEMENTATION-20260722-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-002",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-002",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "policy_baseline",
+        "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "bytes": 8054,
+        "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "artifact_application_receipt",
+        "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+        "bytes": 4812,
+        "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r001",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json",
+        "bytes": 521661,
+        "sha256": "e559a9381ce13462e8d377befe5005a9d5250a0cdd33ada8a98a933bad50e8fe",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r001_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.md",
+        "bytes": 15210,
+        "sha256": "d9f49ec54c8896af49e8cdc12682177193cc61c8675f774b084c77c8097d15da",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r002",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r002.json",
+        "bytes": 393022,
+        "sha256": "94cfcfe3bcc56daeb7ab88cbf0840a7f38b9773aee1c9b4e28a24de3c544d3e5",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r002_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r002.md",
+        "bytes": 1421,
+        "sha256": "2d390c94298f6ac17116628e8dc25a6b0105f87f02c58ca94096b0dcebebe01f",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r001",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r001.json",
+        "bytes": 52046,
+        "sha256": "b0ad9cc6008e15f407cfe0e05620364564834d03794f200f1119b610fb66621f",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r002",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.json",
+        "bytes": 53911,
+        "sha256": "0d2eeafcf094c0c4426e830e548c450df6c1cd2e5100bb36107bcdd9fc59d351",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r002_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.md",
+        "bytes": 847,
+        "sha256": "8411e20038f742c5aba353cf56221332134bca51b90972c7a8b4f460460fc465",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_a_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-a-implementation-record-20260722.json",
+        "bytes": 9925,
+        "sha256": "c4dcdd69a8cfa76881d5fbe9c7f6779849adad1468a792944cee957261debd18",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_a_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-a-implementation-record-20260722.md",
+        "bytes": 4449,
+        "sha256": "9674e4564b8c6e6e92d137941e75f7a2137a194bdfcaf83a3e1bbede8811725e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.json",
+        "bytes": 24692,
+        "sha256": "522474786918c5491775c28dfea772d1f786d35412047bf775170e3a4a70ea83",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.md",
+        "bytes": 5206,
+        "sha256": "247c0c84f4fc9769ed858943c72226998ec4f250d458d2a51f1d839197e9627e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_active_overlay_r001",
+        "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.json",
+        "bytes": 11779,
+        "sha256": "f38c93b3d194b12c5c348db25147ec7b96d40216df98ab197572151eb1b3ab2a",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_active_overlay_r001_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.md",
+        "bytes": 2304,
+        "sha256": "18ffeacb09035963afd2b130b9f25a49e841c6902982ca8a6be92a9907581f0d",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_recovery_drill_r001",
+        "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+        "bytes": 8223,
+        "sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_recovery_drill_r001_markdown",
+        "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.md",
+        "bytes": 4429,
+        "sha256": "99aec18a1da7a8e481d1001c392edc12b2d67e339a6d16c6a5b316084b021b96",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_builder",
+        "path": "scripts/build_walksafe_epic01_phase_b_trace_20260722.py",
+        "bytes": 67016,
+        "sha256": "a9874f7c64d6f4250c6146aa9bd4024a34e456bb6bb28b1ba8e5351e0e883991",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_b_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_b_trace_20260722.py",
+        "bytes": 8988,
+        "sha256": "5e594cc4c752c24473cfea167f266ec714bb6470e8b5ce087f8d1712d0e3a5f4",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_c_trace_20260722.py",
+        "bytes": 68164,
+        "sha256": "a759eb97813f6335b6b9431b3ffe384cb165ef69cb5b1fac878b04d4f24d039e"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_c_trace_20260722.py",
+        "bytes": 19334,
+        "sha256": "20cb319c3b3ebf3ab8fd1003494f64b0cc10d4ddf141b3d60ee3b97d9893339d"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_C_RUNTIME_METRIC_PREFLIGHT",
+    "reassessed_policy_ids": [
+      "FP-009"
+    ],
+    "gap_ids": [
+      "GAP-018"
+    ],
+    "requirement_ids": [
+      "RQ-FP-009-001"
+    ],
+    "planned_test_ids": [
+      "TC-FP-009-01",
+      "TC-FP-009-02",
+      "TC-FP-009-03",
+      "TC-FP-009-04"
+    ],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_C_ANDROID_RUNTIME_METRIC_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "includes_only_android_mainactivity_probe_core_and_tests": true,
+    "approved_production_profile_ids": [],
+    "approved_production_profile_count": 0,
+    "file_count": 11,
+    "path_set_sha256": "4917b920561dc9884d591817addd41a14b892c56c292b8e15f73bc2a3f20d83c",
+    "content_set_sha256": "e181455241f85f2ca3e8278b96d1f7e64cddcc09688d337172b1a9f64166fd1a",
+    "files": [
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "bytes": 311986,
+        "sha256": "0b1bae7715e1c753cf700d5c732eef6b9ce5aa1447164595deb51afd6c0dc0a3"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
+        "bytes": 7618,
+        "sha256": "20ae1ba97349599fefb9e2b0e214f05c9fad123430341134d834a2eadf00be94"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+        "bytes": 3717,
+        "sha256": "6e7dbed28a7eca1b2322179e26492bff6bef73bd64fb41b2c0453d929f019521"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflight.kt",
+        "bytes": 9214,
+        "sha256": "633f7ebb848ac99ad36cc42186b119f07f297c472378fc5ca8785eaa96d2c3f5"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "bytes": 15742,
+        "sha256": "32a07da992ee85c34fcd8e6dc576e789123ffee49ee53b4a408179e8ea368830"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "bytes": 9798,
+        "sha256": "24d2602905cd446559ac0bf7dade3c9eafdd122afe50079a0d811f5b76f26ab0"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+        "bytes": 19835,
+        "sha256": "f8668f4d7431bc4c3da3463cfe7a048db071da60fcb674e37f7cda9478b7601e"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfileTest.kt",
+        "bytes": 4398,
+        "sha256": "3ee73ee27daed471ad1020f5a7da963d33f17996194f8c3ae59f3a2b39267757"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflightTest.kt",
+        "bytes": 10169,
+        "sha256": "e3bd147b2efbc4b44ff596a168819e60dc3563868b47f5ebee81dee04c20cec0"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactoryTest.kt",
+        "bytes": 19030,
+        "sha256": "b811905f6b265f233fabcc744bfa41e59d26c7ce296134fb8216902a2c19e324"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+        "bytes": 16847,
+        "sha256": "f7bf5dee66c654543020addfe0de40975ad6c8439933d2a24375ca5ae8b6512f"
+      }
+    ],
+    "snapshot_sha256": "f80c3e3028d7d9a5184af2165ed0e0a056be2090184c7912d303b02ce2da9091"
+  },
+  "runtime_metric_policy_contract": {
+    "policy_id": "WS-RUNTIME-METRIC-PREFLIGHT-POLICY",
+    "policy_version": "1.0.0",
+    "availability_contract": {
+      "maximum_preflight_duration_ms": 10000,
+      "minimum_distinct_frame_count": {
+        "operator": ">=",
+        "value": 10
+      },
+      "minimum_observation_span_ms": {
+        "operator": ">=",
+        "value": 1000
+      },
+      "passing_frame_contract": {
+        "tracking_required": true,
+        "metric_depth_required": true,
+        "minimum_valid_samples_in_distance_range": {
+          "operator": ">=",
+          "value": 30
+        }
+      },
+      "minimum_passing_ratio": {
+        "operator": ">=",
+        "numerator": 80,
+        "denominator": 100,
+        "decimal": "0.80"
+      }
+    },
+    "valid_distance_range_meters": {
+      "minimum": 0.2,
+      "maximum": 8.0,
+      "minimum_inclusive": true,
+      "maximum_inclusive": true,
+      "finite_value_required": true
+    },
+    "source_binding": {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflight.kt",
+      "sha256": "633f7ebb848ac99ad36cc42186b119f07f297c472378fc5ca8785eaa96d2c3f5"
+    },
+    "contract_sha256": "03fac0b7b77fd4c22a9ec5797599171a30d49b32d15abf680aa556f8bab66a7b"
+  },
+  "production_device_profile_registry": {
+    "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+    "status": "EMPTY_PENDING_DESIGNATED_DEVICE_APPROVAL_EVIDENCE",
+    "approved_profile_ids": [],
+    "approved_profile_count": 0,
+    "full_tier_currently_possible": false,
+    "rule": "실기기 승인 근거와 버전이 생기기 전에는 운영 목록에 임의 프로필을 넣지 않으며 FULL 판정을 허용하지 않는다."
+  },
+  "implemented_controls": [
+    {
+      "control": "STABLE_RUNTIME_METRIC_FRAME_PREFLIGHT",
+      "result": "별도 세대의 실제 ARCore 프레임에서 추적·미터 depth·유효 표본·서로 다른 프레임·관찰시간·통과율을 검사하며 시간초과, 순서 오류, 일시 실패와 생명주기 취소를 UNKNOWN·BLOCKED로 닫는다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflight.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflightTest.kt"
+      ]
+    },
+    {
+      "control": "EMPTY_APPROVED_PROFILE_FAIL_CLOSED",
+      "result": "운영 승인 프로필 목록은 빈 목록이며 제조사·모델·device·SDK 범위와 비어 있지 않은 프로필 버전이 정확히 하나 일치할 때만 승인한다. 중복·빈 값·무일치는 실패 닫힘이다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfileTest.kt"
+      ]
+    },
+    {
+      "control": "PREFLIGHT_RUNTIME_ISOLATION_AND_RECHECK",
+      "result": "MainActivity의 사전검사 AR session은 탐지·신고·피드백·길안내를 시작하지 않고 종료한다. 사용자가 확인한 뒤 새 runtime session에서 미터 프레임을 다시 검사하며 근거가 사라지면 탐지 이후 출력과 대기 피드백을 중단한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactoryTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "actual_device_execution": "NOT_RUN",
+    "result_counts_intentionally_omitted": true,
+    "commands": [
+      {
+        "scope": "runtime metric·승인 프로필 코어 단위검사",
+        "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.device.RuntimeMetricPreflightTest --tests kr.co.hanium.dreamup.walksafe.device.ApprovedDeviceProfileTest --offline --no-daemon",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "MainActivity 사전검사 격리·재검사 정적 계약",
+        "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.RuntimeMetricMainActivityStaticTest --offline --no-daemon",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "MainActivity 시작·접근성·촉각 투영·신고 동의 연결 회귀",
+        "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.MainActivityStartupCapabilityStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityAccessibilityStaticTest --tests kr.co.hanium.dreamup.walksafe.navigation.ArCoreTactileProjectionContextFactoryTest --tests kr.co.hanium.dreamup.walksafe.report.ReportPrivacyConsentSessionTest --offline --no-daemon",
+        "status": "PASS_INTERNAL"
+      }
+    ],
+    "interpretation": "내부 JVM 단위·정적 계약 검사다. 실제 지정 휴대전화의 ARCore/Depth 실행, 승인 프로필 확정 또는 279개 정식 시험을 대신하지 않는다."
+  },
+  "open_issues": [
+    {
+      "id": "PHASE-C-PRODUCTION-PROFILE-EMPTY",
+      "status": "OPEN",
+      "description": "운영 승인 지정 기기 프로필 목록은 비어 있어 현재 어떤 기기도 FULL로 승인되지 않는다."
+    },
+    {
+      "id": "PHASE-C-ACTUAL-DEVICE-NOT-RUN",
+      "status": "NOT_RUN",
+      "description": "실제 지정 휴대전화에서 ARCore session·Depth·미터 프레임 안정성과 runtime 재검사를 실행하지 않았다."
+    },
+    {
+      "id": "PHASE-C-FORMAL-TESTS-NOT-RUN",
+      "status": "NOT_RUN",
+      "description": "FP-009 연결 시험을 포함한 정식 시험 279개는 모두 미실행이다."
+    },
+    {
+      "id": "EPIC-01-LEGACY-WEB-TECHNICAL-CLOSURE",
+      "status": "OPEN_NEXT",
+      "description": "과거 Web 실행·배포·외부 접근 경로의 전체 기술 폐쇄가 남아 있어 GAP-018을 완료로 판정할 수 없다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-01",
+    "work_item_id": "EPIC-01-LEGACY-WEB-TECHNICAL-CLOSURE",
+    "status": "PLANNED_NEXT_WITHIN_IN_PROGRESS_EPIC",
+    "action": "남은 Legacy Web 실행·빌드·배포·외부 접근 경로를 기술적으로 닫고 읽기 전용 참고 경계를 검증한다."
+  },
+  "record_content_sha256": "c469228bfb0662c5eccfc3a9aa835ff05d28a69a94d8b32e886de3a2c65d6906"
+}

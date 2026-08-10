@@ -1,0 +1,335 @@
+{
+  "schema_version": "walksafe.phase1-ai-model-runtime-evidence.v1",
+  "packet_id": "WS-PHASE1-AI-MODEL-RUNTIME-EVIDENCE-20260727-001",
+  "prepared_at": "2026-07-27T20:37:05+09:00",
+  "scope": "W-AI-2_MODEL_RUNTIME_ARTIFACT_BINDING",
+  "inspection_mode": "PHYSICAL_PATH_BYTE_LENGTH_SHA256_AND_STATIC_CONTRACT_ONLY",
+  "prohibited_execution_confirmed": {
+    "gradle": false,
+    "training": false,
+    "model_inference": false,
+    "external_lookup": false
+  },
+  "physical_file_bindings": [
+    {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "exists": true,
+      "byte_length": 5508,
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "ANDROID_RUNTIME_CONFIG",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+      "exists": true,
+      "byte_length": 3567,
+      "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "ANDROID_RUNTIME_CLASS_MAP",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+      "exists": true,
+      "byte_length": 5411845,
+      "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "UNIFIED_SOURCE_PT_CANDIDATE",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "exists": true,
+      "byte_length": 9984493,
+      "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "UNIFIED_ANDROID_TFLITE_CANDIDATE",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+      "exists": true,
+      "byte_length": 38460640,
+      "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "CUSTOM_TACTILE_ANDROID_TFLITE_FALLBACK",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+      "exists": true,
+      "byte_length": 10343256,
+      "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "COCO_GENERAL_ANDROID_TFLITE_FALLBACK",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "model/registry/walksafe-model-registry.json",
+      "exists": true,
+      "byte_length": 2293,
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "LOCAL_MODEL_REGISTRY_CONTROL",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    },
+    {
+      "path": "model/deployments/local-deployment.json",
+      "exists": true,
+      "byte_length": 1348,
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9",
+      "checked_at": "2026-07-27T20:37:05+09:00",
+      "role": "LOCAL_DEVELOPMENT_DEPLOYMENT_CONTROL",
+      "verification": "PHYSICAL_SHA256_MATCH"
+    }
+  ],
+  "physical_file_set_sha256": "84d6b96659627dcde9fcffcaaa6bcd415f238b8cb677186d69e7b2c5bb51c5db",
+  "runtime_generation_projection": {
+    "runtime_model_ids": [
+      "unified_walksafe",
+      "custom_tactile",
+      "coco_general"
+    ],
+    "models": [
+      {
+        "model_id": "unified_walksafe",
+        "role": "PRIMARY_DEVELOPMENT_CANDIDATE",
+        "source_artifact": {
+          "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+          "exists": true,
+          "byte_length": 5411845,
+          "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669"
+        },
+        "runtime_artifact": {
+          "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+          "exists": true,
+          "byte_length": 9984493,
+          "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+        },
+        "source_provenance": "CANDIDATE_PT_PHYSICALLY_BOUND_NOT_APPROVED",
+        "deployment_eligible": false
+      },
+      {
+        "model_id": "custom_tactile",
+        "role": "LEGACY_FALLBACK_COMPONENT",
+        "source_artifact": null,
+        "runtime_artifact": {
+          "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+          "exists": true,
+          "byte_length": 38460640,
+          "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780"
+        },
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "deployment_eligible": false
+      },
+      {
+        "model_id": "coco_general",
+        "role": "LEGACY_FALLBACK_COMPONENT",
+        "source_artifact": null,
+        "runtime_artifact": {
+          "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+          "exists": true,
+          "byte_length": 10343256,
+          "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1"
+        },
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "deployment_eligible": false
+      }
+    ],
+    "runtime_config": {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "exists": true,
+      "byte_length": 5508,
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+    },
+    "kotlin_class_map": {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+      "exists": true,
+      "byte_length": 3567,
+      "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f"
+    },
+    "class_map_alignment": {
+      "unified_walksafe": "MATCH_13_CLASSES",
+      "custom_tactile": "MATCH_3_CLASSES",
+      "coco_general": "MATCH_80_CLASSES"
+    }
+  },
+  "runtime_generation_set_sha256": "d8bdfe41cbf76b8f0ef62597920adf35fd80e0acd1acc8cb5f0affad2f99aa07",
+  "promotion_rollback_contract": {
+    "runtime_generation_set_sha256": "d8bdfe41cbf76b8f0ef62597920adf35fd80e0acd1acc8cb5f0affad2f99aa07",
+    "model_registry": {
+      "path": "model/registry/walksafe-model-registry.json",
+      "exists": true,
+      "byte_length": 2293,
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a"
+    },
+    "local_deployment": {
+      "path": "model/deployments/local-deployment.json",
+      "exists": true,
+      "byte_length": 1348,
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    "required_statuses": {
+      "formal_evaluation": "NOT_RUN",
+      "pt_to_tflite_equivalence": "NOT_RUN",
+      "actual_device_validation": "NOT_RUN",
+      "promotion_approval": "NOT_APPROVED",
+      "rollback_execution": "NOT_RUN"
+    }
+  },
+  "promotion_rollback_contract_sha256": "cbb519ec41a1d5f2f76cd1d4a6d332b23a1b3f8f38ab774c6df0d7ef083eee15",
+  "static_alignment_checks": {
+    "runtime_model_key_set": "MATCH",
+    "runtime_config_embedded_artifact_hashes": "MATCH_PHYSICAL_FILES",
+    "runtime_config_source_pt_hash": "MATCH_PHYSICAL_FILE",
+    "two_model_class_map_unified_13": "MATCH_RUNTIME_CONFIG",
+    "two_model_class_map_custom_3": "MATCH_RUNTIME_CONFIG",
+    "two_model_class_map_coco_80": "MATCH_RUNTIME_CONFIG",
+    "model_registry_pt_and_tflite": "MATCH_PHYSICAL_FILES",
+    "policy_fp035_current_effective_state": "PB-WALKSAFE-FEATURE-POLICY-1.0.1_OVERLAY_APPROVED_EFFECTIVE_COMMITTED",
+    "policy_stale_disallowed_occurrences": 0,
+    "physical_path_bytes_sha256_verification": "MATCH_12_OF_12",
+    "canonical_output_byte_length_basis": "PHYSICAL_FILE_BYTES_EQUIVALENT_TO_WC_C",
+    "implementation_test_gate_state_promotion": "NONE",
+    "policy_source_physical_path_bytes_sha256": "MATCH_2_OF_2",
+    "policy_source_structure_verification": "PASS",
+    "policy_state": "PB-WALKSAFE-FEATURE-POLICY-1.0.1_FP035_APPROVED_EFFECTIVE_COMMITTED",
+    "canonical_outputs_physical_verification": "MATCH_4_OF_4",
+    "implementation_test_deployment_state_promotion": "NONE"
+  },
+  "boundaries": {
+    "fallback_source_provenance": "UNKNOWN_PROVENANCE",
+    "all_deployment_eligible": false,
+    "candidate_metrics_are_formal_evaluation": false,
+    "formal_evaluation_status": "NOT_RUN",
+    "pt_to_tflite_equivalence_status": "NOT_RUN",
+    "actual_device_validation_status": "NOT_RUN",
+    "promotion_status": "NOT_APPROVED",
+    "rollback_anchor_status": "NO_PREVIOUS_APPROVED_GENERATION",
+    "rollback_execution_status": "NOT_RUN"
+  },
+  "trace": {
+    "gap_ids": [
+      "GAP-028",
+      "GAP-029",
+      "GAP-040",
+      "GAP-048"
+    ],
+    "artifact_type_ids": [
+      "AIML-04",
+      "AIML-14",
+      "AIML-15",
+      "AIML-16",
+      "AIML-17",
+      "AIML-24"
+    ]
+  },
+  "output_bindings": [
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "byte_length": 22070,
+      "sha256": "ece6bcf443b9442f7b19519237d633f8a7aacb4992399e3ef181d0e90327901b",
+      "role": "MODEL_REGISTER_WITH_PHYSICAL_RUNTIME_BINDING",
+      "captured_at": "2026-07-27T20:37:05+09:00"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "byte_length": 26320,
+      "sha256": "c944ffc2a179ff619f38cdd6f470e66d9411505a59a804ba7b1b5d51d4c18f5a",
+      "role": "MODEL_DEVELOPMENT_RUNTIME_EVIDENCE",
+      "captured_at": "2026-07-27T20:37:05+09:00"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "byte_length": 29227,
+      "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd",
+      "role": "MODEL_EVALUATION_BOUNDARY",
+      "captured_at": "2026-07-27T20:37:05+09:00"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-operations.md",
+      "byte_length": 12893,
+      "sha256": "d72c78a5ed5a737d283a0323f39f932b354bf2d07223bf7b4800d8e73437fd73",
+      "role": "MODEL_PROMOTION_ROLLBACK_CONTRACT",
+      "captured_at": "2026-07-27T20:37:05+09:00"
+    }
+  ],
+  "register_content_fingerprint_sha256": "2f5ceae0c72efeeb4c59aae16410c810ce5e4670759b8a85d4a90d1d9f1b2b47",
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "scope": "ENTIRE_PACKET_EXCLUDING_TOP_LEVEL_CONTENT_FINGERPRINT",
+    "sha256": "09bc2d0b4889177ab7f4a48f4869eb88d1d552315215f75c5dd7db8d7f0650b9"
+  },
+  "r002_revalidated_at": "2026-07-27T21:17:22+09:00",
+  "policy_state": {
+    "captured_at": "2026-07-27T21:23:50+09:00",
+    "current_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "current_baseline_version": "1.0.1",
+    "baseline_status": "BASELINED",
+    "fp035_overlay": {
+      "feature_id": "FP-035",
+      "approval_status": "APPROVED",
+      "effective_status": "EFFECTIVE",
+      "commit_status": "COMMITTED",
+      "historical_pre_activation_only": "PB-WALKSAFE-FEATURE-POLICY-1.0.0_AND_PREAPPROVAL_CANDIDATE_STATES"
+    },
+    "evidence_roles": [
+      "CURRENT_POLICY_BASELINE_MANIFEST",
+      "CURRENT_EFFECTIVE_DECISION_REGISTER"
+    ],
+    "non_promotion_boundary": {
+      "implementation_status": "NOT_ASSESSED",
+      "test_status": "NOT_RUN",
+      "gate_status": "OPEN",
+      "deployment_eligible": false
+    }
+  },
+  "source_bindings": [
+    {
+      "role": "CURRENT_POLICY_BASELINE_MANIFEST",
+      "capture_role": "AUTHORITATIVE_BASELINE_IDENTITY_AND_FP035_COMPOSITION",
+      "captured_at": "2026-07-27T21:23:50+09:00",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "bytes": 8054,
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "structure_status": "PASS",
+      "bound_values": {
+        "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "baseline_version": "1.0.1",
+        "baseline_status": "BASELINED",
+        "approved_feature_id": "FP-035",
+        "content_sha256": "8fdeab58e8c901a29f4380de373cdfd2b67350cd43dafa765246b4f6c9f77244"
+      }
+    },
+    {
+      "role": "CURRENT_EFFECTIVE_DECISION_REGISTER",
+      "capture_role": "AUTHORITATIVE_CURRENT_APPROVAL_EFFECTIVE_COMMIT_STATE",
+      "captured_at": "2026-07-27T21:23:50+09:00",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "bytes": 10001,
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "structure_status": "PASS",
+      "bound_values": {
+        "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "feature_id": "FP-035",
+        "approval_status": "APPROVED",
+        "effective_status": "EFFECTIVE",
+        "commit_status": "COMMITTED"
+      }
+    }
+  ],
+  "policy_state_manifest": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8_JSON_SORT_KEYS_COMPACT_NO_TRAILING_LF",
+    "sha256": "29f80f4ad28086e4a03375227c9cd6af1e648a084427e12d30c9919e3def3276"
+  },
+  "source_bindings_manifest": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8_JSON_SORT_KEYS_COMPACT_NO_TRAILING_LF",
+    "entry_count": 2,
+    "sha256": "a8de72b75e0ca80f658d05eea626374d2166f393e826cd108206e78c4d000a8c"
+  },
+  "r003_captured_at": "2026-07-27T21:23:50+09:00"
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "walksafe.validation-receipt.v1",
+  "receipt_id": "openapi-check-r002",
+  "observed_at": "2026-07-28T01:47:41Z",
+  "command_scope": "w3-openapi-check",
+  "working_directory": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+  "environment": {
+    "python_candidates": {
+      "3.13": "UNAVAILABLE",
+      "3.12": "UNAVAILABLE",
+      "3.11": "UNAVAILABLE"
+    },
+    "selection_reason": "No compatible preferred interpreter was available; current Python 3.14 was used as authorized fallback.",
+    "virtual_environment": ".venv",
+    "requirements_path": "backend/requirements.txt",
+    "dependency_install_command": ".venv/bin/python -m pip install -r backend/requirements.txt",
+    "dependency_install_exit_code": 0,
+    "dependency_install_performed": true
+  },
+  "python": {
+    "version": "3.14.6",
+    "executable": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/.venv/bin/python",
+    "base_executable": "/home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14"
+  },
+  "check": {
+    "command": ".venv/bin/python scripts/generate_walksafe_openapi.py --check",
+    "exit_code": 0,
+    "result": "PASS",
+    "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-r002.log",
+    "log_sha256": "a1652c64ca8bff87adcb7d6146e4ec6e7d38de143ad4a5410d48c65be25c8aaf"
+  },
+  "prior_blocked_receipt_preserved": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/w3-light-available-checks-receipt.json"
+}

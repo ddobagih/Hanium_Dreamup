@@ -1,0 +1,1068 @@
+{
+  "schema_version": "walksafe.w7.aiml-model-governance-current-state.v1",
+  "snapshot_date": "2026-07-27",
+  "workstream": "W7_AIML_MODEL_GOVERNANCE_CURRENT_STATE",
+  "source_commit": null,
+  "build_id": null,
+  "scope": {
+    "artifact_type_ids": [
+      "DLV-AIML-06",
+      "DLV-AIML-07",
+      "DLV-AIML-10",
+      "DLV-AIML-14",
+      "DLV-AIML-15",
+      "DLV-AIML-16",
+      "DLV-AIML-17",
+      "DLV-AIML-23"
+    ],
+    "artifact_type_count": 8,
+    "runtime_model_ids": [
+      "unified_walksafe",
+      "custom_tactile",
+      "coco_general"
+    ],
+    "runtime_model_count": 3
+  },
+  "authority_boundary": {
+    "document_role": "CURRENT_STATE_AND_INTERNAL_COMPLETION_CANDIDATE_EVIDENCE",
+    "does_not_claim": [
+      "MODEL_EVALUATION_COMPLETE",
+      "CONVERSION_EQUIVALENCE_COMPLETE",
+      "DEVICE_VALIDATION_COMPLETE",
+      "THRESHOLD_APPROVED",
+      "RELEASE_APPROVED",
+      "DEPLOYMENT_ELIGIBLE"
+    ],
+    "independent_review_required_for_candidate": true
+  },
+  "source_bindings": [
+    {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+      "bytes": 5508
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+      "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+      "bytes": 10343256
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+      "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+      "bytes": 38460640
+    },
+    {
+      "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+      "bytes": 9984493
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+      "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f",
+      "bytes": 3567
+    },
+    {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb",
+      "bytes": 639009
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260726/security-ai-audit.json",
+      "sha256": "4eb543de60cb07d267f52af17f725036aa79520da883ba02814456dbfe4dbd14",
+      "bytes": 26822
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+      "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f",
+      "bytes": 22179
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559",
+      "bytes": 39378
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939",
+      "bytes": 23552
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "sha256": "6d3d92bb8b565241dd57556eee7f5a3817339026d036b11e656035028f79eaa4",
+      "bytes": 28026
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+      "bytes": 26684
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+      "sha256": "51a1be7c6f400585d5fe885d1a81c01ff864a41ff01b4daf92f6e673767c2a61",
+      "bytes": 13235
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+      "bytes": 12663
+    },
+    {
+      "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+      "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770",
+      "bytes": 38456
+    },
+    {
+      "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+      "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+      "bytes": 5411845
+    },
+    {
+      "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+      "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15",
+      "bytes": 84116
+    },
+    {
+      "path": "tests/test_walksafe_formal_aiml.py",
+      "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551",
+      "bytes": 23351
+    }
+  ],
+  "common_aiml_source_generation": {
+    "origin_w6_path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+    "origin_w6_content_fingerprint": "5d26dba8ca105121ccc29ee4cb56e710615aec08aa8dcde13caec800bedf665a",
+    "source_commit": null,
+    "build_id": null,
+    "changed_file_count": 7,
+    "changed_files": [
+      {
+        "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+        "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15",
+        "bytes": 84116
+      },
+      {
+        "path": "tests/test_walksafe_formal_aiml.py",
+        "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551",
+        "bytes": 23351
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559",
+        "bytes": 39378
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+        "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939",
+        "bytes": 23552
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+        "bytes": 26684
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+        "bytes": 12663
+      },
+      {
+        "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+        "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770",
+        "bytes": 38456
+      }
+    ],
+    "changed_file_set_fingerprint": "bd051b8ee4267e9a6ed98309789b0a0eb61e770ae1487c34341496b5a17e11f8",
+    "generation": {
+      "status": "PASS",
+      "verified_file_count": 11
+    },
+    "builder_check": {
+      "command": "python3 scripts/build_walksafe_formal_aiml_20260721.py --check",
+      "status": "PASS",
+      "verified_file_count": 11
+    },
+    "pytest": {
+      "command": "pytest -q tests/test_walksafe_formal_aiml.py",
+      "status": "PASS",
+      "collected": 19,
+      "passed": 19,
+      "failed": 0
+    },
+    "evidence_mode": "IN_SESSION_HASH_BOUND_NO_STANDALONE_LOG",
+    "formal_execution_evidence_count": 0,
+    "execution_gate_count": 5,
+    "execution_gate_status": "NOT_RUN",
+    "release_eligibility": "NOT_ELIGIBLE"
+  },
+  "artifact_dispositions": [
+    {
+      "artifact_type_id": "DLV-AIML-06",
+      "catalog_record_fingerprint": "2de250ad97178c3f3d15a8df4ecb42d37074ab5bc8988dcb719ba62f00cda32f",
+      "audit_record_fingerprint": "9be444408983c5f34b573f0e6a67a46f74f15be5e1e0bb6630e8ea012e286264",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "데이터 정제의 keep/fix/hold/drop 수치 기준과 승인 기준이 설정되지 않았다.",
+      "required_next_action": "수치 기준을 동결하고 적용 결과 및 승인 근거를 생성한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-07",
+      "catalog_record_fingerprint": "891647d55fcb35a25fa33d6c65fbb96af2d953cf750a2bff54f30b451d790e30",
+      "audit_record_fingerprint": "b6d9738ef709d318b4b22a374eb5afba609a3d14aa7fce34c06e8262bf96cbe7",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "라벨링 지침에 연결된 승인된 positive/negative 예시 세트가 없다.",
+      "required_next_action": "클래스별 승인 예시와 반례를 작성하고 검토 승인을 기록한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-10",
+      "catalog_record_fingerprint": "bac35627e920c929ac76e1f39e46e4940665e92bff8033d0283ecc223cd4597c",
+      "audit_record_fingerprint": "bc69e0998fc86e8ae928463b5080baf7ea23a72d11a726681b0b7390c4aba5df",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "capture/perceptual/sequence/metadata leakage 검사가 실행되지 않았고 결과가 없다.",
+      "required_next_action": "네 종류 누수 검사를 실제 데이터 스냅샷에 실행하고 증거와 판정을 고정한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-14",
+      "catalog_record_fingerprint": "e9a3d5c190d654a4090210d2569d782ea8c98200cc8ba7e3468035c24774b006",
+      "audit_record_fingerprint": "1b137cc5cb905ebd463248135b048582de3ca66f89b6fca6f87fe4c421c99a3c",
+      "disposition": "OK_CANDIDATE_PENDING_INDEPENDENT_REVIEW",
+      "internal_completion_candidate": true,
+      "independent_review_status": "PENDING",
+      "gap_or_boundary": "런타임 3개 모델의 실제 자산·계약·역할·fallback 현황은 내부 후보 수준으로 결속됐지만 독립 검토 전이다.",
+      "required_next_action": "독립 검토에서 등록부-자산-런타임 구성 일치를 확인한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-15",
+      "catalog_record_fingerprint": "a9f478a965451595e8222ff71ce267ca8d151609da000f2746e97cf25c1110d1",
+      "audit_record_fingerprint": "d86aced4ef730f09f694a5ece273446971e71eb19d702446d5e0456d32649635",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "런타임 3개 모델별 모델 카드와 승인 결과가 없고 통합 설명만 존재한다.",
+      "required_next_action": "모델별 카드 3개를 작성하고 provenance·제약·승인 결과를 각각 고정한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-16",
+      "catalog_record_fingerprint": "3517d32ef4d1d84516310dfb8a0d256b85cabea08c159ae2b5ec941ea5a7ace3",
+      "audit_record_fingerprint": "13e65862259a1ab8180cfe9334efad266fe3b29638a2f923ed8fba6026009a68",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "통합 모델 해시는 결속됐지만 두 fallback 모델의 원천 provenance와 변환 동등성 증거가 없다.",
+      "required_next_action": "fallback 원천 파일과 변환 체인을 복구하고 동등성 평가를 실행한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-17",
+      "catalog_record_fingerprint": "74a0d032564c26d291d2b3f703cba196b04fca7d9fc2fdd458a2b68e2dc3254c",
+      "audit_record_fingerprint": "94bb320ae98848297d7cd58041ffb2efc41c97a090b5f8480a9320c866540191",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "학습 전 동결된 protocol/split hash/탐색 grid/수용 기준/tolerance가 없다.",
+      "required_next_action": "재학습 전 실험 프로토콜과 분할·그리드·판정 허용치를 선동결한다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-23",
+      "catalog_record_fingerprint": "ea3f97e27288ed76a0e452bac6bb324ec6a1e8b3bb1a365ac0a5855c784a0c01",
+      "audit_record_fingerprint": "c0cbecace661b8ba0f174bec8709de8cb92d521647847214f44a4927632b31d0",
+      "disposition": "INTERNAL_GAP",
+      "internal_completion_candidate": false,
+      "independent_review_status": "NOT_READY",
+      "gap_or_boundary": "threshold sweep와 독립 재평가가 NOT_RUN이며 curve·비용·승인 결과가 없다.",
+      "required_next_action": "고정 데이터에서 sweep와 독립 재평가를 실행하고 곡선·비용·승인 판정을 남긴다.",
+      "release_approval": "NOT_APPROVED",
+      "release_eligibility": "NOT_ELIGIBLE"
+    }
+  ],
+  "disposition_summary": {
+    "ok_candidate_pending_independent_review": 1,
+    "internal_gap": 7,
+    "only_internal_completion_candidate": "DLV-AIML-14"
+  },
+  "model_registry_projection": {
+    "register_path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+    "register_schema": "walksafe.aiml-model-register.v2",
+    "runtime_model_ids": [
+      "unified_walksafe",
+      "custom_tactile",
+      "coco_general"
+    ],
+    "runtime_model_count": 3,
+    "runtime_model_set_fingerprint": "b9b4b0c8a9442c016d7da1b69bf85583d497652e07a8835e851ea7307ccbfbf5",
+    "unknown_provenance_runtime_model_ids": [
+      "custom_tactile",
+      "coco_general"
+    ],
+    "approved_model_count": 0,
+    "deployed_release_model_count": 0,
+    "runtime_config": {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+      "bytes": 5508
+    },
+    "kotlin_class_map": {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelClassMap.kt",
+      "sha256": "0f7077a45304338df1ada4e589bd1325c103168418ddb41472af73d61220b83f",
+      "bytes": 3567
+    },
+    "models": [
+      {
+        "runtime_model_id": "unified_walksafe",
+        "lifecycle_status": "CANDIDATE",
+        "approval_status": "NOT_APPROVED",
+        "source_provenance": "CANDIDATE_SOURCE_ARTIFACT_BOUND_NOT_APPROVED",
+        "source_artifact": {
+          "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+          "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+          "bytes": 5411845,
+          "format": "PYTORCH"
+        },
+        "android_asset": {
+          "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+          "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+          "bytes": 9984493,
+          "asset_path": "models/walksafe_unified_yolo26n_768_float32.tflite",
+          "format": "TFLITE"
+        },
+        "input_contract": {
+          "status": "DECLARED",
+          "shape": [
+            1,
+            768,
+            768,
+            3
+          ],
+          "dtype": "float32",
+          "input_side": 768
+        },
+        "output_contract": {
+          "status": "DECLARED",
+          "shape": [
+            1,
+            300,
+            6
+          ],
+          "dtype": "float32"
+        },
+        "class_contract": {
+          "count": 13,
+          "namespace": "walksafe.unified_walksafe.class_id",
+          "ordered_labels": [
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "bus",
+            "truck",
+            "traffic light",
+            "normal_tactile_block",
+            "damaged_tactile_block",
+            "crosswalk",
+            "curb_step",
+            "uneven_sidewalk",
+            "e_scooter_obstruction"
+          ],
+          "order_sha256": "5a01ce89ef0123c136fc17910c326fc64e70a3eaed77f3d4e80548518722d6d3"
+        },
+        "runtime_role": "PRIMARY",
+        "fallback_contract": {
+          "alias": "legacy_two_model",
+          "runtime_model_ids": [
+            "custom_tactile",
+            "coco_general"
+          ]
+        },
+        "evaluation_status": "NOT_RUN",
+        "conversion_equivalence_status": "NOT_RUN",
+        "device_validation_status": "NOT_RUN",
+        "deployment_eligible": false,
+        "release_eligibility": "NOT_ELIGIBLE",
+        "source_record": {
+          "model_id": "unified_walksafe",
+          "runtime_model_id": "unified_walksafe",
+          "candidate_registry_model_id": "walksafe-13cls-yolo26n-img768-epoch270-20260708",
+          "registry_stage": "CANDIDATE",
+          "approval_status": "NOT_APPROVED",
+          "source_artifact": {
+            "provenance_status": "CANDIDATE_SOURCE_ARTIFACT_BOUND_NOT_APPROVED",
+            "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+            "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+            "byte_length": 5411845,
+            "format": "pytorch"
+          },
+          "android_artifact": {
+            "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+            "asset_path": "models/walksafe_unified_yolo26n_768_float32.tflite",
+            "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+            "byte_length": 9984493,
+            "format": "TFLITE"
+          },
+          "input_contract": {
+            "status": "DECLARED_IN_RUNTIME_EXPORT",
+            "shape": [
+              1,
+              768,
+              768,
+              3
+            ],
+            "dtype": "float32",
+            "image_side_pixels": 768
+          },
+          "output_contract": {
+            "status": "DECLARED_IN_RUNTIME_EXPORT",
+            "shape": [
+              1,
+              300,
+              6
+            ],
+            "dtype": "float32",
+            "class_id_namespace": "walksafe.unified_walksafe.class_id"
+          },
+          "class_schema": {
+            "schema_id": "WS-RUNTIME-CLASS-SCHEMA-UNIFIED_WALKSAFE",
+            "class_id_namespace": "walksafe.unified_walksafe.class_id",
+            "class_count": 13,
+            "class_order": [
+              "person",
+              "bicycle",
+              "car",
+              "motorcycle",
+              "bus",
+              "truck",
+              "traffic light",
+              "normal_tactile_block",
+              "damaged_tactile_block",
+              "crosswalk",
+              "curb_step",
+              "uneven_sidewalk",
+              "e_scooter_obstruction"
+            ],
+            "class_order_sha256": "5a01ce89ef0123c136fc17910c326fc64e70a3eaed77f3d4e80548518722d6d3"
+          },
+          "runtime_role": "PRIMARY",
+          "fallback_contract": {
+            "fallback_alias": "legacy_two_model",
+            "fallback_runtime_model_ids": [
+              "custom_tactile",
+              "coco_general"
+            ]
+          },
+          "runtime_config": {
+            "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+            "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+            "thresholds_candidate_not_approved": {
+              "default": 0.2,
+              "person": 0.2,
+              "bicycle": 0.2,
+              "car": 0.2,
+              "motorcycle": 0.2,
+              "bus": 0.2,
+              "truck": 0.2,
+              "traffic light": 0.3,
+              "normal_tactile_block": 0.3,
+              "damaged_tactile_block": 0.3,
+              "crosswalk": 0.3,
+              "curb_step": 0.2,
+              "uneven_sidewalk": 0.15,
+              "e_scooter_obstruction": 0.35
+            }
+          },
+          "deployment_candidate_state": "development_candidate_active",
+          "deployment_eligible": false,
+          "evaluation_status": "NOT_RUN",
+          "conversion_equivalence_status": "NOT_RUN",
+          "android_device_performance_status": "NOT_RUN",
+          "release_status": "NOT_ELIGIBLE",
+          "blockers": [
+            "independent_test_missing",
+            "dataset_content_hashes_missing",
+            "capture_sequence_split_leakage",
+            "curb_step_recall_below_field_gate",
+            "uneven_sidewalk_recall_below_field_gate"
+          ],
+          "candidate_metrics_not_formal_evaluation": {
+            "precision": 0.62087,
+            "recall": 0.56716,
+            "map50": 0.55403,
+            "map50_95": 0.41651
+          }
+        },
+        "candidate_registry_model_id": "walksafe-13cls-yolo26n-img768-epoch270-20260708"
+      },
+      {
+        "runtime_model_id": "custom_tactile",
+        "lifecycle_status": "CANDIDATE",
+        "approval_status": "NOT_APPROVED",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "source_artifact": {
+          "path": null,
+          "sha256": null,
+          "bytes": null,
+          "format": null,
+          "declared_runtime_source_reference": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite"
+        },
+        "android_asset": {
+          "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+          "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+          "bytes": 38460640,
+          "asset_path": "models/custom_tactile_yolo26s_float32.tflite",
+          "format": "TFLITE"
+        },
+        "input_contract": {
+          "status": "PARTIAL_INPUT_SIZE_ONLY",
+          "shape": null,
+          "dtype": null,
+          "input_side": 960
+        },
+        "output_contract": {
+          "status": "CLASS_ORDER_ONLY_TENSOR_CONTRACT_NOT_DECLARED",
+          "shape": null,
+          "dtype": null
+        },
+        "class_contract": {
+          "count": 3,
+          "namespace": "walksafe.custom_tactile.class_id",
+          "ordered_labels": [
+            "normal_tactile_block",
+            "damaged_tactile_block",
+            "tactile_damage_area"
+          ],
+          "order_sha256": "85210b06510e5f0967d1c3ae325aa82e0731a11fe53e0b6a83f67e3d1ad84c00"
+        },
+        "runtime_role": "LEGACY_TWO_MODEL_TACTILE_FALLBACK_COMPONENT",
+        "fallback_contract": {
+          "alias": "legacy_two_model",
+          "fallback_for": "unified_walksafe"
+        },
+        "evaluation_status": "NOT_RUN",
+        "conversion_equivalence_status": "NOT_RUN",
+        "device_validation_status": "NOT_RUN",
+        "deployment_eligible": false,
+        "release_eligibility": "NOT_ELIGIBLE",
+        "source_record": {
+          "model_id": "custom_tactile",
+          "runtime_model_id": "custom_tactile",
+          "candidate_registry_model_id": null,
+          "registry_stage": "CANDIDATE",
+          "approval_status": "NOT_APPROVED",
+          "source_artifact": {
+            "provenance_status": "UNKNOWN_PROVENANCE",
+            "path": null,
+            "sha256": null,
+            "byte_length": null,
+            "format": null,
+            "declared_runtime_source_reference": "android_asset/custom_tactile_yolo26s_float32.tflite",
+            "reason": "runtime source_model points to the Android asset itself, not an independently verified source artifact"
+          },
+          "android_artifact": {
+            "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+            "asset_path": "models/custom_tactile_yolo26s_float32.tflite",
+            "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+            "byte_length": 38460640,
+            "format": "TFLITE"
+          },
+          "input_contract": {
+            "status": "PARTIAL_INPUT_SIZE_ONLY",
+            "shape": null,
+            "dtype": null,
+            "image_side_pixels": 960
+          },
+          "output_contract": {
+            "status": "CLASS_ORDER_ONLY_TENSOR_CONTRACT_NOT_DECLARED",
+            "shape": null,
+            "dtype": null,
+            "class_id_namespace": "walksafe.custom_tactile.class_id"
+          },
+          "class_schema": {
+            "schema_id": "WS-RUNTIME-CLASS-SCHEMA-CUSTOM_TACTILE",
+            "class_id_namespace": "walksafe.custom_tactile.class_id",
+            "class_count": 3,
+            "class_order": [
+              "normal_tactile_block",
+              "damaged_tactile_block",
+              "tactile_damage_area"
+            ],
+            "class_order_sha256": "85210b06510e5f0967d1c3ae325aa82e0731a11fe53e0b6a83f67e3d1ad84c00"
+          },
+          "runtime_role": "LEGACY_TWO_MODEL_TACTILE_FALLBACK_COMPONENT",
+          "fallback_contract": {
+            "member_of_fallback_alias": "legacy_two_model",
+            "fallback_for_runtime_model_id": "unified_walksafe"
+          },
+          "runtime_config": {
+            "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+            "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+            "thresholds_candidate_not_approved": {
+              "normal_tactile_block": 0.25,
+              "damaged_tactile_block": 0.35,
+              "tactile_damage_area": 0.45
+            }
+          },
+          "deployment_candidate_state": "DEVELOPMENT_FALLBACK_COMPONENT",
+          "deployment_eligible": false,
+          "evaluation_status": "NOT_RUN",
+          "conversion_equivalence_status": "NOT_RUN",
+          "android_device_performance_status": "NOT_RUN",
+          "release_status": "NOT_ELIGIBLE",
+          "blockers": [
+            "UNKNOWN_PROVENANCE",
+            "CONVERSION_EQUIVALENCE_NOT_RUN",
+            "ANDROID_DEVICE_PERFORMANCE_NOT_RUN"
+          ],
+          "candidate_metrics_not_formal_evaluation": {}
+        }
+      },
+      {
+        "runtime_model_id": "coco_general",
+        "lifecycle_status": "CANDIDATE",
+        "approval_status": "NOT_APPROVED",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "source_artifact": {
+          "path": null,
+          "sha256": null,
+          "bytes": null,
+          "format": null,
+          "declared_runtime_source_reference": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite"
+        },
+        "android_asset": {
+          "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+          "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+          "bytes": 10343256,
+          "asset_path": "models/coco_yolo26n_float32.tflite",
+          "format": "TFLITE"
+        },
+        "input_contract": {
+          "status": "PARTIAL_INPUT_SIZE_ONLY",
+          "shape": null,
+          "dtype": null,
+          "input_side": 640
+        },
+        "output_contract": {
+          "status": "CLASS_ORDER_ONLY_TENSOR_CONTRACT_NOT_DECLARED",
+          "shape": null,
+          "dtype": null
+        },
+        "class_contract": {
+          "count": 80,
+          "namespace": "coco.coco_general.class_id",
+          "ordered_labels": [
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "airplane",
+            "bus",
+            "train",
+            "truck",
+            "boat",
+            "traffic light",
+            "fire hydrant",
+            "stop sign",
+            "parking meter",
+            "bench",
+            "bird",
+            "cat",
+            "dog",
+            "horse",
+            "sheep",
+            "cow",
+            "elephant",
+            "bear",
+            "zebra",
+            "giraffe",
+            "backpack",
+            "umbrella",
+            "handbag",
+            "tie",
+            "suitcase",
+            "frisbee",
+            "skis",
+            "snowboard",
+            "sports ball",
+            "kite",
+            "baseball bat",
+            "baseball glove",
+            "skateboard",
+            "surfboard",
+            "tennis racket",
+            "bottle",
+            "wine glass",
+            "cup",
+            "fork",
+            "knife",
+            "spoon",
+            "bowl",
+            "banana",
+            "apple",
+            "sandwich",
+            "orange",
+            "broccoli",
+            "carrot",
+            "hot dog",
+            "pizza",
+            "donut",
+            "cake",
+            "chair",
+            "couch",
+            "potted plant",
+            "bed",
+            "dining table",
+            "toilet",
+            "tv",
+            "laptop",
+            "mouse",
+            "remote",
+            "keyboard",
+            "cell phone",
+            "microwave",
+            "oven",
+            "toaster",
+            "sink",
+            "refrigerator",
+            "book",
+            "clock",
+            "vase",
+            "scissors",
+            "teddy bear",
+            "hair drier",
+            "toothbrush"
+          ],
+          "order_sha256": "a2bb9c8218affdef450cc85951e6a5abc5e4d956cd37b1be3d04840ae0120c8e"
+        },
+        "runtime_role": "LEGACY_TWO_MODEL_GENERAL_FALLBACK_COMPONENT",
+        "fallback_contract": {
+          "alias": "legacy_two_model",
+          "fallback_for": "unified_walksafe"
+        },
+        "evaluation_status": "NOT_RUN",
+        "conversion_equivalence_status": "NOT_RUN",
+        "device_validation_status": "NOT_RUN",
+        "deployment_eligible": false,
+        "release_eligibility": "NOT_ELIGIBLE",
+        "source_record": {
+          "model_id": "coco_general",
+          "runtime_model_id": "coco_general",
+          "candidate_registry_model_id": null,
+          "registry_stage": "CANDIDATE",
+          "approval_status": "NOT_APPROVED",
+          "source_artifact": {
+            "provenance_status": "UNKNOWN_PROVENANCE",
+            "path": null,
+            "sha256": null,
+            "byte_length": null,
+            "format": null,
+            "declared_runtime_source_reference": "android_asset/coco_yolo26n_float32.tflite",
+            "reason": "runtime source_model points to the Android asset itself, not an independently verified source artifact"
+          },
+          "android_artifact": {
+            "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+            "asset_path": "models/coco_yolo26n_float32.tflite",
+            "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+            "byte_length": 10343256,
+            "format": "TFLITE"
+          },
+          "input_contract": {
+            "status": "PARTIAL_INPUT_SIZE_ONLY",
+            "shape": null,
+            "dtype": null,
+            "image_side_pixels": 640
+          },
+          "output_contract": {
+            "status": "CLASS_ORDER_ONLY_TENSOR_CONTRACT_NOT_DECLARED",
+            "shape": null,
+            "dtype": null,
+            "class_id_namespace": "coco.coco_general.class_id"
+          },
+          "class_schema": {
+            "schema_id": "WS-RUNTIME-CLASS-SCHEMA-COCO_GENERAL",
+            "class_id_namespace": "coco.coco_general.class_id",
+            "class_count": 80,
+            "class_order": [
+              "person",
+              "bicycle",
+              "car",
+              "motorcycle",
+              "airplane",
+              "bus",
+              "train",
+              "truck",
+              "boat",
+              "traffic light",
+              "fire hydrant",
+              "stop sign",
+              "parking meter",
+              "bench",
+              "bird",
+              "cat",
+              "dog",
+              "horse",
+              "sheep",
+              "cow",
+              "elephant",
+              "bear",
+              "zebra",
+              "giraffe",
+              "backpack",
+              "umbrella",
+              "handbag",
+              "tie",
+              "suitcase",
+              "frisbee",
+              "skis",
+              "snowboard",
+              "sports ball",
+              "kite",
+              "baseball bat",
+              "baseball glove",
+              "skateboard",
+              "surfboard",
+              "tennis racket",
+              "bottle",
+              "wine glass",
+              "cup",
+              "fork",
+              "knife",
+              "spoon",
+              "bowl",
+              "banana",
+              "apple",
+              "sandwich",
+              "orange",
+              "broccoli",
+              "carrot",
+              "hot dog",
+              "pizza",
+              "donut",
+              "cake",
+              "chair",
+              "couch",
+              "potted plant",
+              "bed",
+              "dining table",
+              "toilet",
+              "tv",
+              "laptop",
+              "mouse",
+              "remote",
+              "keyboard",
+              "cell phone",
+              "microwave",
+              "oven",
+              "toaster",
+              "sink",
+              "refrigerator",
+              "book",
+              "clock",
+              "vase",
+              "scissors",
+              "teddy bear",
+              "hair drier",
+              "toothbrush"
+            ],
+            "class_order_sha256": "a2bb9c8218affdef450cc85951e6a5abc5e4d956cd37b1be3d04840ae0120c8e"
+          },
+          "runtime_role": "LEGACY_TWO_MODEL_GENERAL_FALLBACK_COMPONENT",
+          "fallback_contract": {
+            "member_of_fallback_alias": "legacy_two_model",
+            "fallback_for_runtime_model_id": "unified_walksafe"
+          },
+          "runtime_config": {
+            "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+            "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+            "thresholds_candidate_not_approved": {
+              "person": 0.35,
+              "car": 0.35,
+              "bus": 0.35,
+              "truck": 0.35,
+              "bicycle": 0.35,
+              "motorcycle": 0.35,
+              "traffic light": 0.4,
+              "bench": 0.4
+            }
+          },
+          "deployment_candidate_state": "DEVELOPMENT_FALLBACK_COMPONENT",
+          "deployment_eligible": false,
+          "evaluation_status": "NOT_RUN",
+          "conversion_equivalence_status": "NOT_RUN",
+          "android_device_performance_status": "NOT_RUN",
+          "release_status": "NOT_ELIGIBLE",
+          "blockers": [
+            "UNKNOWN_PROVENANCE",
+            "CONVERSION_EQUIVALENCE_NOT_RUN",
+            "ANDROID_DEVICE_PERFORMANCE_NOT_RUN"
+          ],
+          "candidate_metrics_not_formal_evaluation": {}
+        }
+      }
+    ]
+  },
+  "formal_boundary": {
+    "model_evaluation": "NOT_RUN",
+    "conversion_equivalence": "NOT_RUN",
+    "on_device_validation": "NOT_RUN",
+    "threshold_sweep": "NOT_RUN",
+    "independent_reevaluation": "NOT_RUN",
+    "release_approval": "NOT_APPROVED",
+    "release_eligibility": "NOT_ELIGIBLE"
+  },
+  "gap_register": [
+    {
+      "artifact_type_id": "DLV-AIML-06",
+      "status": "INTERNAL_GAP",
+      "statement": "데이터 정제의 keep/fix/hold/drop 수치 기준과 승인 기준이 설정되지 않았다.",
+      "required_next_action": "수치 기준을 동결하고 적용 결과 및 승인 근거를 생성한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-07",
+      "status": "INTERNAL_GAP",
+      "statement": "라벨링 지침에 연결된 승인된 positive/negative 예시 세트가 없다.",
+      "required_next_action": "클래스별 승인 예시와 반례를 작성하고 검토 승인을 기록한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-10",
+      "status": "INTERNAL_GAP",
+      "statement": "capture/perceptual/sequence/metadata leakage 검사가 실행되지 않았고 결과가 없다.",
+      "required_next_action": "네 종류 누수 검사를 실제 데이터 스냅샷에 실행하고 증거와 판정을 고정한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-14",
+      "status": "OK_CANDIDATE_PENDING_INDEPENDENT_REVIEW",
+      "statement": "런타임 3개 모델의 실제 자산·계약·역할·fallback 현황은 내부 후보 수준으로 결속됐지만 독립 검토 전이다.",
+      "required_next_action": "독립 검토에서 등록부-자산-런타임 구성 일치를 확인한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-15",
+      "status": "INTERNAL_GAP",
+      "statement": "런타임 3개 모델별 모델 카드와 승인 결과가 없고 통합 설명만 존재한다.",
+      "required_next_action": "모델별 카드 3개를 작성하고 provenance·제약·승인 결과를 각각 고정한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-16",
+      "status": "INTERNAL_GAP",
+      "statement": "통합 모델 해시는 결속됐지만 두 fallback 모델의 원천 provenance와 변환 동등성 증거가 없다.",
+      "required_next_action": "fallback 원천 파일과 변환 체인을 복구하고 동등성 평가를 실행한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-17",
+      "status": "INTERNAL_GAP",
+      "statement": "학습 전 동결된 protocol/split hash/탐색 grid/수용 기준/tolerance가 없다.",
+      "required_next_action": "재학습 전 실험 프로토콜과 분할·그리드·판정 허용치를 선동결한다."
+    },
+    {
+      "artifact_type_id": "DLV-AIML-23",
+      "status": "INTERNAL_GAP",
+      "statement": "threshold sweep와 독립 재평가가 NOT_RUN이며 curve·비용·승인 결과가 없다.",
+      "required_next_action": "고정 데이터에서 sweep와 독립 재평가를 실행하고 곡선·비용·승인 판정을 남긴다."
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON; sorted keys; compact separators; trailing LF",
+    "content_fingerprint": {
+      "value": "55f5112644c0f8fe26cb1719c31f9242d70c629d602a9aa8531d256dfa177517",
+      "rule": "hash this document with integrity.content_fingerprint.value set to null"
+    },
+    "semantic_projection_fingerprint": {
+      "value": "557ce0fcf0a45cf06a9d9964ecfecb11aeb4e1e291971ba551eb378228f1916d",
+      "projection_schema": "walksafe.w7.aiml-model-governance.semantic.v1"
+    },
+    "input_set_fingerprint": {
+      "value": "3d7769079742311200b547e5c9bc65529c64c9080b8f477498d8d1b22afc0141",
+      "source_binding_count": 18
+    },
+    "markdown_projection_fingerprint": {
+      "value": "ab1807c56d722118c865c442619c20c70821ca68f53fac649ebc7e93095293f1",
+      "rule": "hash Markdown bytes before the fingerprint appendix"
+    },
+    "semantic_projection_contract": {
+      "schema_version": "walksafe.w7.semantic-projection-contract.v1",
+      "projection_root_fields": [
+        "artifact_dispositions",
+        "runtime_models",
+        "formal_boundary"
+      ],
+      "source_paths": {
+        "artifact_dispositions": "$.artifact_dispositions[*]",
+        "runtime_models": "$.model_registry_projection.models[*]",
+        "formal_boundary": "$.formal_boundary"
+      },
+      "field_selection": {
+        "artifact_dispositions": [
+          "artifact_type_id",
+          "disposition",
+          "internal_completion_candidate",
+          "independent_review_status",
+          "release_approval",
+          "release_eligibility"
+        ],
+        "runtime_models": [
+          "runtime_model_id",
+          "source_provenance",
+          "source_artifact",
+          "android_asset",
+          "input_contract",
+          "output_contract",
+          "class_contract",
+          "runtime_role",
+          "fallback_contract",
+          "evaluation_status",
+          "conversion_equivalence_status",
+          "device_validation_status",
+          "deployment_eligible",
+          "release_eligibility"
+        ],
+        "formal_boundary": [
+          "model_evaluation",
+          "conversion_equivalence",
+          "on_device_validation",
+          "threshold_sweep",
+          "independent_reevaluation",
+          "release_approval",
+          "release_eligibility"
+        ]
+      },
+      "array_order": {
+        "artifact_dispositions": "PRESERVE_SOURCE_ARRAY_ORDER; exact order is scope.artifact_type_ids",
+        "runtime_models": "PRESERVE_SOURCE_ARRAY_ORDER; exact order is scope.runtime_model_ids",
+        "nested_arrays": "PRESERVE_SOURCE_ARRAY_ORDER, including shapes, ordered_labels, and fallback runtime_model_ids"
+      },
+      "value_handling": {
+        "missing_selected_field": "ERROR; do not omit or synthesize",
+        "null": "retain typed JSON null and serialize as null",
+        "boolean": "retain typed JSON boolean and serialize as lowercase true or false",
+        "string": "retain exact Unicode scalar sequence with no normalization or type coercion; JSON-escape only as required",
+        "number": "retain JSON numeric type with no string coercion"
+      },
+      "canonical_json": {
+        "encoding": "UTF-8",
+        "ensure_ascii": false,
+        "object_key_order": "LEXICOGRAPHIC_ASCENDING via sort_keys=true",
+        "separators": {
+          "item": ",",
+          "key_value": ":"
+        },
+        "whitespace": "NONE_EXCEPT_REQUIRED_JSON_STRING_ESCAPES_AND_TRAILING_LF",
+        "trailing_lf": true,
+        "hash_algorithm": "SHA-256",
+        "digest_encoding": "lowercase hexadecimal"
+      }
+    }
+  }
+}

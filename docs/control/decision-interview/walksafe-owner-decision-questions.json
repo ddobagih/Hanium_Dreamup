@@ -1,0 +1,639 @@
+{
+  "schema_version": "1.0.0",
+  "title": "WalkSafe 제품책임자 의사결정 질문지",
+  "as_of": "2026-07-18",
+  "purpose": "이미 확정된 내용은 다시 묻지 않고, 제품책임자가 직접 정해야 하는 충돌·범위·정책만 짧게 결정한다.",
+  "source": {
+    "path": "../questionnaire/walksafe-integrated-baseline-questions.json",
+    "sha256": "572150b4980dc570bcc7f511abc10e30eb83326c011e37458cada11ff8a9ffb6",
+    "source_question_count": 144
+  },
+  "groups": [
+    {
+      "id": "ODG-01",
+      "order": 1,
+      "title": "제품 목표와 공개 범위",
+      "description": "누가 어디에서 어떤 수준으로 WalkSafe를 사용할지 정합니다."
+    },
+    {
+      "id": "ODG-02",
+      "order": 2,
+      "title": "앱 구성",
+      "description": "사용자 앱과 관리자 기능의 경계, 지원 기기 범위를 정합니다."
+    },
+    {
+      "id": "ODG-03",
+      "order": 3,
+      "title": "가입과 여러 기기",
+      "description": "가입 정보와 여러 기기의 로그인·보행 원칙을 정합니다."
+    },
+    {
+      "id": "ODG-04",
+      "order": 4,
+      "title": "접근성과 보행 상태",
+      "description": "TalkBack, 앱 전환, 보행 시작·중단 동작을 정합니다."
+    },
+    {
+      "id": "ODG-05",
+      "order": 5,
+      "title": "음성과 길안내",
+      "description": "음성 명령 범위와 경로 선택 원칙을 정합니다."
+    },
+    {
+      "id": "ODG-06",
+      "order": 6,
+      "title": "장애물과 자동신고",
+      "description": "탐지 기능의 공개 범위와 자동신고 정책을 정합니다."
+    },
+    {
+      "id": "ODG-07",
+      "order": 7,
+      "title": "학습데이터 사용",
+      "description": "정지 중 업로드 방식과 서버 데이터 이용 범위를 정합니다."
+    },
+    {
+      "id": "ODG-08",
+      "order": 8,
+      "title": "장애와 복구",
+      "description": "어디서 멈추고 어떻게 재개할지 정합니다."
+    },
+    {
+      "id": "ODG-09",
+      "order": 9,
+      "title": "시험과 출시",
+      "description": "실제 사용자 시험의 참여 범위를 정합니다."
+    },
+    {
+      "id": "ODG-10",
+      "order": 10,
+      "title": "운영",
+      "description": "관리자 한 명이 현실적으로 제공할 지원 범위를 정합니다."
+    }
+  ],
+  "questions": [
+    {
+      "id": "ODQ-003",
+      "canonical_decision_id": "CD-USER-AGE",
+      "group_id": "ODG-01",
+      "order": 1,
+      "priority": "P0",
+      "title": "가입 연령",
+      "prompt": "첫 버전은 몇 살부터 가입할 수 있게 할까요?",
+      "explanation": "미성년자를 받으면 보호자 동의와 개인정보 절차가 추가됩니다.",
+      "recommendation": {
+        "option_id": "adult",
+        "label": "만 18세 이상",
+        "reason": "초기에는 성인으로 제한해 안전·동의 절차를 먼저 안정화하는 편이 좋습니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "adult",
+          "label": "만 18세 이상",
+          "meaning": "성인만 직접 가입합니다.",
+          "impact": "초기 동의와 운영 절차가 단순해집니다."
+        },
+        {
+          "id": "teen",
+          "label": "만 14세 이상·보호자 동의",
+          "meaning": "청소년은 보호자 확인을 거칩니다.",
+          "impact": "보호자 동의·철회 기능이 필요합니다."
+        },
+        {
+          "id": "all",
+          "label": "모든 연령",
+          "meaning": "어린이도 가입할 수 있습니다.",
+          "impact": "연령별 법률·안전대책이 가장 많이 필요합니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-003"
+      ],
+      "affects": [
+        "DSC-02",
+        "REQ-10"
+      ],
+      "document_bundles": [
+        "BND-DSC-DISCOVERY",
+        "BND-REQ-BASELINE"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-009",
+      "canonical_decision_id": "CD-EXCLUDED-FEATURES",
+      "group_id": "ODG-01",
+      "order": 2,
+      "priority": "P1",
+      "title": "보호자 추적·넘어짐 탐지 범위",
+      "prompt": "보호자 추적과 넘어짐 탐지를 이번 버전에 넣을까요?",
+      "explanation": "긴급연락 기능은 이번 버전에서 제외하는 것으로 이미 확정됐습니다. 남은 두 기능의 포함 여부만 정합니다.",
+      "recommendation": {
+        "option_id": "exclude_both",
+        "label": "둘 다 제외",
+        "reason": "길안내와 장애물 경고를 먼저 완성한 뒤 두 기능을 별도 단계로 검토하는 편이 범위를 명확하게 유지합니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "exclude_both",
+          "label": "둘 다 제외",
+          "meaning": "보호자 추적과 넘어짐 탐지를 이번 버전에 넣지 않습니다.",
+          "impact": "핵심 보행 기능 완성에 집중할 수 있습니다."
+        },
+        {
+          "id": "guardian_only",
+          "label": "보호자 추적만",
+          "meaning": "보호자가 사용자의 위치와 상태를 확인하는 기능만 넣습니다.",
+          "impact": "연락처·위치공유·중단 절차가 추가됩니다."
+        },
+        {
+          "id": "fall_only",
+          "label": "넘어짐 탐지만",
+          "meaning": "센서로 넘어짐을 감지하고 사용자에게 알리는 기능만 넣습니다.",
+          "impact": "오탐 방지와 현장 안전시험이 추가됩니다."
+        },
+        {
+          "id": "both",
+          "label": "둘 다 포함",
+          "meaning": "보호자 추적과 넘어짐 탐지를 모두 넣습니다.",
+          "impact": "개인정보·센서·긴급대응 범위가 크게 늘어납니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-009"
+      ],
+      "affects": [
+        "MGT-04",
+        "DSC-12"
+      ],
+      "document_bundles": [
+        "BND-MGT-CHARTER",
+        "BND-DSC-PRODUCT"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-011",
+      "canonical_decision_id": "CD-DEPTH-UNSUPPORTED",
+      "group_id": "ODG-02",
+      "order": 3,
+      "priority": "P0",
+      "title": "거리 측정 미지원 기기",
+      "prompt": "정확한 거리 측정이 안 되는 휴대폰에서도 보행 기능을 열까요?",
+      "explanation": "거리 정보가 없으면 위험 등급과 행동 안내의 신뢰도가 낮아집니다.",
+      "recommendation": {
+        "option_id": "block",
+        "label": "보행 기능 차단",
+        "reason": "거리 기반 기능이 검증되기 전에는 지원 기기만 보행 모드를 쓰게 하는 편이 안전합니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "block",
+          "label": "보행 기능 차단",
+          "meaning": "지원하지 않는 기기라고 알리고 시작하지 않습니다.",
+          "impact": "지원은 좁지만 잘못된 거리 안내를 막습니다."
+        },
+        {
+          "id": "limited",
+          "label": "제한 경고만",
+          "meaning": "거리 없는 물체 종류 경고만 제공합니다.",
+          "impact": "기능 한계를 반복 안내해야 합니다."
+        },
+        {
+          "id": "full",
+          "label": "같은 기능 제공",
+          "meaning": "추정 거리로 모든 기능을 제공합니다.",
+          "impact": "추가 기술과 별도 안전 검증이 필요합니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-014"
+      ],
+      "affects": [
+        "REQ-14",
+        "DES-24",
+        "TST-13"
+      ],
+      "document_bundles": [
+        "BND-REQ-BASELINE",
+        "BND-DES-SECOPS",
+        "BND-TST-EVIDENCE"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-013",
+      "canonical_decision_id": "CD-IDENTITY-VERIFY",
+      "group_id": "ODG-03",
+      "order": 4,
+      "priority": "P1",
+      "title": "가입 확인",
+      "prompt": "가입할 때 이메일·휴대전화·실명 중 무엇을 확인할까요?",
+      "explanation": "연락처를 확인한다면 이메일만, 휴대전화만, 둘 다 중에서 정확히 고릅니다. 실명 본인확인은 별도 선택입니다.",
+      "recommendation": {
+        "option_id": "email_only",
+        "label": "이메일만 확인",
+        "reason": "비용과 개인정보를 적게 늘리면서 계정 복구 연락처 하나를 확인할 수 있습니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "email_only",
+          "label": "이메일만 확인",
+          "meaning": "가입 때 이메일 인증 링크나 번호를 확인합니다.",
+          "impact": "문자 비용 없이 복구 연락처 하나를 확인합니다."
+        },
+        {
+          "id": "phone_only",
+          "label": "휴대전화만 확인",
+          "meaning": "가입 때 문자 인증번호를 확인합니다.",
+          "impact": "전화번호를 수집하고 문자 발송 비용이 생깁니다."
+        },
+        {
+          "id": "email_and_phone",
+          "label": "둘 다 확인",
+          "meaning": "이메일과 휴대전화 인증을 모두 통과해야 합니다.",
+          "impact": "복구 수단은 늘지만 가입 절차와 개인정보가 늘어납니다."
+        },
+        {
+          "id": "none",
+          "label": "별도 확인 없음",
+          "meaning": "아이디와 비밀번호만 만듭니다.",
+          "impact": "가입은 쉽지만 가짜·중복 계정 대응이 어렵습니다."
+        },
+        {
+          "id": "real",
+          "label": "실명 본인확인",
+          "meaning": "외부 본인확인을 사용합니다.",
+          "impact": "확실하지만 비용과 개인정보 처리가 늘어납니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-021"
+      ],
+      "affects": [
+        "REQ-10",
+        "DES-19"
+      ],
+      "document_bundles": [
+        "BND-REQ-BASELINE",
+        "BND-DES-SECOPS"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-015",
+      "canonical_decision_id": "CD-REMOTE-LOGOUT",
+      "group_id": "ODG-03",
+      "order": 5,
+      "priority": "P1",
+      "title": "분실 기기 로그아웃",
+      "prompt": "사용자가 분실한 기기만 골라 로그아웃할 수 있게 할까요?",
+      "explanation": "다른 기기 로그인을 유지하므로 기기별 보안 해제 방법이 필요합니다.",
+      "recommendation": {
+        "option_id": "selected",
+        "label": "기기별 로그아웃",
+        "reason": "기기별 로그아웃은 정상 기기를 계속 쓰면서 분실 기기만 막을 수 있습니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "selected",
+          "label": "기기별 로그아웃",
+          "meaning": "특정 기기 세션만 끊습니다.",
+          "impact": "다른 기기의 로그인은 유지됩니다."
+        },
+        {
+          "id": "all",
+          "label": "모든 기기 함께 로그아웃",
+          "meaning": "전체 세션을 끊습니다.",
+          "impact": "모든 기기에서 다시 로그인해야 합니다."
+        },
+        {
+          "id": "none",
+          "label": "원격 로그아웃 없음",
+          "meaning": "직접 기기를 열 때만 로그아웃합니다.",
+          "impact": "분실 시 계정 보호가 어렵습니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-026"
+      ],
+      "affects": [
+        "SEC-08",
+        "OPS-08"
+      ],
+      "document_bundles": [
+        "BND-SEC-PLAN",
+        "BND-OPS-GUIDE"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-019",
+      "canonical_decision_id": "CD-REBOOT-BEHAVIOR",
+      "group_id": "ODG-04",
+      "order": 6,
+      "priority": "P1",
+      "title": "휴대폰 재부팅",
+      "prompt": "휴대폰을 다시 켰을 때 WalkSafe도 자동으로 시작할까요?",
+      "explanation": "로그인은 유지돼도 카메라·마이크 자동 실행은 별도 결정입니다.",
+      "recommendation": {
+        "option_id": "manual",
+        "label": "사용자가 직접 실행",
+        "reason": "사용자가 앱을 열어 상태를 확인한 뒤 시작하는 편이 예측 가능합니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "manual",
+          "label": "사용자가 직접 실행",
+          "meaning": "재부팅 뒤 앱을 열어야 시작합니다.",
+          "impact": "예상치 못한 센서 실행을 막습니다."
+        },
+        {
+          "id": "confirm",
+          "label": "자동 실행 후 확인",
+          "meaning": "앱은 열리지만 확인 전에는 탐지하지 않습니다.",
+          "impact": "접근성은 좋아지지만 자동 실행 관리가 필요합니다."
+        },
+        {
+          "id": "auto",
+          "label": "자동으로 바로 시작",
+          "meaning": "재부팅 뒤 즉시 기능을 켭니다.",
+          "impact": "사용자 의도와 무관하게 센서가 작동할 수 있습니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-052"
+      ],
+      "affects": [
+        "REQ-03",
+        "REQ-13",
+        "DES-04",
+        "DES-22",
+        "TST-17"
+      ],
+      "document_bundles": [
+        "BND-REQ-BASELINE",
+        "BND-DES-ARCH",
+        "BND-DES-SECOPS",
+        "BND-TST-EVIDENCE"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-026",
+      "canonical_decision_id": "CD-AUTO-REPORT-TIMING",
+      "group_id": "ODG-06",
+      "order": 7,
+      "priority": "P1",
+      "title": "자동신고 전송 시점",
+      "prompt": "손상 점자블록 자동신고 묶음은 언제 서버로 보낼까요?",
+      "explanation": "자동신고 묶음에는 원본 이미지·정확 위치·탐지 정보가 들어갑니다. 서버에 도착한 뒤에는 이미 확정한 원칙대로 학습데이터 후보로도 보관하며, 여기서는 전송 시점과 이동 중 전송 금지의 예외 여부만 정합니다.",
+      "recommendation": {
+        "option_id": "immediate",
+        "label": "보행 중 즉시",
+        "reason": "자동신고 묶음만 이동 중 전송 금지의 명시적 예외로 두면 신고는 빠르게 보내고, 나머지 활동데이터는 정지할 때만 보낼 수 있습니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "immediate",
+          "label": "보행 중 즉시",
+          "meaning": "원본 이미지·정확 위치·탐지 정보로 만든 자동신고 묶음만 이동 중에도 바로 서버로 보냅니다.",
+          "impact": "신고는 가장 빠르지만, 이 묶음은 ‘움직이는 동안 활동데이터를 보내지 않는다’는 원칙의 명시적 예외가 됩니다."
+        },
+        {
+          "id": "stationary",
+          "label": "멈췄을 때",
+          "meaning": "자동신고 묶음도 휴대폰에 저장했다가 움직임이 멈춘 뒤 보냅니다.",
+          "impact": "이동 중 전송 금지에 예외는 없지만 신고가 늦습니다."
+        },
+        {
+          "id": "after",
+          "label": "보행 종료 뒤",
+          "meaning": "자동신고 묶음도 보행 세션이 끝난 뒤 한꺼번에 보냅니다.",
+          "impact": "이동 중 전송 금지에 예외는 없고 통신은 단순하지만 신고가 가장 늦습니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-084"
+      ],
+      "affects": [
+        "REQ-08",
+        "REQ-10",
+        "DES-04",
+        "DES-13",
+        "SEC-06",
+        "AIML-01",
+        "AIML-03",
+        "WS-02"
+      ],
+      "document_bundles": [
+        "BND-REQ-BASELINE",
+        "BND-DES-ARCH",
+        "BND-DES-INTERFACE-DATA",
+        "BND-SEC-PLAN",
+        "BND-AIML-DATA",
+        "BND-WS-SAFETY"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-029",
+      "canonical_decision_id": "CD-UPLOAD-NETWORK",
+      "group_id": "ODG-07",
+      "order": 8,
+      "priority": "P1",
+      "title": "학습데이터 통신망",
+      "prompt": "사용자가 멈췄을 때 모바일 데이터로도 업로드할까요?",
+      "explanation": "정지 중 전송 원칙은 확정됐습니다. 여기서는 Wi-Fi가 없을 때만 정합니다.",
+      "recommendation": {
+        "option_id": "wifi_first",
+        "label": "Wi-Fi 우선·모바일도 허용",
+        "reason": "Wi-Fi를 우선하고 오래 대기한 데이터는 모바일망도 허용하는 편이 균형이 좋습니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "wifi_first",
+          "label": "Wi-Fi 우선·모바일도 허용",
+          "meaning": "Wi-Fi가 없으면 조건을 알리고 모바일망을 씁니다.",
+          "impact": "누락은 줄지만 데이터 요금이 들 수 있습니다."
+        },
+        {
+          "id": "wifi",
+          "label": "Wi-Fi에서만",
+          "meaning": "모바일망에서는 보관합니다.",
+          "impact": "요금은 줄지만 오래 전송되지 않을 수 있습니다."
+        },
+        {
+          "id": "any",
+          "label": "어떤 망이든 바로",
+          "meaning": "정지하면 연결된 망으로 보냅니다.",
+          "impact": "빠르지만 요금·배터리 사용이 늘 수 있습니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-095"
+      ],
+      "affects": [
+        "REQ-12",
+        "DES-13"
+      ],
+      "document_bundles": [
+        "BND-REQ-BASELINE",
+        "BND-DES-INTERFACE-DATA"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-032",
+      "canonical_decision_id": "CD-FAILURE-RECOVERY",
+      "group_id": "ODG-08",
+      "order": 9,
+      "priority": "P0",
+      "title": "장애 복구 뒤 재개",
+      "prompt": "장애가 정상으로 돌아오면 자동으로 보행을 다시 시작할까요?",
+      "explanation": "사용자가 모르게 카메라와 안내가 재개되지 않도록 원칙을 정합니다.",
+      "recommendation": {
+        "option_id": "confirm",
+        "label": "검사 후 사용자 확인",
+        "reason": "필수 기능을 검사하고 사용자 확인을 받은 뒤 재개하는 편이 안전합니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "confirm",
+          "label": "검사 후 사용자 확인",
+          "meaning": "기능 상태를 확인하고 재개할지 묻습니다.",
+          "impact": "사용자가 상태 변화를 압니다."
+        },
+        {
+          "id": "auto",
+          "label": "자동 재개",
+          "meaning": "복구되면 스스로 이어갑니다.",
+          "impact": "예상하지 못한 재개가 될 수 있습니다."
+        },
+        {
+          "id": "restart",
+          "label": "앱 재실행",
+          "meaning": "앱을 다시 열어야 합니다.",
+          "impact": "명확하지만 불편합니다."
+        }
+      ],
+      "detail_prompt": "필요하면 수정 이유나 예외를 짧게 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-116"
+      ],
+      "affects": [
+        "DES-04",
+        "TST-16"
+      ],
+      "document_bundles": [
+        "BND-DES-ARCH",
+        "BND-TST-EVIDENCE"
+      ],
+      "validation": null
+    },
+    {
+      "id": "ODQ-034",
+      "canonical_decision_id": "CD-SUPPORT-HOURS",
+      "group_id": "ODG-10",
+      "order": 10,
+      "priority": "P1",
+      "title": "평일 지원시간",
+      "prompt": "평일 지원시간을 정확히 몇 시부터 몇 시까지로 할까요?",
+      "explanation": "평일 업무시간에 지원한다는 원칙은 이미 확정됐습니다. 운영 문서와 사용자 안내에 적을 정확한 시간만 정합니다.",
+      "recommendation": {
+        "option_id": "09_18",
+        "label": "09:00~18:00",
+        "reason": "일반적인 평일 업무시간으로 사용자에게 이해하기 쉽고 한 명이 운영하기에도 현실적입니다."
+      },
+      "answer_type": "single_choice",
+      "required": true,
+      "options": [
+        {
+          "id": "09_18",
+          "label": "09:00~18:00",
+          "meaning": "평일 오전 9시부터 오후 6시까지 지원합니다.",
+          "impact": "가장 일반적인 업무시간으로 안내할 수 있습니다."
+        },
+        {
+          "id": "10_17",
+          "label": "10:00~17:00",
+          "meaning": "평일 오전 10시부터 오후 5시까지 지원합니다.",
+          "impact": "운영 부담은 줄지만 지원 가능 시간이 짧아집니다."
+        },
+        {
+          "id": "custom",
+          "label": "직접 시간 정의",
+          "meaning": "관리자가 가능한 시작·종료 시각을 직접 적습니다.",
+          "impact": "실제 운영 여건에 맞는 시간을 정할 수 있습니다."
+        }
+      ],
+      "detail_prompt": "직접 시간 정의를 골랐다면 시작·종료 시각과 공휴일 처리 방법을 적어주세요.",
+      "activation": null,
+      "source_ibq_ids": [
+        "IBQ-141"
+      ],
+      "affects": [
+        "OPS-03",
+        "OPS-04",
+        "OPS-07"
+      ],
+      "document_bundles": [
+        "BND-OPS-GUIDE"
+      ],
+      "validation": null
+    }
+  ],
+  "coverage": {
+    "question_count": 10,
+    "target_max": 60,
+    "canonical_decision_ids": [
+      "CD-USER-AGE",
+      "CD-EXCLUDED-FEATURES",
+      "CD-DEPTH-UNSUPPORTED",
+      "CD-IDENTITY-VERIFY",
+      "CD-REMOTE-LOGOUT",
+      "CD-REBOOT-BEHAVIOR",
+      "CD-AUTO-REPORT-TIMING",
+      "CD-UPLOAD-NETWORK",
+      "CD-FAILURE-RECOVERY",
+      "CD-SUPPORT-HOURS"
+    ],
+    "duplicate_canonical_decision_ids": [],
+    "unresolved_owner_decision_ids": [],
+    "invalid_activation_refs": []
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP006-PHONE-MOUNTING-SUCCESSOR-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+  "kind": "SUCCESSOR_TRACE",
+  "status": "PASS",
+  "observed_at": "2026-07-25T00:33:35+09:00",
+  "canonical_update_event_type": "CANONICAL_BINDINGS_UPDATED",
+  "resulting_canonical_bindings": {
+    "IMPLEMENTATION_BACKLOG": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r013.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-013",
+      "file_sha256": "ce22a11e2c3388ef2e728f4a19eb970ecb7bee5658668f159d178a77262c8edb"
+    },
+    "IMPLEMENTATION_GAP": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260724-r013.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-013",
+      "file_sha256": "df2e0682c3589a82bc5c701ef94043bfcf9bdc74ccd3a71d396d6551ec13299a"
+    }
+  },
+  "changed_subject_ids_by_role": {
+    "IMPLEMENTATION_BACKLOG": [
+      "FP-006"
+    ],
+    "IMPLEMENTATION_GAP": [
+      "FP-006",
+      "GAP-015"
+    ]
+  },
+  "next_policy_gap_pair": {
+    "source_policy_id": "FP-010",
+    "gap_id": "GAP-019"
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "schema_version": "walksafe.fp048-r023-provisional-retirement.v1",
+  "document_id": "WS-FP048-R023-PROVISIONAL-RETIREMENT-20260803-001",
+  "status": "RETIRED_BEFORE_DOWNSTREAM_CONSUMPTION",
+  "retired_at": "2026-08-03T05:12:28+09:00",
+  "reason": "The initial internal 0/0/0 review was withdrawn after two cleanup findings. The provisional outputs were preserved before the hardened producer was rebound and republished.",
+  "operation": {
+    "method": "SAME_FILESYSTEM_RENAME_WITHOUT_DELETE_OR_OVERWRITE",
+    "canonical_output_count": 4,
+    "archived_output_count": 4,
+    "archived_producer_source_count": 2,
+    "transaction_residue_after_republication": 0
+  },
+  "downstream_boundary": {
+    "six_document_successor_published": false,
+    "exact257_r012_published": false,
+    "completion_checkpoint_seq43_44_applied": false,
+    "release_eligibility_credited": false
+  },
+  "withdrawn_producer": {
+    "builder_sha256": "9cf30e9422434dae121bfcabd78c623aa660c72b204a46d32c1ea1eaaa9921bb",
+    "test_sha256": "6b24d6c2c67bd136d3a57869a3a9bcf889d3990c9181b9a2bf995ad7b38e11ff",
+    "final_withdrawn_verdict": {
+      "blocker": 0,
+      "major": 0,
+      "minor": 2,
+      "decision": "NO_GO"
+    }
+  },
+  "archived_producer_sources": [
+    {
+      "original_path": "scripts/build_walksafe_fp048_gap_backlog_r023_20260802.py",
+      "archive_path": "producer-sources/build_walksafe_fp048_gap_backlog_r023_20260802.py",
+      "byte_count": 133693,
+      "sha256": "9cf30e9422434dae121bfcabd78c623aa660c72b204a46d32c1ea1eaaa9921bb",
+      "mode": "0600",
+      "link_count": 1
+    },
+    {
+      "original_path": "tests/test_walksafe_fp048_gap_backlog_r023_20260802.py",
+      "archive_path": "producer-sources/test_walksafe_fp048_gap_backlog_r023_20260802.py",
+      "byte_count": 78884,
+      "sha256": "6b24d6c2c67bd136d3a57869a3a9bcf889d3990c9181b9a2bf995ad7b38e11ff",
+      "mode": "0600",
+      "link_count": 1
+    }
+  ],
+  "archived_outputs": [
+    {
+      "original_path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.json",
+      "archive_path": "canonical-outputs/walksafe-implementation-gap-analysis-20260802-r023.json",
+      "byte_count": 518931,
+      "sha256": "80c11ac6448940c11058a5d34f147b136a71b40857d890cc98eab3fa28e98c18",
+      "mode": "0600",
+      "link_count": 1
+    },
+    {
+      "original_path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.md",
+      "archive_path": "canonical-outputs/walksafe-implementation-gap-analysis-20260802-r023.md",
+      "byte_count": 683,
+      "sha256": "b354ec8d379b08fbe0828a2f94639cabf6df36760f76c0fa07e5a1debaaf8c3f",
+      "mode": "0600",
+      "link_count": 1
+    },
+    {
+      "original_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.json",
+      "archive_path": "canonical-outputs/walksafe-implementation-remediation-backlog-20260802-r023.json",
+      "byte_count": 60604,
+      "sha256": "fafaba6eef9450aa3db7f3d8928b183966dc047c7d29605843579e4877c34ac1",
+      "mode": "0600",
+      "link_count": 1
+    },
+    {
+      "original_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.md",
+      "archive_path": "canonical-outputs/walksafe-implementation-remediation-backlog-20260802-r023.md",
+      "byte_count": 516,
+      "sha256": "afb33cae3ec922beceb09074399a137e1afb4e1213e596891c53da32c4494578",
+      "mode": "0600",
+      "link_count": 1
+    }
+  ],
+  "replacement_producer": {
+    "builder_sha256": "8d2ab35bdc3a27ebae8eb3858fb5bc6a566897d3ea7d857f0b0ed794f170f0d1",
+    "test_sha256": "4e196137e9503cb54fb210fb89e90662518dc3591fa4a32d892c82c999879f24",
+    "locked_python_tests_passed": 83,
+    "system_python_314_tests_passed": 83,
+    "independent_verdicts": 2,
+    "findings": {
+      "blocker": 0,
+      "major": 0,
+      "minor": 0
+    }
+  },
+  "replacement_outputs": [
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.json",
+      "byte_count": 518931,
+      "sha256": "34d4b8a4a05ac346e48293344dbf17e10cb65a792e85c5df42f69a7d63c09f82"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.md",
+      "byte_count": 683,
+      "sha256": "b354ec8d379b08fbe0828a2f94639cabf6df36760f76c0fa07e5a1debaaf8c3f"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.json",
+      "byte_count": 60604,
+      "sha256": "eabd987cff1086c6a45b9b6eee9166213727ab59d63cd5b7075da01e27651021"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.md",
+      "byte_count": 516,
+      "sha256": "afb33cae3ec922beceb09074399a137e1afb4e1213e596891c53da32c4494578"
+    }
+  ]
+}

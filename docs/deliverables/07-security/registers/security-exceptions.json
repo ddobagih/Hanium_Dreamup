@@ -1,0 +1,48 @@
+{
+  "schema_version": "walksafe.security-exception-register.v1",
+  "metadata": {
+    "register_id": "WS-SECURITY-EXCEPTION-REGISTER-001",
+    "title": "WalkSafe 위험 수용·보안 예외 기록",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "SEC-16"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "field_contract": {
+    "required": [
+      "exception_id",
+      "risk_or_finding_refs",
+      "scope",
+      "business_reason",
+      "residual_risk",
+      "compensating_controls",
+      "owner_role",
+      "reviewer_identity",
+      "approver_identity",
+      "approved_at",
+      "expires_at",
+      "exit_condition",
+      "status"
+    ],
+    "allowed_statuses": [
+      "PROPOSED",
+      "IN_REVIEW",
+      "APPROVED",
+      "REJECTED",
+      "EXPIRED",
+      "CLOSED"
+    ],
+    "no_auto_renewal": true
+  },
+  "exceptions": [],
+  "summary": {
+    "approved_exception_count": 0,
+    "waived_gate_count": 0
+  }
+}

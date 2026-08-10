@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "record_id": "WS-GOAL-ACTIVE-SUPERSESSION-20260724-001",
+  "recorded_at": "2026-07-24T17:00:00+09:00",
+  "superseded_package": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-2",
+    "plan_version": "2.2.0",
+    "activation_status": "ACTIVE",
+    "manifest_path": "docs/control/goals/walksafe-completion-graph-v2-2/static-plan-manifest-v2.2.0.json",
+    "manifest_sha256": "c761ed6d9ac83fb98a2dded6eb99b639610e67a7bf13bdd306f8be38e996577b",
+    "archived_checkpoint_path": "docs/control/goals/walksafe-completion-graph-v2-3/superseded-v2.2.0-active-checkpoint.json",
+    "archived_checkpoint_raw_sha256": "c15d677c9d8f9b68227cb0b2ffaac3aef4794e2bdb031b8cc4ca4a4790fc6024",
+    "transition_event_count": 20,
+    "transition_history_anchor_sha256": "ec531638c3b3ce68b611e198dba06f6703d837aa712d6aae403f212f8272030d",
+    "supersession_record_path": "docs/control/goals/walksafe-completion-graph-v2-3/active-supersession-record-v2.2.0.json"
+  },
+  "successor_package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
+  "successor_plan_version": "2.3.0",
+  "frozen_control_history": {
+    "checker_path": "scripts/check_walksafe_goal_graph.py",
+    "checker_sha256": "64c5e733499029f608dc56d76096bb25a97bfdf043fa483180565a55d7d68d9e",
+    "test_path": "tests/test_walksafe_goal_graph.py",
+    "test_sha256": "ba195e5c26d8a91eca6b88e09587d2f58fcc213590977d7ef95b434e781db297"
+  },
+  "superseded_package_set": {
+    "managed_path_count": 23,
+    "path_set_sha256": "1afe2adca0413a03b073f0c7f777625872153fcadce2eccfca286142dbfe3398",
+    "content_set_sha256": "724010b3f84129a1d076ea64f42d3a4051b86fa4ed2bab6d7c46e3c4ace39340"
+  },
+  "active_state_projection_sha256": "5c287910837841e6597c6cab92dce0851cb8425cf93173cb074fa15c8067898f",
+  "status_by_goal_sha256": "9e5832614744f6654783055b225c33e00e9f4e0a3caf7e447581e4e183304565",
+  "completion_evidence_by_goal_sha256": "3d5faba0e70418ef0fc68dea57a2be4aebc38393ce369ffbe1af866c8f8a91ff",
+  "dynamic_goal_inventory_sha256": "ced8871fff8f98f87ab8e3fbdc898ea86226a85e2f450a9b7fddfe5084bf2e13",
+  "canonical_binding_snapshot_sha256": "8545e61c81a92a83493a8f97923dc81953f66de4292e653affcb13240c322784",
+  "reason": "활성 v2.2의 현재 FP-005 runtime과 동결된 v2.2 테스트의 FP-004 고정 기대값 충돌을 predecessor bytes 변경 없이 versioned checker/command contract로 교정한다.",
+  "execution_effect": "V2_2_ACTIVE_HISTORY_RETAINED_BYTE_EXACT; V2_3_PREPARED_NOT_ACTIVATED; NO_FP005_PRODUCT_WORK_STARTED"
+}

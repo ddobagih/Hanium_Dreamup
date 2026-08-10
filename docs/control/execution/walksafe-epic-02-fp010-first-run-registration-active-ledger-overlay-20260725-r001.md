@@ -1,0 +1,7 @@
+# EPIC-02 FP-010 첫 실행 등록 Active ledger overlay
+
+- Overlay: `WS-EPIC-02-FP010-FIRST-RUN-REGISTRATION-ACTIVE-LEDGER-OVERLAY-20260725-001`
+- FP-010 내부 구현·검증: `PARTIAL_IMPLEMENTATION_VERIFIED`
+- TC-FP-010-01~04·정식 279개·공급자·사용자·기기: `NOT_RUN`
+- 출시 Gate 5개: `NOT_RUN` / 미면제
+- 출시: `NOT_ELIGIBLE`

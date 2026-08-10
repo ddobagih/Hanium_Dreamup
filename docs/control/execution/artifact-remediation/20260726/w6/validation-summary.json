@@ -1,0 +1,604 @@
+{
+  "schema_version": "walksafe.validation-summary.v6",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W6-VALIDATION-SUMMARY-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "PARTIAL_WAVE_COMPLETED_WITH_7_OPEN_INTERNAL_GAPS",
+  "validation_result": "PASS",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "d8eff6371281e5ae3ac2b89d0bc2ee9799c071e93cd5be49740c4f535a679ac2"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+    "upstream": {
+      "input_set_sha256": "99ff64bf715ee41751b1ff5899cbecc1b0b913bded79f9fe44759833a9572e64",
+      "artifact_status_delta": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341",
+        "byte_count": 31223
+      }
+    },
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS"
+  },
+  "scope": {
+    "wave_id": "W6",
+    "artifact_count": 8,
+    "exact_artifact_ids": [
+      "DLV-AIML-04",
+      "DLV-AIML-05",
+      "DLV-AIML-08",
+      "DLV-AIML-09",
+      "DLV-AIML-11",
+      "DLV-AIML-12",
+      "DLV-AIML-13",
+      "DLV-AIML-21"
+    ]
+  },
+  "state_transition": {
+    "before": {
+      "OK": 114,
+      "INTERNAL_GAP": 65,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "delta": {
+      "OK": 1,
+      "INTERNAL_GAP": -1,
+      "EXTERNAL": 0,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    },
+    "after": {
+      "OK": 115,
+      "INTERNAL_GAP": 64,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "OK": {
+      "count": 1,
+      "artifact_ids": [
+        "DLV-AIML-04"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 7,
+      "artifact_ids": [
+        "DLV-AIML-05",
+        "DLV-AIML-08",
+        "DLV-AIML-09",
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-21"
+      ]
+    }
+  },
+  "transition_authority": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+    "sha256": "5439c7007049bff7108418ff210a17d98030d6bc3b62f5a080a0c48e47dc576a",
+    "status": "GO",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "sole_transition_authority": true,
+    "declared_historical_subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f",
+    "current_subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+    "temporal_digest_equal": false,
+    "authority_scope": "W6_EXACT8_ONLY",
+    "formal_approval_claimed": false,
+    "temporal_limit": "W7 current-state pair was revised after this W6 review; the review is not claimed to cover the revised W7 pair.",
+    "w6_basis": "The review explicitly reproduced W6 JSON fingerprints and verified all seven W6 source-evidence records."
+  },
+  "review_subject_lineage": {
+    "transition_authority_review": {
+      "declared_subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f",
+      "subject_count": 11,
+      "historical_preimage_available": false
+    },
+    "current_actual_subject": {
+      "subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+      "subject_count": 11,
+      "independently_recomputed": true
+    },
+    "digest_equal": false,
+    "known_change_scope": "W7 current-state pair revised to close W7 minor findings",
+    "claim_not_made": "W6 review did not review the revised W7 current-state pair"
+  },
+  "validation_matrix": [
+    {
+      "check_id": "W6-01-SCHEMA_VERSION",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-02-DOCUMENT_ID",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-03-EXACT_SCOPE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-04-EXACT_SCOPE_UNIQUE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-05-TRANSITION_AUTHORITY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-06-REVIEW_FINDINGS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-07-CURRENT_REVIEW_SUBJECT_SET",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-08-TEMPORAL_REVIEW_LINEAGE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-09-SOURCE7_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-10-CURRENT_PAIRS_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-11-REVIEW_FILES_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-12-PREDECESSOR_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-13-INPUT_SET_RECOMPUTE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-14-COMMON_FINGERPRINT_RECOMPUTE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-15-SELF_FINGERPRINT_CONTRACT",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-16-DAG_ACYCLIC",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-17-PRE_COUNTS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-18-APPLIED_DELTA",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-19-POST_COUNTS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-20-TOTAL_EXACT_257",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-21-EXTERNAL_UNCHANGED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-22-N_A_CANDIDATE_UNCHANGED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-23-EXACT_ONE_OK",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-24-EXACT_SEVEN_OPEN_INTERNAL_GAPS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-25-BOUNDARY_PRESERVATION",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W6-26-RAW_SECRET_AND_ADVISORY_EXCLUSION",
+      "result": "PASS"
+    }
+  ],
+  "validation_totals": {
+    "check_count": 26,
+    "passed": 26,
+    "failed": 0,
+    "result": "PASS"
+  },
+  "boundary_assertions": {
+    "dataset_manifest_status": "NO_IMMUTABLE_CONTENT_HASHED_INSTANCE",
+    "gold_set_and_adjudication_status": "NOT_RUN",
+    "immutable_split_status": "NOT_MATERIALIZED",
+    "training_provenance_status": "NOT_MATERIALIZED",
+    "formal_experiment_status": "NOT_RUN",
+    "same_protocol_comparison_status": "NOT_RUN",
+    "prediction_equivalence_status": "NOT_RUN",
+    "model_card_set_status": "NOT_APPROVED",
+    "data_quality_execution_status": "NOT_RUN",
+    "leakage_execution_status": "NOT_RUN",
+    "frozen_protocol_status": "NOT_MATERIALIZED",
+    "threshold_sweep_status": "NOT_RUN",
+    "formal_test_catalog_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "actual_device_validation_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gates_waived": false,
+    "release_gate_status": "NOT_RUN",
+    "release_approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "evidence_exclusion_boundary": {
+    "raw_secret_material_included": false,
+    "raw_advisory_dump_included": false,
+    "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+  },
+  "validation_statement": "W6 exact8에서 독립 검토가 허용한 1건만 OK로 전이하고 7건은 INTERNAL_GAP으로 유지했다. 입력·공통·자기 지문과 비순환 DAG 및 257건 회계를 재현했다.",
+  "integrity": {
+    "input_count": 13,
+    "input_set_sha256": "99ff64bf715ee41751b1ff5899cbecc1b0b913bded79f9fe44759833a9572e64",
+    "delta_sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341",
+    "check_count": 26,
+    "passed_check_count": 26,
+    "failed_check_count": 0,
+    "common_fingerprint": "d8eff6371281e5ae3ac2b89d0bc2ee9799c071e93cd5be49740c4f535a679ac2",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "cca4cbebe2642a330893fda99a71e288dad7b1d32649854e83007466b31d7f5b"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "role_excluded": true
+      },
+      "preimage": [
+        {
+          "byte_count": 47592,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+          "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+        },
+        {
+          "byte_count": 22179,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+          "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f"
+        },
+        {
+          "byte_count": 11828,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.md",
+          "sha256": "a3c455d6a5a892e519574c2bb703f1c5a590e04ca4326fb7efdccaab0a94b661"
+        },
+        {
+          "byte_count": 4139,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+          "sha256": "5439c7007049bff7108418ff210a17d98030d6bc3b62f5a080a0c48e47dc576a"
+        },
+        {
+          "byte_count": 41414,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "byte_count": 11458,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.md",
+          "sha256": "466a3e869dac2c8be3389e7f44fbb5bdefcc78b434ea67f773e674a160a86714"
+        },
+        {
+          "byte_count": 39378,
+          "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+          "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559"
+        },
+        {
+          "byte_count": 23552,
+          "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+          "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939"
+        },
+        {
+          "byte_count": 26684,
+          "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+          "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd"
+        },
+        {
+          "byte_count": 12663,
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+        },
+        {
+          "byte_count": 38456,
+          "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+          "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770"
+        },
+        {
+          "byte_count": 84116,
+          "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+          "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15"
+        },
+        {
+          "byte_count": 23351,
+          "path": "tests/test_walksafe_formal_aiml.py",
+          "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "99ff64bf715ee41751b1ff5899cbecc1b0b913bded79f9fe44759833a9572e64"
+    },
+    "current_review_subject_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "11 review subject records as {path,sha256,byte_length}",
+      "preimage": [
+        {
+          "byte_length": 22179,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+          "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f"
+        },
+        {
+          "byte_length": 11828,
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.md",
+          "sha256": "a3c455d6a5a892e519574c2bb703f1c5a590e04ca4326fb7efdccaab0a94b661"
+        },
+        {
+          "byte_length": 41414,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "byte_length": 11458,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.md",
+          "sha256": "466a3e869dac2c8be3389e7f44fbb5bdefcc78b434ea67f773e674a160a86714"
+        },
+        {
+          "byte_length": 39378,
+          "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+          "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559"
+        },
+        {
+          "byte_length": 23552,
+          "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+          "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939"
+        },
+        {
+          "byte_length": 26684,
+          "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+          "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd"
+        },
+        {
+          "byte_length": 12663,
+          "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+          "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+        },
+        {
+          "byte_length": 38456,
+          "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+          "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770"
+        },
+        {
+          "byte_length": 84116,
+          "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+          "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15"
+        },
+        {
+          "byte_length": 23351,
+          "path": "tests/test_walksafe_formal_aiml.py",
+          "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": false,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "digest": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact wave central state, review authority, predecessor, evidence and boundary object reproduced in preimage",
+      "basis_fields": [
+        "schema",
+        "wave_id",
+        "predecessor",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "current_review_subject_set_sha256",
+        "transition_authority",
+        "source_binding",
+        "boundary",
+        "evidence_exclusion_boundary"
+      ],
+      "preimage": {
+        "schema": "walksafe.w6-central-common.v1",
+        "wave_id": "W6",
+        "predecessor": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+          "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+          "byte_count": 47592
+        },
+        "exact": [
+          "DLV-AIML-04",
+          "DLV-AIML-05",
+          "DLV-AIML-08",
+          "DLV-AIML-09",
+          "DLV-AIML-11",
+          "DLV-AIML-12",
+          "DLV-AIML-13",
+          "DLV-AIML-21"
+        ],
+        "OK": [
+          "DLV-AIML-04"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-AIML-05",
+          "DLV-AIML-08",
+          "DLV-AIML-09",
+          "DLV-AIML-11",
+          "DLV-AIML-12",
+          "DLV-AIML-13",
+          "DLV-AIML-21"
+        ],
+        "pre": {
+          "OK": 114,
+          "INTERNAL_GAP": 65,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 115,
+          "INTERNAL_GAP": 64,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "99ff64bf715ee41751b1ff5899cbecc1b0b913bded79f9fe44759833a9572e64",
+        "current_review_subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+        "transition_authority": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+          "sha256": "5439c7007049bff7108418ff210a17d98030d6bc3b62f5a080a0c48e47dc576a",
+          "status": "GO",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 0
+          },
+          "sole_transition_authority": true,
+          "declared_historical_subject_set_sha256": "6912e7e3a87394d33ac1d17755c39064e6457d7bc44cfa1ea635ee4d04dc134f",
+          "current_subject_set_sha256": "7bc296d82ce24ec68f59cc0d185fce5693030784effcbc6b28c0bbad44088240",
+          "temporal_digest_equal": false,
+          "authority_scope": "W6_EXACT8_ONLY"
+        },
+        "source_binding": {
+          "common_aiml_source_count": 7,
+          "current_state_pair_count": 2,
+          "cross_wave_current_state_pair_count": 2,
+          "review_file_count": 1
+        },
+        "boundary": {
+          "dataset_manifest_status": "NO_IMMUTABLE_CONTENT_HASHED_INSTANCE",
+          "gold_set_and_adjudication_status": "NOT_RUN",
+          "immutable_split_status": "NOT_MATERIALIZED",
+          "training_provenance_status": "NOT_MATERIALIZED",
+          "formal_experiment_status": "NOT_RUN",
+          "same_protocol_comparison_status": "NOT_RUN",
+          "prediction_equivalence_status": "NOT_RUN",
+          "model_card_set_status": "NOT_APPROVED",
+          "data_quality_execution_status": "NOT_RUN",
+          "leakage_execution_status": "NOT_RUN",
+          "frozen_protocol_status": "NOT_MATERIALIZED",
+          "threshold_sweep_status": "NOT_RUN",
+          "formal_test_catalog_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "actual_device_validation_status": "NOT_RUN",
+          "release_gate_count": 5,
+          "release_gates_waived": false,
+          "release_gate_status": "NOT_RUN",
+          "release_approval_status": "NOT_APPROVED",
+          "release_status": "NOT_ELIGIBLE"
+        },
+        "evidence_exclusion_boundary": {
+          "raw_secret_material_included": false,
+          "raw_advisory_dump_included": false,
+          "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+        }
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "arrays": "preserve declared semantic order"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "all central raw output SHA-256 values",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "d8eff6371281e5ae3ac2b89d0bc2ee9799c071e93cd5be49740c4f535a679ac2"
+    }
+  },
+  "digest_contract_validation": {
+    "input_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "current_review_subject_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "common_fingerprint": "PASS_INDEPENDENT_RECOMPUTE",
+    "artifact_status_delta_sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341"
+  }
+}

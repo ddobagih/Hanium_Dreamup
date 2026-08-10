@@ -1,0 +1,572 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-B-ADMIN-AUTH-RECOVERY-IMPLEMENTATION-20260722-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-22",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-01 Phase B 관리자 인증·복구 내부 구현 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_approved_baseline_or_r001": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": false,
+    "claims_formal_test_pass": false,
+    "claims_recovery_drill_pass": false,
+    "claims_production_provisioning_complete": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "artifact_application_receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+    "phase_a_record_id": "WS-EPIC-01-PHASE-A-IMPLEMENTATION-20260722-001",
+    "implementation_gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-001",
+    "implementation_backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-001",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "policy_baseline",
+        "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "bytes": 8054,
+        "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+        "immutability": "APPROVED_OR_R001_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "artifact_application_receipt",
+        "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+        "bytes": 4812,
+        "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+        "immutability": "APPROVED_OR_R001_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_a_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-a-implementation-record-20260722.json",
+        "bytes": 9925,
+        "sha256": "c4dcdd69a8cfa76881d5fbe9c7f6779849adad1468a792944cee957261debd18",
+        "immutability": "APPROVED_OR_R001_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r001",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json",
+        "bytes": 521661,
+        "sha256": "e559a9381ce13462e8d377befe5005a9d5250a0cdd33ada8a98a933bad50e8fe",
+        "immutability": "APPROVED_OR_R001_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r001",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r001.json",
+        "bytes": 52046,
+        "sha256": "b0ad9cc6008e15f407cfe0e05620364564834d03794f200f1119b610fb66621f",
+        "immutability": "APPROVED_OR_R001_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_b_trace_20260722.py",
+        "bytes": 67016,
+        "sha256": "a9874f7c64d6f4250c6146aa9bd4024a34e456bb6bb28b1ba8e5351e0e883991"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_b_trace_20260722.py",
+        "bytes": 8988,
+        "sha256": "5e594cc4c752c24473cfea167f266ec714bb6470e8b5ce087f8d1712d0e3a5f4"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_B_ADMIN_AUTH_AND_RECOVERY",
+    "reassessed_policy_ids": [
+      "FP-003"
+    ],
+    "related_policy_ids_not_reassessed_here": [
+      "FP-007",
+      "FP-047"
+    ],
+    "gap_ids": [
+      "GAP-012",
+      "GAP-068"
+    ],
+    "requirement_ids": [
+      "RQ-FP-003-001",
+      "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001"
+    ],
+    "planned_test_ids": [
+      "TC-FP-003-01",
+      "TC-FP-003-02",
+      "TC-FP-003-03",
+      "TC-FP-003-04",
+      "TC-GATE-SINGLE-ADMIN-RECOVERY-DRILL-01"
+    ],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_B_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "file_count": 60,
+    "path_set_sha256": "e05141c4e466489d4fc47e3a22c8ad74b5b7261bd7f1574c28ed90884fb8429c",
+    "content_set_sha256": "a558557bc5877280c40526e287084253788766921fb50b73bb84f692875297ab",
+    "files": [
+      {
+        "path": "configs/walksafe_product_boundary_20260722.json",
+        "bytes": 10018,
+        "sha256": "d572d33054230c8a7983396920f748839385a6f2dc963116e496e8e6a57d5f1c"
+      },
+      {
+        "path": "apps/android/adminapp/build.gradle.kts",
+        "bytes": 3325,
+        "sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6"
+      },
+      {
+        "path": "apps/android/adminapp/gradle.lockfile",
+        "bytes": 1313,
+        "sha256": "7fcb3d8abaa4a28198acf963069005d4a387e43880085533b2cdee8572e07d53"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/AndroidManifest.xml",
+        "bytes": 878,
+        "sha256": "064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+        "bytes": 19867,
+        "sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicy.java",
+        "bytes": 1389,
+        "sha256": "1ee7614e6509fd5ef433637b0c3d1b71ec906c25015117629d7d49a4febb7bb7"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+        "bytes": 1432,
+        "sha256": "c334d2841e8239cf24214ec56c59449c893a84c517590bbd57923c202b784b87"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+        "bytes": 4244,
+        "sha256": "821a2bf4714b4797f745c2da11df1ff66f73f0e340553105f02b8805f6a5f4cf"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+        "bytes": 12876,
+        "sha256": "6094d8791ab0bfd5d315b5f4f7f08fb72a912b46021ed840faba508cdf2b9d7a"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+        "bytes": 19717,
+        "sha256": "2abf36bc1fa7dbb1eb9729cdc494df1bf38d676bb887ee1f5f7bb8db3ebeb563"
+      },
+      {
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityState.java",
+        "bytes": 572,
+        "sha256": "3384bfec42bed0162580f8feecf66b75a5319dedb2bb2c7f10b1f2b7fa460b1d"
+      },
+      {
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicyTest.java",
+        "bytes": 1325,
+        "sha256": "4f8d0128e881bdef0b3480d3d38ff7164ba70470f3b98e5d4b1b20ddb2a13cd5"
+      },
+      {
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+        "bytes": 2192,
+        "sha256": "368fc34bffc734b740a9e6d1e6b7a97e15f949c05386b57f40915d19c3ac38c0"
+      },
+      {
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+        "bytes": 3689,
+        "sha256": "c8001d929910f6791e29dfb983c4b40dad1e23d16e1179756ea720c65f9b06b2"
+      },
+      {
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+        "bytes": 12348,
+        "sha256": "101e39b178d1aef07e987e7cef8e6e0d0b105f76038ce3a21413fd075f0bf823"
+      },
+      {
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+        "bytes": 13394,
+        "sha256": "87aa43cc406c96de01697be3f104d5a708dad06d281e94fbf36c6b7c6d34121f"
+      },
+      {
+        "path": "backend/alembic/versions/202607220001_admin_password_totp_security.py",
+        "bytes": 10312,
+        "sha256": "5b9ed9f3c83fb928d14be7ca87dc08b8bc4d70da0243a62d2569b33dd401aed1"
+      },
+      {
+        "path": "backend/.env.example",
+        "bytes": 3521,
+        "sha256": "50531cc334c13bcf58b8707d7bf70a8137c011ee1c30e5f6caff876cabd6483b"
+      },
+      {
+        "path": "backend/README.md",
+        "bytes": 4210,
+        "sha256": "b532df887aa0435d7bfaad0a7ee88971ef8b6d267817b090e37a5e5334685827"
+      },
+      {
+        "path": "backend/app/api/admin_security.py",
+        "bytes": 10688,
+        "sha256": "b60bcbd4897257758cf52d054288aea265ec3484f237d8de99bae9e78d29007f"
+      },
+      {
+        "path": "backend/app/api/health.py",
+        "bytes": 12501,
+        "sha256": "c4dad04a1e54c72b18f82d01df6639029f7050d3bb94aa35e1ce2562291688ea"
+      },
+      {
+        "path": "backend/app/api/reports.py",
+        "bytes": 78368,
+        "sha256": "6f23068e4656de642e2e42fd83b48db5cb37116bbb1d58fd561ec9c809b89691"
+      },
+      {
+        "path": "backend/app/config.py",
+        "bytes": 35783,
+        "sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f"
+      },
+      {
+        "path": "backend/app/field_test_security.py",
+        "bytes": 17741,
+        "sha256": "13482ad1b5a3cdd810148f067637b103c92c1d091da6b836bef5745f7a5d29b3"
+      },
+      {
+        "path": "backend/app/main.py",
+        "bytes": 2537,
+        "sha256": "4840f7b46ae202f9d433427a6e8f1f04df4296e6ac8eb23ec2cdcf2196e17eb2"
+      },
+      {
+        "path": "backend/app/models.py",
+        "bytes": 13239,
+        "sha256": "bbcbc679ecaeb498685f81d3290bda41fd838161f3d8f2e62fdced699cfc43e2"
+      },
+      {
+        "path": "backend/app/openapi_contract.py",
+        "bytes": 6689,
+        "sha256": "ca01783f5c5906fe67d8d49e7ad3c7ca267d2940f3b3dc2453bcf89f1a61ad56"
+      },
+      {
+        "path": "backend/app/services/admin_security.py",
+        "bytes": 59310,
+        "sha256": "55f1e3471fbca155d925fbf259703d9c6e9920675670a67362edc29bea13dda6"
+      },
+      {
+        "path": "backend/requirements.lock",
+        "bytes": 148319,
+        "sha256": "69017e7df8862a09063ab6329535883c28335dd7202caae5d77a5f3dcbc01069"
+      },
+      {
+        "path": "backend/requirements.txt",
+        "bytes": 245,
+        "sha256": "a54ae7931a13504b1be671c645832b422d79320f68fce3fd580d5f94bfa51779"
+      },
+      {
+        "path": "backend/tests/conftest.py",
+        "bytes": 6149,
+        "sha256": "abfe0b60668c0576b2e7f8b645b7835f3336de1efab9d460de00a9cdff789f24"
+      },
+      {
+        "path": "backend/tests/test_admin_security.py",
+        "bytes": 34107,
+        "sha256": "d62f5183750bcf37e12de16b72fce8338a888cfe5e19f01ce0489c821cbf00f0"
+      },
+      {
+        "path": "backend/tests/test_field_test_security.py",
+        "bytes": 35259,
+        "sha256": "ad7a2288e4624c1f72affa902983f17eb7d28e6cd53c528fe64153c9d3c59c68"
+      },
+      {
+        "path": "backend/tests/test_health_readiness.py",
+        "bytes": 19700,
+        "sha256": "26df879d4bc24554979276b1d02a89bd2d8bd1a47404d86c15189e50d0acfa1e"
+      },
+      {
+        "path": "backend/tests/test_openapi_contract.py",
+        "bytes": 3223,
+        "sha256": "d57d216c374495168944b7f1fd6d04c5cb77b92df15f142bf48a78c096b28f89"
+      },
+      {
+        "path": "contracts/README.md",
+        "bytes": 817,
+        "sha256": "45c1bb1558d0606e6a4ce812bb58ca92a0bcd4653bf9ba4fd9a3a1650ace6e94"
+      },
+      {
+        "path": "contracts/walksafe.openapi.json",
+        "bytes": 126321,
+        "sha256": "798a3421781db46b081881cc91a2230f382456f7eaffa55cee6bfcd2f276c7ca"
+      },
+      {
+        "path": "deploy/config/walksafe-backend.env.example",
+        "bytes": 2735,
+        "sha256": "2659575135256f605e1234e1ed4ca8eee66996da10dd532f62d95c8266cd769b"
+      },
+      {
+        "path": "deploy/systemd/walksafe-backend-migrate.service",
+        "bytes": 657,
+        "sha256": "bee77d523ce308da3023504c50747aa5337beeab101e6d408d9000a3de009cb7"
+      },
+      {
+        "path": "deploy/systemd/walksafe-backend.service",
+        "bytes": 1025,
+        "sha256": "053b35b035dfef887a85cedbe3db98dd5e2df8557da16b995d146ce179883e14"
+      },
+      {
+        "path": "deploy/systemd/walksafe-log-retention.service",
+        "bytes": 435,
+        "sha256": "bdd5f8d2942962a3e16d7e952949f0eecb8ee8b091a68a24740029d94cde68b3"
+      },
+      {
+        "path": "docs/backend/api_reference.md",
+        "bytes": 25764,
+        "sha256": "646e08179dea63a647e209ea2e37e32a205c45dd0e395ee95b2c09e7583d47af"
+      },
+      {
+        "path": "docs/backend/backend_environment.md",
+        "bytes": 13508,
+        "sha256": "8bf8343ab48c8a852ef251cffc729775647ec4907a83dbda575eb5f7c0ca429c"
+      },
+      {
+        "path": "scripts/README.md",
+        "bytes": 20672,
+        "sha256": "fa687a246d2eaa4bad50ec7e6c72c95ddcf5e11a8b9417fe0c4feffb593e9b79"
+      },
+      {
+        "path": "scripts/check_report_retention_dry_run.py",
+        "bytes": 105968,
+        "sha256": "c20efd03308a3ccdbd69ad2a4c608a35a3f4024141fbf4a9b1bfbad34b95f4eb"
+      },
+      {
+        "path": "scripts/check_walksafe_release_evidence_20260711.py",
+        "bytes": 244180,
+        "sha256": "f44a73ae2b0db627c0242acdab45beeee58e1dda21f145c717c25e598b03cac6"
+      },
+      {
+        "path": "scripts/generate_walksafe_openapi.py",
+        "bytes": 5479,
+        "sha256": "849f0bb411a834f4f2bd147825c49f40cadaa963df67acafedc5f80423c54b02"
+      },
+      {
+        "path": "scripts/manage_field_telemetry_retention_20260711.py",
+        "bytes": 11748,
+        "sha256": "104afa4c5e181b56f72b4ecfd7b7cbfe01830ef391ed94c901968a483fa351c9"
+      },
+      {
+        "path": "scripts/prune_walksafe_backups_20260711.py",
+        "bytes": 5755,
+        "sha256": "bd53f51a49f3139bec3286c58727f0a1eeca0e0dbd92608be0a82bf100d49c0a"
+      },
+      {
+        "path": "scripts/run_walksafe_report_retention_20260717.sh",
+        "bytes": 27942,
+        "sha256": "d257133820135e07d95c63749afe27e1830d4f92030b64afda427b45035992bc"
+      },
+      {
+        "path": "scripts/run_walksafe_test_layers_20260711.sh",
+        "bytes": 13565,
+        "sha256": "4eeb7e134f75e1574a74ed37c26682132b18d5541437d3cc1405861fa259bd2f"
+      },
+      {
+        "path": "scripts/validate_walksafe_full_rc_20260713.py",
+        "bytes": 143845,
+        "sha256": "a30a82028e696660fdca43a2df1a32342af74c1ab18845057cde35e30ab445a4"
+      },
+      {
+        "path": "scripts/walksafe_admin_high_risk_gate.py",
+        "bytes": 6190,
+        "sha256": "c5a64cc8c56a43f08b1d8aada6d1684981638f6370aa177d2e5b3c3c0df2da8c"
+      },
+      {
+        "path": "tests/test_walksafe_backup_prune.py",
+        "bytes": 2681,
+        "sha256": "4cf374e088fa5cea57718ebf485cac5d34293a4efb65042be4c8950e79e09390"
+      },
+      {
+        "path": "tests/test_report_retention_scheduler.py",
+        "bytes": 36184,
+        "sha256": "2ad0dc186991f958683c8f5a2838eb6e86d468086811b4f633692df58b6f3547"
+      },
+      {
+        "path": "tests/test_field_telemetry_retention.py",
+        "bytes": 5197,
+        "sha256": "230eba67cd829fe016a93ee66a5fe0fd7b652f01922eef68f26f98ac8e226a4a"
+      },
+      {
+        "path": "tests/test_release_evidence_gate.py",
+        "bytes": 170357,
+        "sha256": "b6f6f810bbbc8dc6bc22d3e725892edaa085406e7422dd53dc5185b7b75cc9bd"
+      },
+      {
+        "path": "tests/test_walksafe_full_rc_tooling.py",
+        "bytes": 129423,
+        "sha256": "9d6b0215700b2cb3a65a4e0acd0aeee938c06dafdf524d0445d2ee5239231b91"
+      },
+      {
+        "path": "tests/test_walksafe_admin_high_risk_data_delete_gate.py",
+        "bytes": 13770,
+        "sha256": "3d982f7bf7eae62eb2db6ef69a373c318998c2288e2025571126b7626114b4ca"
+      },
+      {
+        "path": "tests/test_walksafe_android_product_boundary.py",
+        "bytes": 12684,
+        "sha256": "7219f5ca9525841ee4a5402de02ed0fa24e7eb3d486170a881d7469bed0d6bab"
+      }
+    ],
+    "snapshot_sha256": "d176d6fbcca327f7fa73b355991b3383988639fd4759be5a8f63a385b9fc72b1"
+  },
+  "implemented_controls": [
+    {
+      "control": "PASSWORD_TOTP_AND_REPLAY_REJECTION",
+      "result": "개별 관리자 비밀번호의 scrypt 저장과 TOTP 추가 본인확인, 성공한 같은 시각구간 또는 과거 TOTP 재사용 거부를 서버 권한으로 구현했다.",
+      "paths": [
+        "backend/app/services/admin_security.py",
+        "backend/app/config.py",
+        "backend/app/api/admin_security.py"
+      ]
+    },
+    {
+      "control": "SERVER_AUTHORITATIVE_DEVICE_BOUND_SESSIONS",
+      "result": "불투명 세션 원문은 응답 시점에만 만들고 서버에는 SHA-256 지문만 저장하며, 관리자 앱 종류·역할·대상 API·기기 ID를 함께 검사하고 세션 조회·개별 폐기를 제공한다.",
+      "paths": [
+        "backend/alembic/versions/202607220001_admin_password_totp_security.py",
+        "backend/app/models.py",
+        "backend/app/services/admin_security.py",
+        "backend/app/api/admin_security.py"
+      ]
+    },
+    {
+      "control": "FAIL_CLOSED_RECOVERY_STATE",
+      "result": "복구 시작 시 기존 세션을 폐기하고 고위험 작업을 동결한다. 복구코드는 성공적으로 완료될 때만 사용 처리하며, 응답 유실 때 같은 미사용 코드·같은 기기에서 만료를 늘리지 않고 복구 증명값을 회전해 재개한다.",
+      "paths": [
+        "backend/app/services/admin_security.py",
+        "backend/app/models.py",
+        "configs/walksafe_product_boundary_20260722.json"
+      ]
+    },
+    {
+      "control": "HIGH_RISK_OPERATION_GUARD",
+      "result": "복구 중이거나 최근 비밀번호·TOTP 재확인이 없으면 고위험 작업을 실패 닫힘으로 차단한다. API는 실제 변경 transaction에서 다시 검사한다. 오프라인 삭제는 DB 연결이 정상 유지되는 동안 관리자 control transaction 잠금을 유지하고 성공 시 관리자·세션 결속 감사기록을 함께 commit한다.",
+      "paths": [
+        "backend/app/services/admin_security.py",
+        "backend/app/field_test_security.py",
+        "backend/app/api/reports.py",
+        "scripts/walksafe_admin_high_risk_gate.py",
+        "scripts/check_report_retention_dry_run.py",
+        "scripts/manage_field_telemetry_retention_20260711.py",
+        "scripts/prune_walksafe_backups_20260711.py"
+      ]
+    },
+    {
+      "control": "ADMIN_ANDROID_SECURITY_ONLY_BOUNDARY",
+      "result": "관리자 Android 앱은 보안 제어 화면만 열고 업무 기능은 잠근다. 세션·복구 증명값은 프로세스 메모리에만 두며 release 빌드는 HTTPS 관리자 API 주소가 없으면 생성하지 않는다.",
+      "paths": [
+        "apps/android/adminapp/src/main/AndroidManifest.xml",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicy.java",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityState.java"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "result_counts_intentionally_omitted": true,
+    "commands": [
+      {
+        "scope": "Android 관리자 앱 단위·조립·정적검사",
+        "command": "cd apps/android && ./gradlew :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug --offline --no-daemon",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "격리 PostgreSQL을 포함한 백엔드 전체 회귀",
+        "command": "WALKSAFE_TEST_DATABASE_URL=<isolated-db> python -m pytest backend/tests -q",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "격리 PostgreSQL 관리자 전체 흐름",
+        "command": "WALKSAFE_TEST_DATABASE_URL=<isolated-db> python -m pytest backend/tests/test_admin_security.py -q",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "고위험 자료삭제 잠금·감사 결속과 Android 제품경계",
+        "command": "python -m pytest tests/test_walksafe_admin_high_risk_data_delete_gate.py tests/test_walksafe_backup_prune.py tests/test_walksafe_android_product_boundary.py -q",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "관리자 release API origin 양·음성 gate",
+        "command": "WALKSAFE_ADMIN_API_ORIGIN=https://<approved-origin> ./gradlew :adminapp:assembleRelease --offline --no-daemon; unset origin validation must fail",
+        "status": "PASS_INTERNAL_UNSIGNED_APK_ONLY"
+      }
+    ],
+    "interpretation": "구현 세션의 내부 회귀 결과다. 승인 환경의 정식 시험, 실제 휴대전화 분실 복구훈련 또는 출시 증거가 아니다."
+  },
+  "remaining_work": [
+    {
+      "id": "ADMIN-PRODUCTION-PROVISIONING",
+      "status": "OPEN",
+      "description": "실제 운영 관리자 계정·TOTP 비밀·고엔트로피 복구코드를 비밀관리 절차로 만들고 배포환경에 주입하지 않았다."
+    },
+    {
+      "id": "ADMIN-OFF-PHONE-ENCRYPTED-CUSTODY",
+      "status": "OPEN",
+      "description": "관리자 휴대전화와 분리된 암호화 복구자료·서버키·서명키 백업을 실제로 만들고 복원 확인하지 않았다."
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "description": "실제 휴대전화 분실을 가정한 외부 복구수단·세션폐기·고위험 동결·복구훈련을 실행하지 않았다."
+    },
+    {
+      "id": "ADMIN-SIGNING-DISTRIBUTION-DEVICE",
+      "status": "DEFERRED",
+      "description": "관리자 앱 실제 서명·비공개 배포·등록 실기기 검증은 후속 EPIC과 정식 시험에 남아 있다."
+    },
+    {
+      "id": "ADMIN-OFFLINE-DELETE-FENCING",
+      "status": "OPEN",
+      "description": "장시간 오프라인 삭제 중 DB 연결·transaction 잠금이 끊기면 이후 삭제를 즉시 중단시키는 operation lease·fencing과 항목별 재검증이 아직 없다."
+    },
+    {
+      "id": "ADMIN-OFFLINE-DELETE-DURABLE-JOURNAL",
+      "status": "OPEN",
+      "description": "현장 로그·백업 삭제가 일부 진행된 뒤 실패해도 독립 STARTED·항목별 진행·FAILED 기록이 남는 durable journal을 아직 강제하지 않는다."
+    },
+    {
+      "id": "ADMIN-RETENTION-CREDENTIAL-HANDOFF",
+      "status": "OPEN",
+      "description": "정기 보존삭제에 최근 관리자 재확인 세션을 파일에 저장하지 않고 일회성으로 인계하는 절차와 최소권한 DB role 계약이 아직 없다."
+    },
+    {
+      "id": "ADMIN-DB-ROLE-SEPARATION",
+      "status": "OPEN",
+      "description": "migration owner와 runtime·retention DB role을 분리하고 DDL 권한을 회수하지 않아 DB owner가 append-only 감사 trigger를 변경할 수 있는 잔여 위험이 있다."
+    },
+    {
+      "id": "EPIC-01-REMAINING-PHASES",
+      "status": "OPEN",
+      "description": "실행 중 미터 거리 preflight, Legacy Web 전체 기술 폐쇄, Android API gateway 추출과 나머지 목적 표면 정합화가 남아 있다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_test_status": "NOT_RUN",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": "EPIC-01에서 실행 중 실제 미터 거리 frame과 승인된 지정 기기 프로필을 함께 검사하는 runtime metric preflight를 구현한다.",
+  "record_content_sha256": "de806b1f9ecd5d7ce5b86f781a6caf70a61b1a142682ff94fbac302d98929e87"
+}

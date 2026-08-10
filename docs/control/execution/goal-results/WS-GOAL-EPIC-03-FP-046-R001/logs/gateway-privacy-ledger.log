@@ -1,0 +1,6 @@
+WALKSAFE_FP046_COMMAND cd apps/android-gateway && npm run typecheck && npm test
+WALKSAFE_FP046_STARTED_AT 2026-08-10T06:53:00+09:00
+Node tests=88 pass=88 fail=0; typecheck=PASS; build=PASS
+WALKSAFE_FP046_SUMMARY passed=88 failed=0 errors=0 skipped=0
+WALKSAFE_FP046_EXIT_CODE 0
+WALKSAFE_FP046_ENDED_AT 2026-08-10T06:53:04+09:00

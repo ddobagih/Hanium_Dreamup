@@ -1,0 +1,2005 @@
+{
+  "schema_version": "walksafe.artifact-remediation.operations-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W2-OPERATIONS-CURRENT-STATE-20260726-001",
+  "version": "1.1.0",
+  "kind": "NON_DESTRUCTIVE_SUCCESSOR_SUPPLEMENT",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T22:16:08+09:00",
+  "source_commit": null,
+  "source_state": "DIRTY_WORKTREE_PATH_CONTENT_SNAPSHOT",
+  "lifecycle_status": "DRAFT_SUCCESSOR_SUPPLEMENT",
+  "scope": {
+    "wave": "W2",
+    "lane": "DES-OPS",
+    "artifact_type_count": 5,
+    "artifact_type_ids": [
+      "DLV-DES-22",
+      "DLV-DES-23",
+      "DLV-DES-24",
+      "DLV-DES-25",
+      "DLV-DES-27"
+    ]
+  },
+  "non_destructive_boundary": {
+    "legacy_canonical_documents_modified": false,
+    "legacy_approval_or_baseline_modified": false,
+    "legacy_builders_or_registers_modified": false,
+    "artifact_lifecycle_or_approval_change_claimed": false,
+    "checkpoint_or_release_state_modified": false,
+    "interpretation": "This supplement records the observed implementation and unresolved operational design state. It neither overwrites nor approves the predecessor design canon."
+  },
+  "claim_boundary": {
+    "allowed": [
+      "Repository code and policy establish the enumerated implementation defaults, fail-closed branches, approved capacity/retention values and provisional engineering budgets.",
+      "Eight versioned admin/gateway telemetry producer events and their closed allowlists are internally implemented and unit verified.",
+      "The 35-day backup-prune CLI default and boundary behavior are internally unit verified.",
+      "Provisional W4 performance budgets and W8 recovery tiers are NOT_APPROVED and NOT_RUN."
+    ],
+    "prohibited": [
+      "Any provisional PB-* or T0/T1/T2 value is an approved requirement, SLA or measured PASS.",
+      "Telemetry collector, persistent retention, dashboard, alert delivery or production monitoring is complete.",
+      "A production backup, prune, restore, fault injection, failover, load, actual-device or deployment test passed.",
+      "Actual RTO/RPO, zero loss, full-cloud budget approval or release eligibility exists.",
+      "The five design artifacts are approved, baselined or release-complete."
+    ]
+  },
+  "formal_and_release_boundary": {
+    "formal_test_case_total": 279,
+    "formal_test_executed_count": 0,
+    "formal_test_passed_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "required_gate_count": 5,
+    "unwaived_gate_count": 5,
+    "gates": [
+      {
+        "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ],
+    "actual_load_test": "NOT_RUN",
+    "actual_device_test": "NOT_RUN",
+    "backup_restore_drill": "NOT_RUN",
+    "fault_injection": "NOT_RUN",
+    "failover_test": "NOT_RUN",
+    "deployment": "NOT_RUN",
+    "release_eligibility": "NOT_ELIGIBLE"
+  },
+  "artifacts": [
+    {
+      "artifact_type_id": "DLV-DES-22",
+      "display_code": "DES-22",
+      "title": "오류·예외 처리 설계",
+      "successor_status": "CURRENT_IMPLEMENTATION_CONTRACT_CAPTURED_INTERNAL_GAPS_REMAIN",
+      "approval_status_change_claimed": false,
+      "module_contracts": [
+        {
+          "module": "android_user_app",
+          "observed_contracts": [
+            {
+              "area": "metric_depth_preflight",
+              "codes": [
+                "AWAITING_STABLE_EVIDENCE",
+                "STABLE_METRIC_DEPTH",
+                "EXPLICIT_DEPTH_UNSUPPORTED",
+                "TIMEOUT",
+                "TRANSIENT_FAILURE",
+                "LIFECYCLE_CANCELLED",
+                "GENERATION_MISMATCH",
+                "INVALID_FRAME_ORDER",
+                "INVALID_FRAME_EVIDENCE"
+              ],
+              "timeout_ms": 10000,
+              "fallback": "UNSUPPORTED is LIMITED; UNKNOWN/IN_PROGRESS is BLOCKED; no metric claim from unknown evidence",
+              "user_action": "Use only the exposed limited/blocked startup path; do not treat timeout as distance support."
+            },
+            {
+              "area": "detector_runtime",
+              "trigger": "3 consecutive invoke failures by default",
+              "actions": [
+                "KEEP_CURRENT before threshold",
+                "LOAD_LEGACY only when unified is active and a legacy known-good is available",
+                "DISABLE otherwise"
+              ],
+              "partial_success_rule": "A failed model is never replaced by fake detection."
+            },
+            {
+              "area": "activity_original_upload",
+              "codes": [
+                "BLOCKED_WHILE_WALKING",
+                "WIFI_ALLOWED",
+                "APPROVED_CELLULAR_ALLOWED",
+                "QUEUED_UNTIL_WIFI",
+                "FAIL_CLOSED"
+              ],
+              "retry": "No upload while walking; wait for stationary confirmation and an admitted network. Cellular additionally requires explicit opt-in.",
+              "cancellation": "Movement, unknown session state, tracking stop or admission-generation change closes admission and cancels active uploads."
+            },
+            {
+              "area": "walking_route",
+              "partial_success_rule": "Provider/schema/priority/geometry/endpoints/guide monotonicity are validated as one response; any violation rejects the whole route.",
+              "user_action": "Keep the prior still-valid route or pause guidance; never use an unvalidated partial route."
+            },
+            {
+              "area": "report_feedback",
+              "partial_success_rule": "A duplicate candidate is retained and tagged rather than silently deleted or merged.",
+              "user_action": "Explicit reports announce completion/failure; missing GPS requests location; an existing candidate is disclosed."
+            }
+          ]
+        },
+        {
+          "module": "android_adminapp",
+          "observed_contracts": [
+            {
+              "area": "recovery_security",
+              "wire_error_codes": [
+                "admin_recovery_expired",
+                "admin_recovery_invalid",
+                "admin_auth_rate_limited",
+                "admin_recovery_in_progress",
+                "admin_totp_secret_not_replaced",
+                "admin_recovery_verification_failed"
+              ],
+              "retry_after_seconds_valid_range": [
+                1,
+                3600
+              ],
+              "user_action": "Stable Korean recovery/retry/help messages are selected by code; rate-limited work waits for the bounded Retry-After value."
+            }
+          ],
+          "known_gap": "Versioned six-event producer is implemented; collector, persistent retention, dashboard and production monitoring remain W9."
+        },
+        {
+          "module": "android_gateway",
+          "observed_contracts": [
+            {
+              "area": "upstream_proxy",
+              "timeout_ms": 15000,
+              "request_body_timeout_ms": 10000,
+              "failure_behavior": "Return bounded gateway closed/timeout/unavailable responses; do not expose raw upstream error bodies.",
+              "retry": "Forward only validated Retry-After and bounded audit/request correlation headers where allowed."
+            },
+            {
+              "area": "upload_admission",
+              "window_seconds": 60,
+              "limits": {
+                "global": 120,
+                "actor": 12,
+                "ip": 30
+              },
+              "per_actor_concurrency": 1,
+              "overload_behavior": "429/503 with bounded Retry-After; no unbounded concurrent upload."
+            },
+            {
+              "area": "privacy_rights_partial_completion",
+              "item_states": [
+                "PENDING",
+                "IN_PROGRESS",
+                "EXTERNAL_PENDING",
+                "RETRY_WAIT",
+                "LEGAL_HOLD",
+                "FAILED",
+                "COMPLETED",
+                "NOT_APPLICABLE"
+              ],
+              "partial_success_rule": "Overall completion is forbidden while any scoped item remains external, waiting, held or failed; retry_after and evidence_ref remain per item.",
+              "integrity": "Event and state ledgers are SHA-256 chained."
+            }
+          ],
+          "known_gap": "Versioned two-event failure producer is implemented; collector, persistent retention, dashboard and production monitoring remain W9."
+        },
+        {
+          "module": "backend",
+          "observed_contracts": [
+            {
+              "area": "tmap",
+              "http_error_codes": {
+                "503": "tmap_app_key_missing",
+                "502_invalid_key": "tmap_invalid_api_key",
+                "504": "tmap_timeout",
+                "502_provider": "tmap_provider_error",
+                "422": "route_priority_unsupported"
+              },
+              "retry": "No automatic provider substitution; retry must remain bounded and must not infer a route."
+            },
+            {
+              "area": "detect_overload",
+              "behavior": "Bounded 429/503/timeout envelopes include stable public code/type and a short Retry-After where configured; raw internal path/exception text is not a client contract."
+            },
+            {
+              "area": "report_persistence",
+              "max_pending_journal_entries": 10000,
+              "partial_success_rule": "Journal/reconciliation and exclusive transaction locking prevent a DB-only or object-only state from being silently promoted to completion."
+            }
+          ]
+        }
+      ],
+      "unresolved": [
+        {
+          "gap_id": "DES22-GAP-01",
+          "status": "INTERNAL_GAP",
+          "item": "One versioned cross-module error catalogue and correlation-ID propagation proof",
+          "owner_roles": [
+            "기술책임자",
+            "QA책임자"
+          ],
+          "due_event": "Before DES-22 review and TST-16 formal execution",
+          "target_wave": "W3",
+          "closure_condition": "One versioned cross-module error catalogue and automated propagation proof passes internal integration tests.",
+          "evidence_required": [
+            "W3 error-contract catalogue",
+            "correlation propagation test receipt"
+          ]
+        },
+        {
+          "gap_id": "DES22-GAP-02",
+          "status": "INTERNAL_GAP",
+          "item": "Circuit-breaker thresholds and retry ownership for every external dependency",
+          "owner_roles": [
+            "기술책임자",
+            "운영책임자"
+          ],
+          "due_event": "After supplier limits and failure-injection results are available",
+          "target_wave": "W3",
+          "closure_condition": "Every external dependency has bounded retry/circuit ownership and internal failure tests.",
+          "evidence_required": [
+            "W3 dependency retry matrix",
+            "failure-path test receipt"
+          ]
+        }
+      ],
+      "disposition": "REMEDIATE_IMPLEMENTATION_CONTRACT_W3"
+    },
+    {
+      "artifact_type_id": "DLV-DES-23",
+      "display_code": "DES-23",
+      "title": "로깅·모니터링 설계",
+      "successor_status": "VERSIONED_PRODUCER_CONTRACT_IMPLEMENTED_MONITORING_W9_OPEN",
+      "approval_status_change_claimed": false,
+      "telemetry_inventory": [
+        {
+          "surface": "android_user_app",
+          "implemented": [
+            "allowlisted field metadata log",
+            "capture/session status and bounded runtime measurements",
+            "debug/test capture separated from release behavior"
+          ],
+          "status": "PARTIAL_INTERNAL_IMPLEMENTATION_FIELD_COLLECTION_NOT_RUN"
+        },
+        {
+          "surface": "android_adminapp",
+          "implemented": [
+            "six versioned auth/recovery events",
+            "closed six-field allowlist",
+            "internal UUID v4",
+            "bounded failure codes",
+            "Android Log and injectable Recorder",
+            "sink-failure isolation"
+          ],
+          "test_result": "11/11 PASS",
+          "status": "INTERNAL_PRODUCER_IMPLEMENTED"
+        },
+        {
+          "surface": "android_gateway",
+          "implemented": [
+            "two versioned proxy/privacy failure events",
+            "closed eight-field allowlist",
+            "internal UUID v4",
+            "pathname-only route",
+            "production stderr JSON and injectable sink",
+            "sink-failure isolation"
+          ],
+          "test_result": "2/2 PASS",
+          "status": "INTERNAL_PRODUCER_IMPLEMENTED"
+        },
+        {
+          "surface": "backend",
+          "implemented": [
+            "durable admin/report audit records",
+            "Retry-After and public error envelopes",
+            "readiness checks",
+            "redacted/minimum export paths"
+          ],
+          "status": "PARTIAL_INTERNAL_IMPLEMENTATION"
+        }
+      ],
+      "retention_contract": [
+        {
+          "data": "actual report row and upload image",
+          "period_days": 180,
+          "execution_status": "GUARDED_TOOL_EXISTS_ACTUAL_APPLY_NOT_RUN"
+        },
+        {
+          "data": "fake/demo report",
+          "period_days": 30,
+          "qualifier": "maximum",
+          "execution_status": "GUARDED_TOOL_EXISTS_ACTUAL_APPLY_NOT_RUN"
+        },
+        {
+          "data": "field telemetry and debug/test capture",
+          "period_days": 7,
+          "qualifier": "maximum",
+          "execution_status": "GUARDED_TOOL_EXISTS_ACTUAL_APPLY_NOT_RUN"
+        },
+        {
+          "data": "regenerable local export",
+          "period_days": 7,
+          "execution_status": "POLICY_ONLY_NO_PRODUCTION_PROOF"
+        },
+        {
+          "data": "backup rotation",
+          "period_days": 35,
+          "execution_status": "POLICY_AND_TOOL_CANDIDATE_DRILL_NOT_RUN"
+        },
+        {
+          "data": "adminapp logs",
+          "period_days": null,
+          "status": "UNRESOLVED"
+        },
+        {
+          "data": "gateway logs",
+          "period_days": null,
+          "status": "UNRESOLVED"
+        }
+      ],
+      "required_metric_contract": [
+        {
+          "domain": "device safety",
+          "fields": [
+            "frame/inference latency",
+            "drop",
+            "capability tier",
+            "safe-stop",
+            "TTS queue",
+            "battery low",
+            "storage low",
+            "thermal critical"
+          ],
+          "measurement_status": "NOT_RUN"
+        },
+        {
+          "domain": "navigation",
+          "fields": [
+            "GPS accuracy",
+            "route age",
+            "deviation suspect/confirmed",
+            "TMAP latency/error"
+          ],
+          "measurement_status": "NOT_RUN"
+        },
+        {
+          "domain": "report/original",
+          "fields": [
+            "queue bytes/age/count",
+            "retry",
+            "receipt digest mismatch",
+            "30-day expiry"
+          ],
+          "measurement_status": "NOT_RUN"
+        },
+        {
+          "domain": "server capacity",
+          "fields": [
+            "primary GiB/percent",
+            "backup GiB",
+            "cost estimate",
+            "state version/age"
+          ],
+          "measurement_status": "NOT_RUN"
+        },
+        {
+          "domain": "backup/restore",
+          "fields": [
+            "bundle completeness",
+            "digest",
+            "restore duration",
+            "deletion replay"
+          ],
+          "measurement_status": "NOT_RUN"
+        }
+      ],
+      "unresolved": [
+        {
+          "gap_id": "DES23-GAP-01",
+          "status": "INTERNAL_GAP",
+          "item": "First-party structured logs, metrics and traces for adminapp and gateway",
+          "owner_roles": [
+            "운영책임자",
+            "기술책임자"
+          ],
+          "due_event": "Before integration observability review",
+          "target_wave": "W9",
+          "closure_condition": "Admin and gateway events reach an approved persistent collector with configured retention.",
+          "evidence_required": [
+            "W9 collector configuration",
+            "retention apply evidence",
+            "ingestion test receipt"
+          ]
+        },
+        {
+          "gap_id": "DES23-GAP-02",
+          "status": "INTERNAL_GAP",
+          "item": "End-to-end correlation schema, environment levels, sampling, dashboard and alert ownership",
+          "owner_roles": [
+            "운영책임자",
+            "보안·개인정보책임자"
+          ],
+          "due_event": "Before production-like monitoring verification",
+          "target_wave": "W9",
+          "closure_condition": "Dashboard, alert thresholds, delivery route and on-call acknowledgement are verified in a production-like environment.",
+          "evidence_required": [
+            "W9 dashboard export",
+            "alert rule manifest",
+            "notification drill receipt"
+          ]
+        },
+        {
+          "gap_id": "DES23-GAP-03",
+          "status": "INTERNAL_GAP",
+          "item": "Adminapp/gateway log redaction and retention periods",
+          "owner_roles": [
+            "보안·개인정보책임자",
+            "운영책임자"
+          ],
+          "due_event": "Before DES-23 approval review",
+          "target_wave": "W5",
+          "closure_condition": "Security review verifies all telemetry producers/collectors preserve the forbidden-data and redaction contract.",
+          "evidence_required": [
+            "W5 telemetry threat review",
+            "secret/PII negative-test receipt"
+          ]
+        }
+      ],
+      "disposition": "PRODUCERS_IMPLEMENTED_MONITORING_DEFERRED_W9",
+      "versioned_telemetry_contract": {
+        "contract_id": "WS-DES23-TELEMETRY-CONTRACT-20260726-001",
+        "schema_version": "walksafe.operations-telemetry-contract.v1",
+        "version": "1.0.0",
+        "status": "INTERNAL_PRODUCER_IMPLEMENTED_AND_UNIT_VERIFIED",
+        "event_count": 8,
+        "events": [
+          {
+            "event_name": "walksafe.admin.auth.succeeded",
+            "surface": "android_adminapp",
+            "severity": "INFO",
+            "outcome": "succeeded",
+            "failure_code": null
+          },
+          {
+            "event_name": "walksafe.admin.auth.failed",
+            "surface": "android_adminapp",
+            "severity": "WARN",
+            "outcome": "failed",
+            "failure_code": "BOUNDED_ALLOWLIST"
+          },
+          {
+            "event_name": "walksafe.admin.recovery.start.succeeded",
+            "surface": "android_adminapp",
+            "severity": "INFO",
+            "outcome": "succeeded",
+            "failure_code": null
+          },
+          {
+            "event_name": "walksafe.admin.recovery.start.failed",
+            "surface": "android_adminapp",
+            "severity": "WARN",
+            "outcome": "failed",
+            "failure_code": "BOUNDED_ALLOWLIST"
+          },
+          {
+            "event_name": "walksafe.admin.recovery.complete.succeeded",
+            "surface": "android_adminapp",
+            "severity": "INFO",
+            "outcome": "succeeded",
+            "failure_code": null
+          },
+          {
+            "event_name": "walksafe.admin.recovery.complete.failed",
+            "surface": "android_adminapp",
+            "severity": "WARN",
+            "outcome": "failed",
+            "failure_code": "BOUNDED_ALLOWLIST"
+          },
+          {
+            "event_name": "walksafe.gateway.proxy.failed",
+            "surface": "android_gateway",
+            "severity": "ERROR_FOR_5XX_WARN_FOR_409",
+            "outcome": "FAILED_ENCODED_BY_EVENT_NAME_NO_OUTCOME_FIELD",
+            "failure_code": "BOUNDED_ALLOWLIST"
+          },
+          {
+            "event_name": "walksafe.gateway.privacy.failed",
+            "surface": "android_gateway",
+            "severity": "ERROR_FOR_5XX",
+            "outcome": "FAILED_ENCODED_BY_EVENT_NAME_NO_OUTCOME_FIELD",
+            "failure_code": "BOUNDED_ALLOWLIST"
+          }
+        ],
+        "field_allowlists": {
+          "android_adminapp": [
+            "schema_version",
+            "event_name",
+            "severity",
+            "correlation_id",
+            "outcome",
+            "failure_code"
+          ],
+          "android_gateway": [
+            "schema_version",
+            "event_name",
+            "severity",
+            "correlation_id",
+            "route",
+            "method",
+            "http_status",
+            "failure_code"
+          ]
+        },
+        "failure_code_allowlists": {
+          "android_adminapp": [
+            "api_<AdminSecurityApiException enum>",
+            "io_failure",
+            "validation_failure",
+            "runtime_failure"
+          ],
+          "android_gateway": [
+            "privacy_operation_inactive",
+            "privacy_service_unavailable",
+            "client_cancelled",
+            "upstream_failure",
+            "proxy_service_unavailable",
+            "upstream_timeout",
+            "proxy_internal_failure"
+          ]
+        },
+        "correlation_contract": {
+          "format": "UUID v4",
+          "admin_generation": "Internal UUID.randomUUID() once per login/recovery-start/recovery-complete attempt",
+          "gateway_generation": "Internal randomUUID() once per emitted failure event",
+          "accept_user_or_request_correlation_id": false,
+          "propagate_secret_bearing_incoming_correlation_id": false
+        },
+        "sampling_contract": {
+          "sampler_implemented": false,
+          "effective_sample_rate": 1.0,
+          "admin_emission": "Exactly one success or failure event for every covered attempt",
+          "gateway_emission": "One event for fixed proxy routes returning 409/499/5xx and privacy-rights responses returning 5xx; successes and other statuses are not events"
+        },
+        "forbidden_data": [
+          "admin ID",
+          "password",
+          "new password",
+          "TOTP",
+          "recovery code",
+          "access token",
+          "recovery token",
+          "device ID",
+          "device label",
+          "raw exception message",
+          "authorization header",
+          "cookie or secret header",
+          "query values",
+          "request body",
+          "raw location",
+          "email/phone/address or other raw PII",
+          "user-provided correlation ID"
+        ],
+        "redaction_contract": {
+          "strategy": "CLOSED_ALLOWLIST_CONSTRUCTION_NOT_POST_HOC_SECRET_REDACTION",
+          "gateway_route": "pathname only; query omitted",
+          "admin_failure": "bounded type/code only; exception message omitted",
+          "raw_request_headers_query_body_recorded": false
+        },
+        "sink_contract": {
+          "android_adminapp": "Android Log JSON, tag WalkSafeAdminSecurity; injectable Recorder; sink exceptions do not change auth/recovery behavior",
+          "android_gateway": "production console.error JSON; no default sink under NODE_ENV=test; injectable sink; sink exceptions do not change response behavior"
+        },
+        "retention_contract": {
+          "application_owned_persistent_store_implemented": false,
+          "android_log_retention": "PLATFORM_MANAGED_NOT_A_WALKSAFE_RETENTION_GUARANTEE",
+          "gateway_stderr_retention": "PROCESS_STREAM_ONLY_NO_WALKSAFE_RETENTION_GUARANTEE",
+          "collector_retention_days": null,
+          "status": "UNRESOLVED_W9_MONITORING"
+        },
+        "alert_contract": {
+          "primary_owner_role": "운영책임자",
+          "security_escalation_owner_role": "보안·개인정보책임자",
+          "rule_thresholds": null,
+          "delivery_path": null,
+          "status": "NOT_IMPLEMENTED_TARGET_W9"
+        },
+        "boundary": {
+          "producer_code": "IMPLEMENTED",
+          "unit_tests": "PASS",
+          "external_collector": "NOT_IMPLEMENTED",
+          "persistent_telemetry_store": "NOT_IMPLEMENTED",
+          "dashboard": "NOT_IMPLEMENTED",
+          "alert_rules_and_delivery": "NOT_IMPLEMENTED",
+          "production_deployment_and_monitoring": "NOT_RUN_TARGET_W9"
+        }
+      }
+    },
+    {
+      "artifact_type_id": "DLV-DES-24",
+      "display_code": "DES-24",
+      "title": "성능·확장성 설계",
+      "successor_status": "APPROVED_POLICY_VALUES_SEPARATED_FROM_PROVISIONAL_W4_BUDGETS",
+      "approval_status_change_claimed": false,
+      "budget_classification": "IMPLEMENTATION_DEFAULTS_AND_RESOURCE_GUARDS_NOT_FORMAL_ACCEPTANCE_THRESHOLDS",
+      "implementation_limits": [
+        {
+          "area": "metric_depth_preflight",
+          "value": 10000,
+          "unit": "ms maximum observation window",
+          "status": "CODE_DEFAULT_NOT_DEVICE_PERFORMANCE_PASS"
+        },
+        {
+          "area": "backend DB connect",
+          "value": 5,
+          "unit": "seconds default",
+          "configured_max": 30,
+          "status": "CONFIG_BOUND_NOT_LOAD_PASS"
+        },
+        {
+          "area": "backend DB statement",
+          "value": 10000,
+          "unit": "ms default",
+          "configured_max": 120000,
+          "status": "CONFIG_BOUND_NOT_LOAD_PASS"
+        },
+        {
+          "area": "warmed inference",
+          "value": 2.0,
+          "unit": "seconds default",
+          "configured_max": 30,
+          "status": "CONFIG_BOUND_NOT_DEVICE_PASS"
+        },
+        {
+          "area": "inference startup/warm-up",
+          "value": 30.0,
+          "unit": "seconds default",
+          "configured_max": 120,
+          "status": "CONFIG_BOUND_NOT_DEVICE_PASS"
+        },
+        {
+          "area": "TMAP request whole deadline",
+          "value": 4.0,
+          "unit": "seconds default",
+          "configured_max": 30,
+          "status": "IMPLEMENTATION_TIMEOUT_NOT_SUPPLIER_SLA"
+        },
+        {
+          "area": "gateway upstream proxy",
+          "value": 15000,
+          "unit": "ms",
+          "status": "IMPLEMENTATION_TIMEOUT_NOT_END_TO_END_BUDGET"
+        },
+        {
+          "area": "gateway request body",
+          "value": 10000,
+          "unit": "ms",
+          "status": "IMPLEMENTATION_TIMEOUT_NOT_END_TO_END_BUDGET"
+        },
+        {
+          "area": "report metadata",
+          "value": 65536,
+          "unit": "bytes default",
+          "configured_max": 1048576,
+          "status": "REQUEST_BOUND"
+        },
+        {
+          "area": "report export/summary",
+          "value": 10000,
+          "unit": "rows maximum",
+          "status": "QUERY_BOUND"
+        },
+        {
+          "area": "pending report reconciliation journal",
+          "value": 10000,
+          "unit": "entries maximum",
+          "status": "INTERNAL_BOUND_NOT_CAPACITY_TEST"
+        }
+      ],
+      "backpressure_and_scaling": [
+        {
+          "surface": "gateway original upload",
+          "window_seconds": 60,
+          "global_limit": 120,
+          "actor_limit": 12,
+          "ip_limit": 30,
+          "per_actor_concurrency": 1,
+          "validation_status": "UNIT_OR_INTERNAL_EVIDENCE_ONLY"
+        },
+        {
+          "surface": "server object storage",
+          "primary_gib": 300,
+          "backup_gib": 300,
+          "physical_total_gib": 600,
+          "monthly_budget_krw": 30000,
+          "state_thresholds": [
+            {
+              "percent": 70,
+              "primary_gib": 210,
+              "action": "admin warning"
+            },
+            {
+              "percent": 85,
+              "primary_gib": 255,
+              "action": "stop adding new field-test participants"
+            },
+            {
+              "percent": 95,
+              "primary_gib": 285,
+              "action": "clean expired data then hold new original-collection sessions"
+            },
+            {
+              "percent": 100,
+              "primary_gib": 300,
+              "action": "quietly hold new training material and automatic-report candidates"
+            }
+          ],
+          "recovery_rule": "Resume only the held data creation/transfer after space recovery; never auto-resume a user walk.",
+          "deletion_rule": "Do not delete unexpired existing originals for cost relief.",
+          "measurement_status": "NOT_RUN"
+        },
+        {
+          "surface": "phone original queue",
+          "byte_limit": null,
+          "status": "UNRESOLVED_GATE_NOT_RUN"
+        }
+      ],
+      "device_resource_budget": {
+        "signals": [
+          "Android OS low-battery signal",
+          "DEVICE_STORAGE_LOW",
+          "THERMAL_STATUS_CRITICAL"
+        ],
+        "admission_states": [
+          "READY",
+          "PENDING",
+          "UNAVAILABLE"
+        ],
+        "numeric_battery_threshold": null,
+        "numeric_thermal_threshold": null,
+        "numeric_storage_threshold": null,
+        "reason": "Device-specific numeric thresholds require supported-device measurement and are not invented here.",
+        "actual_device_measurement_status": "NOT_RUN"
+      },
+      "measurement_state": {
+        "formal_metric_executed": 0,
+        "formal_metric_passed": 0,
+        "formal_coverage_percent": 0,
+        "quality_state": "NOT_MEASURED",
+        "load_test": "NOT_RUN",
+        "thermal_test": "NOT_RUN",
+        "battery_test": "NOT_RUN",
+        "API_capacity_test": "NOT_RUN",
+        "storage_cost_measurement": "NOT_RUN"
+      },
+      "unresolved": [
+        {
+          "gap_id": "DES24-GAP-01",
+          "status": "INTERNAL_GAP",
+          "item": "End-to-end camera-to-feedback, route and report latency/throughput/concurrency acceptance budgets",
+          "owner_roles": [
+            "기술책임자",
+            "QA책임자"
+          ],
+          "due_event": "After supported-device and load baselines are measured",
+          "target_wave": "W4",
+          "closure_condition": "All PB latency, throughput, CPU and memory budgets are measured on the immutable declared environments and separately approved or revised.",
+          "evidence_required": [
+            "W4 raw measurement bundle",
+            "device/load manifest",
+            "budget decision receipt"
+          ]
+        },
+        {
+          "gap_id": "DES24-GAP-02",
+          "status": "INTERNAL_GAP",
+          "item": "Device-specific battery, thermal and storage numeric thresholds plus phone queue byte limit",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ],
+          "due_event": "Before GATE-PHONE-QUEUE-BYTE-LIMIT closure",
+          "target_wave": "W4",
+          "closure_condition": "Battery, thermal, transient-storage and phone-queue budgets pass supported-device measurement and the phone queue gate closes.",
+          "evidence_required": [
+            "W4 device resource report",
+            "queue boundary test",
+            "GATE-PHONE-QUEUE-BYTE-LIMIT receipt"
+          ]
+        },
+        {
+          "gap_id": "DES24-GAP-03",
+          "status": "INTERNAL_GAP",
+          "item": "Measured cloud capacity, API saturation and monthly-cost proof",
+          "owner_roles": [
+            "운영책임자",
+            "기술책임자"
+          ],
+          "due_event": "Before cloud cost and server-capacity gates close",
+          "target_wave": "W4",
+          "closure_condition": "Staging shape, capacity state, API saturation and storage/full-cloud cost are measured; separate full-cloud approval is recorded.",
+          "evidence_required": [
+            "W4 load report",
+            "capacity-state receipt",
+            "cost estimate and approval receipt"
+          ]
+        }
+      ],
+      "disposition": "PROVISIONAL_BUDGETS_REQUIRE_MEASUREMENT_W4",
+      "approved_parameters": [
+        {
+          "parameter_id": "AP-STORAGE-PRIMARY",
+          "value": 300,
+          "unit": "GiB",
+          "approval_status": "APPROVED_POLICY_VALUE"
+        },
+        {
+          "parameter_id": "AP-STORAGE-BACKUP",
+          "value": 300,
+          "unit": "GiB",
+          "approval_status": "APPROVED_POLICY_VALUE"
+        },
+        {
+          "parameter_id": "AP-SERVER-CAPACITY-THRESHOLDS",
+          "values": [
+            70,
+            85,
+            95,
+            100
+          ],
+          "unit": "percent",
+          "approval_status": "APPROVED_POLICY_VALUE"
+        },
+        {
+          "parameter_id": "AP-STORAGE-COST",
+          "value": 30000,
+          "unit": "KRW/month",
+          "approval_status": "APPROVED_POLICY_VALUE"
+        },
+        {
+          "parameter_id": "AP-BACKUP-RETENTION",
+          "value": 35,
+          "unit": "days",
+          "approval_status": "APPROVED_POLICY_VALUE"
+        }
+      ],
+      "provisional_engineering_budgets": [
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-C2F-01",
+          "metric": "camera-to-feedback latency",
+          "environment": "release Android; fixed model/config; SM-G981N and one lowest supported tier; 20-30 C; 30-minute run",
+          "unit": "ms",
+          "thresholds": {
+            "p50_max": 900,
+            "p95_max": 1500,
+            "p99_max": 2000,
+            "absolute_max": 2500
+          },
+          "measurement_method": "Monotonic camera capture timestamp to haptic start or TTS onStart; per-device N>=1000; cold/warm separated",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-ROUTE-01",
+          "metric": "route acquisition latency",
+          "environment": "fixed Seoul origin/destination; Wi-Fi RTT<=50 ms and >=10 Mbps; real TMAP and stub reported separately",
+          "unit": "ms",
+          "thresholds": {
+            "p50_max": 1500,
+            "p95_max": 3000,
+            "p99_max": 4500,
+            "absolute_max": 8000
+          },
+          "measurement_method": "User destination confirmation to validated route store or explicit timeout; N>=200; success/error separated",
+          "owner_roles": [
+            "Backend책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-REPORT-01",
+          "metric": "report upload to validated receipt latency",
+          "environment": "stationary Wi-Fi; 1 MiB JPEG plus metadata<=64 KiB; concurrency 1",
+          "unit": "ms",
+          "thresholds": {
+            "p50_max": 2500,
+            "p95_max": 6000,
+            "p99_max": 10000,
+            "absolute_max": 12000
+          },
+          "measurement_method": "Monotonic upload start to strict server receipt validation; N>=200; 8 MiB boundary tested separately",
+          "owner_roles": [
+            "Android책임자",
+            "Gateway책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-CPU-01",
+          "metric": "Android app CPU",
+          "environment": "same controlled 30-minute walk; one-core equivalent",
+          "unit": "percent",
+          "thresholds": {
+            "average_max": 80,
+            "p95_max": 120,
+            "above_150_contiguous_seconds_max": 10
+          },
+          "measurement_method": "Perfetto/simpleperf one-second samples; cold/warm separated",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-MEM-01",
+          "metric": "Android app PSS",
+          "environment": "same controlled 30-minute release-app run",
+          "unit": "MiB",
+          "thresholds": {
+            "p95_max": 512,
+            "absolute_max": 640,
+            "oom_or_lmk_max_count": 0
+          },
+          "measurement_method": "dumpsys meminfo every 5 seconds plus end-of-run leak comparison",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-BAT-01",
+          "metric": "battery consumption",
+          "environment": "unplugged; screen/camera/GPS/TTS active for 30 minutes; fixed brightness/network; start SOC 40-80 percent",
+          "unit": "percentage-points/30min",
+          "thresholds": {
+            "consumption_max": 12,
+            "abnormal_termination_max_count": 0
+          },
+          "measurement_method": "Reset batterystats; three runs; compare median and raw charge-counter evidence",
+          "owner_roles": [
+            "QA책임자",
+            "Android책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-THERM-01",
+          "metric": "thermal status and degradation response",
+          "environment": "same 30-minute release-app run repeated three times",
+          "unit": "events/seconds",
+          "thresholds": {
+            "critical_entry_max_count": 0,
+            "severe_total_seconds_max": 60,
+            "degradation_response_seconds_max": 5
+          },
+          "measurement_method": "Android thermal listener correlated with Perfetto and feature-degradation events",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-STORAGE-01",
+          "metric": "controlled transient storage and remaining device space",
+          "environment": "release app with report/raw queue and field-log worst-case fixtures",
+          "unit": "GiB/percent",
+          "thresholds": {
+            "controlled_transient_gib_max": 1,
+            "free_space_gib_min": 2,
+            "free_space_percent_min": 10
+          },
+          "threshold_rule": "required free space=max(2 GiB,10 percent); below it stop new optional originals",
+          "measurement_method": "StatFs plus exact queue/log manifest byte sum under low-storage injection",
+          "owner_roles": [
+            "Android책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-PHONE-QUEUE-01",
+          "metric": "encrypted Android report/raw queue",
+          "environment": "crash/restart, expiry, receipt commit and deletion fixture",
+          "unit": "MiB/reports/percent",
+          "thresholds": {
+            "capacity_mib": 256,
+            "report_count_max": 20,
+            "single_report_mib_max": 8,
+            "optional_degrade_at_percent": 80,
+            "new_optional_reject_at_percent": 100
+          },
+          "measurement_method": "Sum actual file bytes and signed/hashed manifest state through restart and committed deletion",
+          "owner_roles": [
+            "Android책임자",
+            "데이터책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-API-01",
+          "metric": "general non-external API service level",
+          "environment": "staging shape; 20 virtual users; fixed fixture; 10 minutes",
+          "unit": "RPS/ms/percent",
+          "thresholds": {
+            "sustained_rps_min": 20,
+            "latency_p95_ms_max": 750,
+            "latency_p99_ms_max": 1500,
+            "http_5xx_percent_max_exclusive": 1
+          },
+          "measurement_method": "HTTP load harness with client monotonic latency and DB wait/CPU/RSS correlation",
+          "owner_roles": [
+            "Backend책임자",
+            "QA책임자",
+            "운영책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-API-NAV-01",
+          "metric": "navigation stub throughput",
+          "environment": "staging; five actors; concurrency 5; provider stub, with real-TMAP smoke reported separately",
+          "unit": "RPS",
+          "thresholds": {
+            "stub_aggregate_rps_min": 2
+          },
+          "measurement_method": "Fixed route-fixture load; separately verify real provider stays within actor limit and PB-ROUTE-01",
+          "owner_roles": [
+            "Backend책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-API-REPORT-01",
+          "metric": "serialized report throughput",
+          "environment": "one gateway; stationary admitted 1 MiB uploads; 10 minutes",
+          "unit": "uploads/minute",
+          "thresholds": {
+            "sustained_uploads_per_minute_min": 6,
+            "serialized_busy_error_max_count": 0,
+            "allowed_in_flight": 1
+          },
+          "measurement_method": "Serial load plus separate concurrency=2 admission test expecting explicit second-request rejection",
+          "owner_roles": [
+            "Gateway책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-STAGING-SHAPE-01",
+          "metric": "provisional staging resource shape",
+          "environment": "single staging environment for W4 measurement",
+          "unit": "vCPU/GiB/sessions",
+          "thresholds": {
+            "gateway_vcpu": 1,
+            "gateway_memory_gib": 1,
+            "backend_vcpu": 2,
+            "backend_memory_gib": 4,
+            "postgres_vcpu": 2,
+            "postgres_memory_gib": 4,
+            "postgres_storage_gib": 20,
+            "authenticated_sessions": 25
+          },
+          "measurement_method": "Record deployed requests/limits and session count, then evaluate all W4 API budgets on the same immutable shape",
+          "owner_roles": [
+            "기술책임자",
+            "운영책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W4",
+          "budget_id": "PB-CLOUD-COST-01",
+          "metric": "full-cloud monthly cost control",
+          "environment": "provisional full-cloud estimate and bill comparison; separate from approved storage-only KRW 30,000 value",
+          "unit": "KRW/month",
+          "thresholds": {
+            "provisional_alert": 80000,
+            "provisional_stop": 100000
+          },
+          "measurement_method": "Monthly SKU estimate and actual bill by storage/request/egress/compute; separate approval required before enforcement",
+          "owner_roles": [
+            "운영책임자",
+            "프로젝트책임자"
+          ]
+        }
+      ],
+      "approval_boundary": "Only approved_parameters are approved policy values. Every PB-* value is NOT_APPROVED and NOT_RUN until W4 measurement and separate approval."
+    },
+    {
+      "artifact_type_id": "DLV-DES-25",
+      "display_code": "DES-25",
+      "title": "백업·복구·재해복구 설계",
+      "successor_status": "RETENTION_FIX_VERIFIED_PROVISIONAL_RECOVERY_TIERS_W8_OPEN",
+      "approval_status_change_claimed": false,
+      "backup_contract": {
+        "targets": [
+          "account/consent/report/approved-setting DB metadata",
+          "original object storage",
+          "model/config registry",
+          "completed deletion/tombstone ledger"
+        ],
+        "consistency_key": "backup_bundle_id at one approved observation time",
+        "manifest_fields": [
+          "component version",
+          "object count/bytes",
+          "SHA-256 or Merkle candidate",
+          "start/completion time",
+          "encryption key version"
+        ],
+        "protection": [
+          "OpenPGP encryption",
+          "SHA-256 manifest",
+          "detached signature",
+          "maintenance flock and write quiescence",
+          "separate authority and storage boundary from production service"
+        ],
+        "rotation_days": 35,
+        "backup_frequency": null,
+        "backup_frequency_status": "UNRESOLVED",
+        "retention_enforcement": {
+          "policy_retention_days": 35,
+          "prune_cli_default_retention_days": 35,
+          "minimum_copies_default": 3,
+          "cli_dry_run_default": true,
+          "status": "INTERNAL_IMPLEMENTED_UNIT_VERIFIED",
+          "test_result": "5/5 PASS",
+          "automatic_schedule_status": "NOT_IMPLEMENTED",
+          "interpretation": "The CLI default now matches the 35-day policy and boundary tests pass. This does not prove an enabled schedule, a production prune, a backup or a restore drill."
+        }
+      },
+      "restore_order": [
+        {
+          "step": 1,
+          "contract": "Approve incident scope and restore point; freeze high-risk writes and new walk starts."
+        },
+        {
+          "step": 2,
+          "contract": "Prepare an identity-separated isolated host, empty PostGIS DB and nonexistent private upload root."
+        },
+        {
+          "step": 3,
+          "contract": "Verify trusted-signer manifest signature and every encrypted payload SHA-256."
+        },
+        {
+          "step": 4,
+          "contract": "Decrypt only in sealed memfd/tmpfs handling and precheck DB schema/version."
+        },
+        {
+          "step": 5,
+          "contract": "Restore the PostgreSQL custom dump with single-transaction semantics."
+        },
+        {
+          "step": 6,
+          "contract": "Restore objects into a staging tree and publish only after complete verification."
+        },
+        {
+          "step": 7,
+          "contract": "Reapply completed deletion ledger/tombstones and verify model/config signature and API compatibility."
+        },
+        {
+          "step": 8,
+          "contract": "Validate DB references, object bytes/hash, missing/orphan, rows/SRID and run synthetic restricted-read smoke."
+        },
+        {
+          "step": 9,
+          "contract": "Record actual RPO/RTO, loss and manual actions in a signed receipt; require separate approval before any traffic transition."
+        }
+      ],
+      "candidate_tool_boundary": {
+        "backup_tool": "scripts/backup_walksafe_data_20260711.sh",
+        "restore_tool": "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "restore_target": "empty isolated test/drill DB and new upload root only",
+        "backup_instance_count": 0,
+        "restore_execution_count": 0,
+        "execution_status": "ACTUAL_BACKUP_RESTORE_PRUNE_NOT_RUN",
+        "interpretation": "Tool structure is not backup availability or restore success evidence.",
+        "prune_tool": "scripts/prune_walksafe_backups_20260711.py",
+        "prune_35_day_policy_conformance": "INTERNAL_IMPLEMENTED_UNIT_VERIFIED_5_PASS"
+      },
+      "recovery_objectives": {
+        "actual_rto_seconds": null,
+        "actual_rpo_seconds": null,
+        "actual_status": "NOT_RUN",
+        "provisional_tier_count": 3,
+        "provisional_status": "NOT_APPROVED",
+        "zero_downtime_or_zero_loss_claim_allowed": false
+      },
+      "unresolved": [
+        {
+          "gap_id": "DES25-GAP-01",
+          "status": "INTERNAL_GAP",
+          "item": "Service-tier RTO/RPO and backup frequency",
+          "owner_roles": [
+            "운영책임자",
+            "제품책임자",
+            "QA책임자"
+          ],
+          "due_event": "After business impact analysis and measured restore drill",
+          "target_wave": "W8",
+          "closure_condition": "T0/T1/T2 provisional frequency, RPO and RTO are measured in isolated drills and explicitly approved or revised.",
+          "evidence_required": [
+            "W8 tier drill receipts",
+            "RPO/RTO decision receipt"
+          ]
+        },
+        {
+          "gap_id": "DES25-GAP-02",
+          "status": "INTERNAL_GAP",
+          "item": "Actual signed backup, isolated restore receipt, deletion replay and failover proof",
+          "owner_roles": [
+            "운영책임자",
+            "보안·개인정보책임자"
+          ],
+          "due_event": "Before GATE-SINGLE-ADMIN-RECOVERY-DRILL and release recovery review",
+          "target_wave": "W8",
+          "closure_condition": "A signed bundle containing DB/object/model-config/deletion ledger/key-version is restored with the nine-step contract.",
+          "evidence_required": [
+            "W8 backup manifest",
+            "signed restore receipt",
+            "deletion replay evidence"
+          ]
+        },
+        {
+          "gap_id": "DES25-GAP-03",
+          "status": "INTERNAL_GAP",
+          "item": "Approved alternate environment, credentials, network and storage capacity",
+          "owner_roles": [
+            "운영책임자",
+            "프로젝트책임자"
+          ],
+          "due_event": "Before disaster-recovery activation",
+          "target_wave": "W8",
+          "closure_condition": "Identity-separated alternate environment capacity and traffic-transition authority are approved and drilled.",
+          "evidence_required": [
+            "W8 isolated environment manifest",
+            "traffic approval record",
+            "failover drill receipt"
+          ]
+        },
+        {
+          "gap_id": "DES25-GAP-04",
+          "status": "CLOSED_INTERNAL",
+          "item": "Bind the backup prune execution path to the approved 35-day retention policy instead of the current 30-day CLI default",
+          "owner_roles": [
+            "운영책임자",
+            "기술책임자"
+          ],
+          "due_event": "Before backup rotation or recovery readiness can be claimed",
+          "target_wave": "W2",
+          "closure_condition": "CLI default equals 35 days and strict boundary/default/dry-run/high-risk tests pass.",
+          "evidence_required": [
+            "scripts/prune_walksafe_backups_20260711.py",
+            "tests/test_walksafe_backup_prune.py",
+            "W2-OPS-TEST-BACKUP-PRUNE"
+          ]
+        }
+      ],
+      "disposition": "PRUNE_FIXED_PROVISIONAL_RECOVERY_REQUIRES_DRILL_W8",
+      "provisional_recovery_tiers": [
+        {
+          "tier_id": "T0_CONTROL",
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W8",
+          "assets": [
+            "model/config registry",
+            "approved configuration",
+            "key-version and recovery metadata",
+            "administrator recovery material"
+          ],
+          "frequency": "change-event bundle plus daily presence/signature verification",
+          "rpo_hours_max": 1,
+          "rto_hours_max": 2,
+          "measurement_environment": "isolated recovery environment with exact control-plane version set",
+          "measurement_method": "Trigger a controlled change, select restore point, rebuild and verify signatures/config compatibility, then record elapsed time and loss",
+          "owner_roles": [
+            "보안·개인정보책임자",
+            "기술책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "tier_id": "T1_DB",
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W8",
+          "assets": [
+            "account",
+            "consent",
+            "report",
+            "audit",
+            "completed deletion receipt PostgreSQL data"
+          ],
+          "frequency": "daily full plus immediately before destructive action",
+          "rpo_hours_max": 24,
+          "rto_hours_max": 4,
+          "measurement_environment": "isolated PostGIS target with prototype DB <=10 GiB",
+          "measurement_method": "Restore custom dump in one transaction, validate migration head/SRID/count/digest and measure source point to acceptance",
+          "owner_roles": [
+            "운영책임자",
+            "Backend책임자",
+            "QA책임자"
+          ]
+        },
+        {
+          "tier_id": "T2_OBJECT",
+          "status": "PROVISIONAL_ENGINEERING_BUDGET",
+          "approval_status": "NOT_APPROVED",
+          "execution_status": "NOT_RUN",
+          "target_wave": "W8",
+          "assets": [
+            "report images",
+            "original objects up to approved 300 GiB envelope"
+          ],
+          "frequency": "daily change bundle plus weekly full plus immediately before destructive action",
+          "rpo_hours_max": 24,
+          "rto_hours_max": 12,
+          "measurement_environment": "isolated object restore; W8 reduced sample measured separately from 300 GiB transfer-rate extrapolation",
+          "measurement_method": "Restore staged objects, verify count/bytes/hash/missing/orphan and distinguish measured duration from extrapolated envelope",
+          "owner_roles": [
+            "운영책임자",
+            "데이터책임자",
+            "QA책임자"
+          ]
+        }
+      ],
+      "bundle_contract": {
+        "status": "PROVISIONAL_W8_CONTRACT_NOT_FULLY_IMPLEMENTED",
+        "required": [
+          "single backup_bundle_id",
+          "quiesce/lock time",
+          "DB payload",
+          "object payload",
+          "model/config payload",
+          "completed deletion ledger/tombstones",
+          "encryption key version",
+          "per-payload OpenPGP encryption",
+          "canonical manifest",
+          "SHA-256 digests and count/bytes",
+          "detached trusted-signer signature",
+          "signed restore receipt with actual RPO/RTO/loss/manual actions"
+        ],
+        "currently_verified": [
+          "DB and uploads same-snapshot boundary candidate",
+          "OpenPGP payload encryption",
+          "SHA-256 manifest/digest",
+          "detached signature",
+          "35-day prune default and minimum 3 copies"
+        ],
+        "actual_restore_status": "NOT_RUN"
+      }
+    },
+    {
+      "artifact_type_id": "DLV-DES-27",
+      "display_code": "DES-27",
+      "title": "외부 서비스 장애·대체 경로 설계",
+      "successor_status": "DEPENDENCY_FAIL_SAFE_MATRIX_CAPTURED_SLA_AND_FAULT_VALIDATION_UNRESOLVED",
+      "approval_status_change_claimed": false,
+      "dependency_contracts": [
+        {
+          "dependency": "TMAP POI and pedestrian route",
+          "detection": [
+            "configured readiness",
+            "HTTP/status/schema validation",
+            "whole-request 4-second default timeout"
+          ],
+          "supplier_sla": null,
+          "quota": null,
+          "fallback": "Retain only a still-current validated route in its limited validity context or pause route guidance.",
+          "prohibited": [
+            "invent a new route",
+            "straight-line substitute",
+            "automatic provider switch",
+            "automatic recall after deviation"
+          ],
+          "retry_and_resync": "Retry only after explicit current request/selection; store a new validated route version.",
+          "validation_status": "IMPLEMENTED_PARTIAL_FORMAL_AND_FAULT_TEST_NOT_RUN"
+        },
+        {
+          "dependency": "GPS/ARCore metric depth and device sensors",
+          "detection": [
+            "freshness",
+            "accuracy",
+            "tracking",
+            "metric-depth preflight"
+          ],
+          "timeout": "metric-depth preflight 10 seconds; other supplier SLA not applicable/unresolved",
+          "fallback": "Use only the declared limited capability tier or stop metric/turn/local steering outputs.",
+          "prohibited": [
+            "derive trusted distance from unknown depth",
+            "reuse stale pose/location"
+          ],
+          "retry_and_resync": "Re-run current capability and freshness gates; never silently resume a prior walk.",
+          "validation_status": "INTERNAL_TESTS_ONLY_ACTUAL_DEVICE_NOT_RUN"
+        },
+        {
+          "dependency": "Android STT/TTS",
+          "detection": [
+            "engine availability",
+            "initialization/language result",
+            "completion callback",
+            "audio focus"
+          ],
+          "timeout": null,
+          "fallback": "TalkBack interaction, bounded screen/help surfaces and policy-allowed haptic cues; safety-critical channel loss can stop dependent outputs.",
+          "prohibited": [
+            "treat silent failure as success",
+            "let dialogue delay a higher-priority risk warning"
+          ],
+          "retry_and_resync": "Recheck engine and require an explicit safe resume path.",
+          "validation_status": "JVM_INTERNAL_ONLY_DEVICE_AUDIO_TEST_NOT_RUN"
+        },
+        {
+          "dependency": "LiteRT/model asset",
+          "detection": [
+            "load/invoke result",
+            "three consecutive runtime failures by default",
+            "model/config identity"
+          ],
+          "timeout": "backend warmed inference 2 seconds default and startup 30 seconds default; Android device SLA unresolved",
+          "fallback": "Load a verified legacy known-good only when available; otherwise disable detection.",
+          "prohibited": [
+            "fake detection",
+            "unverified model substitution"
+          ],
+          "retry_and_resync": "Reset failure count only after success; revalidate model/config generation.",
+          "validation_status": "INTERNAL_COMPONENT_EVIDENCE_DEVICE_FIELD_NOT_RUN"
+        },
+        {
+          "dependency": "Android gateway/backend",
+          "detection": [
+            "readiness",
+            "TLS/HTTP status",
+            "15-second gateway upstream timeout",
+            "bounded error envelope"
+          ],
+          "fallback": "Keep independent on-device detection/risk/TTS functions where their own gates remain valid and queue server-bound work.",
+          "prohibited": [
+            "make real-time safety depend on a server round trip",
+            "claim queued data as uploaded"
+          ],
+          "retry_and_resync": "On connectivity, revalidate session/consent/network/capacity version and retransmit by stable identity/idempotency contract.",
+          "validation_status": "INTERNAL_INTEGRATION_ONLY_DEPLOYMENT_FAILOVER_NOT_RUN"
+        },
+        {
+          "dependency": "object storage",
+          "detection": [
+            "permission/status",
+            "capacity state",
+            "object receipt and digest"
+          ],
+          "supplier_sla": null,
+          "quota": null,
+          "fallback": "Keep an eligible item in the bounded phone queue for at most the policy window; hold new material under capacity policy.",
+          "prohibited": [
+            "mark complete from DB metadata alone",
+            "delete unexpired originals for cost"
+          ],
+          "retry_and_resync": "Completion only after full object receipt/digest; reconcile by stable ID after recovery.",
+          "validation_status": "TARGET_GCS_NOT_PROVISIONED_ACTUAL_STORAGE_TEST_NOT_RUN"
+        },
+        {
+          "dependency": "network transport",
+          "detection": [
+            "OFFLINE/WIFI/CELLULAR/OTHER",
+            "walking versus stationary evidence"
+          ],
+          "fallback": "Block original upload while walking; stationary Wi-Fi is allowed, stationary cellular requires explicit opt-in, otherwise wait/fail closed.",
+          "prohibited": [
+            "upload original activity data while walking",
+            "treat unknown transport or motion as stationary"
+          ],
+          "retry_and_resync": "Re-evaluate motion, consent and the actual selected network immediately before transfer; cancel if movement resumes.",
+          "validation_status": "UNIT_INTERNAL_ONLY_ACTUAL_NETWORK_DEVICE_TEST_NOT_RUN",
+          "report_upload_retry_contract": {
+            "initial_backoff_seconds": 2,
+            "maximum_exponential_backoff_seconds": 30,
+            "http_429_delay_seconds": 30,
+            "http_401_403_422_delay_seconds": 60,
+            "server_retry_after_max_seconds": 300,
+            "status": "IMPLEMENTED_BOUNDED_CLIENT_POLICY",
+            "verification_boundary": "Actual fault injection and actual network/device testing remain NOT_RUN."
+          }
+        },
+        {
+          "dependency": "authentication/admin recovery",
+          "detection": [
+            "session/actor binding",
+            "expiry",
+            "stable recovery errors",
+            "bounded Retry-After"
+          ],
+          "fallback": "Block protected server/admin operations while preserving independent local safety behavior when otherwise eligible.",
+          "prohibited": [
+            "reuse stale actor/session",
+            "bypass high-risk recovery controls"
+          ],
+          "retry_and_resync": "Reauthenticate or follow the explicit recovery action; revalidate actor and high-risk state before commit.",
+          "validation_status": "INTERNAL_TESTS_ONLY_EXTERNAL_IDENTITY_AND_FIELD_RECOVERY_NOT_RUN"
+        }
+      ],
+      "global_recovery_rule": "After any dependency recovers, re-check current permission, consent, capability, route, safety and user-confirmation state. Do not automatically resume a previous walk or route.",
+      "unresolved": [
+        {
+          "gap_id": "DES27-GAP-01",
+          "status": "INTERNAL_GAP",
+          "item": "Supplier SLA, quota, cache TTL and approved retry/backoff for TMAP and GCS",
+          "owner_roles": [
+            "제품책임자",
+            "운영책임자",
+            "보안·개인정보책임자"
+          ],
+          "due_event": "After contracts, legal review and provider quotas are confirmed",
+          "target_wave": "W3",
+          "closure_condition": "TMAP/GCS supplier limits and every dependency retry/backoff/circuit rule are implemented without unsafe substitution.",
+          "evidence_required": [
+            "W3 supplier/dependency matrix",
+            "bounded retry tests"
+          ]
+        },
+        {
+          "gap_id": "DES27-GAP-02",
+          "status": "INTERNAL_GAP",
+          "item": "Cross-boundary adminapp/gateway/backend outage telemetry and user-message verification",
+          "owner_roles": [
+            "기술책임자",
+            "QA책임자",
+            "접근성·안전책임자"
+          ],
+          "due_event": "Before TST-16 formal execution",
+          "target_wave": "W5",
+          "closure_condition": "Cross-boundary admin/gateway/backend outage messages and telemetry pass security and accessibility review.",
+          "evidence_required": [
+            "W5 outage threat review",
+            "message/accessibility test receipt"
+          ]
+        },
+        {
+          "gap_id": "DES27-GAP-03",
+          "status": "INTERNAL_GAP",
+          "item": "Actual offline, timeout, quota, fault injection, recovery and re-synchronization evidence",
+          "owner_roles": [
+            "QA책임자",
+            "운영책임자"
+          ],
+          "due_event": "Before external-service release gate closure",
+          "target_wave": "W3",
+          "closure_condition": "Offline, timeout, quota and re-synchronization internal fault scenarios pass while external/device execution remains separately gated.",
+          "evidence_required": [
+            "W3 fault scenario receipt",
+            "idempotent re-sync evidence"
+          ]
+        }
+      ],
+      "disposition": "REMEDIATE_DEPENDENCY_CONTRACT_W3_AND_SECURITY_W5"
+    }
+  ],
+  "source_bindings": [
+    {
+      "source_id": "SRC-W2-OPS-01",
+      "path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "sha256": "acd97ac8c0c77dcb745812754f9d1e2dbd63e31c7f16aca0e214531146cf2362",
+      "source_commit": null,
+      "claim": "DES-22/23/24/25/27 predecessor content, fail-safe matrix, capacity and recovery boundaries"
+    },
+    {
+      "source_id": "SRC-W2-OPS-02",
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+      "source_commit": null,
+      "claim": "exact artifact definitions, required contents, lifecycle and approval state"
+    },
+    {
+      "source_id": "SRC-W2-OPS-03",
+      "path": "docs/control/execution/artifact-audits/20260726/technical-audit.json",
+      "sha256": "daa9d258d9baea8cac9e82b65927b805b805b0dc4977aaa040098500886af856",
+      "source_commit": null,
+      "claim": "W2 predecessor INTERNAL_GAP classifications and remediation reasons"
+    },
+    {
+      "source_id": "SRC-W2-OPS-04",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+      "sha256": "615f35910cb1fffab6284aee456e562e6d21e75671f225bd9f06868ad0785dce",
+      "source_commit": null,
+      "claim": "formal 279 NOT_RUN and exact five unwaived gate boundary"
+    },
+    {
+      "source_id": "SRC-W2-OPS-05",
+      "path": "docs/backend/backend_error_contract.md",
+      "sha256": "b7abbe200dc9de3b1e9f49a1666074faeee6b49c4551f885b44de12b04f0987b",
+      "source_commit": null,
+      "claim": "backend public error envelope and client action contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-06",
+      "path": "docs/backend/backend_environment.md",
+      "sha256": "8bf8343ab48c8a852ef251cffc729775647ec4907a83dbda575eb5f7c0ca429c",
+      "source_commit": null,
+      "claim": "DB, inference and TMAP implementation timeout defaults and readiness boundary"
+    },
+    {
+      "source_id": "SRC-W2-OPS-07",
+      "path": "docs/backend/api_reference.md",
+      "sha256": "646e08179dea63a647e209ea2e37e32a205c45dd0e395ee95b2c09e7583d47af",
+      "source_commit": null,
+      "claim": "TMAP/detect/report HTTP status and stable error-code contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-08",
+      "path": "docs/operations/data_retention_policy.md",
+      "sha256": "dfddcf8d2e3d2379d1cf1e1f8fcab7fc4dc4b03dffaef40a567a6fb12f72e82b",
+      "source_commit": null,
+      "claim": "report, capture, export retention and guarded destructive-operation boundary"
+    },
+    {
+      "source_id": "SRC-W2-OPS-09",
+      "path": "docs/operations/report_operations.md",
+      "sha256": "cb8ddbe6029944acf84778cb859f4f26e66a5e1f2cfca2f32c647a0727fcd080",
+      "source_commit": null,
+      "claim": "report success/failure/duplicate user feedback and partial-state rules"
+    },
+    {
+      "source_id": "SRC-W2-OPS-10",
+      "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+      "sha256": "87bc656f7644cbc0ac8eae4f9f2ee84a3176bfde4ea67f4631d258e1da2c2f72",
+      "source_commit": null,
+      "claim": "server capacity/cost policy, backup/restore execution counts and unresolved phone byte gate"
+    },
+    {
+      "source_id": "SRC-W2-OPS-11",
+      "path": "docs/deliverables/10-operations/recovery-plan.md",
+      "sha256": "81d4362c302220be5534fd5d1a90cb7873a1f77c4ad1309b45382dee1d19ebc5",
+      "source_commit": null,
+      "claim": "recovery order, isolated drill boundary and unresolved RTO/RPO"
+    },
+    {
+      "source_id": "SRC-W2-OPS-12",
+      "path": "docs/deliverables/06-testing/registers/metrics.json",
+      "sha256": "7ea5ebaa38d29448646873dc4b48c559b14c5a2b9b274e82868505058f39c476",
+      "source_commit": null,
+      "claim": "zero executed measurements and NOT_MEASURED quality state"
+    },
+    {
+      "source_id": "SRC-W2-OPS-13",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-09-server-capacity-resilience.md",
+      "sha256": "9ff9b42eae674cd748c9faf2643db27a0c33851868f5e6989b41eefeaafdc8fc",
+      "source_commit": null,
+      "claim": "300+300 GiB and 70/85/95/100 percent server capacity policy"
+    },
+    {
+      "source_id": "SRC-W2-OPS-14",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-11-release-operations-recovery-readiness.md",
+      "sha256": "d31f3046be826e164f73662fe94716715d8062914c0cba4a1f909c8057e5d876",
+      "source_commit": null,
+      "claim": "35-day backup, dashboard and recovery implementation-ready boundary"
+    },
+    {
+      "source_id": "SRC-W2-OPS-15",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflight.kt",
+      "sha256": "633f7ebb848ac99ad36cc42186b119f07f297c472378fc5ca8785eaa96d2c3f5",
+      "source_commit": null,
+      "claim": "metric-depth preflight reasons and bounded 10-second evidence window"
+    },
+    {
+      "source_id": "SRC-W2-OPS-16",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+      "sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+      "source_commit": null,
+      "claim": "OS-derived battery, storage and thermal admission signals without invented numeric thresholds"
+    },
+    {
+      "source_id": "SRC-W2-OPS-17",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/DetectorRuntimeSupervisor.kt",
+      "sha256": "3d299e4c0b3e3961ce4bf38ee1c38f1b03b4a67de4ef6696e4973e9fb086fd10",
+      "source_commit": null,
+      "claim": "three-consecutive-failure known-good fallback or detector disable contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-18",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+      "source_commit": null,
+      "claim": "walking upload prohibition, stationary/Wi-Fi/cellular admission and cancellation contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-19",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+      "sha256": "a44c232b7db2f07907261115b76d80145072abefe57a812679a40021e691faf3",
+      "source_commit": null,
+      "claim": "whole-response route validation and fail-closed partial-route rejection"
+    },
+    {
+      "source_id": "SRC-W2-OPS-20",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApiException.java",
+      "sha256": "7d73f3ad6edc3593eddfecf817d6bc181cd7d6bdb8031b65cea49e2779e27b97",
+      "source_commit": null,
+      "claim": "admin stable wire errors and bounded Retry-After parsing"
+    },
+    {
+      "source_id": "SRC-W2-OPS-21",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicy.java",
+      "sha256": "27a2e45431301319be1ebff7fe73a2da8ae0dd96fda9e74149b7915533ed5061",
+      "source_commit": null,
+      "claim": "admin recovery error-to-Korean-message and next-action mapping"
+    },
+    {
+      "source_id": "SRC-W2-OPS-22",
+      "path": "apps/android-gateway/src/backend.ts",
+      "sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81",
+      "source_commit": null,
+      "claim": "upstream timeout, upload concurrency/rate limit and bounded response-header forwarding"
+    },
+    {
+      "source_id": "SRC-W2-OPS-23",
+      "path": "apps/android-gateway/src/request-body.ts",
+      "sha256": "a99d24c7a4dadaf4a98cd2fe5ab5eab5b3a2c7042d93ff97ff9a9981206e4d73",
+      "source_commit": null,
+      "claim": "gateway request-body timeout and bounded body processing"
+    },
+    {
+      "source_id": "SRC-W2-OPS-24",
+      "path": "apps/android-gateway/src/privacy-rights.ts",
+      "sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+      "source_commit": null,
+      "claim": "per-scope partial completion/retry state and hash-chain ledger contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-25",
+      "path": "backend/app/config.py",
+      "sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f",
+      "source_commit": null,
+      "claim": "validated timeout and request-size implementation bounds"
+    },
+    {
+      "source_id": "SRC-W2-OPS-26",
+      "path": "backend/app/services/tmap_pedestrian.py",
+      "sha256": "369eaee6d42be77965e77734a5eb94572bbdd8d71836d90f6091cc402347cd06",
+      "source_commit": null,
+      "claim": "TMAP whole-deadline and provider error mapping"
+    },
+    {
+      "source_id": "SRC-W2-OPS-27",
+      "path": "backend/app/services/report_storage.py",
+      "sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+      "source_commit": null,
+      "claim": "bounded pending report journal and reconciliation lock"
+    },
+    {
+      "source_id": "SRC-W2-OPS-28",
+      "path": "backend/app/api/reports.py",
+      "sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+      "source_commit": null,
+      "claim": "report Retry-After, row bounds, redacted export and durable audit fields"
+    },
+    {
+      "source_id": "SRC-W2-OPS-29",
+      "path": "scripts/backup_walksafe_data_20260711.sh",
+      "sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+      "source_commit": null,
+      "claim": "quiesced OpenPGP backup bundle, manifest, hash and detached-signature candidate tool"
+    },
+    {
+      "source_id": "SRC-W2-OPS-30",
+      "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+      "source_commit": null,
+      "claim": "isolated empty-target restore, verification and signed receipt candidate tool"
+    },
+    {
+      "source_id": "SRC-W2-OPS-31",
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+      "source_commit": null,
+      "claim": "35-day CLI default, signed-set verification, minimum-copy dry-run and high-risk destructive gate"
+    },
+    {
+      "source_id": "SRC-W2-OPS-32",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+      "sha256": "3bf6116f5598839edc5e2348b3e54d891360ad03c9c6013fa73a9089a4d37d5d",
+      "source_commit": null,
+      "claim": "Android report connect/read and bounded retry/Retry-After implementation contract"
+    },
+    {
+      "source_id": "SRC-W2-OPS-33",
+      "path": "docs/deliverables/03-requirements/system-requirements.md",
+      "sha256": "efe0707df0cdbb63e6272602e52da76e00b20685fc83593a1504839f74481d6e",
+      "source_commit": null,
+      "claim": "approved 300+300 GiB, 70/85/95/100 percent and KRW 30,000 monthly storage policy values"
+    },
+    {
+      "source_id": "SRC-W2-OPS-34",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+      "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0",
+      "source_commit": null,
+      "claim": "admin telemetry schema, six event types, allowlist fields, internal UUID and bounded failure codes"
+    },
+    {
+      "source_id": "SRC-W2-OPS-35",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+      "sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+      "source_commit": null,
+      "claim": "admin authentication and recovery producer call sites with sink-failure isolation"
+    },
+    {
+      "source_id": "SRC-W2-OPS-36",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "sha256": "05031bec9bb2c048cc18bdd0d9986f6fe48d3b433ff78bf34fe342b0eb94b50f",
+      "source_commit": null,
+      "claim": "admin telemetry and controller unit test source, 11 cases"
+    },
+    {
+      "source_id": "SRC-W2-OPS-37",
+      "path": "apps/android/adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml",
+      "sha256": "da40358253c6b0471e8432928d4224f0f0772abef083a4dd26854b37a1cde749",
+      "source_commit": null,
+      "claim": "admin JUnit result: 11 tests, zero skipped/failures/errors"
+    },
+    {
+      "source_id": "SRC-W2-OPS-38",
+      "path": "apps/android-gateway/src/telemetry.ts",
+      "sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96",
+      "source_commit": null,
+      "claim": "gateway telemetry schema, two failure events, closed allowlist, internal UUID and stderr sink"
+    },
+    {
+      "source_id": "SRC-W2-OPS-39",
+      "path": "apps/android-gateway/src/routes.ts",
+      "sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+      "source_commit": null,
+      "claim": "gateway telemetry producer integration and sink-failure isolation at response boundary"
+    },
+    {
+      "source_id": "SRC-W2-OPS-40",
+      "path": "apps/android-gateway/test/telemetry.test.ts",
+      "sha256": "13f62070ed2f405df8b249d117f61fd43421cb3c1b48ace3e6f2f544b6750e4b",
+      "source_commit": null,
+      "claim": "gateway telemetry unit test source, 2 cases"
+    },
+    {
+      "source_id": "SRC-W2-OPS-41",
+      "path": "tests/test_walksafe_backup_prune.py",
+      "sha256": "8176b919a00caaed8c84a836c80b10ee07bc03bd0d3a94b8dfe11234301ccc0b",
+      "source_commit": null,
+      "claim": "35-day prune boundary/default/dry-run/high-risk denial regression source, 5 executed cases"
+    }
+  ],
+  "integrity": {
+    "artifact_type_count": 5,
+    "artifact_type_unique_count": 5,
+    "artifact_id_set_sha256": "f397725bf76f76536a6c833697e771977e1bf902180f4fd04d96e58c05a87ccb",
+    "source_binding_count": 41,
+    "source_path_sha256_set": "d89c3a9fde07b80d14729137110cc33fe9b71c8b085d8f1a27b33b01e541b35c",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), content_fingerprint.value=null, trailing LF",
+      "value": "445dc54d1113b13c33718df1077b10911f3143c30bd53017d9a8bb8f76d35f81"
+    }
+  },
+  "test_results": [
+    {
+      "test_id": "W2-OPS-TEST-ADMIN-TELEMETRY",
+      "scope": "admin telemetry/controller",
+      "command": "./gradlew :adminapp:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest",
+      "case_count": 11,
+      "passed": 11,
+      "failed": 0,
+      "errors": 0,
+      "status": "PASS",
+      "execution_provenance": "W2 telemetry implementation lane result; exact JUnit XML bound",
+      "source_paths": [
+        "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java"
+      ],
+      "result_path": "apps/android/adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml"
+    },
+    {
+      "test_id": "W2-OPS-TEST-GATEWAY-TELEMETRY",
+      "scope": "gateway telemetry",
+      "command": "node --test dist/test/telemetry.test.js",
+      "case_count": 2,
+      "passed": 2,
+      "failed": 0,
+      "errors": 0,
+      "status": "PASS",
+      "execution_provenance": "W2 telemetry implementation lane result; exact TypeScript test source bound",
+      "source_paths": [
+        "apps/android-gateway/test/telemetry.test.ts"
+      ],
+      "result_path": null
+    },
+    {
+      "test_id": "W2-OPS-TEST-BACKUP-PRUNE",
+      "scope": "35-day backup prune",
+      "command": "uv run --with pytest python -m pytest -q tests/test_walksafe_backup_prune.py",
+      "case_count": 5,
+      "passed": 5,
+      "failed": 0,
+      "errors": 0,
+      "status": "PASS",
+      "execution_provenance": "W2 backup-retention implementation lane result; exact pytest source bound",
+      "source_paths": [
+        "tests/test_walksafe_backup_prune.py"
+      ],
+      "result_path": null
+    }
+  ]
+}

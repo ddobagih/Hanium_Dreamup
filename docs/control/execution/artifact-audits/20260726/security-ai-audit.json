@@ -1,0 +1,543 @@
+{
+  "schema_version": "walksafe.artifact-current-state-audit.v1",
+  "audit_id": "WS-ARTIFACT-AUDIT-SEC-AIML-20260726-001",
+  "audited_on": "2026-07-26",
+  "scope_prefixes": [
+    "DLV-AIML-",
+    "DLV-SEC-"
+  ],
+  "summary": {
+    "OK": 4,
+    "INTERNAL_GAP": 26,
+    "EXTERNAL": 7,
+    "N/A_CANDIDATE": 8,
+    "total": 45
+  },
+  "items": [
+    {
+      "artifact_type_id": "DLV-AIML-01",
+      "classification": "EXTERNAL",
+      "priority": "P1",
+      "reason": "데이터 수명주기 계획은 있으나 출처 권리, 동의 원본, 책임 승인이 검증되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/data-source-register.json"
+      ],
+      "required_action": "출처별 권리와 동의 원본 ID, hash, 허용 범위, 책임 승인을 결속한다.",
+      "external_dependency": "데이터 제공자와 통제 저장소의 권리·동의 원본"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-02",
+      "classification": "EXTERNAL",
+      "priority": "P0",
+      "reason": "선언된 dataset manifest가 없고 version, content hash, split, 분포, 권리가 검증되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json"
+      ],
+      "required_action": "불변 dataset manifest를 복구하고 전체 content hash, 분포, split, 권리 상태를 승인한다.",
+      "external_dependency": "원 데이터와 제공자 권리 증거"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-03",
+      "classification": "EXTERNAL",
+      "priority": "P0",
+      "reason": "후보 source 6개 모두 제공자, URL, 취득일, license, 학습 허용, privacy 검토가 미확인이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/data-source-register.json"
+      ],
+      "required_action": "각 source의 원문 약관과 동의 증거를 수입해 허용·금지·철회 영향을 판정한다.",
+      "external_dependency": "제공자 약관, 라이선스, 동의 또는 기관 승인 원본"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-04",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "13-class schema는 Draft이고 runtime fallback의 3-class와 80-class 계약 및 migration 결속이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md",
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "required_action": "전체 runtime class schema, version, validator, 호환성과 migration 규칙을 한 기준선으로 고정한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-05",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "정식 데이터 품질 실행이 0건이며 누락, 손상, 중복, 분포, privacy 수치가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "고정 dataset hash를 대상으로 품질검사를 실행하고 원자료와 판정을 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-06",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "keep, fix, hold, drop 원칙은 있으나 blur, 노출, 해상도, class와 box 수치 기준이 미정이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md"
+      ],
+      "required_action": "정제 수치 기준과 사유 코드를 사전 동결하고 실제 결정 기록에 적용한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-07",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "텍스트 지침은 있으나 승인된 positive·negative 예시 세트와 애매 사례 결정 기록이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/data-management.md"
+      ],
+      "required_action": "비식별 class별 예시 세트와 질문·개정 기록을 승인 기준선으로 만든다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-08",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "gold set, 이중 라벨 표본, 일치도, 오류 집계와 재작업 결과가 모두 NOT_RUN이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "표본과 합격선을 동결한 뒤 독립 품질검사를 실행하고 재작업 evidence를 남긴다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-09",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "split manifest, 비율, seed, SHA-256, capture group 중복 검사 결과가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "sequence-safe train, validation, test manifest와 각 hash를 만들고 test split을 잠근다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-10",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "exact, perceptual, sequence, metadata 기반 누수 검사가 0건이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "AIML-09 split에 누수 검사를 실행하고 후보 pair, 판정, 재검사 결과를 보존한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-11",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "PT 모델과 metric은 존재하지만 학습 실행은 NOT_RUN으로 기록되어 commit, data, split, config, seed, 환경 결속이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json",
+        "model/train_yolo.py",
+        "configs/walksafe_unified_epoch270_field_20260711.json"
+      ],
+      "required_action": "후보 모델의 학습 provenance를 복구하거나 승인 입력으로 재학습해 단일 실행 record를 만든다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-12",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "formal experiment가 0건이고 후보 metric과 checkpoint가 experiment ID에 연결되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/experiment-register.json"
+      ],
+      "required_action": "실험 질문, 입력 hash, 환경, metric 원자료, checkpoint hash와 결론을 append-only로 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-13",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "unified 후보와 fallback 모델이 함께 존재하지만 동일 dataset·protocol 비교실험은 0건이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "required_action": "고정 test split에서 후보와 fallback을 비교해 class별 metric, 자원, 퇴행과 선정 판정을 남긴다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-14",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "모델 등록부는 unified 후보 1개만 포함하고 실제 runtime의 custom tactile과 COCO fallback을 누락한다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "required_action": "runtime이 참조하는 세 모델 전부의 ID, stage, hash, 입출력, 평가와 대체 관계를 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-15",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "unified 후보 card만 있고 fallback 모델, 승인 평가 ID, threshold와 강건성 결과가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-development.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json"
+      ],
+      "required_action": "전체 runtime 모델과 AIML-18·20·23 승인 결과를 결속한 model card를 작성한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-16",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "unified PT·TFLite hash는 일치하지만 fallback 두 파일, semantic version, 변환 실행과 동등성 결속이 등록부에 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite"
+      ],
+      "required_action": "모든 runtime artifact의 version, format, 크기, hash, source, 변환 도구와 배포 상태를 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-17",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "평가 절차는 있으나 test split hash, numeric grid, 합격선과 TFLite 허용오차가 동결되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "결과 열람 전에 대상 model·split hash, metric grid, 안전 합격선과 허용오차를 승인한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-18",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P2",
+      "reason": "명명된 후보의 독립 평가가 완료되지 않아 현재 activation condition 전이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "모델 승격 평가를 시작할 때 ACTIVE로 전환하고 전체·class별 원지표와 판정을 생성한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-19",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P2",
+      "reason": "AIML-18의 정식 FP·FN 표본이 없어 현재 분석 대상을 활성화할 수 없다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "AIML-18 완료 또는 중대 현장 결함 발생 시 ACTIVE로 전환해 오류 taxonomy와 안전 조치를 기록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-20",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P1",
+      "reason": "정식 모델 승격이나 사용자·환경 범위 확대가 아직 승인되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "승격 또는 범위 확대 전에 ACTIVE로 전환하고 조건별 강건성·안전 평가를 실행한다.",
+      "external_dependency": "대표 기기·환경 표본과 독립 안전·편향 검토자"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-21",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "source PT와 Android TFLite hash는 있으나 동일 corpus의 output, box, score 비교가 NOT_RUN이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "required_action": "고정 corpus에서 PT와 TFLite를 비교하고 허용오차, 불일치, 변환 도구와 판정을 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-22",
+      "classification": "EXTERNAL",
+      "priority": "P0",
+      "reason": "지원 Android 기기에서 latency, FPS, memory, battery, thermal 측정이 0건이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "APK·model·config hash와 기기 조건을 고정해 반복 성능시험과 지원 판정을 남긴다.",
+      "external_dependency": "지원 후보 Android 실기기와 통제된 전원·온도 시험환경"
+    },
+    {
+      "artifact_type_id": "DLV-AIML-23",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "0.15~0.35 후보 threshold가 runtime에 있으나 sweep, curve, FP·FN 비용과 승인 근거가 없다.",
+      "evidence_paths": [
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "docs/deliverables/08-ai-ml-data/registers/evaluation-evidence-register.json"
+      ],
+      "required_action": "사전 grid와 class·거리별 안전 비용으로 threshold를 평가하고 config hash에 결속한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-24",
+      "classification": "OK",
+      "priority": "P4",
+      "reason": "promotion gate, release generation, canary, rollback trigger와 안전정지 경계가 구체적으로 정의되어 있다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-operations.md"
+      ],
+      "required_action": "모델 교체 시 계획에 따라 실행 receipt와 registry 상태를 갱신한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-25",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P3",
+      "reason": "모델이 공유 시험·운영 트래픽에 사용되지 않아 monitoring baseline이 아직 활성화되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-operations.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-operations-register.json"
+      ],
+      "required_action": "공유 시험 또는 운영 시작 전에 ACTIVE로 전환해 privacy-safe baseline과 alert threshold를 승인한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-AIML-26",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P3",
+      "reason": "재학습 trigger 또는 정기 재검토 시점이 발생하지 않았고 formal request가 0건이다.",
+      "evidence_paths": [
+        "docs/deliverables/08-ai-ml-data/model-operations.md",
+        "docs/deliverables/08-ai-ml-data/registers/model-operations-register.json"
+      ],
+      "required_action": "trigger 발생 시 ACTIVE로 전환하고 data 승인부터 배포·rollback까지 재승인한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-01",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "계획 골격은 있으나 exact source·build 기준선, 교육·역할 분리 증거와 실제 scan 연결이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "docs/deliverables/00-control/artifact-register.json"
+      ],
+      "required_action": "현재 source generation, 역할·교육, scan 도구와 SLA, release gate를 실행 가능한 기준선으로 결속한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-02",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "자산·위협 표는 있으나 공격자 taxonomy, DFD, 위협별 가능성·영향·잔여위험 결속이 부족하다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "docs/deliverables/07-security/registers/security-risks.json"
+      ],
+      "required_action": "현재 시스템 DFD와 trust boundary를 작성하고 공격 시나리오별 위험도·통제·검증을 연결한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-03",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "6개 OPEN 위험은 있으나 공격경로, 조치기한, 현재 노출과 처리결정 필드가 불충분하다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-risks.json"
+      ],
+      "required_action": "각 위험에 원인·공격경로·due date·현재노출·잔여위험·처리결정을 추가한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-04",
+      "classification": "EXTERNAL",
+      "priority": "P0",
+      "reason": "검토 절차만 존재하고 실제 기준선, 독립 참여자, finding, 재검토와 승인이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md"
+      ],
+      "required_action": "현재 코드·설계 generation을 고정해 독립 보안 설계검토와 finding 재검증을 완료한다.",
+      "external_dependency": "개발 작성자와 독립된 보안 검토자"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-05",
+      "classification": "EXTERNAL",
+      "priority": "P0",
+      "reason": "DPIA 초안은 있으나 독립 개인정보 검토와 법률 적합성 확인이 NOT_RUN이다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md"
+      ],
+      "required_action": "처리별 필요성·비례성·잔여위험을 독립 검토하고 법률 의무와 승인 결과를 기록한다.",
+      "external_dependency": "개인정보·법률 검토자와 적용 법규 판단"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-06",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "동의 ledger 구현은 있으나 처리별 법적 근거, 정확한 고지 화면·버전, 제3자 제공과 재동의 증거가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "apps/android-gateway/src/integrated-consent.ts"
+      ],
+      "required_action": "실제 UI 문구·버전·receipt와 처리별 법적 근거, 제공·철회·재동의 조건을 결속한다.",
+      "external_dependency": "법적 근거와 고지 적합성 검토"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-07",
+      "classification": "OK",
+      "priority": "P4",
+      "reason": "데이터별 보존기한·삭제 SLA가 문서화되고 삭제 ledger가 항목별 기한과 상태를 구현한다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "apps/android-gateway/src/privacy-rights.ts"
+      ],
+      "required_action": "운영 활성화 시 외부 저장소와 백업 삭제 receipt를 연결한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-08",
+      "classification": "OK",
+      "priority": "P4",
+      "reason": "사용자·관리자 역할 분리, TOTP, actor assertion, rate limit과 배포환경 fail-closed가 구현되어 있다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "backend/app/config.py",
+        "backend/app/field_test_security.py",
+        "backend/app/api/admin_security.py"
+      ],
+      "required_action": "권한 변경 시 matrix와 감사 연결을 갱신하고 복구훈련 evidence를 별도로 남긴다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-09",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "secret 길이·분리·TOTP 검증은 있으나 secret별 owner, 저장·주입 inventory, rotation, expiry, 유출 대응 증거가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "backend/app/config.py"
+      ],
+      "required_action": "비밀정보 inventory와 발급·회전·만료·폐기·유출 대응 및 scan evidence를 작성한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-10",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "SAST 실행이 0건이며 tool, version, ruleset, commit, finding과 report hash가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-verification-evidence.json"
+      ],
+      "required_action": "이름 붙인 source commit에 SAST를 실행해 finding, 조치, 재검증과 report hash를 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-11",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "SCA 실행이 0건이며 SBOM, 취약점 DB 시점, CVE reachability와 재검사 판정이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-verification-evidence.json"
+      ],
+      "required_action": "release lock·SBOM에 SCA를 실행하고 CVE별 도달성·완화·예외·재검사를 기록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-12",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "secret scan 실행이 0건이며 history 범위와 폐기·회전·영향조사 증거가 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-verification-evidence.json"
+      ],
+      "required_action": "release source와 전체 history에 secret scan을 실행해 실제 비밀 판정과 대응을 등록한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-13",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P2",
+      "reason": "승인된 원격 staging API, 관리자 접점과 test account가 없어 activation이 미확정이다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-verification-evidence.json"
+      ],
+      "required_action": "원격 시험환경 승인 시 ACTIVE로 전환해 endpoint coverage와 DAST 결과를 생성한다.",
+      "external_dependency": "격리된 원격 staging 환경과 시험 계정"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-14",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P2",
+      "reason": "이름 붙인 release candidate와 독립 침투시험 범위·시험자가 아직 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-verification-evidence.json"
+      ],
+      "required_action": "독립 침투시험이 release gate로 승인되면 ACTIVE로 전환하고 외부 원본 ID·hash와 retest를 수입한다.",
+      "external_dependency": "권한 있는 독립 침투시험자, 계약·범위 승인, 외부 보고서 원본"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-15",
+      "classification": "INTERNAL_GAP",
+      "priority": "P0",
+      "reason": "취약점 원장은 비어 있고 opened_at, source evidence baseline과 실제 finding이 없어 0건을 증명하지 못한다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/vulnerabilities.json"
+      ],
+      "required_action": "원장 개설 기준선과 opened_at을 고정하고 SEC-10~14 finding을 source evidence ID로 수입한다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-16",
+      "classification": "OK",
+      "priority": "P4",
+      "reason": "승인 예외 0건을 명시하고 필수 필드, 만료, 철회와 무자동연장 schema를 갖췄다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/registers/security-exceptions.json"
+      ],
+      "required_action": "예외 제안 시 대안 검토, 보상통제, 승인자, 만료와 종료조건을 모두 채운다.",
+      "external_dependency": null
+    },
+    {
+      "artifact_type_id": "DLV-SEC-17",
+      "classification": "EXTERNAL",
+      "priority": "P1",
+      "reason": "대응 절차와 등급은 있으나 실제 연락망, 당직, 기관별 통지기한과 훈련 결과가 미확정이다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-response-and-monitoring.md"
+      ],
+      "required_action": "연락·지휘 체계와 적용 통지기한을 승인하고 tabletop 또는 복구훈련 receipt를 남긴다.",
+      "external_dependency": "운영 연락망, 관할 법률·기관 의무, 실제 훈련 참여자"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-18",
+      "classification": "N/A_CANDIDATE",
+      "priority": "P3",
+      "reason": "외부 공개 서비스와 취약점 신고 채널이 아직 활성화되지 않았다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-response-and-monitoring.md"
+      ],
+      "required_action": "공개 베타 전에 ACTIVE로 전환해 실제 채널, safe harbor, SLA와 공개 조율 정책을 승인한다.",
+      "external_dependency": "공개 신고 채널 운영자와 safe harbor 법률 검토"
+    },
+    {
+      "artifact_type_id": "DLV-SEC-19",
+      "classification": "INTERNAL_GAP",
+      "priority": "P1",
+      "reason": "일부 append-only audit는 구현됐지만 전체 감사 범위, 탐지 임계값, alert 조사절차와 로그 보존기간이 없다.",
+      "evidence_paths": [
+        "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "backend/alembic/versions/202607110004_append_only_audit_tables.py"
+      ],
+      "required_action": "민감 행위 전체의 event schema, 보존기간, 탐지 rule·threshold, alert 조사와 운영 검증을 결속한다.",
+      "external_dependency": null
+    }
+  ]
+}

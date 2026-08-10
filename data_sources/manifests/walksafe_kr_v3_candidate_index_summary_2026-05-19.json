@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-05-19 KST",
+  "source_manifests": [
+    "walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+    "walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv"
+  ],
+  "output_csv": "data_sources/manifests/walksafe_kr_v3_candidate_index_2026-05-19.csv",
+  "rows_total": 61,
+  "rows_by_source_manifest": {
+    "walksafe_kr_v3_curation_manifest_2026-05-18.csv": 40,
+    "walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv": 21
+  },
+  "rows_by_policy_decision": {
+    "include_as_hard_negative": 33,
+    "include_after_box_review": 12,
+    "hold_until_min_box_policy_review": 9,
+    "include_with_small_object_augmentation": 3,
+    "include_as_hard_negative_and_prioritize_threshold_augmentation_review": 4
+  },
+  "rows_by_privacy_status": {
+    "no_face_or_license_plate_visible_in_contact_sheet; keep local-only until source privacy audit": 40,
+    "no_face_or_license_plate_visible_in_review_sheet; keep local-only until source privacy audit": 21
+  },
+  "training_gate": "Do not train until hold_until_min_box_policy_review rows are resolved and privacy/location audit is complete."
+}

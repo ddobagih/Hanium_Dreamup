@@ -1,0 +1,457 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "WS-WALKSAFE-COMPLETION-PLAN-REBASELINE-20260729-R001",
+  "version": "1.0.0",
+  "prepared_on": "2026-07-29",
+  "status": "PLAN_REVIEWED_NOT_ACTIVATED",
+  "plan_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001.md",
+  "predecessor_plan_paths": [
+    "plans/features/2026-07-26_artifact_completion_execution_plan.md",
+    "docs/control/execution/artifact-audits/20260727/final-257/remaining-work-execution-plan.md"
+  ],
+  "predecessor_plan_bindings": [
+    {
+      "path": "plans/features/2026-07-26_artifact_completion_execution_plan.md",
+      "file_sha256": "3b0c75d5338116dd9026b3a70f4c6121041c8b1fc666a3b31df0c661dc042cf8",
+      "bytes": 10856
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/remaining-work-execution-plan.md",
+      "file_sha256": "0af0aa016a7952d1561c8ae97d2a46f8c9594f8c8b1e499710cbada9a568f873",
+      "bytes": 46814
+    }
+  ],
+  "plan_output_paths": [
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001.md",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/plan-manifest.json",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/planning-defect-register.json",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/gap-reassessment-candidates.json",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/gap-evidence-bindings.json",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/historical-replay-baseline-binding.json",
+    "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/plan-output-bindings.json",
+    "docs/control/execution/artifact-audits/20260727/final-257/remaining-work-execution-plan-r004-plan-only-successor.md",
+    "docs/control/execution/artifact-closure/run-20260727-001/CONTINUATION-PLAN-HANDOFF-20260729-R002.md"
+  ],
+  "detached_output_binding_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/plan-output-bindings.json",
+  "independent_review": {
+    "status": "COMPLETE_FINDINGS_ZERO",
+    "receipt_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/independent-plan-review-r001.md",
+    "receipt_is_post_package_trust_anchor": true,
+    "review_tracks": [
+      "SEMANTIC_CONTRACT",
+      "PHYSICAL_EXACTNESS"
+    ],
+    "blocking_findings": 0,
+    "major_findings": 0,
+    "minor_findings": 0,
+    "execution_credit": 0
+  },
+  "source_bindings": [
+    {
+      "role": "CONTINUATION_CHECKPOINT",
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "file_sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+      "bytes": 1329415
+    },
+    {
+      "role": "STATIC_PLAN_V2_4",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/static-plan-manifest-v2.4.0.json",
+      "file_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+      "bytes": 39534
+    },
+    {
+      "role": "IMPLEMENTATION_GAP_R021",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "file_sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+      "bytes": 488160
+    },
+    {
+      "role": "IMPLEMENTATION_BACKLOG_R021",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "file_sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+      "bytes": 59266
+    },
+    {
+      "role": "EXACT257_LEDGER_R011",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r011/phase1-exact257-successor-ledger-r011.json",
+      "file_sha256": "7fc4bd6f2242b17de75faa040e42b4744c972a492f87ff4365caaeae53f93368",
+      "bytes": 2637012
+    },
+    {
+      "role": "EXACT257_INDEPENDENT_REVIEW_R011",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-independent-review-r011.md",
+      "file_sha256": "3bf2d1d107db482ab63601f25ade3805536aaa242070d888823bfa271e9a4e5f",
+      "bytes": 11686
+    },
+    {
+      "role": "PREDECESSOR_HANDOFF_R001",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/CONTINUATION-HANDOFF-20260728-R001.md",
+      "file_sha256": "99a3b63b6db8b334f52c8df4f9d07005e25190acd11bd4178eb495e397f82601",
+      "bytes": 24612
+    }
+  ],
+  "static_plan_contract": {
+    "static_plan_version": "2.4.0",
+    "static_plan_locked": true,
+    "in_place_mutation_allowed": false,
+    "add_only_successor_policy": true,
+    "transition_history_append_only": true,
+    "transition_history_tail_sequence": 39,
+    "canonical_transition": "APPEND_ONLY_EVENT_AFTER_SEPARATE_AUTHORIZATION",
+    "status_text_pointer_change": "V2_4_CANONICAL_UPDATE_CANDIDATE_NOT_APPLIED",
+    "structural_change": "V2_5_SUCCESSOR_ONLY",
+    "active_package_mutated": false,
+    "checkpoint_switched": false,
+    "goal_event_appended": false
+  },
+  "current_state": {
+    "goal_package": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+    "package_status": "ACTIVE",
+    "ready_frontier_goal_ids": [
+      "WS-GOAL-EPIC-03",
+      "WS-GOAL-EPIC-12"
+    ],
+    "complete_at_internal_target_slice_count": 13,
+    "gap_assessment_count": 68,
+    "canonical_implemented_count": 0,
+    "formal279_pass_count": 0,
+    "actual_device_execution_count": 0,
+    "closed_release_gate_count": 0,
+    "release_gate_count": 5,
+    "artifact_record_count": 257,
+    "artifact_closed_equivalent_count": 126,
+    "artifact_open_count": 131,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "artifact_open_routes": {
+    "INTERNAL_READY": 62,
+    "EVIDENCE_FACT_PENDING": 6,
+    "OWNER_APPROVAL_PENDING": 14,
+    "ATTESTATION_REVIEW_PENDING": 4,
+    "INTERNAL_RUN_REQUIRED": 24,
+    "REAL_EVENT_PENDING": 21
+  },
+  "hard_dependency_edges": [
+    {
+      "from": "WS-GOAL-EPIC-01",
+      "to": "WS-GOAL-EPIC-02",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-01",
+      "to": "WS-GOAL-EPIC-03",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-04",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-05",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-06",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-07",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-07",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-02",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-08",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-05",
+      "to": "WS-GOAL-EPIC-10",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-10",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-03",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-07",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-08",
+      "to": "WS-GOAL-EPIC-09",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-09",
+      "to": "WS-GOAL-EPIC-11",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-10",
+      "to": "WS-GOAL-EPIC-11",
+      "edge_kind": "START_AND_COMPLETION"
+    },
+    {
+      "from": "WS-GOAL-EPIC-04",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-05",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-06",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-08",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-09",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-10",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    },
+    {
+      "from": "WS-GOAL-EPIC-11",
+      "to": "WS-GOAL-EPIC-12",
+      "edge_kind": "COMPLETION_ONLY"
+    }
+  ],
+  "epic12_readiness_semantics": {
+    "current_status": "READY",
+    "meaning": "PREPARATION_BRANCH_ONLY",
+    "formal_run_authorized": false,
+    "completion_dependencies_must_still_complete": true
+  },
+  "known_reassessment_candidates": {
+    "MISSING_TO_PARTIAL": [
+      "GAP-008",
+      "GAP-017",
+      "GAP-054",
+      "GAP-055"
+    ],
+    "CONFLICTING_TO_PARTIAL": [
+      "GAP-036",
+      "GAP-044",
+      "GAP-052"
+    ],
+    "STATUS_KEEP_TEXT_FIX": [
+      "GAP-002",
+      "GAP-005",
+      "GAP-025",
+      "GAP-028",
+      "GAP-030",
+      "GAP-034",
+      "GAP-040",
+      "GAP-041",
+      "GAP-042",
+      "GAP-045",
+      "GAP-049",
+      "GAP-053"
+    ],
+    "STATUS_CHANGE_WITH_TEXT_FIX": [
+      "GAP-052",
+      "GAP-054",
+      "GAP-055"
+    ],
+    "IMPLEMENTED_CANDIDATE_COUNT": 0,
+    "authority": "PLANNING_CANDIDATES_ONLY_NOT_CANONICAL_STATUS"
+  },
+  "planning_phases": [
+    {
+      "phase_id": "P0-A",
+      "name": "SOURCE_BINDING_PIN",
+      "status": "COMPLETE_IN_PLAN_CANDIDATE",
+      "execution_credit": 0
+    },
+    {
+      "phase_id": "P0-B",
+      "name": "EXACT68_LIVE_REASSESSMENT_DESIGN",
+      "status": "COMPLETE_IN_PLAN_CANDIDATE",
+      "execution_credit": 0
+    },
+    {
+      "phase_id": "P0-C",
+      "name": "R022_GAP_BACKLOG_CANDIDATE_CONTRACT",
+      "status": "COMPLETE_IN_PLAN_CANDIDATE",
+      "execution_credit": 0
+    },
+    {
+      "phase_id": "P0-D",
+      "name": "STATIC_CHANGE_CLASSIFICATION_RULE",
+      "status": "CLASSIFICATION_RULE_DEFINED_PENDING_EXACT68",
+      "execution_credit": 0
+    },
+    {
+      "phase_id": "P0-E",
+      "name": "INDEPENDENT_PLAN_REVIEW",
+      "status": "COMPLETE_FINDINGS_ZERO",
+      "execution_credit": 0
+    },
+    {
+      "phase_id": "E1-E6",
+      "name": "PRODUCT_ARTIFACT_FORMAL_EXTERNAL_EXECUTION",
+      "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+      "execution_credit": 0
+    }
+  ],
+  "technical_debt_lanes": [
+    {
+      "lane_id": "TD-HISTORICAL-REPLAY-RESOLVER",
+      "blocking_product_plan": false,
+      "execution_status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+      "baseline": {
+        "verification_status": "UNVERIFIED_OBSERVATION_PENDING_M0",
+        "binding_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/historical-replay-baseline-binding.json",
+        "passed": 458,
+        "skipped": 1,
+        "failed": 35,
+        "seq38_residual_count": 233,
+        "seq39_residual_count": 233,
+        "ordered_residual_digest": "df20bb768b73049f3580fd795a95ddb2f32282233decb8237e3c08d84c4e4436",
+        "seq39_new_regression_count": 0
+      },
+      "milestones": [
+        {
+          "milestone_id": "M0",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [],
+          "exit": "Record immutable seq38 and seq39 residual lists, digest equality and frozen source hashes."
+        },
+        {
+          "milestone_id": "M1",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [
+            "M0"
+          ],
+          "exit": "Classify 35 tests and 233 residuals with zero unknown root or cascade rows."
+        },
+        {
+          "milestone_id": "M2",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [
+            "M1"
+          ],
+          "exit": "Approve a fail-closed path, expected SHA, mode and event-context resolver contract with negative cases."
+        },
+        {
+          "milestone_id": "M3",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [
+            "M2"
+          ],
+          "exit": "Reduce only classified root causes, preserve seq38/seq39 A-B equality and add zero new residuals."
+        },
+        {
+          "milestone_id": "M4",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [
+            "M3"
+          ],
+          "exit": "Pass FP014 and FP047 append-only tail positive and negative matrices using event-local snapshots."
+        },
+        {
+          "milestone_id": "M5",
+          "status": "NOT_STARTED_OUT_OF_CURRENT_SCOPE",
+          "execution_credit": 0,
+          "approval_credit": 0,
+          "artifact_credit": 0,
+          "release_credit": 0,
+          "requires": [
+            "M4"
+          ],
+          "exit": "Close 35 and 233 only when all required sealed preimages legitimately exist; frozen v2.2 and v2.3 bytes remain unchanged."
+        }
+      ],
+      "forbidden": [
+        "ERROR_STRING_SUPPRESSION",
+        "FABRICATED_PREIMAGE",
+        "CURRENT_LIVE_COPY_AS_HISTORY",
+        "FROZEN_V2_2_OR_V2_3_MODIFICATION",
+        "SEQ39_CREDIT_REINTERPRETATION"
+      ]
+    }
+  ],
+  "execution_boundary": {
+    "plan_candidate_prepared": true,
+    "plan_rebaselined": false,
+    "plan_activated": false,
+    "product_code_modified": false,
+    "product_test_executed": false,
+    "formal_test_executed": false,
+    "actual_device_or_field_event_executed": false,
+    "goal_event_appended": false,
+    "checkpoint_switched": false,
+    "canonical_gap_or_backlog_switched": false,
+    "artifact_state_credit_added": false,
+    "owner_or_attestation_credit_added": false,
+    "release_credit_added": false,
+    "execution_started": false,
+    "credit": {
+      "acceptance": 0,
+      "execution": 0,
+      "owner_approval": 0,
+      "attestation": 0,
+      "actual_event": 0,
+      "artifact": 0,
+      "release": 0
+    }
+  },
+  "next_action": "WAIT_FOR_EXPLICIT_SEPARATE_EXECUTION_INSTRUCTION"
+}

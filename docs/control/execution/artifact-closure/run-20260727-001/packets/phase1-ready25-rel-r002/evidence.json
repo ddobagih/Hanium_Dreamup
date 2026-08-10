@@ -1,0 +1,893 @@
+{
+  "schema_version": "walksafe.phase1-ready25-rel-evidence.v1",
+  "packet_id": "WS-PHASE1-READY25-REL-EVIDENCE-20260728-R002",
+  "prepared_on": "2026-07-28",
+  "predecessor_lineage": {
+    "artifact_baseline_candidate": {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-candidate-20260721-r001.json",
+      "sha256": "af0d9ca906cd40a3ca1aa65fa9e34d5a0733add4563e6299ef5a0c9147aa3683",
+      "byte_length": 1126937
+    },
+    "r001_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-rel/evidence.json",
+      "sha256": "52d899dba79d9143337fd8df85f3a9bf94171237fd6e262e73e75d642c923b09",
+      "byte_length": 33214
+    },
+    "r001_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready25-rel/phase1-ready25-rel-check-receipt-r001.json",
+      "sha256": "0c41a32fe2e83cacb3737008f0815cc386fc3ce30f9926226c3141cffd1e8f05",
+      "byte_length": 2358
+    }
+  },
+  "scope_decision": {
+    "decision": "IN_SCOPE",
+    "artifact_type_ids": [
+      "REL-03",
+      "REL-05",
+      "REL-09"
+    ],
+    "user_scope_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json",
+      "sha256": "7015c81effdaab52dc83168484a36bd7a4fbdee6f8a405ab819d691bfa7810ad"
+    }
+  },
+  "r007_subject_contracts": [
+    {
+      "artifact_type_id": "REL-03",
+      "catalog_artifact_id": "DLV-REL-03",
+      "subject_of_truth": {
+        "coverage_anchor": "rel-03",
+        "generated_locators": [],
+        "primary_locator": "docs/deliverables/09-release/release-control.md",
+        "subject_type": "CONTROLLED_PLAN_OR_DEFINITION_CONTENT"
+      },
+      "acceptance_contract": {
+        "authority_level": "DESIGNATED_PROJECT_APPROVER",
+        "authority_roles": {
+          "approver_role": "제품책임자",
+          "content_owner_role": "릴리스책임자",
+          "external_signer_or_issuer": null,
+          "reviewer_roles": [
+            "QA책임자",
+            "운영책임자",
+            "보안·개인정보책임자",
+            "접근성·안전책임자"
+          ],
+          "unassigned_required_reviewer_roles": []
+        },
+        "execution_predicate": {
+          "all_of": [
+            "No production event is required for submission content acceptance.",
+            "Any later execution claim must create a separately bound receipt."
+          ],
+          "mode": "NOT_REQUIRED_FOR_SUBMISSION"
+        },
+        "minimum_evidence": [
+          {
+            "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+            "value": "docs/deliverables/09-release/release-control.md#rel-03"
+          },
+          {
+            "evidence_type": "CURRENT_REQUIRED_ACTION",
+            "value": "명명된 version 발행 여부를 결정해 적용성을 확정한다."
+          },
+          {
+            "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+            "value": [
+              "제품 version·release ID",
+              "component·API·schema version",
+              "모델·config version"
+            ]
+          },
+          {
+            "evidence_type": "REQUIRED_INPUT",
+            "value": [
+              "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+              "source·build·model·config·migration artifact"
+            ]
+          },
+          {
+            "evidence_type": "CONTENT_TRACE_REVIEW",
+            "value": "required content, named sources, explicit assumptions/open items, trace and approval record"
+          }
+        ],
+        "review_method": "CONTENT_TRACE_AND_AUTHORITY_REVIEW",
+        "submission_predicate": {
+          "all_of": [
+            "Controlled content locator resolves.",
+            "Required contents and inputs are addressed or explicitly blocked with owner and due condition.",
+            "Trace, review and approval are recorded without claiming an execution event."
+          ],
+          "mode": "SUBMISSION_CONTENT_ONLY"
+        }
+      },
+      "scope_decision_status": "IN_SCOPE",
+      "artifact_completion_claimed": false,
+      "release_eligible": false
+    },
+    {
+      "artifact_type_id": "REL-05",
+      "catalog_artifact_id": "DLV-REL-05",
+      "subject_of_truth": {
+        "coverage_anchor": "rel-05",
+        "generated_locators": [],
+        "primary_locator": "docs/deliverables/09-release/release-control.md",
+        "subject_type": "NAMED_IMPLEMENTATION_ARTIFACT_BYTES_AND_CONFORMANCE"
+      },
+      "acceptance_contract": {
+        "authority_level": "TECHNICAL_EVIDENCE_OWNER_AND_DESIGNATED_APPROVER",
+        "authority_roles": {
+          "approver_role": "제품책임자",
+          "content_owner_role": "릴리스책임자",
+          "external_signer_or_issuer": null,
+          "reviewer_roles": [
+            "QA책임자",
+            "운영책임자",
+            "보안·개인정보책임자",
+            "접근성·안전책임자"
+          ],
+          "unassigned_required_reviewer_roles": []
+        },
+        "execution_predicate": {
+          "all_of": [
+            "Artifact snapshot and conformance review are complete.",
+            "If the required action explicitly calls for execution, a separate raw receipt satisfies that action."
+          ],
+          "mode": "NOT_PRODUCTION_EVENT_BY_DEFAULT"
+        },
+        "minimum_evidence": [
+          {
+            "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+            "value": "docs/deliverables/09-release/release-control.md#rel-05"
+          },
+          {
+            "evidence_type": "CURRENT_REQUIRED_ACTION",
+            "value": "release 후보 승인 후 commit과 tag 적용성을 결정한다."
+          },
+          {
+            "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+            "value": [
+              "repository·commit SHA",
+              "tag·서명",
+              "submodule·LFS 상태"
+            ]
+          },
+          {
+            "evidence_type": "REQUIRED_INPUT",
+            "value": [
+              "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+              "source·build·model·config·migration artifact"
+            ]
+          },
+          {
+            "evidence_type": "HASH_PROVENANCE_CONFORMANCE",
+            "value": "named artifact bytes, version/hash, provenance and scope-specific conformance review"
+          }
+        ],
+        "review_method": "HASH_PROVENANCE_AND_CONFORMANCE_REVIEW",
+        "submission_predicate": {
+          "all_of": [
+            "Named implementation artifact exists at the controlled locator.",
+            "Version/hash, provenance and applicable configuration are bound.",
+            "Conformance is reviewed against the HANIUM submission baseline without implying production operation."
+          ],
+          "mode": "SUBMISSION_CONTENT_ONLY"
+        }
+      },
+      "scope_decision_status": "IN_SCOPE",
+      "artifact_completion_claimed": false,
+      "release_eligible": false
+    },
+    {
+      "artifact_type_id": "REL-09",
+      "catalog_artifact_id": "DLV-REL-09",
+      "subject_of_truth": {
+        "coverage_anchor": "rel-09",
+        "generated_locators": [],
+        "primary_locator": "docs/deliverables/09-release/release-control.md",
+        "subject_type": "CONTROLLED_PLAN_OR_DEFINITION_CONTENT"
+      },
+      "acceptance_contract": {
+        "authority_level": "DESIGNATED_PROJECT_APPROVER",
+        "authority_roles": {
+          "approver_role": "제품책임자",
+          "content_owner_role": "릴리스책임자",
+          "external_signer_or_issuer": null,
+          "reviewer_roles": [
+            "QA책임자",
+            "운영책임자",
+            "보안·개인정보책임자",
+            "접근성·안전책임자"
+          ],
+          "unassigned_required_reviewer_roles": []
+        },
+        "execution_predicate": {
+          "all_of": [
+            "No production event is required for submission content acceptance.",
+            "Any later execution claim must create a separately bound receipt."
+          ],
+          "mode": "NOT_REQUIRED_FOR_SUBMISSION"
+        },
+        "minimum_evidence": [
+          {
+            "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+            "value": "docs/deliverables/09-release/release-control.md#rel-09"
+          },
+          {
+            "evidence_type": "CURRENT_REQUIRED_ACTION",
+            "value": "release version 확정 후 실제 변경과 제한을 작성한다."
+          },
+          {
+            "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+            "value": [
+              "release·날짜·대상",
+              "주요 기능·개선",
+              "수정 결함·보안 변경"
+            ]
+          },
+          {
+            "evidence_type": "REQUIRED_INPUT",
+            "value": [
+              "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+              "source·build·model·config·migration artifact"
+            ]
+          },
+          {
+            "evidence_type": "CONTENT_TRACE_REVIEW",
+            "value": "required content, named sources, explicit assumptions/open items, trace and approval record"
+          }
+        ],
+        "review_method": "CONTENT_TRACE_AND_AUTHORITY_REVIEW",
+        "submission_predicate": {
+          "all_of": [
+            "Controlled content locator resolves.",
+            "Required contents and inputs are addressed or explicitly blocked with owner and due condition.",
+            "Trace, review and approval are recorded without claiming an execution event."
+          ],
+          "mode": "SUBMISSION_CONTENT_ONLY"
+        }
+      },
+      "scope_decision_status": "IN_SCOPE",
+      "artifact_completion_claimed": false,
+      "release_eligible": false
+    }
+  ],
+  "r010_chain_binding": {
+    "semantics": "ADD_ONLY_READY25_REL_SUCCESSOR_OVER_R010_WRAPPER_AND_R007_LEDGER_SUBJECT",
+    "r010_evidence": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json",
+      "sha256": "e878aa9915e549cfd06acaef7f150b75e0d6a0221d6c9978d6597d15c81c8056"
+    },
+    "r010_check_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r010.json",
+      "sha256": "5e9300013d252932cc696585c8e2d99ddcd434d972647c32a57620e64f62d51a"
+    }
+  },
+  "artifact_contracts": [
+    {
+      "artifact_type_id": "REL-03",
+      "catalog_artifact_id": "DLV-REL-03",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_RELEASE_VERSION_NOT_NAMED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "제품·Android 앱·관리자 앱·server·API·DB schema·model·config version 체계를 정의한다.",
+        "compatibility·breaking change·upgrade·support·EOL 규칙을 정하되 실제 release ID는 만들지 않는다.",
+        "development→controlled demo→beta→production promotion과 rollback 조건을 5개 gate에 연결한다."
+      ],
+      "release_strategy": {
+        "environment_order": [
+          "DEVELOPMENT",
+          "CONTROLLED_DEMO",
+          "BETA",
+          "PRODUCTION"
+        ],
+        "deployment_model": "MANAGED_CLOUD_STAGING_FIRST",
+        "promotion_requires_all_five_gates": true,
+        "rollback_plan_required": true,
+        "named_release_candidate": null,
+        "promotion_status": "NOT_RUN",
+        "rollback_execution_status": "NOT_RUN"
+      },
+      "five_gate_boundary": [
+        {
+          "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+          "status": "NOT_RUN",
+          "waived": false
+        }
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-REL-03-NAMED-CANDIDATE-OR-SOURCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PRODUCT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "BEFORE_NAMED_VERSION_PUBLICATION_OR_EXTERNAL_DELIVERY",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-REL-03-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_RELEASE_PROMOTION",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "execution_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_release_candidate_or_result_prohibited": true,
+      "catalog_acceptance_contract": {
+        "required_contents": [
+          "제품 version·release ID",
+          "component·API·schema version",
+          "모델·config version",
+          "호환성·breaking change",
+          "upgrade 경로",
+          "지원·EOL 기간"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 제품 version·release ID, component·API·schema version.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      },
+      "r007_subject_and_acceptance_contract": {
+        "artifact_type_id": "REL-03",
+        "catalog_artifact_id": "DLV-REL-03",
+        "subject_of_truth": {
+          "coverage_anchor": "rel-03",
+          "generated_locators": [],
+          "primary_locator": "docs/deliverables/09-release/release-control.md",
+          "subject_type": "CONTROLLED_PLAN_OR_DEFINITION_CONTENT"
+        },
+        "acceptance_contract": {
+          "authority_level": "DESIGNATED_PROJECT_APPROVER",
+          "authority_roles": {
+            "approver_role": "제품책임자",
+            "content_owner_role": "릴리스책임자",
+            "external_signer_or_issuer": null,
+            "reviewer_roles": [
+              "QA책임자",
+              "운영책임자",
+              "보안·개인정보책임자",
+              "접근성·안전책임자"
+            ],
+            "unassigned_required_reviewer_roles": []
+          },
+          "execution_predicate": {
+            "all_of": [
+              "No production event is required for submission content acceptance.",
+              "Any later execution claim must create a separately bound receipt."
+            ],
+            "mode": "NOT_REQUIRED_FOR_SUBMISSION"
+          },
+          "minimum_evidence": [
+            {
+              "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+              "value": "docs/deliverables/09-release/release-control.md#rel-03"
+            },
+            {
+              "evidence_type": "CURRENT_REQUIRED_ACTION",
+              "value": "명명된 version 발행 여부를 결정해 적용성을 확정한다."
+            },
+            {
+              "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+              "value": [
+                "제품 version·release ID",
+                "component·API·schema version",
+                "모델·config version"
+              ]
+            },
+            {
+              "evidence_type": "REQUIRED_INPUT",
+              "value": [
+                "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+                "source·build·model·config·migration artifact"
+              ]
+            },
+            {
+              "evidence_type": "CONTENT_TRACE_REVIEW",
+              "value": "required content, named sources, explicit assumptions/open items, trace and approval record"
+            }
+          ],
+          "review_method": "CONTENT_TRACE_AND_AUTHORITY_REVIEW",
+          "submission_predicate": {
+            "all_of": [
+              "Controlled content locator resolves.",
+              "Required contents and inputs are addressed or explicitly blocked with owner and due condition.",
+              "Trace, review and approval are recorded without claiming an execution event."
+            ],
+            "mode": "SUBMISSION_CONTENT_ONLY"
+          }
+        },
+        "scope_decision_status": "IN_SCOPE",
+        "artifact_completion_claimed": false,
+        "release_eligible": false
+      }
+    },
+    {
+      "artifact_type_id": "REL-05",
+      "catalog_artifact_id": "DLV-REL-05",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_RELEASE_CANDIDATE_COMMIT_TAG_NOT_AVAILABLE",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "repository·commit SHA·protected tag·signature·submodule·LFS·dirty-tree 금지 schema를 정의한다.",
+        "REL-04 manifest와 동일 release generation으로 source binding을 결속하는 절차를 정한다.",
+        "named release candidate 승인 전 실제 commit/tag/signature 또는 conformance PASS를 생성하지 않는다."
+      ],
+      "release_strategy": {
+        "environment_order": [
+          "DEVELOPMENT",
+          "CONTROLLED_DEMO",
+          "BETA",
+          "PRODUCTION"
+        ],
+        "deployment_model": "MANAGED_CLOUD_STAGING_FIRST",
+        "promotion_requires_all_five_gates": true,
+        "rollback_plan_required": true,
+        "named_release_candidate": null,
+        "promotion_status": "NOT_RUN",
+        "rollback_execution_status": "NOT_RUN"
+      },
+      "five_gate_boundary": [
+        {
+          "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+          "status": "NOT_RUN",
+          "waived": false
+        }
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-REL-05-NAMED-CANDIDATE-OR-SOURCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PRODUCT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "AFTER_NAMED_CANDIDATE_APPROVAL_BEFORE_SOURCE_FREEZE",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-REL-05-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_RELEASE_PROMOTION",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "execution_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_release_candidate_or_result_prohibited": true,
+      "catalog_acceptance_contract": {
+        "required_contents": [
+          "repository·commit SHA",
+          "tag·서명",
+          "submodule·LFS 상태",
+          "dirty tree 금지 증거",
+          "branch·보호 정책",
+          "manifest·build 연결",
+          "REL-04가 동일 release generation의 최종 manifest로 결속할 source commit·tag binding"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: repository·commit SHA, tag·서명.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      },
+      "r007_subject_and_acceptance_contract": {
+        "artifact_type_id": "REL-05",
+        "catalog_artifact_id": "DLV-REL-05",
+        "subject_of_truth": {
+          "coverage_anchor": "rel-05",
+          "generated_locators": [],
+          "primary_locator": "docs/deliverables/09-release/release-control.md",
+          "subject_type": "NAMED_IMPLEMENTATION_ARTIFACT_BYTES_AND_CONFORMANCE"
+        },
+        "acceptance_contract": {
+          "authority_level": "TECHNICAL_EVIDENCE_OWNER_AND_DESIGNATED_APPROVER",
+          "authority_roles": {
+            "approver_role": "제품책임자",
+            "content_owner_role": "릴리스책임자",
+            "external_signer_or_issuer": null,
+            "reviewer_roles": [
+              "QA책임자",
+              "운영책임자",
+              "보안·개인정보책임자",
+              "접근성·안전책임자"
+            ],
+            "unassigned_required_reviewer_roles": []
+          },
+          "execution_predicate": {
+            "all_of": [
+              "Artifact snapshot and conformance review are complete.",
+              "If the required action explicitly calls for execution, a separate raw receipt satisfies that action."
+            ],
+            "mode": "NOT_PRODUCTION_EVENT_BY_DEFAULT"
+          },
+          "minimum_evidence": [
+            {
+              "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+              "value": "docs/deliverables/09-release/release-control.md#rel-05"
+            },
+            {
+              "evidence_type": "CURRENT_REQUIRED_ACTION",
+              "value": "release 후보 승인 후 commit과 tag 적용성을 결정한다."
+            },
+            {
+              "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+              "value": [
+                "repository·commit SHA",
+                "tag·서명",
+                "submodule·LFS 상태"
+              ]
+            },
+            {
+              "evidence_type": "REQUIRED_INPUT",
+              "value": [
+                "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+                "source·build·model·config·migration artifact"
+              ]
+            },
+            {
+              "evidence_type": "HASH_PROVENANCE_CONFORMANCE",
+              "value": "named artifact bytes, version/hash, provenance and scope-specific conformance review"
+            }
+          ],
+          "review_method": "HASH_PROVENANCE_AND_CONFORMANCE_REVIEW",
+          "submission_predicate": {
+            "all_of": [
+              "Named implementation artifact exists at the controlled locator.",
+              "Version/hash, provenance and applicable configuration are bound.",
+              "Conformance is reviewed against the HANIUM submission baseline without implying production operation."
+            ],
+            "mode": "SUBMISSION_CONTENT_ONLY"
+          }
+        },
+        "scope_decision_status": "IN_SCOPE",
+        "artifact_completion_claimed": false,
+        "release_eligible": false
+      }
+    },
+    {
+      "artifact_type_id": "REL-09",
+      "catalog_artifact_id": "DLV-REL-09",
+      "applicability": "IN_SCOPE",
+      "activation_state": "IN_SCOPE_RELEASE_NOTES_CANDIDATE_NOT_NAMED",
+      "content_status": "PLAN_SCHEMA_CHECKLIST_AUTHORED",
+      "content_authored": true,
+      "internal_checklist": [
+        "release·날짜·대상·기능·결함·보안·migration·known issue·지원 링크 template을 정의한다.",
+        "실제 change set과 잔여 제한은 named candidate의 검증된 source에서만 채우도록 한다.",
+        "promotion·rollback·5개 gate 상태를 명시하되 배포·승인·release 결과를 생성하지 않는다."
+      ],
+      "release_strategy": {
+        "environment_order": [
+          "DEVELOPMENT",
+          "CONTROLLED_DEMO",
+          "BETA",
+          "PRODUCTION"
+        ],
+        "deployment_model": "MANAGED_CLOUD_STAGING_FIRST",
+        "promotion_requires_all_five_gates": true,
+        "rollback_plan_required": true,
+        "named_release_candidate": null,
+        "promotion_status": "NOT_RUN",
+        "rollback_execution_status": "NOT_RUN"
+      },
+      "five_gate_boundary": [
+        {
+          "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+          "status": "NOT_RUN",
+          "waived": false
+        }
+      ],
+      "blockers": [
+        {
+          "blocker_id": "READY25-REL-09-NAMED-CANDIDATE-OR-SOURCE-PENDING",
+          "status": "OPEN",
+          "owner_role": "PRODUCT_OWNER",
+          "owner_identity": "김민호",
+          "due_condition": "AFTER_NAMED_VERSION_AND_CHANGESET_BEFORE_DISTRIBUTION",
+          "due_at": null
+        },
+        {
+          "blocker_id": "READY25-REL-09-INDEPENDENT-QA-UNASSIGNED",
+          "status": "OPEN",
+          "owner_role": "PROJECT_OWNER",
+          "owner_identity": "김민호",
+          "missing_role": "INDEPENDENT_QA_REVIEWER",
+          "assigned_reviewer": null,
+          "due_condition": "BEFORE_CONTENT_ACCEPTANCE_OR_RELEASE_PROMOTION",
+          "due_at": null
+        }
+      ],
+      "responsibility_boundary": {
+        "project_owner": "김민호",
+        "service_owner": "김민호",
+        "product_owner": "김민호",
+        "independent_qa_reviewer": null,
+        "independent_qa_status": "UNASSIGNED",
+        "self_review_credit_allowed": false
+      },
+      "claim_boundary": {
+        "accepted": false,
+        "approval_count": 0,
+        "execution_count": 0,
+        "actual_event_count": 0,
+        "formal_evidence_count": 0,
+        "release_credit_count": 0,
+        "actual_receipt_ids": [],
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "fabricated_release_candidate_or_result_prohibited": true,
+      "catalog_acceptance_contract": {
+        "required_contents": [
+          "release·날짜·대상",
+          "주요 기능·개선",
+          "수정 결함·보안 변경",
+          "breaking·migration",
+          "known issue·우회법",
+          "지원·문서 링크"
+        ],
+        "completion_criteria": [
+          "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: release·날짜·대상, 주요 기능·개선.",
+          "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+          "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+          "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다."
+        ]
+      },
+      "r007_subject_and_acceptance_contract": {
+        "artifact_type_id": "REL-09",
+        "catalog_artifact_id": "DLV-REL-09",
+        "subject_of_truth": {
+          "coverage_anchor": "rel-09",
+          "generated_locators": [],
+          "primary_locator": "docs/deliverables/09-release/release-control.md",
+          "subject_type": "CONTROLLED_PLAN_OR_DEFINITION_CONTENT"
+        },
+        "acceptance_contract": {
+          "authority_level": "DESIGNATED_PROJECT_APPROVER",
+          "authority_roles": {
+            "approver_role": "제품책임자",
+            "content_owner_role": "릴리스책임자",
+            "external_signer_or_issuer": null,
+            "reviewer_roles": [
+              "QA책임자",
+              "운영책임자",
+              "보안·개인정보책임자",
+              "접근성·안전책임자"
+            ],
+            "unassigned_required_reviewer_roles": []
+          },
+          "execution_predicate": {
+            "all_of": [
+              "No production event is required for submission content acceptance.",
+              "Any later execution claim must create a separately bound receipt."
+            ],
+            "mode": "NOT_REQUIRED_FOR_SUBMISSION"
+          },
+          "minimum_evidence": [
+            {
+              "evidence_type": "CONTROLLED_SUBJECT_LOCATOR",
+              "value": "docs/deliverables/09-release/release-control.md#rel-09"
+            },
+            {
+              "evidence_type": "CURRENT_REQUIRED_ACTION",
+              "value": "release version 확정 후 실제 변경과 제한을 작성한다."
+            },
+            {
+              "evidence_type": "REQUIRED_CONTENT_BOUNDARY",
+              "value": [
+                "release·날짜·대상",
+                "주요 기능·개선",
+                "수정 결함·보안 변경"
+              ]
+            },
+            {
+              "evidence_type": "REQUIRED_INPUT",
+              "value": [
+                "승인된 정책 기준선·릴리스 범위·출시 gate와 판정 기준",
+                "source·build·model·config·migration artifact"
+              ]
+            },
+            {
+              "evidence_type": "CONTENT_TRACE_REVIEW",
+              "value": "required content, named sources, explicit assumptions/open items, trace and approval record"
+            }
+          ],
+          "review_method": "CONTENT_TRACE_AND_AUTHORITY_REVIEW",
+          "submission_predicate": {
+            "all_of": [
+              "Controlled content locator resolves.",
+              "Required contents and inputs are addressed or explicitly blocked with owner and due condition.",
+              "Trace, review and approval are recorded without claiming an execution event."
+            ],
+            "mode": "SUBMISSION_CONTENT_ONLY"
+          }
+        },
+        "scope_decision_status": "IN_SCOPE",
+        "artifact_completion_claimed": false,
+        "release_eligible": false
+      }
+    }
+  ],
+  "generated_output_bindings": [
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "cea8b58fc5afa527614522481df56d69618c6fd1015c10b63d6cc8b6e0678c67",
+      "byte_length": 102892
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "a0c993257c1b80211c2e8e4db5aa464708ac4aba9d47ed9b434eda277ee6547f",
+      "byte_length": 3803696
+    },
+    {
+      "path": "docs/deliverables/09-release/registers/release-control-register.json",
+      "sha256": "4cbc76dc79bd7c82ffa477b1cf663f1a9aae28db519bdbdbe6446e60b981a752",
+      "byte_length": 5937
+    },
+    {
+      "path": "docs/deliverables/09-release/release-control.md",
+      "sha256": "e07c7b80aa2a432f2943b20ce68f064178af023859447ed9326f65e8cc4471e3",
+      "byte_length": 49553
+    },
+    {
+      "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+      "sha256": "7a7c099fd0fc8c793a694e82a14a267471f1685211282ec6abe21c2f41083643",
+      "byte_length": 168330
+    }
+  ],
+  "five_gate_boundary": [
+    {
+      "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "summary": {
+    "exact_artifact_count": 3,
+    "in_scope_count": 3,
+    "content_authored_count": 3,
+    "accepted_count": 0,
+    "approval_count": 0,
+    "execution_count": 0,
+    "actual_event_count": 0,
+    "formal_evidence_count": 0,
+    "release_credit_count": 0
+  },
+  "claim_boundary": {
+    "named_release_candidate_count": 0,
+    "release_commit_or_tag_count": 0,
+    "release_note_result_count": 0,
+    "deployment_count": 0,
+    "promotion_count": 0,
+    "rollback_execution_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "a79869d1c37e503dd4ffcfecbfc831360349801635f83c2f9e355e91d68b7850"
+  }
+}

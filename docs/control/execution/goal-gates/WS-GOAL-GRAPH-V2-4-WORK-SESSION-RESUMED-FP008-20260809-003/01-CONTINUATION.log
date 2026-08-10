@@ -1,0 +1,236 @@
+WalkSafe v2.4 continuation check: FAIL
+- v2.4 activation quick gate check 1 output is missing or unsafe
+- v2.4 activation quick gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 session_resume gate check 1 output is missing or unsafe
+- v2.4 session_resume gate check 2 output is missing or unsafe
+- v2.4 session_resume gate check 3 output is missing or unsafe
+- v2.4 session_resume gate check 4 output is missing or unsafe
+- v2.4 session_resume gate check 5 output is missing or unsafe
+- v2.4 session_resume gate check 6 output is missing or unsafe
+- v2.4 session_resume gate check 7 output is missing or unsafe
+- v2.4 session_resume gate check 8 output is missing or unsafe
+- v2.4 session_resume gate check 9 output is missing or unsafe
+- v2.4 session_resume gate check 10 output is missing or unsafe
+- v2.4 session_resume gate check 11 output is missing or unsafe
+- v2.4 session_resume gate check 12 output is missing or unsafe
+- v2.4 session_resume gate check 13 output is missing or unsafe
+- v2.4 session_resume gate check 14 output is missing or unsafe
+- v2.4 session_resume gate check 15 output is missing or unsafe
+- v2.4 session_resume gate check 16 output is missing or unsafe
+- v2.4 session_resume gate check 17 output is missing or unsafe
+- v2.4 session_resume gate check 18 output is missing or unsafe
+- v2.4 session_resume gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 session_resume gate check 1 output is missing or unsafe
+- v2.4 session_resume gate check 2 output is missing or unsafe
+- v2.4 session_resume gate check 3 output is missing or unsafe
+- v2.4 session_resume gate check 4 output is missing or unsafe
+- v2.4 session_resume gate check 5 output is missing or unsafe
+- v2.4 session_resume gate check 6 output is missing or unsafe
+- v2.4 session_resume gate check 7 output is missing or unsafe
+- v2.4 session_resume gate check 8 output is missing or unsafe
+- v2.4 session_resume gate check 9 output is missing or unsafe
+- v2.4 session_resume gate check 10 output is missing or unsafe
+- v2.4 session_resume gate check 11 output is missing or unsafe
+- v2.4 session_resume gate check 12 output is missing or unsafe
+- v2.4 session_resume gate check 13 output is missing or unsafe
+- v2.4 session_resume gate check 14 output is missing or unsafe
+- v2.4 session_resume gate check 15 output is missing or unsafe
+- v2.4 session_resume gate check 16 output is missing or unsafe
+- v2.4 session_resume gate check 17 output is missing or unsafe
+- v2.4 session_resume gate check 18 output is missing or unsafe
+- v2.4 session_resume gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 session_resume gate check 1 output is missing or unsafe
+- v2.4 session_resume gate check 2 output is missing or unsafe
+- v2.4 session_resume gate check 3 output is missing or unsafe
+- v2.4 session_resume gate check 4 output is missing or unsafe
+- v2.4 session_resume gate check 5 output is missing or unsafe
+- v2.4 session_resume gate check 6 output is missing or unsafe
+- v2.4 session_resume gate check 7 output is missing or unsafe
+- v2.4 session_resume gate check 8 output is missing or unsafe
+- v2.4 session_resume gate check 9 output is missing or unsafe
+- v2.4 session_resume gate check 10 output is missing or unsafe
+- v2.4 session_resume gate check 11 output is missing or unsafe
+- v2.4 session_resume gate check 12 output is missing or unsafe
+- v2.4 session_resume gate check 13 output is missing or unsafe
+- v2.4 session_resume gate check 14 output is missing or unsafe
+- v2.4 session_resume gate check 15 output is missing or unsafe
+- v2.4 session_resume gate check 16 output is missing or unsafe
+- v2.4 session_resume gate check 17 output is missing or unsafe
+- v2.4 session_resume gate check 18 output is missing or unsafe
+- v2.4 session_resume gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate check 1 output is missing or unsafe
+- v2.4 initial_start gate check 2 output is missing or unsafe
+- v2.4 initial_start gate check 3 output is missing or unsafe
+- v2.4 initial_start gate check 4 output is missing or unsafe
+- v2.4 initial_start gate check 5 output is missing or unsafe
+- v2.4 initial_start gate check 6 output is missing or unsafe
+- v2.4 initial_start gate check 7 output is missing or unsafe
+- v2.4 initial_start gate check 8 output is missing or unsafe
+- v2.4 initial_start gate check 9 output is missing or unsafe
+- v2.4 initial_start gate check 10 output is missing or unsafe
+- v2.4 initial_start gate check 11 output is missing or unsafe
+- v2.4 initial_start gate check 12 output is missing or unsafe
+- v2.4 initial_start gate check 13 output is missing or unsafe
+- v2.4 initial_start gate check 14 output is missing or unsafe
+- v2.4 initial_start gate check 15 output is missing or unsafe
+- v2.4 initial_start gate check 16 output is missing or unsafe
+- v2.4 initial_start gate check 17 output is missing or unsafe
+- v2.4 initial_start gate check 18 output is missing or unsafe
+- v2.4 initial_start gate check 19 output is missing or unsafe
+- v2.4 start gate repository-state payload is missing
+- v2.4 initial_start gate inventory must contain only the 9 ordered logs and receipt
+- v2.4 initial_start gate check 1 output file is missing: [Errno 2] No such file or directory: '01-CONTINUATION.log'
+- v2.4 initial_start gate check 2 output file is missing: [Errno 2] No such file or directory: '02-V24_ARTIFACT_WORK_QUEUE.log'
+- v2.4 initial_start gate check 3 output file is missing: [Errno 2] No such file or directory: '03-TEST_LAYER_REGISTRY_VALIDATE.log'
+- v2.4 initial_start gate check 4 output file is missing: [Errno 2] No such file or directory: '04-BACKEND_TEST_DATABASE_PREFLIGHT.log'
+- v2.4 initial_start gate check 5 output file is missing: [Errno 2] No such file or directory: '05-BACKEND_ADMIN_REPORTS_OPENAPI_POSTGRES.log'
+- v2.4 initial_start gate check 6 output file is missing: [Errno 2] No such file or directory: '06-ANDROID_USER_INTERNAL.log'
+- v2.4 initial_start gate check 7 output file is missing: [Errno 2] No such file or directory: '07-ANDROID_ADMIN_INTERNAL.log'
+- v2.4 initial_start gate check 8 output file is missing: [Errno 2] No such file or directory: '08-ROOT_FP008_CONTROL_REGRESSION.log'
+- v2.4 initial_start gate check 9 output file is missing: [Errno 2] No such file or directory: '09-REPOSITORY_STATE.log'
+- v2.4 initial_start gate final inventory must contain only the 9 ordered logs and receipt
+- WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-002 final start gate inventory must contain only the 9 ordered logs and receipt
+- v2.4 start gate repository-state payload is missing

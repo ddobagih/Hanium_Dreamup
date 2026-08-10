@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0",
+  "manifest_id": "WS-GOAL-STATIC-PLAN-MANIFEST-1.1.0",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-V1",
+  "plan_version": "1.1.0",
+  "created_on": "2026-07-23",
+  "supersedes_manifest_sha256": "",
+  "protected_files": [
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/00-master-goal.md",
+      "sha256": "9f0796bf7d13a010b084fe52cca1d8e6b3d22cb7a019690ecea8b917328908b9"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/10-phase-a-implementation-readiness.md",
+      "sha256": "30634cd4602db0b425fdb0ed68c104273fec5dcd27b32e00d19bf39eb82fcb56"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/20-phase-b-formal-verification.md",
+      "sha256": "6412f5d72780d2622b2e01cdba429270e26445833da275a80ded035733e988db"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/30-phase-c-release-delivery.md",
+      "sha256": "a4efc41127663b16fbb5f8afb36746eeb637ad8354b998b9710e4229dd96642d"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/40-phase-d-operation-handover-closure.md",
+      "sha256": "b9fc496172eb0d420b2a2a17529ec0c2a7b97749366976d1473441d2e9763ddc"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/README.md",
+      "sha256": "6c827a66ba87f86cd3308c142e763127e158f2ed8aa0bb9e2362fcd0dd221cc0"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-01-product-boundary.md",
+      "sha256": "295259a042e8f4f298bdc1dc484c9552dbbb3bf17fc5dbbe73950906b158f8f6"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-02-safe-walk-state-and-permissions.md",
+      "sha256": "88dd88ede55897a0177fdb2fdb8e089e571141ed2fc5ca7e2cb94478dcc7d24d"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-03-account-admin-security.md",
+      "sha256": "748b5ffc29078076ad0658c03d519e6ca6112258c3c1997f68e804f971802b8c"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-04-navigation-arrival-deviation.md",
+      "sha256": "e5c34833c81f73b310901851576e4eb15cecbe66e97956b1576dc4c0dc52d32f"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-05-object-detection-safety.md",
+      "sha256": "2d37c5c77fc59e1b21accf7a5a7f47ea8347587f221834ccb0b8db0a9f2c6bb9"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-06-voice-haptic-accessibility.md",
+      "sha256": "2b424a8c853eb391828c0aa2b18cf13bdc9391fcec318ae142f3278ed72529dd"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-07-raw-data-lifecycle.md",
+      "sha256": "d272f552f9109237535990349479ed5cb69587fd314eee9c24aac8695f01be24"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-08-auto-report-queue.md",
+      "sha256": "4b25b234b3b5719651fb0daf70de2f4914f2fbdfd0522091bd95a5dcf28b94f3"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-09-server-capacity-resilience.md",
+      "sha256": "205f0732ca9ce71195f075ab4864b5a4cc33c1a86deae7e1a74be97e50664cf0"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-10-ai-model-lifecycle.md",
+      "sha256": "aec3cdea72c24d935912882e78a0eeee5d659dabd65f991da57939a250147846"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-11-release-operations-recovery-readiness.md",
+      "sha256": "e97d6c7a76a1df90c255c77a4252cf021b17bd43967df1caa3a41356fb496b60"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/epics/epic-12-formal-verification-gates.md",
+      "sha256": "e3c796d92f01de83cf28fb18261daf40f544988f33c9567b732d39c81437b077"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/templates/work-item-template.md",
+      "sha256": "01c4c4605c1c0660422487a601aa1d8d0c599ccd8855b7c7982e42e91c573171"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-v1/work-items/a/epic-02-fp018-walk-state-recovery-r001.md",
+      "sha256": "da8705fb37488a0d1fa2eabe4aa930192c60bf032608e06aec75da6301a90845"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "schema_version": "walksafe.change-request-register.v1",
+  "metadata": {
+    "title": "WalkSafe 변경요청·변경이력",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-16"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "requests": [
+    {
+      "change_request_id": "CR-0001",
+      "title": "정식 산출물의 Android 주제품 경계 재정렬",
+      "trigger": "승인 정책 FP-007~009와 준비문서의 Web/PWA 전제가 불일치",
+      "scope": [
+        "artifact-types.json",
+        "documentation-authoring-preparation-plan.md",
+        "0~6 Draft"
+      ],
+      "policy_change": false,
+      "implementation_change": false,
+      "status": "APPLIED_TO_DRAFT_PENDING_REVIEW",
+      "approval_status": "NOT_APPROVED_AS_FORMAL_CHANGE_RECORD",
+      "before": "Web/PWA를 현재 제품처럼 읽을 수 있는 오염된 문서 전제",
+      "after_proposed": "Android 사용자·비공개 관리자 앱은 정식 제품, Web/PWA는 legacy",
+      "impact_analysis": [
+        "MGT·DSC·REQ·DES·TST 문서 경계 변경",
+        "현재 구현 적합성은 별도 Gap 분석",
+        "정책 내용 변경 없음"
+      ],
+      "implementation_commit": null,
+      "verification_evidence": "생성기 구조검사와 관련 단위시험; 사람 검토 대기",
+      "rollback_or_freeze": "검토 반려 시 Draft revision으로 정정하고 승인본은 생성하지 않음",
+      "result": "Android 사용자·관리자 앱은 정식 제품, Web/PWA는 legacy로 문서 초안을 정렬했다."
+    },
+    {
+      "change_request_id": "CR-0002",
+      "title": "FP-035 일반 활동원본 전송망 조건 문구 정합화",
+      "trigger": "같은 승인 정책 안에 'Wi-Fi 또는 명시적 이동통신망 선택'과 'Wi-Fi 필수' 문구가 함께 존재",
+      "scope": [
+        "FP-035",
+        "SP-13",
+        "RQ-FP-035-001",
+        "REQ-03",
+        "REQ-06",
+        "DES-04",
+        "DES-13",
+        "DES-20",
+        "MOD-ANDROID-USER",
+        "MOD-BACKEND",
+        "TC-FP-035-*"
+      ],
+      "direct_artifact_codes": [
+        "REQ-03",
+        "REQ-06",
+        "DES-04",
+        "DES-13",
+        "DES-20"
+      ],
+      "related_downstream_artifact_codes": [
+        "REQ-16",
+        "REQ-18",
+        "DES-09",
+        "MGT-14",
+        "MGT-16",
+        "DEV-18",
+        "TST-05"
+      ],
+      "correction_candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+      "correction_candidate_path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "correction_candidate_sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "policy_change": true,
+      "implementation_change": false,
+      "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "approval_status": "NOT_APPROVED",
+      "result": null,
+      "before": "FP-035 안에 이동통신망 선택 허용 문구와 Wi-Fi 필수 문구가 함께 존재",
+      "captured_owner_directive": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+      "after_proposed": "포착한 지시문으로 FP-035·SP-13·요구·설계 문구를 통일",
+      "impact_analysis": [
+        "보행 중 전송 금지 유지",
+        "이동통신망 opt-in 상태와 허용망 검증 필요",
+        "미선택 사용자는 Wi-Fi 전용",
+        "관련 요구·설계·시험·동의 문구 재결속 필요"
+      ],
+      "verification_evidence": null,
+      "implementation_commit": null,
+      "rollback_or_freeze": "새 일괄 승인 전 일반 활동원본 이동통신망 전송 구현·실행 동결",
+      "interim_rule": "지시사항을 반영한 산출물 묶음이 새로 승인되기 전에는 일반 활동원본의 이동통신망 전송 구현과 시험을 시작하지 않는다."
+    }
+  ]
+}

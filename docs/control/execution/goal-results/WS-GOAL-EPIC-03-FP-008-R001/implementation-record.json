@@ -1,0 +1,593 @@
+{
+  "authority_bindings": {
+    "goal": {
+      "byte_length": 4596,
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
+      "role": "FP008_GOAL",
+      "sha256": "2654fe5f595aefaecf974a4de70bad7946c2385cba9716200f2d2f49d849dd8e"
+    },
+    "initial_exact9_gate": {
+      "byte_length": 10155,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-002/implementation-start-gate-receipt.json",
+      "repository_state_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-002/09-REPOSITORY_STATE.log",
+      "repository_state_sha256": "5e6832dd3a34b65e8baf8ba2b4ae1133edc623df613d5339eca617eeeb27e16c",
+      "role": "INITIAL_EXACT9_IMPLEMENTATION_START_GATE",
+      "sha256": "c60c0da7311e86d3b3ee0c8282719468474d5356c267d283e049c911f550b47a"
+    },
+    "policy_contract": {
+      "byte_length": 13598,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/policy-contract.json",
+      "role": "FP008_POLICY_CONTRACT",
+      "sha256": "59f4ce8d160a4736b3f3820d3b60f0a805ef7cd887f6451ca5424917412b8a16"
+    },
+    "seq48_resume_gate": {
+      "byte_length": 10245,
+      "event_id": "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+      "event_sequence": 48,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/implementation-resume-gate-receipt.json",
+      "role": "SEQ48_WORK_SESSION_RESUME_GATE",
+      "sha256": "394c9775c8ed3b2fbdac1b3cf8354ff839006b91998adc8cbbbb7c5f13dd8c5e"
+    }
+  },
+  "changed_artifacts": [
+    {
+      "byte_length": 356,
+      "path": "apps/android/settings.gradle.kts",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0"
+    },
+    {
+      "byte_length": 74,
+      "path": "apps/android/build.gradle.kts",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "20485875f2123b6dfa69bdb228a06890f440c46c5443bf68b936531fa2b0df28"
+    },
+    {
+      "byte_length": 8618,
+      "path": "apps/android/gradlew",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "fb68debc1b1acf8ec55dc0d5e5495e1dedd0bd6b61f304bee61613eeb2bd9b92"
+    },
+    {
+      "byte_length": 46175,
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.jar",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13"
+    },
+    {
+      "byte_length": 339,
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.properties",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "1e3d87ddfd70069f68afa0c9ddcaab26913c3baf3d809447b0362d2d49f57325"
+    },
+    {
+      "byte_length": 199913,
+      "path": "apps/android/gradle/verification-metadata.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+    },
+    {
+      "byte_length": 3237,
+      "path": "apps/android/adminapp/README.md",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "642338176659264549b13ffb60547a981dc66e60e418c2cb8cf4df380623cbdf"
+    },
+    {
+      "byte_length": 4445,
+      "path": "apps/android/adminapp/build.gradle.kts",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "8c36f8af65ba6a291b2a6f9174a3572c61880d2f6b666f52230d81d426d3085e"
+    },
+    {
+      "byte_length": 40829,
+      "path": "apps/android/adminapp/gradle.lockfile",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13"
+    },
+    {
+      "byte_length": 82,
+      "path": "apps/android/adminapp/proguard-rules.pro",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "8d4eaac33b650616549287d6a0f3c166a9a130612b55015a5f480bcecb0cf129"
+    },
+    {
+      "byte_length": 878,
+      "path": "apps/android/adminapp/src/main/AndroidManifest.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb"
+    },
+    {
+      "byte_length": 214,
+      "path": "apps/android/adminapp/src/debug/AndroidManifest.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "371e6b693f3e126f24f205d4c596b39371b7a9b176ad80f47468aebeb69cb8db"
+    },
+    {
+      "byte_length": 342,
+      "path": "apps/android/adminapp/src/debug/res/xml/admin_debug_network_security_config.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "9187f485f22fde712aea8de5243664710440a9ee08e9f1b172978eef96a15001"
+    },
+    {
+      "byte_length": 491,
+      "path": "apps/android/adminapp/src/main/res/xml/admin_data_extraction_rules.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "d0566a2aca46b7dd502650911f774119a0feb462850892e1d22445931f7e54c5"
+    },
+    {
+      "byte_length": 34089,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "2722d196becabe0ed443687cff67e30b2b529a9fe68f5967e36cf70dd943c92b"
+    },
+    {
+      "byte_length": 9993,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncoding.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "2c784b60fca59a4030936e2a29047196ac5a30caaef454dc36cafcb148f6b7c1"
+    },
+    {
+      "byte_length": 8468,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyStore.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "56b6b7f5811a17d4b3ab17e1ea094cb3ad795b3801ac35ac37141b2b9da09172"
+    },
+    {
+      "byte_length": 18998,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProof.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "9c48183a3e9e16f333b366391b725ed726b946939a87db975fdef87df47ace47"
+    },
+    {
+      "byte_length": 1389,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicy.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "1ee7614e6509fd5ef433637b0c3d1b71ec906c25015117629d7d49a4febb7bb7"
+    },
+    {
+      "byte_length": 4261,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101"
+    },
+    {
+      "byte_length": 4613,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminInstitutionDelivery.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "977029ba93813214c0b441e568f65594323eca9db620f0043066deba895fb73c"
+    },
+    {
+      "byte_length": 5930,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsApi.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "d2169fa6d10e97af1c642b6a08edccd8dfc6f30565d1123518a308dc33fa05e6"
+    },
+    {
+      "byte_length": 26084,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClient.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "fe1a706c191fbe30204688e36fbb77a0591edc243a2603e880fbe11f28ead9f9"
+    },
+    {
+      "byte_length": 3043,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicy.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "27a2e45431301319be1ebff7fe73a2da8ae0dd96fda9e74149b7915533ed5061"
+    },
+    {
+      "byte_length": 3947,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportDecision.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "174ba67379a693e5c22da6bab24f621fb90422abc01aa3d64081519c5fc7c8a5"
+    },
+    {
+      "byte_length": 4817,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "22b126d131d4b9229bdb7d71c03c408bfa323424520e6480fee0aba30b89f9ab"
+    },
+    {
+      "byte_length": 1752,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApiException.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "7d73f3ad6edc3593eddfecf817d6bc181cd7d6bdb8031b65cea49e2779e27b97"
+    },
+    {
+      "byte_length": 22516,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "56516ba689e1a2fc87d14091cb53e6b4352dd7743e8e702dc0578949bf5cbae4"
+    },
+    {
+      "byte_length": 27356,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "03ac3e35a8a7c3d6ee7141cb1ce972b6aaffb9e3e2ab9b56c64c9d84267c0d85"
+    },
+    {
+      "byte_length": 572,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityState.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "3384bfec42bed0162580f8feecf66b75a5319dedb2bb2c7f10b1f2b7fa460b1d"
+    },
+    {
+      "byte_length": 3229,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0"
+    },
+    {
+      "byte_length": 9799,
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJson.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "07bee52b1e71294d5687ffc7f184c78ffe90c40a6bc29964838254734b2161f9"
+    },
+    {
+      "byte_length": 711,
+      "path": "apps/android/adminapp/src/main/res/values/strings.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "98099d169625286a6ed2f24a885939d34257459db8882a0350c7bb113f095756"
+    },
+    {
+      "byte_length": 274,
+      "path": "apps/android/adminapp/src/main/res/values/styles.xml",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "b55e90d6a20aac934bcc4fd3e474c842d1fb4807d4b984a80de03959b529f649"
+    },
+    {
+      "byte_length": 4381,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncodingTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "264aefb9a9cb0ebd15329430383a32b390f04f4dd44dd7fd22f4e0443678dcb2"
+    },
+    {
+      "byte_length": 1943,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyDescriptorTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "fd3d2e67fe76f18367a63f8905beac9f1590fb62424fa99cb49ae2e8a319259e"
+    },
+    {
+      "byte_length": 8748,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProofTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "0bf98628d4eba4854fac92dc531b18189aa02ab2856f364b4fa923d13187b1f3"
+    },
+    {
+      "byte_length": 1325,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicyTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "4f8d0128e881bdef0b3480d3d38ff7164ba70470f3b98e5d4b1b20ddb2a13cd5"
+    },
+    {
+      "byte_length": 3720,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "d644fda5184b3d33c2393d44d22e746ff3820be0abb758119cde0f5cbabb7c85"
+    },
+    {
+      "byte_length": 6194,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationModelsTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "92973a01efa6523e4ce942dfef79b91a5388293e0b06ba9d1065bcfe23ce7302"
+    },
+    {
+      "byte_length": 18760,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClientTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "ddf3c7567cc489bc195c1ccab5b46e56ed4aec561834bff60c2ccdde890c5fa1"
+    },
+    {
+      "byte_length": 4042,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "3443252c3cb3397c37636eb57a1a365aeb649bd64675fe2613749d6186739851"
+    },
+    {
+      "byte_length": 5967,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "e5ff4be6ed5b4734e6e2dad02acb40cfaa1e6a8b6a04dd01bf8f00fd9f5395fc"
+    },
+    {
+      "byte_length": 22424,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "b1e6b21f7a793f54ee3a680b584d0341f42d998d77e439da5513fa438e6f88d2"
+    },
+    {
+      "byte_length": 23662,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "5632bf0e918f31d3a110dbff3fbed9c8a67faee78829ff8a59b4f556eab39a7c"
+    },
+    {
+      "byte_length": 1855,
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJsonTest.java",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "401901e3f34e513af01bd280c8d395ec4be89804944036ef7ff7cd9d12e39ea9"
+    },
+    {
+      "byte_length": 7060,
+      "path": "backend/README.md",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "1c942086b6a3d156176a41f720050d4145478de4f5cfd9dd8309381639b0c957"
+    },
+    {
+      "byte_length": 4361,
+      "path": "backend/app/main.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "3e3a1c21508d2a62de0267731747528986b64772d528fe0251f8721f8c1b449a"
+    },
+    {
+      "byte_length": 36125,
+      "path": "backend/app/models.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "2c3398b53f44363f39a26bb7aaef74fa60c5dbf141d40cb7cfcd372ff6e95318"
+    },
+    {
+      "byte_length": 15232,
+      "path": "backend/alembic/versions/202608080001_fp008_admin_review_delivery.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "d137342225219f9199c1b39b1592249d98dcae865890f2066509977763eb7f33"
+    },
+    {
+      "byte_length": 19187,
+      "path": "backend/app/api/admin_security.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "32fed4e8334f3946e9ed337309b1b6676a9097edbcb7b19265f2a6f6cbec8f19"
+    },
+    {
+      "byte_length": 15703,
+      "path": "backend/app/api/health.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "3c22a7841663cf48e8646831357fe1dee7ad57e23de2a12cc08ee8432cd8d020"
+    },
+    {
+      "byte_length": 93251,
+      "path": "backend/app/api/reports.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "301baff07ea4784b5d374efff93e16ec59969691b565351c22b96be1e497a743"
+    },
+    {
+      "byte_length": 39867,
+      "path": "backend/app/config.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "41eb4484578743bc8461f8172399749a97d648f024ecd66b4d09d5a906b16206"
+    },
+    {
+      "byte_length": 32973,
+      "path": "backend/app/field_test_security.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "317bd9153c984fbd62817cd3146994a4154cc1a1f8617545c7a799427f67e087"
+    },
+    {
+      "byte_length": 11699,
+      "path": "backend/app/openapi_contract.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "e4a705a961ec8932501c41e09a109b5766142f945f3794cd876b7cf252c90ea5"
+    },
+    {
+      "byte_length": 2691,
+      "path": "backend/app/request_limits.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "122cadc9b7fa13241e0602e45cff7abbd4e8a7b469f60eb857eb985e97b6dd79"
+    },
+    {
+      "byte_length": 31493,
+      "path": "backend/app/services/admin_device_proof.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "78159a32bb43dec76a02147748b2357b1e766a5eb607b8422695e5c511476f08"
+    },
+    {
+      "byte_length": 12646,
+      "path": "backend/app/services/admin_report_workflow.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "2e323ccd88be95078d53bc5cd2e375933ae341a0d89c4f8c057c92a83bd3c8d4"
+    },
+    {
+      "byte_length": 77772,
+      "path": "backend/app/services/admin_security.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "8de2dbd58bce32ac84399c02aeabd5aa513d07cf86e80ae97ef3b86b0f1ece04"
+    },
+    {
+      "byte_length": 21966,
+      "path": "backend/app/schemas.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "7995362359886ecb4da34e2b9f8f14aa0a3c4b8ec15c156bd9aec5357510a3ec"
+    },
+    {
+      "byte_length": 4155,
+      "path": "scripts/provision_walksafe_admin_device_key.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "bfefef97c746a99d8de46151bba53f5176468a73d6781a25c8d7ee2bed9c9784"
+    },
+    {
+      "byte_length": 163047,
+      "path": "contracts/walksafe.openapi.json",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "3790ddc49e84608554cb113e4ba86015dd646ad949d5da5cd6e9e1fe8c9d7b17"
+    },
+    {
+      "byte_length": 46851,
+      "path": "backend/tests/test_admin_device_proof.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "46efee20bd4142c8dbe0e30d0d8e544236505bd6056e1b74acc7c5f5cc5dcbe9"
+    },
+    {
+      "byte_length": 39817,
+      "path": "backend/tests/test_admin_report_workflow.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "81f8390eb3f3107501bf87d4742dea0a6b60c15257dcd624f81642d39fbd2742"
+    },
+    {
+      "byte_length": 14605,
+      "path": "backend/tests/test_fp008_postgres_integration.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "d08ed15d3471e945cfbffc8372208de1814e463bb1f5477bf0b4adf4d131759b"
+    },
+    {
+      "byte_length": 8318,
+      "path": "backend/tests/conftest.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "59e5079aed2f5a9d95147ef7b250750d74d98f77ba735a7b31ed448b5324ad8f"
+    },
+    {
+      "byte_length": 4628,
+      "path": "backend/tests/test_openapi_contract.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "b02bb87a6e79a6417fa8368ab430a4fd405240b9a40c143f03a45616081325a4"
+    },
+    {
+      "byte_length": 5083,
+      "path": "README.md",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "4398a2ce216be2bf120ee026b4ab0bdabe24c04b377fa3e0e72d86e90240b05b"
+    },
+    {
+      "byte_length": 29814,
+      "path": "docs/backend/api_reference.md",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "85e2a11fd6e84a97b612205b96b1365b028b970567d8e2207649720b984ad487"
+    },
+    {
+      "byte_length": 26769,
+      "path": "scripts/README.md",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "558ef90c9faa60a69ef5dae6d6cc776b8a8d8cb1b8d068b5ab3b474df682c258"
+    },
+    {
+      "byte_length": 4854,
+      "path": "scripts/check_code_documentation_20260710.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "6871578861651c10f41eef209ae8366da99d4ebfc8347e2cc389a47c901d5238"
+    },
+    {
+      "byte_length": 17754,
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "62d615c191c1076ba14e92594ea6c8f5a2fd11ba98c940e07c6da1ac3ee0ee7f"
+    },
+    {
+      "byte_length": 11227,
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0"
+    },
+    {
+      "byte_length": 14136,
+      "path": "tests/test_walksafe_android_product_boundary.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "ea082f089c1964513d2c1340b39bbe8514ead8d442fd5397f714c6d9d31931c0"
+    },
+    {
+      "byte_length": 77078,
+      "path": "scripts/build_walksafe_fp008_admin_review_delivery_trace_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "c2fc02a7bf9f3ae8cd1b79e53e6c89835c8fd7b79b53f6372742f4db4576af87"
+    },
+    {
+      "byte_length": 22398,
+      "path": "scripts/build_walksafe_fp008_gap_backlog_r024_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "a6b0bf0bdcd6836b7436a9cc55d565bbde357ca04f000b625d620e82c438c543"
+    },
+    {
+      "byte_length": 96262,
+      "path": "scripts/build_walksafe_fp008_artifact_trace_successor_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "b8aa2c30348100490b654064cf146dff07b1268bd231d24adc96c97419b41519"
+    },
+    {
+      "byte_length": 26643,
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r013_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "53ba4eb4dada19671e63a52e245b05b3ecad53d13b3ae6ab88551e32a2e41483"
+    },
+    {
+      "byte_length": 34355,
+      "path": "scripts/build_walksafe_fp008_strict_review_gate_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "f64dba38bd094581d08841467317e3a8a36888ef6206d8807e9cc5f6c105620f"
+    },
+    {
+      "byte_length": 11493,
+      "path": "tests/walksafe_fp008_builder_test_support.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "4b8320c2a7bfd6f930988d68c33c997bf49e7c059a153137a324865be05b56d1"
+    },
+    {
+      "byte_length": 35482,
+      "path": "tests/test_walksafe_fp008_admin_review_delivery_trace_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "53177e4332a467f249dae69d55d4ffc4ae44f76e49c3cfe5687d7dcb7a206a03"
+    },
+    {
+      "byte_length": 6664,
+      "path": "tests/test_walksafe_fp008_gap_backlog_r024_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "50367621a38c550076e9788a4d98910dc290a0a6f0620e1fdb4900887b97a5a8"
+    },
+    {
+      "byte_length": 22929,
+      "path": "tests/test_walksafe_fp008_artifact_trace_successor_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "a1e82751c2ae96f8a343dd65a0225b141cb97fc81261fdd6df7ca1f2fc4b7ebb"
+    },
+    {
+      "byte_length": 4698,
+      "path": "tests/test_walksafe_phase1_exact257_successor_r013_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "110be2b5cf2b2d5b1a9848f0fbde135ebb804618ff0f431d91e3bc41cdaa6396"
+    },
+    {
+      "byte_length": 6378,
+      "path": "tests/test_walksafe_fp008_strict_review_gate_20260803.py",
+      "role": "FP008_IMPLEMENTATION_SOURCE",
+      "sha256": "a8245567f8472a2bbfcb885b382113679bec65f262c22cfba885f61cac4753e1"
+    }
+  ],
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_authentication_status": "NOT_RUN",
+    "external_institution_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-008-01",
+      "TC-FP-008-02",
+      "TC-FP-008-03",
+      "TC-FP-008-04"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP008_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-IMPLEMENTATION-20260803-001",
+  "exact_path_count": 86,
+  "gap_id": "GAP-017",
+  "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "implementation_content_set_sha256": "77a9ec5b6bebce7aa68088e74a7ffb68d5f3d4e2d70484cfc690ace0d1bccae0",
+  "implementation_record_content_sha256": "9131632addba0e370f3c24ad01b8e1b10c632efdc9f49412ddf2a6e9bfcb9c1d",
+  "implemented_controls": [
+    "separate Android admin application identity, signing boundary and session namespace",
+    "registered-device proof plus additional designated-admin authentication",
+    "approve, reject and duplicate review decisions with reason, administrator and time",
+    "manual institution-delivery receipt and status recording with later lookup",
+    "admin-path failure isolation from a healthy user walking session"
+  ],
+  "kind": "IMPLEMENTATION_RECORD",
+  "observed_at": "2026-08-09T16:39:26+09:00",
+  "policy_id": "FP-008",
+  "schema_version": "walksafe.fp008-implementation-record.v1",
+  "scope_kind": "EXACT_ORDERED_FP008_IMPLEMENTATION_PATH_SET",
+  "status": "PASS"
+}

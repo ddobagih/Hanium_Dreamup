@@ -1,0 +1,42 @@
+{
+  "schema_version": "walksafe.closure-execution-template.v1",
+  "metadata": {
+    "title": "종료·이관·폐기 실행 템플릿",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "template_only": true,
+  "is_live_evidence": false,
+  "target_artifact_type_ids": [
+    "CLS-02",
+    "CLS-05",
+    "CLS-06",
+    "CLS-10",
+    "CLS-13",
+    "CLS-14",
+    "CLS-15",
+    "CLS-16"
+  ],
+  "closure_id": null,
+  "branch": null,
+  "allowed_branches": [
+    "TRANSFER_TO_OPERATIONS",
+    "DECOMMISSION_SERVICE"
+  ],
+  "recipient_or_authority": null,
+  "data_actions": [],
+  "account_key_infrastructure_actions": [],
+  "contract_actions": [],
+  "external_original_refs": [],
+  "raw_evidence_refs": [],
+  "execution_status": "NOT_RUN",
+  "approval_status": "NOT_APPROVED",
+  "result": null
+}

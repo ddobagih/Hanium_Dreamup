@@ -1,0 +1,70 @@
+{
+  "schema_version": "walksafe.feature-policy-baseline-approval-intake.v1",
+  "intake_id": "WS-FEATURE-POLICY-BASELINE-APPROVAL-INTAKE-20260721-001",
+  "intake_version": "1.0.0",
+  "recorded_at": "2026-07-21T00:54:30+09:00",
+  "recorded_at_basis": "PROCESSING_TIME_MESSAGE_HAS_NO_MACHINE_TIMESTAMP",
+  "approval_event_date": "2026-07-21",
+  "source_event_id": null,
+  "source_event_timestamp": null,
+  "source_event_metadata_status": "NOT_EXPOSED_BY_CONVERSATION_INTERFACE",
+  "source_kind": "USER_CHAT_MESSAGE",
+  "capture_fidelity": "DISPLAYED_MESSAGE_TRANSCRIPTION_WITH_TERMINAL_NEWLINE",
+  "source_record_path": "docs/control/decision-interview/source-records/walksafe-feature-policy-baseline-approval-20260721-r001.txt",
+  "source_record_sha256": "7ce42cce4bb7011d42de4099dc53841a1e76bc846f36c209c06464882449c69d",
+  "source_record_byte_length": 541,
+  "approver": {
+    "name": "김민호",
+    "role": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+    "identity_basis": "CURRENT_CONVERSATION_ACTOR_AND_CONTROLLED_REVIEWER_NAME",
+    "identity_verification_status": "CONVERSATION_CONTINUITY_NOT_CRYPTOGRAPHICALLY_VERIFIED",
+    "cryptographic_signature_status": "NOT_SIGNED"
+  },
+  "normalization_policy": {
+    "unicode": "NFC",
+    "terminal_newline": "IGNORED_AS_TEXT_FILE_SERIALIZATION",
+    "allowed_layout_replacements": [
+      {
+        "from": "WS-FEATURE-\n  POLICY",
+        "to": "WS-FEATURE-POLICY",
+        "required_count": 1
+      },
+      {
+        "from": "항목은\n  면제",
+        "to": "항목은 면제",
+        "required_count": 1
+      }
+    ],
+    "meaning_changes_allowed": false
+  },
+  "approval_target": {
+    "review_resolution_id": "WS-FEATURE-POLICY-BASELINE-REVIEW-RESOLUTION-20260721-001",
+    "review_resolution_version": "1.0.0",
+    "decision_binding_sha256": "16064cabf95dc16109bfe315032905a12881cab40cf7730e97d8171d15476538",
+    "policy_document_id": "WS-FEATURE-POLICY-DRAFT-20260720",
+    "policy_document_version": "1.0.0",
+    "policy_document_content_sha256": "e49ffe0ee9e59de0cec173cac9425d61aa78e0ccd65980ba568045a3975e0b28",
+    "policy_baseline_version": "1.0.0",
+    "scope": "POLICY_BASELINE_ONLY"
+  },
+  "approval_boundary": {
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "formal_deliverables_0_to_6": "AUTHORIZED_TO_START",
+    "implementation_completion_claimed": false,
+    "test_completion_claimed": false
+  },
+  "record_controls": {
+    "source_class": "EXTERNAL",
+    "artifact_form": "EXTERNAL_RECORD",
+    "evidence_classification": "USER_APPROVED",
+    "adoption_trust": "A",
+    "confidentiality": "INTERNAL",
+    "personal_data": [
+      "approver_name"
+    ],
+    "retention_class": "PROJECT_LIFECYCLE_PLUS_3_YEARS",
+    "notes": "사용자 대화의 승인문 원문을 별도 텍스트로 보존하고, 화면 줄바꿈만 정규화해 사전 고정 승인문과 비교한다."
+  }
+}

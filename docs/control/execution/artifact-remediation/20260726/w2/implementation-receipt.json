@@ -1,0 +1,515 @@
+{
+  "schema_version": "walksafe.artifact-remediation-implementation-receipt.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W2-IMPLEMENTATION-RECEIPT-20260726-001",
+  "prepared_on": "2026-07-26",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "COMPLETED_INTERNAL_ARTIFACT_REMEDIATION_ONLY",
+  "result": "PASS",
+  "document_family": {
+    "paths": {
+      "design_trace_json": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.json",
+      "design_trace_markdown": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.md",
+      "artifact_status_delta": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+      "validation_summary": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "implementation_receipt": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json"
+    },
+    "binding_dag": {
+      "order": [
+        "design_trace_json",
+        "design_trace_markdown",
+        "artifact_status_delta",
+        "validation_summary",
+        "implementation_receipt"
+      ],
+      "hash_edges": [
+        "artifact_status_delta -> design_trace_json",
+        "artifact_status_delta -> design_trace_markdown",
+        "validation_summary -> artifact_status_delta",
+        "implementation_receipt -> validation_summary"
+      ],
+      "forward_references": "PATH_ONLY",
+      "cycle_status": "ACYCLIC"
+    },
+    "role": "TERMINAL_BINDS_VALIDATION_ONLY"
+  },
+  "completion_scope": {
+    "wave_id": "W2",
+    "title": "설계 계약 및 아키텍처 추적 정합화",
+    "artifact_count": 23,
+    "exact_artifact_ids": [
+      "DLV-DES-01",
+      "DLV-DES-02",
+      "DLV-DES-03",
+      "DLV-DES-04",
+      "DLV-DES-05",
+      "DLV-DES-06",
+      "DLV-DES-07",
+      "DLV-DES-08",
+      "DLV-DES-09",
+      "DLV-DES-10",
+      "DLV-DES-11",
+      "DLV-DES-12",
+      "DLV-DES-13",
+      "DLV-DES-14",
+      "DLV-DES-16",
+      "DLV-DES-17",
+      "DLV-DES-18",
+      "DLV-DES-22",
+      "DLV-DES-23",
+      "DLV-DES-24",
+      "DLV-DES-25",
+      "DLV-DES-26",
+      "DLV-DES-27"
+    ],
+    "internal_artifact_remediation_complete": true,
+    "open_downstream_gap_count": 37,
+    "formal_product_release_completion_claimed": false
+  },
+  "source_bindings": [
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/routes.ts",
+      "sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+      "byte_count": 30206,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/telemetry.ts",
+      "sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96",
+      "byte_count": 2345,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "apps/android-gateway/test/telemetry.test.ts",
+      "sha256": "13f62070ed2f405df8b249d117f61fd43421cb3c1b48ace3e6f2f544b6750e4b",
+      "byte_count": 4066,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    },
+    {
+      "role": "ADMIN_TELEMETRY_JUNIT_XML",
+      "path": "apps/android/adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml",
+      "sha256": "da40358253c6b0471e8432928d4224f0f0772abef083a4dd26854b37a1cde749",
+      "byte_count": 2349,
+      "allowed_claim": "Executed admin telemetry unit result 11/11 PASS.",
+      "prohibited_claim": "Formal, device, deployed collector or release PASS."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+      "sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+      "byte_count": 18158,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+      "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0",
+      "byte_count": 3229,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "sha256": "05031bec9bb2c048cc18bdd0d9986f6fe48d3b433ff78bf34fe342b0eb94b50f",
+      "byte_count": 19897,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    },
+    {
+      "role": "CANONICAL_OPENAPI",
+      "path": "contracts/walksafe.openapi.json",
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "byte_count": 128867,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+      "byte_count": 229471,
+      "allowed_claim": "Original factual required_action and INTERNAL_GAP classification for W2 exact 23.",
+      "prohibited_claim": "Retroactive mutation, approval or execution completion."
+    },
+    {
+      "role": "WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "byte_count": 56499,
+      "allowed_claim": "W2 exact 23 scope and ordered downstream W3-W9 waves.",
+      "prohibited_claim": "That any wave is completed."
+    },
+    {
+      "role": "W1_FINAL_DELTA",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+      "byte_count": 53979,
+      "allowed_claim": "Post-W1 projection 75/105/41/36 and unchanged approval/release boundaries.",
+      "prohibited_claim": "Retroactive W1 mutation or W2 completion by itself."
+    },
+    {
+      "role": "W1_FINAL_RECEIPT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+      "sha256": "895ff118ab2d41c67d4dfa767260bc7c4959a444aecfce5073cb3bea3fa2c641",
+      "byte_count": 16850,
+      "allowed_claim": "Post-W1 projection 75/105/41/36 and unchanged approval/release boundaries.",
+      "prohibited_claim": "Retroactive W1 mutation or W2 completion by itself."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+      "sha256": "470b4566a0272d5fc5fc028e53a3ee8a8bde19b06b889570ad60adcce53b62ea",
+      "byte_count": 86842,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+      "sha256": "3899ad0b8ac57a8835b32d50a2798696bd16ab54b26fa5a870e9e6378cb80d21",
+      "byte_count": 12586,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_UX_DESIGN_TOKEN_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+      "sha256": "039afefa3809239e1140fd99882a7e8355664dfea532a1cefdd9cbf932939d0a",
+      "byte_count": 19389,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+      "sha256": "a7d0da87529c60be3c416ade6fefc63e55578627f8c411ff63df0ceed4fba888",
+      "byte_count": 9303,
+      "allowed_claim": "W2 review APPROVED, 23 OK recommendations and findings 0/0/0.",
+      "prohibited_claim": "Formal artifact approval, product verification, deployment or release completion."
+    },
+    {
+      "role": "W2_INTERFACE_EVIDENCE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+      "sha256": "71103726662e25cf30fe38ab521e8151c46b8f66af70f6431d7af0aa4cb55a48",
+      "byte_count": 65576,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_INTERFACE_EVIDENCE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+      "sha256": "e9ddc685344bb12a89be236c42db11e8db019faf10c2ebe1cbc9c8fdc21bd949",
+      "byte_count": 16752,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+      "sha256": "e6eabf259f9eb223976c68b8d9315f5f7caf2abe757c4e4511cf4bcf53fee89d",
+      "byte_count": 59173,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+      "sha256": "21f7cdb3eb1f5ff43a68b28301b4d6d78fad168fb7629b6b9c1b6320b5b044fe",
+      "byte_count": 11048,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_OPERATIONS_EVIDENCE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+      "sha256": "ea5fd68ea2f37149b6864b37dde7a8cf1414aac447f53fc8485719bc4926ae6c",
+      "byte_count": 51261,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_OPERATIONS_EVIDENCE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+      "sha256": "d819b5e2a0c8f0a1cee17ff38c8a572d9b70ff8e5d4e3b3877170554dcd5db73",
+      "byte_count": 5581,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+      "sha256": "113ca25f769ecf932955c76edd47a4d8d5d23ccb064825f72f84de2be26ccb27",
+      "byte_count": 81615,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md",
+      "sha256": "b35668a2489c2a4d0c9b631c6c17e1ae1461a12c2475bbc181baf47f44b22375",
+      "byte_count": 12119,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_UX_PROTOTYPE_RENDERING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+      "sha256": "4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356",
+      "byte_count": 10834,
+      "allowed_claim": "Exact bound evidence bytes.",
+      "prohibited_claim": "Claims outside the bound evidence scope."
+    },
+    {
+      "role": "W2_UX_PROTOTYPE_TRACE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+      "sha256": "6403e24e9f2480ffe2fbd5363e4138d6c372ebe99593406e8a6bdc51578773a1",
+      "byte_count": 9215,
+      "allowed_claim": "Exact bound evidence bytes.",
+      "prohibited_claim": "Claims outside the bound evidence scope."
+    },
+    {
+      "role": "RAW_RUNTIME_OPENAPI",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "byte_count": 128867,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+      "sha256": "0d60327172735809b97c5d4546a6120f265c6f50d1ac101fd4fa9a644b8b46c1",
+      "byte_count": 15871,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md",
+      "sha256": "b726c793c934305f5c6bb9a380014607598b39e5f5aeccf5ce6b17f35134d1fe",
+      "byte_count": 3722,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/backup_walksafe_data_20260711.sh",
+      "sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+      "byte_count": 22315,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "OPENAPI_GENERATOR",
+      "path": "scripts/generate_walksafe_openapi.py",
+      "sha256": "849f0bb411a834f4f2bd147825c49f40cadaa963df67acafedc5f80423c54b02",
+      "byte_count": 5479,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+      "byte_count": 5755,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+      "byte_count": 47092,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "tests/test_walksafe_backup_prune.py",
+      "sha256": "8176b919a00caaed8c84a836c80b10ee07bc03bd0d3a94b8dfe11234301ccc0b",
+      "byte_count": 5112,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    }
+  ],
+  "source_binding_summary": {
+    "count": 34,
+    "exact_path_sha256_set": "298e1fa7f0e7d92e979a17d0bd3e2b5e304e8a680a4dd494e5d2bf7c603dde6e"
+  },
+  "backward_bindings": [
+    {
+      "role": "VALIDATION_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "file_sha256": "9280ded6353ba5cbc4b1056eaaafb7d0ec8dbb9578f7e43b253901caf42bbb24",
+      "content_fingerprint": "3ffa70dce05160a948c01fcce47a0d02eb56c6a4daacfb13cad5693176c9b287"
+    }
+  ],
+  "classification_projection": {
+    "pre_w2_post_w1": {
+      "OK": 75,
+      "INTERNAL_GAP": 105,
+      "EXTERNAL": 41,
+      "N/A_CANDIDATE": 36
+    },
+    "delta": {
+      "OK": 23,
+      "INTERNAL_GAP": -23,
+      "EXTERNAL": 0,
+      "N/A_CANDIDATE": 0
+    },
+    "post_w2": {
+      "OK": 98,
+      "INTERNAL_GAP": 82,
+      "EXTERNAL": 41,
+      "N/A_CANDIDATE": 36
+    },
+    "total": 257
+  },
+  "approval_and_baseline_boundary": {
+    "status": "UNCHANGED",
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "formal_approval_claimed": false,
+    "new_artifact_content_baseline_claimed": false
+  },
+  "source_snapshot": {
+    "source_commit": null,
+    "dirty_worktree": true,
+    "whole_repository_frozen": false,
+    "commit_attribution_claimed": false
+  },
+  "policy_authority": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "version": "1.0.1",
+    "status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT"
+  },
+  "verification_results": {
+    "admin_telemetry": {
+      "tests": 11,
+      "status": "PASS_INTERNAL_UNIT_ONLY"
+    },
+    "gateway_telemetry": {
+      "tests": 2,
+      "status": "PASS_INTERNAL_UNIT_ONLY",
+      "execution_record_reused": true
+    },
+    "backup_prune": {
+      "tests": 5,
+      "status": "PASS_INTERNAL_UNIT_ONLY",
+      "execution_record_reused": true
+    },
+    "runtime_openapi": {
+      "run_count": 2,
+      "deterministic": true,
+      "raw_and_canonical_byte_identical": true,
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "status": "PASS_INTERNAL_CONTRACT_EVIDENCE"
+    },
+    "independent_review": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0,
+      "status": "APPROVED_INTERNAL_ARTIFACT_SCOPE"
+    },
+    "generic_fingerprints": {
+      "input_count": 8,
+      "new_json_count": 4,
+      "status": "PASS"
+    },
+    "formal_tests": {
+      "count": 279,
+      "status": "NOT_RUN",
+      "pass_claimed": false
+    }
+  },
+  "dependency_reinstall_boundary": {
+    "status": "INTERRUPTED_NOT_A_TEST_RESULT",
+    "counted_as_pass": false,
+    "counted_as_failure": false,
+    "product_dependency_state_problem_claimed": false,
+    "interpretation": "An interrupted reinstall attempt establishes neither PASS nor a product dependency defect; only completed bound test evidence is used."
+  },
+  "remaining_gates": {
+    "count": 5,
+    "waived_count": 0,
+    "all_unwaived": true,
+    "items": [
+      {
+        "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-CLOUD-COST-MEASUREMENT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ]
+  },
+  "not_run_boundaries": {
+    "formal_tests": 279,
+    "device": "NOT_RUN",
+    "deployment": "NOT_RUN",
+    "restore_failover": "NOT_RUN",
+    "performance": "NOT_RUN",
+    "accessibility": "NOT_RUN"
+  },
+  "release": {
+    "status": "NOT_ELIGIBLE",
+    "deployment_completion_claimed": false
+  },
+  "claim_boundary": {
+    "allowed": [
+      "W2 design artifact required_action and downstream gap trace are internally complete.",
+      "Exact 23 artifacts may transition from INTERNAL_GAP to OK in an add-only projection."
+    ],
+    "prohibited": [
+      "Formal artifact approval or baseline mutation.",
+      "Closure of 37 downstream W3-W9 gaps.",
+      "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+    ]
+  },
+  "integration_validation": {
+    "json_parse": "PASS",
+    "generic_fingerprints": "PASS",
+    "exact23": "PASS",
+    "gap_references": "PASS",
+    "source_sha_set": "PASS",
+    "hash_dag": "ACYCLIC"
+  },
+  "integrity": {
+    "source_binding_count": 34,
+    "source_binding_set_sha256": "298e1fa7f0e7d92e979a17d0bd3e2b5e304e8a680a4dd494e5d2bf7c603dde6e",
+    "artifact_count": 23,
+    "open_gap_count": 37,
+    "post_total": 257,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), content_fingerprint.value=null, trailing LF",
+      "value": "6fcd0eb20a8763430d4994aa0eebbf8e01f61fed74f81ac5eb4dcfe3d111ff32"
+    }
+  }
+}

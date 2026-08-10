@@ -1,0 +1,351 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-F-PURPOSE-SURFACES-IMPLEMENTATION-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-01 Phase F 제품 목적·안전 한계 사용자 표면 정합화 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_phase_e_or_approved_baseline": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": false,
+    "claims_purpose_surfaces_internally_aligned": true,
+    "claims_rel17_approved": false,
+    "claims_rel09_executed_or_published": false,
+    "claims_actual_device_pass": false,
+    "claims_formal_test_pass": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "phase_e_record_id": "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005",
+    "overlay_predecessor_id": "WS-EPIC-01-PHASE-E-ACTIVE-LEDGER-OVERLAY-20260723-001",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "phase_e_builder",
+        "path": "scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
+        "bytes": 78419,
+        "sha256": "4c55aadbdf7ec0dddf00d0c5363381b84366cf26b00213e6e58a408e99751e5a",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_e_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
+        "bytes": 18002,
+        "sha256": "36383044a552f627359c549a9426521e66416847751e330bef9d02d19e6fac94",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_e_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.json",
+        "bytes": 22367,
+        "sha256": "6deafda42451e5f03c1422bb5bcd02994890a9e05e107eef2f846b4571a72f23",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_e_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.md",
+        "bytes": 3214,
+        "sha256": "63d57140c43b428f7cfaa5dcb1b32abbb3cbce0afcbfce4615f273b729f809d7",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r005",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r005.json",
+        "bytes": 414008,
+        "sha256": "adf2a32c4e6ab04f3d6b7c97346956aa434aa281ad80de6607293bd00382e571",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r005_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r005.md",
+        "bytes": 1358,
+        "sha256": "dc4cab8490a5f4f13052cd1361785069088e19f8b0e7537a85f0c5786d7cfb7c",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r005",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r005.json",
+        "bytes": 56702,
+        "sha256": "d0479054d9a0a374ebe34dc0726f791c4e81095cfd3d4ca834bd1340be60d298",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r005_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r005.md",
+        "bytes": 768,
+        "sha256": "750d93ea39bcee00fe5f05276a4a03689e64a7180e4fe27c5b6ff11083610d04",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_e_active_overlay",
+        "path": "docs/control/execution/walksafe-epic-01-phase-e-active-ledger-overlay-20260723-r001.json",
+        "bytes": 14123,
+        "sha256": "30e8275dd29302805b61810633a09276a3199a2328c63feefd9968a57f109ff1",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_e_active_overlay_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-e-active-ledger-overlay-20260723-r001.md",
+        "bytes": 2403,
+        "sha256": "e948928715984d375adeb7e27fc34abaa10655e2ab43206e05176e0ca0ebb2c7",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py",
+        "bytes": 59339,
+        "sha256": "e961bcbc80bfb9ba510b8f54529ec88a207cf42b97d9059d18d4b587919c78ec"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py",
+        "bytes": 16544,
+        "sha256": "537d5f0353e894222bc9ffd74614dfb86d221be9982e17f4e7aa7b796b5844e6"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_F_PRODUCT_PURPOSE_AND_SAFETY_SURFACES",
+    "directly_reassessed_policy_ids": [
+      "FP-001"
+    ],
+    "directly_reassessed_gap_ids": [
+      "GAP-010"
+    ],
+    "impact_reviewed_policy_ids": [],
+    "impact_reviewed_gap_ids": [],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_F_PURPOSE_SURFACES_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "excluded_from_scope": [
+      "unrelated dirty-tree paths",
+      "checkpoint, runbook, test-layer records, and daylog",
+      "Phase A-E implementation paths not changed by Phase F",
+      "Phase E immutable predecessors",
+      "Phase F builder, test, and generated trace outputs"
+    ],
+    "file_count": 9,
+    "path_set_sha256": "a4a588a9f1539f074f8005648ae01803d23a0780dde2c8bc49d8878af939f703",
+    "content_set_sha256": "3c5292f45803172b2cb0c770ac01a1c0e36288914a2c2b867169ef34e3d4a41a",
+    "files": [
+      {
+        "path": "apps/android/README.md",
+        "bytes": 25223,
+        "sha256": "8ee085adba050076989b582d885c6419106894b0178cf3d23d04e79c810d2713"
+      },
+      {
+        "path": "apps/android/USER_GUIDE.md",
+        "bytes": 7999,
+        "sha256": "7232be39a09c19909207b64f9be4074c02edd9f3ed206dee200911f2e080de3a"
+      },
+      {
+        "path": "apps/android/RELEASE_DESCRIPTION.md",
+        "bytes": 2868,
+        "sha256": "cd90614ed8d60c255659c5aa50c3476399585a5337d5da3d84e55d6027922725"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "bytes": 312084,
+        "sha256": "b56c5ca940f45160454e0285f6c6b458cf6764234b51ff6de80be9cb4907406a"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "bytes": 6989,
+        "sha256": "7f8b7a271118638d85e7c479f420ef9432dfad106ca99b5309f20cfb96a04666"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+        "bytes": 2219,
+        "sha256": "1c8a54942fed3fc82c324e4a8c4100bcaf447cfa67497d2c3697e6a971623417"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt",
+        "bytes": 6641,
+        "sha256": "741b896ea90b05bdfdfc1a07a0f63cf5f1979d59198af97099e577fed0b5e982"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+        "bytes": 17379,
+        "sha256": "84f4f4a8b94683cfe1026ff8cf346bcf805d2cf475323c885735e7a060568bf7"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ProductPurposeSurfacesStaticTest.kt",
+        "bytes": 2240,
+        "sha256": "410c34a7b021f27efa479fc3f9c73eacce4a160eabd1070aafda055c1b2a9db1"
+      }
+    ],
+    "snapshot_sha256": "ada6a25e7902b59a8e805e898de671a91ed011240bee70f21d7d7cd9356e65d8"
+  },
+  "purpose_surface_contract": {
+    "scope": "FP_001_ANDROID_PURPOSE_AND_SAFETY_SURFACES",
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "source_policy_id": "FP-001",
+    "purpose_statement_ko": "워크세이프는 시각장애인의 도심 보행 중 가까운 위험과 이동 방향을 알려 주고 손상 점자블록 신고를 돕는 안드로이드 보행 보조 서비스입니다.",
+    "safety_limitation_ko": "워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다.",
+    "product_axes": [
+      "가까운 위험 안내",
+      "TMAP 큰 이동 방향 안내",
+      "손상 점자블록 신고 지원"
+    ],
+    "surfaces": [
+      {
+        "surface": "ANDROID_FIRST_SCREEN",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "state": "INTERNAL_IMPLEMENTATION_VERIFIED"
+      },
+      {
+        "surface": "ANDROID_REPORT_CONSENT",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+        "state": "INTERNAL_IMPLEMENTATION_VERIFIED"
+      },
+      {
+        "surface": "REL_17_USER_GUIDE_CANDIDATE",
+        "path": "apps/android/USER_GUIDE.md",
+        "state": "DRAFT_NOT_APPROVED"
+      },
+      {
+        "surface": "REL_09_RELEASE_DESCRIPTION_CANDIDATE",
+        "path": "apps/android/RELEASE_DESCRIPTION.md",
+        "state": "PLANNED_NOT_RUN_INTERNAL_DRAFT_NOT_PUBLISHED"
+      }
+    ],
+    "report_scope": "DAMAGED_TACTILE_BLOCK_ONLY",
+    "ambiguous_general_risk_reporting_user_text": "ABSENT_IN_CONTROLLED_ANDROID_SURFACES",
+    "excluded_feature_boundary": [
+      "보호자 추적",
+      "넘어짐 탐지"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "release_description_publication_status": "NOT_PUBLISHED",
+    "release_status": "NOT_ELIGIBLE",
+    "contract_sha256": "7e21643651393120c42f899a694f9a9338520d34617746f99a6defba7238e814"
+  },
+  "implemented_controls": [
+    {
+      "control": "SHARED_PURPOSE_AND_SAFETY_CONSTANTS",
+      "result": "첫 화면과 신고 동의가 FP-001 목적문·안전 한계 공통 상수를 사용한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt"
+      ]
+    },
+    {
+      "control": "DAMAGED_TACTILE_BLOCK_REPORT_WORDING",
+      "result": "사용자 신고 문구를 손상 점자블록으로 한정하고 모호한 일반 위험 신고 표현을 제거했다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ProductPurposeSurfacesStaticTest.kt"
+      ]
+    },
+    {
+      "control": "REL_17_DRAFT_USER_GUIDE",
+      "result": "비전공자용 설명 후보를 작성했지만 REL-17은 DRAFT·NOT_APPROVED다.",
+      "paths": [
+        "apps/android/README.md",
+        "apps/android/USER_GUIDE.md"
+      ]
+    },
+    {
+      "control": "REL_09_UNPUBLISHED_RELEASE_DESCRIPTION",
+      "result": "릴리스 설명 후보를 작성했지만 REL-09는 PLANNED/NOT_RUN이고 게시하지 않았다.",
+      "paths": [
+        "apps/android/README.md",
+        "apps/android/RELEASE_DESCRIPTION.md"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "actual_device_execution": "NOT_RUN",
+    "rel17_approval": "NOT_APPROVED",
+    "rel09_execution": "NOT_RUN",
+    "release_description_publication": "NOT_PUBLISHED",
+    "commands": [
+      {
+        "scope": "Phase F 목적 표면 focused JVM 회귀",
+        "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest --tests '*ProductPurposeSurfacesStaticTest' --tests '*WalkSafeStartupCapabilityTest' --tests '*ReportPrivacyConsentSessionTest'",
+        "status": "PASS_INTERNAL_16_OF_16"
+      },
+      {
+        "scope": "Android 사용자 앱 전체 JVM·lint 회귀",
+        "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest :app:lintDebug",
+        "status": "PASS_INTERNAL_379_OF_379_LINT_PASS"
+      }
+    ],
+    "interpretation": "저장소 내부 목적문·동의·문서 정합성과 JVM 회귀 증거다. 실제 기기, 사용자 접근성, 정식 시험, REL-17 승인, REL-09 실행·게시 또는 출시 증거가 아니다."
+  },
+  "open_issues": [
+    {
+      "id": "EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE",
+      "status": "OPEN_NEXT",
+      "description": "목적지를 선택하지 않은 상태에서도 가까운 위험 안내가 작동하도록 길안내와 위험안내의 경로 의존 조건을 분리하고 검증한다."
+    },
+    {
+      "id": "PHASE-F-REL17-APPROVAL",
+      "status": "NOT_APPROVED",
+      "description": "사용자 설명서는 내부 Draft이며 정식 검토·승인되지 않았다."
+    },
+    {
+      "id": "PHASE-F-REL09-EXECUTION-PUBLICATION",
+      "status": "NOT_RUN",
+      "description": "릴리스 설명은 내부 후보이며 실행·게시되지 않았다."
+    },
+    {
+      "id": "PHASE-F-ACTUAL-DEVICE-AND-ACCESSIBILITY",
+      "status": "NOT_RUN",
+      "description": "실제 기기와 대상 사용자의 첫 화면·동의·접근성 이해 여부를 검증하지 않았다."
+    },
+    {
+      "id": "PHASE-F-FORMAL-TESTS",
+      "status": "NOT_RUN",
+      "description": "정식 시험 279개는 모두 미실행이다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "actual_device_test_status": "NOT_RUN",
+    "rel17_status": "DRAFT_NOT_APPROVED",
+    "rel09_status": "PLANNED_NOT_RUN_NOT_PUBLISHED",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-01",
+    "work_item_id": "EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE",
+    "status": "PLANNED_NEXT_WITHIN_IN_PROGRESS_EPIC",
+    "action": "목적지를 선택하지 않은 상태에서도 가까운 위험 안내가 작동하도록 길안내와 위험안내의 경로 의존 조건을 분리하고 검증한다."
+  },
+  "record_content_sha256": "1c532bb993464d431856a441ff391850314b2f58aa2f10947c0a781dcd012f7c"
+}

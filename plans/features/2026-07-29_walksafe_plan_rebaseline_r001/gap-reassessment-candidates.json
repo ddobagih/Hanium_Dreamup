@@ -1,0 +1,616 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GAP-REASSESSMENT-CANDIDATES-20260729-R001",
+  "status": "PLAN_ONLY_NOT_CANONICAL_GAP",
+  "source_gap_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260726-021",
+  "source_gap_sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+  "evidence_binding_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/gap-evidence-bindings.json",
+  "evidence_binding_required": true,
+  "records": [
+    {
+      "gap_id": "GAP-002",
+      "source_policy_id": "NPC-DATA-LIFECYCLE",
+      "r021_assessment_sha256": "a91b2a84946cab71c7f6b489f7ce6f50dbe5a416eb95498f708913868416dd69",
+      "r021_status": "PARTIAL",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits the current deletion policy and Gateway rights ledger.",
+      "candidate_current_text": "Android deletion policy and a Gateway rights ledger exist, while real per-store workers, backup expiry and retention enforcement remain incomplete.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+          "file_sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7",
+          "bytes": 13324,
+          "symbol_or_test": "PrivacyDeletionPolicy",
+          "observed_fact": "Defines the Android-side deletion-state and fail-closed policy boundary."
+        },
+        {
+          "path": "apps/android-gateway/src/privacy-rights.ts",
+          "file_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+          "bytes": 44699,
+          "symbol_or_test": "privacy rights ledger handlers",
+          "observed_fact": "Implements Gateway-side privacy-right request and ledger handling."
+        }
+      ],
+      "internal_residual": "Connect actual per-store deletion workers, backup expiry and retention enforcement.",
+      "external_residual": "Legal, privacy and operational deletion verification remain not run."
+    },
+    {
+      "gap_id": "GAP-005",
+      "source_policy_id": "NPC-AUTO-REPORT",
+      "r021_assessment_sha256": "83410800ae513762d98c05a17481a128b00b2e066c6b18791e5cca1849142685",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text does not distinguish current consent controls from the still-conflicting active-walk upload path.",
+      "candidate_current_text": "Integrated consent controls exist, but MainActivity still reaches direct upload during an active walk instead of a post-walk durable queue.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+          "file_sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9",
+          "bytes": 18732,
+          "symbol_or_test": "IntegratedConsentPolicy",
+          "observed_fact": "Defines separate consent and withdrawal decisions for reporting-related data."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "symbol_or_test": "MainActivity report transfer path",
+          "observed_fact": "Contains the current active-walk report candidate and transfer integration."
+        }
+      ],
+      "internal_residual": "Replace active-walk direct upload with post-walk encrypted durable queue transfer.",
+      "external_residual": "Disconnected, reboot, real damage and deletion-SLA device verification remain not run."
+    },
+    {
+      "gap_id": "GAP-008",
+      "source_policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "r021_assessment_sha256": "2e9cf7c816b9fa96e80c2db871a6aea3cac7b5e25f2234ad11bfd329ea14715b",
+      "r021_status": "MISSING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": false,
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+          "file_sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+          "bytes": 19867,
+          "symbol_or_test": "AdminBoundaryActivity",
+          "observed_fact": "Exposes a separate Android administrator boundary and recovery entry points."
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+          "file_sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+          "bytes": 18158,
+          "symbol_or_test": "AdminSecurityController",
+          "observed_fact": "Implements administrator security and recovery-code controls."
+        },
+        {
+          "path": "backend/app/services/admin_security.py",
+          "file_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+          "bytes": 74728,
+          "symbol_or_test": "admin recovery service",
+          "observed_fact": "Implements backend administrator recovery state and verification logic."
+        }
+      ],
+      "internal_residual": "Complete external recovery-material provisioning and action-bound operational recovery paths.",
+      "external_residual": "Signing, device provisioning and actual loss-recovery drill remain not run."
+    },
+    {
+      "gap_id": "GAP-017",
+      "source_policy_id": "FP-008",
+      "r021_assessment_sha256": "fe3ce342122ad17699fe2d1ebcef08a64a2c3d4d5a786efb88373f08f8068853",
+      "r021_status": "MISSING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": false,
+      "evidence_locators": [
+        {
+          "path": "apps/android/settings.gradle.kts",
+          "file_sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+          "bytes": 356,
+          "symbol_or_test": "Gradle module inclusion",
+          "observed_fact": "Includes a distinct Android adminapp module."
+        },
+        {
+          "path": "apps/android/adminapp/build.gradle.kts",
+          "file_sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+          "bytes": 3325,
+          "symbol_or_test": "adminapp Android application module",
+          "observed_fact": "Defines the separately buildable Android administrator application."
+        },
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+          "file_sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+          "bytes": 19867,
+          "symbol_or_test": "AdminBoundaryActivity",
+          "observed_fact": "Shows the separate administrator UI boundary, with operational workflows still disabled."
+        }
+      ],
+      "internal_residual": "Implement admin review, rejection, agency delivery, receipt and audit workflows that are currently disabled.",
+      "external_residual": "Separate signing, private distribution, registered-device and agency verification remain not run."
+    },
+    {
+      "gap_id": "GAP-025",
+      "source_policy_id": "FP-016",
+      "r021_assessment_sha256": "cde44f2cf31ac47c7dccdc1f5f8e3db5e6d70374d369d56e25ef8cddd2f58758",
+      "r021_status": "PARTIAL",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 current implementation text was copied from an unrelated permission gap.",
+      "candidate_current_text": "The Android screen has a camera-centered minimal control flow with voice and back-navigation handling, while actual TalkBack and user usability evidence is absent.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+          "file_sha256": "1adfa0cf064c0cec0d0e41a3da88478cc633e88e3e3923c1cc510ba48ad0977f",
+          "bytes": 8754,
+          "symbol_or_test": "MainActivityFp016StaticTest",
+          "observed_fact": "Statically checks the FP-016 screen, voice and navigation contract."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "symbol_or_test": "MainActivity FP-016 UI flow",
+          "observed_fact": "Contains the camera-centered UI, voice prompts and back-navigation behavior."
+        }
+      ],
+      "internal_residual": "Describe and complete the camera-centered, minimal-button, voice and back-navigation contract.",
+      "external_residual": "Actual user, TalkBack and device usability verification remain not run."
+    },
+    {
+      "gap_id": "GAP-028",
+      "source_policy_id": "FP-019",
+      "r021_assessment_sha256": "7654fe55f2180ac2586ac6e1eb85bc23b729b427865d37b59e355e09c0bacf63",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits the detector-to-depth runtime connection while the approved-model boundary remains unresolved.",
+      "candidate_current_text": "A TFLite frame detector is connected to the depth pipeline, but model eligibility, risk thresholds and formal device evidence remain conflicting.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/inference/TfliteAndroidFrameDetector.kt",
+          "file_sha256": "ebe6e558f11b6553e6311e9e9069ecaf84a034ccdaafb986c42d14787f8b02c5",
+          "bytes": 17632,
+          "symbol_or_test": "TfliteAndroidFrameDetector",
+          "observed_fact": "Implements Android frame inference through a TFLite detector."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/ObjectDepthRuntimePipeline.kt",
+          "file_sha256": "67083a4d3ca5a0633a56d618573ad0c0ece1fd0f4999c41f8dbb82131bb9946e",
+          "bytes": 4905,
+          "symbol_or_test": "ObjectDepthRuntimePipeline",
+          "observed_fact": "Connects detected objects to depth estimation and runtime decisions."
+        }
+      ],
+      "internal_residual": "Remove noneligible model and low-threshold risk-path conflicts while preserving terminal fail-safe behavior.",
+      "external_residual": "Independent model, device performance and formal safety verification remain not run."
+    },
+    {
+      "gap_id": "GAP-030",
+      "source_policy_id": "FP-021",
+      "r021_assessment_sha256": "4b32f3c753747b27fa17eb2b4e54205cadb33ec68e7e0f8bae1637d85d2f847d",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits current frame-quality and supported-device policy controls.",
+      "candidate_current_text": "Frame-quality and approved-device policy controls exist, but production profile binding, measurements and field calibration remain absent.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicy.kt",
+          "file_sha256": "0005c18a68edc1cccbe8e5b5716fb883f9c38ef7fb7c343c757b3d91e4e15d95",
+          "bytes": 7593,
+          "symbol_or_test": "CameraFrameQualityPolicy",
+          "observed_fact": "Defines frame-quality acceptance and fail-closed decision rules."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfile.kt",
+          "file_sha256": "6e7dbed28a7eca1b2322179e26492bff6bef73bd64fb41b2c0453d929f019521",
+          "bytes": 3717,
+          "symbol_or_test": "ApprovedDeviceProfile",
+          "observed_fact": "Defines the supported-device profile boundary used by startup checks."
+        }
+      ],
+      "internal_residual": "Bind production profiles and actual frame measurements to the quality and distance gates.",
+      "external_residual": "Supported-device field calibration and formal verification remain not run."
+    },
+    {
+      "gap_id": "GAP-034",
+      "source_policy_id": "FP-025",
+      "r021_assessment_sha256": "4e4330ca9e58d340590b3930d68a01f93ccf55c977935e8f97bcd1ef1c635cf8",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits the current startup capability probe and its MainActivity integration.",
+      "candidate_current_text": "A startup capability probe is integrated, while approved wake-word, listening-cue and command-lifecycle behavior remains incomplete.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidStartupCapabilityProbe.kt",
+          "file_sha256": "20ae1ba97349599fefb9e2b0e214f05c9fad123430341134d834a2eadf00be94",
+          "bytes": 7618,
+          "symbol_or_test": "AndroidStartupCapabilityProbe",
+          "observed_fact": "Aggregates startup capability checks into a fail-closed result."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "symbol_or_test": "MainActivity startup capability integration",
+          "observed_fact": "Uses the startup probe before entering the walk flow."
+        }
+      ],
+      "internal_residual": "Implement the approved wake word, listening cues and command lifecycle without weakening offline recognition.",
+      "external_residual": "Noise, TalkBack, device and formal speech verification remain not run."
+    },
+    {
+      "gap_id": "GAP-036",
+      "source_policy_id": "FP-027",
+      "r021_assessment_sha256": "96cfc4ac0a759fc0bd1b314ef984c2b29e16f0be692154112bc45b37027cf5e1",
+      "r021_status": "CONFLICTING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": false,
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+          "file_sha256": "8ecb306453a80763db0caba8d5665a4403d836ee8ed757d4fdb2b106b9c2cfec",
+          "bytes": 7129,
+          "symbol_or_test": "WalkSafeStartupCapability",
+          "observed_fact": "Models offline speech readiness and fail-closed startup capability."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+          "file_sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+          "bytes": 42238,
+          "symbol_or_test": "AndroidFeedbackActuator",
+          "observed_fact": "Implements Korean speech and haptic feedback with fail-safe behavior."
+        }
+      ],
+      "internal_residual": "Complete bounded retry and distinct warning, caution and full-stop haptic semantics.",
+      "external_residual": "Offline TTS and haptic device/formal verification remain not run."
+    },
+    {
+      "gap_id": "GAP-040",
+      "source_policy_id": "FP-031",
+      "r021_assessment_sha256": "3561a0e11ae35172b9cf792a68373c13cc53eb6c0ab4709df3c14c2166d1d684",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits repeated-observation and consent controls but must retain the active-walk transfer conflict.",
+      "candidate_current_text": "Repeated-observation, GPS-confidence and consent controls exist, but candidates still reach transfer during an active walk instead of a post-walk durable queue.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicy.kt",
+          "file_sha256": "6dbb8871a1365546351e4201ae36c6aebda99453a356ae2e3ff31b1ef2cdd875",
+          "bytes": 7540,
+          "symbol_or_test": "AndroidReportCandidatePolicy",
+          "observed_fact": "Defines repeated-observation and candidate eligibility rules."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "symbol_or_test": "MainActivity report integration",
+          "observed_fact": "Integrates report candidate creation and the current transfer path."
+        }
+      ],
+      "internal_residual": "Move repeated observations to a post-walk encrypted queue and implement merge and deletion policy.",
+      "external_residual": "Real damage, location, disconnection and deletion-SLA verification remain not run."
+    },
+    {
+      "gap_id": "GAP-041",
+      "source_policy_id": "FP-032",
+      "r021_assessment_sha256": "57a7f1d70b424ef753f3419d521add9eb92ede585b6606eb2efcaec14e6e98c8",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits current pending-store, uploader and backend replay controls while durable payload recovery remains incomplete.",
+      "candidate_current_text": "Pending metadata, uploader checks and backend replay/storage recovery exist, but encrypted payload persistence, a stable ID and reboot-safe status-first recovery do not.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "symbol_or_test": "AndroidPendingReportStore",
+          "observed_fact": "Stores pending report metadata but does not provide the required complete durable payload contract."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+          "file_sha256": "5da74e5af5de0f2e977dabdd20a71541de3177eb4a35dd98a2c11f79e5bde264",
+          "bytes": 13861,
+          "symbol_or_test": "AndroidReportUploader",
+          "observed_fact": "Implements current upload and receipt checks."
+        },
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "symbol_or_test": "report storage service",
+          "observed_fact": "Implements backend report storage and recovery journal behavior."
+        }
+      ],
+      "internal_residual": "Implement encrypted payload persistence, stable ID, status-first recovery, expiry and reboot drain.",
+      "external_residual": "Lost-response, concurrent retry, reboot and partial-store verification remain not run."
+    },
+    {
+      "gap_id": "GAP-042",
+      "source_policy_id": "FP-033",
+      "r021_assessment_sha256": "6f576d11cefff9deef5a863011c0d646355cc596234ec91cb0990472e9d4a04d",
+      "r021_status": "PARTIAL",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text incorrectly implies one Android module and omits the current separate adminapp and backend review surfaces.",
+      "candidate_current_text": "A separate adminapp and backend review/status surfaces exist, but review, rejection, agency receipt and user feedback workflows remain incomplete or disabled.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+          "file_sha256": "9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97",
+          "bytes": 19867,
+          "symbol_or_test": "AdminBoundaryActivity",
+          "observed_fact": "Provides a separate administrator surface while operational report workflows remain disabled."
+        },
+        {
+          "path": "backend/app/api/reports.py",
+          "file_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+          "bytes": 79611,
+          "symbol_or_test": "administrator report API",
+          "observed_fact": "Provides backend review and report state endpoints without actual agency submission."
+        }
+      ],
+      "internal_residual": "Complete review, rejection reason, agency submission, receipt, result and user correction state machine.",
+      "external_residual": "Actual agency receipt and admin/user accessibility and least-privilege verification remain not run."
+    },
+    {
+      "gap_id": "GAP-044",
+      "source_policy_id": "FP-035",
+      "r021_assessment_sha256": "2ed736d1811e48a05ba502b5e77353979a6b777a2d6b4b76b1d8c2794b9c4ee1",
+      "r021_status": "CONFLICTING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": false,
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "file_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+          "bytes": 12485,
+          "symbol_or_test": "AndroidNetworkTransferPolicy",
+          "observed_fact": "Defines stopped-walk confirmation, Wi-Fi default, cellular opt-in and unknown-network fail-closed behavior."
+        }
+      ],
+      "internal_residual": "Add encrypted durable queue, reboot recovery, 30-day expiry, chunk hash receipt and release collector.",
+      "external_residual": "Background, battery and network-transition device/formal verification remain not run."
+    },
+    {
+      "gap_id": "GAP-045",
+      "source_policy_id": "FP-036",
+      "r021_assessment_sha256": "aa535d242303de931de318b8bae33262b48368f8e7ebb9de49c51db64b98d120",
+      "r021_status": "MISSING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "MISSING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 remediation text omits current atomic report storage and lists retention periods inconsistently with policy.",
+      "candidate_current_text": "Atomic report-image storage and journal recovery exist, but the approved source-dataset receipt, device deletion, quarantine and retention lifecycle is missing.",
+      "evidence_locators": [
+        {
+          "path": "backend/app/services/report_storage.py",
+          "file_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+          "bytes": 6132,
+          "symbol_or_test": "report storage service",
+          "observed_fact": "Implements atomic report-image storage and journal recovery, not the full dataset lifecycle."
+        }
+      ],
+      "internal_residual": "Implement dataset receipt comparison, device deletion, quarantine, retention and backup-deletion chain.",
+      "external_residual": "Failure injection, time travel and operational backup evidence remain not run."
+    },
+    {
+      "gap_id": "GAP-049",
+      "source_policy_id": "FP-040",
+      "r021_assessment_sha256": "b31a86c712acb44faf0bfcf0830ed4fe997abdbdd15f8b58b8f0f621c260f063",
+      "r021_status": "PARTIAL",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits current Gateway and backend administrator security boundaries.",
+      "candidate_current_text": "Gateway route/auth boundaries and backend administrator security controls exist, while a single operational admin entry, exception approval, full idempotency and resource separation remain incomplete.",
+      "evidence_locators": [
+        {
+          "path": "apps/android-gateway/src/routes.ts",
+          "file_sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+          "bytes": 30206,
+          "symbol_or_test": "Gateway route/auth boundary",
+          "observed_fact": "Defines authenticated Gateway operational route boundaries; it does not itself establish administrator routes."
+        },
+        {
+          "path": "backend/app/api/admin_security.py",
+          "file_sha256": "6ab25efeba7aebf244d98fd9675c9b8f23a32b08d61072a3f347fb5f84f8c274",
+          "bytes": 11600,
+          "symbol_or_test": "backend administrator security API",
+          "observed_fact": "Provides backend administrator security endpoints and checks."
+        }
+      ],
+      "internal_residual": "Complete single admin entry, exception approval, all-write idempotency and workload resource separation.",
+      "external_residual": "Cross-process, operational deployment and formal verification remain not run."
+    },
+    {
+      "gap_id": "GAP-052",
+      "source_policy_id": "FP-043",
+      "r021_assessment_sha256": "404342822742a243317b4afe49347b6f548fd2b88af5703ce3e9220f69e1d5e3",
+      "r021_status": "CONFLICTING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 current text does not reflect the current walk-session resource probe and safe-stop integration.",
+      "candidate_current_text": "Walk-session resource probes and MainActivity safe-stop integration cover several resource failures, while the location-inclusive matrix and one consistent recovery state machine remain incomplete.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+          "file_sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+          "bytes": 5353,
+          "symbol_or_test": "AndroidWalkSessionResourceProbe",
+          "observed_fact": "Aggregates Android low-battery, private-storage and critical-thermal observations for a walk session."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "file_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+          "bytes": 757627,
+          "symbol_or_test": "MainActivity resource safe-stop integration",
+          "observed_fact": "Integrates resource results into the current walk safety flow."
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSessionDeviceResourceSnapshotTest.kt",
+          "file_sha256": "0a15f83bd09a53411ac715f492b0ea6787cd630b1ccadb04f07e71d819b426cf",
+          "bytes": 2457,
+          "symbol_or_test": "WalkSessionDeviceResourceSnapshotTest",
+          "observed_fact": "Checks resource snapshot classification and fail-closed outcomes without providing device or formal credit."
+        }
+      ],
+      "internal_residual": "Complete the location-inclusive failure matrix and one consistent safe-stop meaning.",
+      "external_residual": "Actual device, cross-process and formal failure verification remain not run."
+    },
+    {
+      "gap_id": "GAP-053",
+      "source_policy_id": "FP-044",
+      "r021_assessment_sha256": "1db306a542508f1b937b4b529b0ffc96e7909269567d55bb6750b41f97d6eeb1",
+      "r021_status": "CONFLICTING",
+      "disposition": "TEXT_FIX",
+      "status_disposition": "KEEP",
+      "candidate_status": "CONFLICTING",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 text omits the current stopped-network policy and pending-report metadata store.",
+      "candidate_current_text": "Stopped-walk and network-choice controls plus a pending metadata store exist, but active-state policy, encrypted payload capacity and reboot-safe recovery remain conflicting.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "file_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+          "bytes": 12485,
+          "symbol_or_test": "AndroidNetworkTransferPolicy",
+          "observed_fact": "Defines stopped-walk and network eligibility decisions."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+          "file_sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d",
+          "bytes": 8917,
+          "symbol_or_test": "AndroidPendingReportStore",
+          "observed_fact": "Provides pending report metadata storage without the full encrypted payload queue contract."
+        }
+      ],
+      "internal_residual": "Implement active-state policy, encrypted 30-day queue, reboot recovery and capacity contract.",
+      "external_residual": "Wi-Fi, cellular, reboot and field verification remain not run."
+    },
+    {
+      "gap_id": "GAP-054",
+      "source_policy_id": "FP-045",
+      "r021_assessment_sha256": "08f43a7f2eb0cbb2a9531d88f6929f04b0725c147d9af8f29e2241d569e57e6e",
+      "r021_status": "MISSING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 current text does not reflect the implemented resource probe and runtime metric preflight controls.",
+      "candidate_current_text": "Resource snapshot and runtime metric preflight controls exist with unit/static tests, while approved numeric limits, degradation order and supported-device long-run evidence remain absent.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+          "file_sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7",
+          "bytes": 5353,
+          "symbol_or_test": "AndroidWalkSessionResourceProbe",
+          "observed_fact": "Collects current walk-session resource observations."
+        },
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflight.kt",
+          "file_sha256": "633f7ebb848ac99ad36cc42186b119f07f297c472378fc5ca8785eaa96d2c3f5",
+          "bytes": 9214,
+          "symbol_or_test": "RuntimeMetricPreflightSession",
+          "observed_fact": "Defines bounded runtime metric preflight states and fail-closed outcomes."
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflightTest.kt",
+          "file_sha256": "e3bd147b2efbc4b44ff596a168819e60dc3563868b47f5ebee81dee04c20cec0",
+          "bytes": 10169,
+          "symbol_or_test": "RuntimeMetricPreflightTest",
+          "observed_fact": "Checks preflight bounds, timeout, lifecycle and invalid-evidence behavior without device credit."
+        },
+        {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+          "file_sha256": "16cb64f6028e9996c14550c7b05a804f0e4ffb40e31977de3872b2b57bf84151",
+          "bytes": 20353,
+          "symbol_or_test": "RuntimeMetricMainActivityStaticTest",
+          "observed_fact": "Statically checks MainActivity preflight integration without actual device or formal credit."
+        }
+      ],
+      "internal_residual": "Approve numeric thresholds, degradation order and long-running metric collection.",
+      "external_residual": "Supported-device thermal, battery and storage measurements remain not run."
+    },
+    {
+      "gap_id": "GAP-055",
+      "source_policy_id": "FP-046",
+      "r021_assessment_sha256": "dd605aee946cb50df56cf6c8ca61885c4386e5fd7f0c73fc75f8dd8fd9f056cb",
+      "r021_status": "MISSING",
+      "disposition": "REASSESS_UP",
+      "status_disposition": "REASSESS_UP",
+      "candidate_status": "PARTIAL",
+      "text_fix_required": true,
+      "text_fix_reason": "The r021 current text does not reflect the Android deletion client and Gateway privacy-rights ledger.",
+      "candidate_current_text": "An Android deletion client and Gateway privacy-rights ledger exist, while real per-store deletion, backup reapplication and retention enforcement remain incomplete.",
+      "evidence_locators": [
+        {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+          "file_sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89",
+          "bytes": 8994,
+          "symbol_or_test": "AndroidPrivacyDeletionClient",
+          "observed_fact": "Implements the Android privacy deletion request client boundary."
+        },
+        {
+          "path": "apps/android-gateway/src/privacy-rights.ts",
+          "file_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+          "bytes": 44699,
+          "symbol_or_test": "privacy rights ledger handlers",
+          "observed_fact": "Implements Gateway-side privacy deletion request and ledger handling."
+        }
+      ],
+      "internal_residual": "Implement per-store deletion workers, backup reapplication and retention-period enforcement.",
+      "external_residual": "Actual object store, KMS, legal and privacy verification remain not run."
+    }
+  ],
+  "summary": {
+    "record_count": 19,
+    "reassess_up_count": 7,
+    "status_keep_text_fix_count": 12,
+    "status_change_with_text_fix_count": 3,
+    "total_text_fix_required_count": 15,
+    "implemented_candidate_count": 0,
+    "canonical_status_changed": false,
+    "execution_credit": 0,
+    "acceptance_credit": 0,
+    "approval_credit": 0,
+    "artifact_credit": 0,
+    "event_credit": 0,
+    "release_credit": 0
+  }
+}

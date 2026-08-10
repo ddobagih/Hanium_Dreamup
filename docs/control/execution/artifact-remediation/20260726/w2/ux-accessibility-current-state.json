@@ -1,0 +1,199 @@
+{
+  "schema_version": "walksafe.artifact-remediation.ux-accessibility-current-state.v2",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W2-UX-ACCESSIBILITY-CURRENT-STATE-20260726-001",
+  "version": "2.0.0",
+  "kind": "NON_DESTRUCTIVE_SUCCESSOR_SUPPLEMENT",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T22:05:20+09:00",
+  "source_commit": null,
+  "lifecycle_status": "DRAFT_SUCCESSOR_SUPPLEMENT",
+  "scope": {
+    "wave": "W2",
+    "packet": "W2-DES-UX",
+    "artifact_type_count": 4,
+    "artifact_type_ids": ["DLV-DES-14", "DLV-DES-16", "DLV-DES-17", "DLV-DES-18"]
+  },
+  "non_destructive_boundary": {
+    "legacy_canonical_documents_modified": false,
+    "legacy_approval_records_modified": false,
+    "legacy_registers_modified": false,
+    "application_code_modified": false,
+    "actual_device_screenshots_generated": false,
+    "artifact_state_or_approval_changed": false,
+    "formal_verification_changed": false,
+    "release_decision_changed": false,
+    "interpretation": "현행 source에 결속된 W2 정적 prototype과 Draft token/component 계약을 add-only로 제공한다. 구현·실기기·승인 완료를 대신하지 않는다."
+  },
+  "application_and_route_inventory": [
+    {
+      "application":"WALKSAFE-ANDROID-USER",
+      "module":"apps/android/app",
+      "role":"보행 사용자 및 우선 사용자 교육 대상",
+      "route_id":"ANDROID-USER-LAUNCHER",
+      "entry":"MAIN/LAUNCHER",
+      "controller":"kr.co.hanium.dreamup.walksafe.MainActivity",
+      "secondary_route_observed":false,
+      "navigation_model":"단일 portrait Activity의 programmatic FrameLayout/ScrollView와 상태별 visibility",
+      "logical_regions":["first_run","priority_onboarding","startup_device_permission","walk_runtime","navigation","privacy_report_account","debug_only"]
+    },
+    {
+      "application":"WALKSAFE-ANDROID-ADMIN",
+      "module":"apps/android/adminapp",
+      "role":"관리자 보안·복구 담당자",
+      "route_id":"ANDROID-ADMIN-LAUNCHER",
+      "entry":"MAIN/LAUNCHER",
+      "controller":"kr.co.hanium.dreamup.walksafe.admin.AdminBoundaryActivity",
+      "secondary_route_observed":false,
+      "navigation_model":"별도 단일 Activity ScrollView와 security state별 group visibility",
+      "logical_regions":["authentication","recovery","sessions","high_risk_lock"],
+      "operational_boundary":"ADMIN_OPERATIONAL_WORKFLOWS_ENABLED=true이면 Activity 생성 거부; controller 없음이면 interactive group 숨김"
+    }
+  ],
+  "prototype_and_design_contract": {
+    "prototype_path":"docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+    "prototype_sha256":"4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356",
+    "prototype_trace_path":"docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+    "prototype_trace_sha256":"6403e24e9f2480ffe2fbd5363e4138d6c372ebe99593406e8a6bdc51578773a1",
+    "design_token_contract_path":"docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+    "design_token_contract_sha256":"039afefa3809239e1140fd99882a7e8355664dfea532a1cefdd9cbf932939d0a",
+    "frame_count":10,
+    "state_classes":["loading","empty","error","blocked","safety","recovery"],
+    "route_frame_mapping_status":"PASS_STATIC_TRACE",
+    "token_component_mapping_status":"COMPLETE_AS_TOKEN_MAPPED_OR_UNAPPROVED_DEVIATION",
+    "historical_figma_or_pwa_current_authority":false,
+    "actual_device_screenshot_status":"NOT_RUN",
+    "approved_prototype_or_design_system_claimed":false
+  },
+  "artifacts": [
+    {
+      "artifact_type_id":"DLV-DES-14",
+      "display_code":"DES-14",
+      "title":"화면 정보구조",
+      "current_disposition":"INTERNAL_CONTENT_COMPLETE_RUNTIME_EVIDENCE_PENDING",
+      "approval_status_change_claimed":false,
+      "delivered":"두 별도 Android 앱의 exact launcher/controller, 역할 경계, 논리 구역과 상태 frame을 결속했다.",
+      "gap_disposition":{
+        "gap_id":"W2-UX-GAP-DES14-001",
+        "owner_roles":["Android개발책임자","QA책임자","접근성·안전책임자"],
+        "target_wave":"W4",
+        "current_status":"STATIC_ROUTE_SCREEN_INVENTORY_COMPLETE_ACTUAL_DEVICE_PENDING",
+        "closure_condition":"고정 후보 Android build에서 user/admin launcher와 10개 상태 frame에 대응하는 실제 화면·전이·회복을 확인하고 route/screen capture manifest를 승인 가능한 evidence로 결속한다.",
+        "expected_evidence_paths":["docs/control/execution/artifact-remediation/20260726/w4/android-ui-state-capture-manifest.json","docs/control/execution/artifact-remediation/20260726/w4/android-ui-route-transition-results.json"]
+      }
+    },
+    {
+      "artifact_type_id":"DLV-DES-16",
+      "display_code":"DES-16",
+      "title":"와이어프레임·프로토타입",
+      "current_disposition":"STATIC_PROTOTYPE_BASELINE_CREATED_RUNTIME_CAPTURE_PENDING",
+      "approval_status_change_claimed":false,
+      "delivered":"source-linked deterministic HTML 10 frame과 trace matrix를 만들어 loading/empty/error/blocked/safety/recovery를 frame과 1:1 매핑했다.",
+      "gap_disposition":{
+        "gap_id":"W2-UX-GAP-DES16-001",
+        "owner_roles":["제품책임자","Android개발책임자","QA책임자"],
+        "target_wave":"W4",
+        "current_status":"STATIC_PROTOTYPE_CREATED_ACTUAL_DEVICE_VISUAL_BASELINE_PENDING",
+        "closure_condition":"고정 후보 build의 실제 user/admin 화면을 동일 state matrix로 재현하고 screenshot hash, viewport/device identity, prototype 차이와 승인 판정을 남긴다.",
+        "expected_evidence_paths":["docs/control/execution/artifact-remediation/20260726/w4/android-ui-state-capture-manifest.json","docs/control/execution/artifact-remediation/20260726/w4/android-prototype-conformance-results.json"]
+      }
+    },
+    {
+      "artifact_type_id":"DLV-DES-17",
+      "display_code":"DES-17",
+      "title":"디자인 시스템",
+      "current_disposition":"DRAFT_SHARED_TOKEN_COMPONENT_CONTRACT_CREATED_RUNTIME_CONFORMANCE_PENDING",
+      "approval_status_change_claimed":false,
+      "delivered":"공통 semantic color/typography/spacing/focus/announcement/risk/safe/admin-lock token과 8개 component contract를 정의하고 실제 literal/component를 TOKEN_MAPPED 또는 UNAPPROVED_DEVIATION으로 분류했다.",
+      "gap_disposition":{
+        "gap_id":"W2-UX-GAP-DES17-001",
+        "owner_roles":["기술책임자","Android개발책임자","접근성·안전책임자","QA책임자"],
+        "target_wave":"W4",
+        "current_status":"DRAFT_CONTRACT_COMPLETE_SOURCE_REFACTOR_AND_DEVICE_MEASUREMENT_PENDING",
+        "closure_condition":"두 앱이 승인된 resource/component contract를 소비하도록 deviation을 처리하고 실제 대비, 큰 글꼴, focus indicator와 48dp target을 측정해 PASS 또는 잔여 결함으로 판정한다.",
+        "expected_evidence_paths":["docs/control/execution/artifact-remediation/20260726/w4/android-visual-token-conformance-results.json","docs/control/execution/artifact-remediation/20260726/w4/android-ui-accessibility-defect-register.json"]
+      }
+    },
+    {
+      "artifact_type_id":"DLV-DES-18",
+      "display_code":"DES-18",
+      "title":"접근성 설계",
+      "current_disposition":"STATIC_SEMANTIC_FOCUS_ANNOUNCEMENT_TRACE_COMPLETE_DEVICE_ACCESSIBILITY_PENDING",
+      "approval_status_change_claimed":false,
+      "delivered":"사용자 앱의 명시적 heading/live region/focus/TalkBack 정적 계약과 관리자 앱의 partial live-region 및 누락 focus 계약을 prototype·token에 연결했다.",
+      "gap_disposition":{
+        "gap_id":"W2-UX-GAP-DES18-001",
+        "owner_roles":["접근성·안전책임자","Android개발책임자","QA책임자"],
+        "target_wave":"W4",
+        "current_status":"STATIC_TRACE_COMPLETE_TALKBACK_AND_USER_VALIDATION_PENDING",
+        "closure_condition":"실기기 TalkBack tree와 탐색 순서, dynamic announcement, panel/group 전환 focus, 큰 글꼴/reflow, 대비/touch target을 10개 frame에 대해 실행하고 차단 결함 0 또는 승인된 잔여위험을 증명한다.",
+        "expected_evidence_paths":["docs/control/execution/artifact-remediation/20260726/w4/android-talkback-accessibility-results.json","docs/control/execution/artifact-remediation/20260726/w4/android-accessibility-tree-captures.json","docs/control/execution/artifact-remediation/20260726/w4/android-ui-accessibility-defect-register.json"]
+      }
+    }
+  ],
+  "semantic_and_accessibility_trace": {
+    "user_static_present":["camera PreviewView accessibility exclusion","heading and polite live regions","high-frequency status live-region none plus explicit priority announcement","permission denial assertive focus/traversal","TalkBack fallback and risk repeat suppression static test contract"],
+    "admin_static_present":["polite status live region","assertive async result live region","native text/hint widget labels","pending interactive disable","high-risk action text and reason list"],
+    "unapproved_or_unverified":["admin title heading and explicit traversal/focus restore","admin stateDescription/contentDescription coverage","session zero/load-failure copy split","runtime TalkBack tree","large text/reflow","contrast","focus indicator","all touch targets","actual blind/low-vision user test"]
+  },
+  "claim_boundary": {
+    "allowed":["W2 static prototype and Draft design contract exist with exact source mappings.","DES16 and DES17 internal documentation majors are addressed at static contract level.","Four remaining runtime gaps each have one stable disposition bound to W4 owner, closure and evidence paths."],
+    "prohibited":["Approved design baseline, application refactor, actual-device screenshot, TalkBack PASS, user-test PASS, formal completion, gate waiver, production readiness or release eligibility."]
+  },
+  "verification_boundary": {
+    "static_prototype_trace_status":"PASS",
+    "source_sha_status":"PASS_AT_GENERATION",
+    "application_build_or_test_executed":false,
+    "actual_device_screenshot_status":"NOT_RUN",
+    "talkback_navigation_status":"NOT_RUN",
+    "accessibility_tree_capture_status":"NOT_RUN",
+    "actual_blind_or_low_vision_user_test_status":"NOT_RUN",
+    "large_text_reflow_status":"NOT_RUN",
+    "color_contrast_measurement_status":"NOT_RUN",
+    "touch_target_measurement_status":"NOT_RUN",
+    "formal_test_plan_count":279,
+    "formal_test_not_run_count":279,
+    "formal_test_status":"NOT_RUN",
+    "release_gate_count":5,
+    "release_gate_status":"NOT_RUN",
+    "release_gates_waived":false,
+    "release_status":"NOT_ELIGIBLE"
+  },
+  "source_bindings": [
+    {"binding_id":"SRC-W2-AUDIT","path":"docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json","sha256":"713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc","allowed_claim":"DES14/16/17/18 audit reasons and actions.","prohibited_claim":"Remediation approval."},
+    {"binding_id":"SRC-W2-WAVE","path":"docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json","sha256":"873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258","allowed_claim":"W2 scope and boundary.","prohibited_claim":"Wave completion."},
+    {"binding_id":"SRC-LEGACY-DES-DRAFT","path":"docs/deliverables/04-design/user-experience-and-accessibility-design.md","sha256":"962b3b9471faac60a895f2056865a8e4b12cb354874e197928ba35aa964dbe06","allowed_claim":"Predecessor design intent and NOT_RUN boundary.","prohibited_claim":"Current approval."},
+    {"binding_id":"SRC-LEGACY-DES-REGISTER","path":"docs/deliverables/04-design/design-traceability-register.json","sha256":"1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa","allowed_claim":"Predecessor DRAFT/NOT_APPROVED/NOT_RUN state.","prohibited_claim":"Current lifecycle promotion."},
+    {"binding_id":"SRC-USER-MAIN","path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","sha256":"a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43","allowed_claim":"User route controller, regions, states and accessibility source.","prohibited_claim":"Runtime UI or device PASS."},
+    {"binding_id":"SRC-USER-MANIFEST","path":"apps/android/app/src/main/AndroidManifest.xml","sha256":"d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52","allowed_claim":"User launcher route and portrait.","prohibited_claim":"Successful device execution."},
+    {"binding_id":"SRC-USER-STYLES","path":"apps/android/app/src/main/res/values/styles.xml","sha256":"e4d7e6828932ca6d969086c37e51af2a076d9d22388a0854eef78d5cf6b3579c","allowed_claim":"User theme literals.","prohibited_claim":"Approved tokens or measured contrast."},
+    {"binding_id":"SRC-USER-A11Y-TEST","path":"apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt","sha256":"00343190f9b2145303e375405bc41f23d19ae79aafef98940ac0b236943e9d87","allowed_claim":"Pre-existing static accessibility contract source.","prohibited_claim":"This packet ran tests or TalkBack passed."},
+    {"binding_id":"SRC-ADMIN-ACTIVITY","path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","sha256":"9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97","allowed_claim":"Admin regions, security states, live regions and locks.","prohibited_claim":"Operational workflow or accessibility completion."},
+    {"binding_id":"SRC-ADMIN-MANIFEST","path":"apps/android/adminapp/src/main/AndroidManifest.xml","sha256":"064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb","allowed_claim":"Separate admin launcher.","prohibited_claim":"Authorization completion."},
+    {"binding_id":"SRC-ADMIN-STYLES","path":"apps/android/adminapp/src/main/res/values/styles.xml","sha256":"b55e90d6a20aac934bcc4fd3e474c842d1fb4807d4b984a80de03959b529f649","allowed_claim":"Admin theme literals.","prohibited_claim":"Approved shared tokens."},
+    {"binding_id":"SRC-STATIC-PROTOTYPE","path":"docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html","sha256":"4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356","allowed_claim":"Deterministic static state frames.","prohibited_claim":"Actual-device screenshot or approved UI."},
+    {"binding_id":"SRC-PROTOTYPE-TRACE","path":"docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json","sha256":"6403e24e9f2480ffe2fbd5363e4138d6c372ebe99593406e8a6bdc51578773a1","allowed_claim":"Route/frame/source/token mapping.","prohibited_claim":"Runtime state execution."},
+    {"binding_id":"SRC-DESIGN-TOKEN-CONTRACT","path":"docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json","sha256":"039afefa3809239e1140fd99882a7e8355664dfea532a1cefdd9cbf932939d0a","allowed_claim":"Draft shared token/component/deviation contract.","prohibited_claim":"Source refactor or runtime conformance."}
+  ],
+  "validation_invariants": {
+    "artifact_type_count":4,
+    "artifact_type_ids_exact":["DLV-DES-14","DLV-DES-16","DLV-DES-17","DLV-DES-18"],
+    "gap_disposition_count":4,
+    "gap_disposition_per_artifact":1,
+    "all_target_waves":"W4",
+    "frame_count":10,
+    "route_count":2,
+    "source_commit_is_null":true,
+    "actual_device_screenshot_status":"NOT_RUN",
+    "formal_test_not_run_count":279,
+    "remaining_gate_count":5,
+    "release_gates_waived":false,
+    "release_status":"NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), trailing_lf=true, integrity.content_fingerprint.value=null",
+      "value": "758d25b6ea30f7631eefec65ad41c7b822e008dc2e35e83f30d1583ea29aaf39"
+    }
+  }
+}

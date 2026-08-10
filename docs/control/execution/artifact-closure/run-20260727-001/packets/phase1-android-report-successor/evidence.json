@@ -1,0 +1,640 @@
+{
+  "capture_time": "2026-07-28T00:16:10+09:00",
+  "claim_bindings": [
+    {
+      "claim": "Persistent report payload persistence is disabled and fail-closed cleanup-only, not a completed durable queue.",
+      "sources": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt"
+      ],
+      "tests": [
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStoreTest.kt"
+      ]
+    },
+    {
+      "claim": "Direct upload response binding and cooldown/retry metadata are implemented at host-tested code level.",
+      "sources": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicy.kt"
+      ],
+      "tests": [
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicyTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt"
+      ]
+    },
+    {
+      "claim": "Account-deletion fallback marker behavior is implemented at host-tested code level.",
+      "sources": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt"
+      ],
+      "tests": [
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt"
+      ]
+    }
+  ],
+  "claim_boundary": {
+    "co_binding_note": "This packet content-addresses current source/test files and receipts together; receipts do not prove those exact file bytes were the execution-time snapshot.",
+    "execution_receipts_embed_source_manifest": false,
+    "formal279_claimed": false,
+    "host_unit_and_static_lint_only": true,
+    "instrumentation_claimed": false,
+    "pass_interpretation": "PASS applies only to the exact recorded host Gradle/JUnit/lint commands and counts; it is not device, server, field, product, or release evidence.",
+    "physical_device_claimed": false,
+    "product_release_claimed": false,
+    "separate_process_claimed": false,
+    "server_contract_claimed": false
+  },
+  "current_validation": {
+    "failure_clusters": {
+      "errors": 0,
+      "failures": 0,
+      "junit_xml_files": 5,
+      "result": "PASS",
+      "skipped": 0,
+      "tests": 45
+    },
+    "full_unit": {
+      "errors": 0,
+      "failures": 0,
+      "junit_xml_files": 99,
+      "result": "PASS",
+      "skipped": 0,
+      "tests": 759
+    },
+    "lint": {
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    "targeted": {
+      "errors": 0,
+      "failures": 0,
+      "junit_xml_files": 14,
+      "result": "PASS",
+      "skipped": 0,
+      "tests": 82
+    }
+  },
+  "exact_count_self_check": {
+    "expected_log_count": 10,
+    "expected_receipt_count": 9,
+    "expected_source_count": 12,
+    "expected_test_source_count": 20,
+    "observed_log_count": 10,
+    "observed_receipt_count": 9,
+    "observed_source_count": 12,
+    "observed_test_source_count": 20,
+    "status": "PASS"
+  },
+  "implementation_facts": {
+    "account_deletion_fallback_marker": {
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "status": "IMPLEMENTED"
+    },
+    "cooldown_and_retry_metadata": {
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "status": "IMPLEMENTED"
+    },
+    "direct_upload_response_binding": {
+      "evidence_level": "STATIC_SOURCE_AND_HOST_UNIT_TEST",
+      "status": "IMPLEMENTED"
+    },
+    "persistent_report_payload_queue": {
+      "feature_flag": "PERSISTENT_REPORT_QUEUE_ENABLED",
+      "mode": "DISABLED_FAIL_CLOSED_CLEANUP_ONLY",
+      "persistent_payload_decrypt": "OPEN",
+      "persistent_payload_drain": "OPEN",
+      "persistent_payload_enqueue": "OPEN",
+      "persistent_payload_load": "OPEN",
+      "value": false
+    }
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "excluded_json_path": "$.packet_content_fingerprint",
+    "sha256": "0f0eec806a5168151b361185c884dd850aa8239d32e555c3268fe2d8e5c2e5db"
+  },
+  "packet_id": "PHASE1-ANDROID-REPORT-SUCCESSOR-20260727-001",
+  "packet_status": "PARTIAL_IMPLEMENTATION_HOST_VALIDATION_PASS_OPEN_GATES_PRESERVED",
+  "prepared_on": "2026-07-28",
+  "preserved_failure_history": [
+    {
+      "failures": 0,
+      "run": "targeted-attempt1",
+      "stage": "compileDebugKotlin",
+      "tests": 0
+    },
+    {
+      "failures": 0,
+      "run": "targeted-attempt2",
+      "stage": "compileDebugUnitTestKotlin",
+      "tests": 0
+    },
+    {
+      "failures": 6,
+      "run": "targeted-attempt3",
+      "tests": 82
+    },
+    {
+      "failures": 1,
+      "run": "targeted-attempt4",
+      "tests": 82
+    },
+    {
+      "failures": 18,
+      "run": "full-unit-attempt1",
+      "tests": 759
+    }
+  ],
+  "residual_risks": [
+    {
+      "detail": "Persistent payload enqueue/load/decrypt/drain is not implemented or enabled.",
+      "id": "OPEN-PERSISTENT-PAYLOAD-QUEUE",
+      "status": "OPEN"
+    },
+    {
+      "detail": "HTTP-date Retry-After handling is absent.",
+      "id": "OPEN-HTTP-DATE-RETRY-AFTER",
+      "status": "OPEN"
+    },
+    {
+      "detail": "Server idempotency and payload receipt binding are not established.",
+      "id": "OPEN-SERVER-IDEMPOTENCY-PAYLOAD-RECEIPT",
+      "status": "OPEN"
+    },
+    {
+      "detail": "Consent-response tuple binding is not established.",
+      "id": "OPEN-CONSENT-RESPONSE-TUPLE",
+      "status": "OPEN"
+    },
+    {
+      "detail": "Cooldown preferences and v2 state update are not atomic.",
+      "id": "OPEN-NONATOMIC-COOLDOWN-STATE",
+      "status": "OPEN"
+    },
+    {
+      "detail": "Safety marker creation can block the UI for up to 2 seconds.",
+      "id": "OPEN-UI-BLOCK-SAFETY-MARKER",
+      "status": "OPEN"
+    },
+    {
+      "detail": "Real separate-process coverage and real legacy fixture coverage are insufficient.",
+      "id": "OPEN-REAL-PROCESS-LEGACY-FIXTURES",
+      "status": "OPEN"
+    }
+  ],
+  "schema_version": "walksafe.phase1-android-report-successor-evidence.v1",
+  "scope": {
+    "canonical_docs_or_code_modified": false,
+    "git_used": false,
+    "release_eligible": false,
+    "subject": "Android report/privacy successor",
+    "tests_run_by_packet_authoring": false
+  },
+  "source_test_binding": {
+    "capture_mode": "CURRENT_FILES_CONTENT_ADDRESSED_WITHOUT_PROOF_OF_EXECUTION_TIME_IDENTITY",
+    "hash_algorithm": "SHA-256",
+    "manifest_sha256": "d22bbc3f5f4a007f8f848356104800a3180de7f05a9cb103bd2ecc0526931c9f",
+    "source_count": 12,
+    "source_total_bytes": 875532,
+    "sources": [
+      {
+        "byte_length": 4652,
+        "exact_path": "apps/android/app/build.gradle.kts",
+        "sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160"
+      },
+      {
+        "byte_length": 757627,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e"
+      },
+      {
+        "byte_length": 10523,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+        "sha256": "d4fed81cd6f7857088213bfeba9ce9b08f9519bf5540dd30df56f8344a01fd25"
+      },
+      {
+        "byte_length": 8994,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+        "sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89"
+      },
+      {
+        "byte_length": 12443,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+        "sha256": "746907805a196b3d73dcd4299db2706350953c691e6b23f42e8afee8859dfb07"
+      },
+      {
+        "byte_length": 8917,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStore.kt",
+        "sha256": "5c18152c19d92ad4973bd88bb41ee37dbf9a26bd690ed0ee10df34618155a34d"
+      },
+      {
+        "byte_length": 7540,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicy.kt",
+        "sha256": "6dbb8871a1365546351e4201ae36c6aebda99453a356ae2e3ff31b1ef2cdd875"
+      },
+      {
+        "byte_length": 12573,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicy.kt",
+        "sha256": "4df71d859cfc6716180444cfa8ef3e5c1dd80e41d7dbddac986dab1b80a8216a"
+      },
+      {
+        "byte_length": 13861,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+        "sha256": "5da74e5af5de0f2e977dabdd20a71541de3177eb4a35dd98a2c11f79e5bde264"
+      },
+      {
+        "byte_length": 6346,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+        "sha256": "f0bc17b243f52f9a100f926fdda51973df572c34b9368b2ac4e750ef1fd8b6ef"
+      },
+      {
+        "byte_length": 18732,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+        "sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9"
+      },
+      {
+        "byte_length": 13324,
+        "exact_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+        "sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7"
+      }
+    ],
+    "test_source_count": 20,
+    "test_source_total_bytes": 198101,
+    "tests": [
+      {
+        "byte_length": 14592,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AndroidReportSuccessorStaticTest.kt",
+        "sha256": "98275a80ba9bcd3680d106840dc1ed398f994774a1f4257e69646e0a7faaa729"
+      },
+      {
+        "byte_length": 12989,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+        "sha256": "1be7bbcd8854f8f1b3fb050c1206fd071e3daecf4eccef6e46b29ef8968f2a7e"
+      },
+      {
+        "byte_length": 8732,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+        "sha256": "46c1fba3167b9fb92b1c61f77645bc283b0b262f146b705ad0dd0b13f5518bc3"
+      },
+      {
+        "byte_length": 1595,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalStaticTest.kt",
+        "sha256": "5fecb60b9fea9414c9a31bfc2b9117698f0b75d1c81a7c50393c37fe70f288e8"
+      },
+      {
+        "byte_length": 20326,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt",
+        "sha256": "cd34e3d9369bbc1a4719dbc33ff2e4bf481f905acfca00c49ddaa31ccc90a5a7"
+      },
+      {
+        "byte_length": 4295,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+        "sha256": "de171ee17b89b6675c0c5959fa490facecf147510ed1785c9f1c14d21b1e92fd"
+      },
+      {
+        "byte_length": 3743,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+        "sha256": "ab0ac3ec00c53a8ea36d986985f206ac20835a2c1cfeaa408bc134fc51ab1dd5"
+      },
+      {
+        "byte_length": 13858,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+        "sha256": "c83ba6ce541b1639d16cbd6741c39705e8f50f29be32e284c797b46b090b5686"
+      },
+      {
+        "byte_length": 11829,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStoreTest.kt",
+        "sha256": "df6cfbbbe43ba0d2a2b3b8f46ae816adb241466f16a489a1c66cef16d10d6913"
+      },
+      {
+        "byte_length": 8240,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicyTest.kt",
+        "sha256": "03e00799b55ac534c132b39aa0738d7b6ecaad100f331da75f9f2a564f557522"
+      },
+      {
+        "byte_length": 7097,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicyTest.kt",
+        "sha256": "94981b5eb45c0873b6e8e4f9eab1bedb633b5f1d0c322b1847f596fe8ebe850e"
+      },
+      {
+        "byte_length": 2442,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportPurposeHeaderStaticTest.kt",
+        "sha256": "a90dfe8fad0d5c2f989633ef10a037864bb19295702ec937b921431dae63e355"
+      },
+      {
+        "byte_length": 20790,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+        "sha256": "c3d4cf89a8a264435f232916eaf91e39bc03108518fcaa499ada764fa8ea7ff2"
+      },
+      {
+        "byte_length": 9596,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+        "sha256": "59fbffefcb55ee48ce64d7532354e8012b5c59ecaeecb91fe5c05a09026450d0"
+      },
+      {
+        "byte_length": 2934,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyAccountDeletionTest.kt",
+        "sha256": "e19d0dd8136e6f083f692727a0699ab4d958931eca698da1c32aa63923499d09"
+      },
+      {
+        "byte_length": 22770,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+        "sha256": "aa18d2fc648b713751481f152d78638b2a0c5293fd435607bc86227e0f1bd4de"
+      },
+      {
+        "byte_length": 16842,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+        "sha256": "3bb534c89d088c23b3755c5573801ff6bf0f3a1cf57876be655e9158abedf62b"
+      },
+      {
+        "byte_length": 3953,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentWithdrawalTest.kt",
+        "sha256": "a2c0d75efd12f0fa04991a40ebfab5bff095247d25a956b708f73768cfe3c0b3"
+      },
+      {
+        "byte_length": 5751,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+        "sha256": "ea0ee6d7077fdc72c273d8a3be018c4bcf3d3c60d9973ae9699f8128bd0bbedd"
+      },
+      {
+        "byte_length": 5727,
+        "exact_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+        "sha256": "03062251a4269ee596f4633c66c93c849b980a302683cc6f91a8918547487f41"
+      }
+    ]
+  },
+  "validation_evidence_binding": {
+    "direct_path_and_sha_match_count": 6,
+    "log_file_count": 10,
+    "log_total_bytes": 38604,
+    "logs": [
+      {
+        "byte_length": 2374,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4.log",
+        "sha256": "e8869170b0b9af4c25537d16cf0c6d164f7d813713ed192986ecf378ba0c9776"
+      },
+      {
+        "byte_length": 9134,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-attempt1-fail.log",
+        "sha256": "def00872f36b2a5462825414e4ab38b4cee584a466bde63dbb9f0cf3df8744ce"
+      },
+      {
+        "byte_length": 5430,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4.log",
+        "sha256": "abacad53db8291319976a7ea0adbde5637eb92c200b630566a9935900db46dc4"
+      },
+      {
+        "byte_length": 2076,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4.log",
+        "sha256": "d7cb7493cb40965999427b6972cd8835fa0a1a32e2c05c90ac2ac6d2b2954e5d"
+      },
+      {
+        "byte_length": 3944,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-pending-report-targeted.log",
+        "sha256": "145a6d8223d88c06288474144492b3b5c0b857def4812e98104235ac039e28a0"
+      },
+      {
+        "byte_length": 1618,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt1-compile-fail.log",
+        "sha256": "752b6a720408d1952bce5d858c593e39879f5a493eefc0e2af742a8429abfb73"
+      },
+      {
+        "byte_length": 6112,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt2-test-compile-fail.log",
+        "sha256": "63cec6e888ce4d41495c54459d82afd851c91a5476a327155eeb818fd79d31bb"
+      },
+      {
+        "byte_length": 3573,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt3-test-fail.log",
+        "sha256": "1a7a27d3539c48eb9ee2c90b1c50d40d8e9451b0337ce577396bf51865fbf539"
+      },
+      {
+        "byte_length": 2425,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt4-test-fail.log",
+        "sha256": "aa47b93994c41cd0bff2d0cea8b5caa5d25a1b53cd77dfc33487fa8bb39baed9"
+      },
+      {
+        "byte_length": 1918,
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+        "sha256": "e4832666eae394efa0cb8fb8fa9061f84b49018f70df543407adaa37fdc5c53b"
+      }
+    ],
+    "manifest_sha256": "f8bcd36b6c64fb68da9e8205b363add8ab46aa4a9c85dcd81d5c9a54a46bf9a2",
+    "receipt_count": 9,
+    "receipt_total_bytes": 6361,
+    "receipts": [
+      {
+        "bound_log_byte_length": 1918,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+        "bound_log_sha256": "e4832666eae394efa0cb8fb8fa9061f84b49018f70df543407adaa37fdc5c53b",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+        "declared_log_sha256": "e4832666eae394efa0cb8fb8fa9061f84b49018f70df543407adaa37fdc5c53b",
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "historical": false,
+        "junit_xml_files": 14,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T15:00:58.102445+00:00",
+        "receipt_byte_length": 668,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-receipt.json",
+        "receipt_sha256": "e26bcddb987e44b5d920d67e29e621cdb49d3bfa0e77152614078b970c625111",
+        "result": "PASS",
+        "run_id": "android-report-r4-targeted",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 82
+      },
+      {
+        "bound_log_byte_length": 5430,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4.log",
+        "bound_log_sha256": "abacad53db8291319976a7ea0adbde5637eb92c200b630566a9935900db46dc4",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4.log",
+        "declared_log_sha256": "abacad53db8291319976a7ea0adbde5637eb92c200b630566a9935900db46dc4",
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "historical": false,
+        "junit_xml_files": 99,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T15:05:46.150441+00:00",
+        "receipt_byte_length": 688,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-receipt.json",
+        "receipt_sha256": "94b0eafea6345122971afa44dc61d8281646cdabc294bff8ef1b48efac961d97",
+        "result": "PASS",
+        "run_id": "android-full-debug-unit-r4",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 759
+      },
+      {
+        "bound_log_byte_length": 2374,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4.log",
+        "bound_log_sha256": "e8869170b0b9af4c25537d16cf0c6d164f7d813713ed192986ecf378ba0c9776",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4.log",
+        "declared_log_sha256": "e8869170b0b9af4c25537d16cf0c6d164f7d813713ed192986ecf378ba0c9776",
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "historical": false,
+        "junit_xml_files": 5,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T15:05:04.824490+00:00",
+        "receipt_byte_length": 682,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4-receipt.json",
+        "receipt_sha256": "d31570d79744860fd7131c6b0afa56b4072eb58edee291f9574efb2c70f5be7d",
+        "result": "PASS",
+        "run_id": "android-full-failure-clusters-r4",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 45
+      },
+      {
+        "bound_log_byte_length": 2076,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4.log",
+        "bound_log_sha256": "d7cb7493cb40965999427b6972cd8835fa0a1a32e2c05c90ac2ac6d2b2954e5d",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4.log",
+        "declared_log_sha256": "d7cb7493cb40965999427b6972cd8835fa0a1a32e2c05c90ac2ac6d2b2954e5d",
+        "errors": 0,
+        "exit_code": 0,
+        "failures": 0,
+        "historical": false,
+        "junit_xml_files": 0,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T15:06:33.696494+00:00",
+        "receipt_byte_length": 530,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4-receipt.json",
+        "receipt_sha256": "5d9cf1b4313b49f7440a365111f9745316c233004193459ff9db3f7fa2aed873",
+        "result": "PASS",
+        "run_id": "android-lint-debug-r4",
+        "skipped": 0,
+        "test_execution_started": false,
+        "tests": 0
+      },
+      {
+        "bound_log_byte_length": 1618,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt1-compile-fail.log",
+        "bound_log_sha256": "752b6a720408d1952bce5d858c593e39879f5a493eefc0e2af742a8429abfb73",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt1-compile-fail.log",
+        "declared_log_sha256": "752b6a720408d1952bce5d858c593e39879f5a493eefc0e2af742a8429abfb73",
+        "errors": 0,
+        "exit_code": 1,
+        "failure_stage": "compileDebugKotlin",
+        "failures": 0,
+        "historical": true,
+        "junit_xml_files": 0,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T14:49:38.889203611Z",
+        "receipt_byte_length": 888,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt1-receipt.json",
+        "receipt_sha256": "aa7227e67492034e07a56dd3f0dc3b6dfbbd2d9ffb93fa86be4b9bc2bf8e11c4",
+        "result": "FAIL",
+        "run_id": "android-report-r4-targeted-attempt1",
+        "skipped": 0,
+        "test_execution_started": false,
+        "tests": 0
+      },
+      {
+        "bound_log_byte_length": 6112,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt2-test-compile-fail.log",
+        "bound_log_sha256": "63cec6e888ce4d41495c54459d82afd851c91a5476a327155eeb818fd79d31bb",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt2-test-compile-fail.log",
+        "declared_log_sha256": "63cec6e888ce4d41495c54459d82afd851c91a5476a327155eeb818fd79d31bb",
+        "errors": 0,
+        "exit_code": 1,
+        "failure_stage": "compileDebugUnitTestKotlin",
+        "failures": 0,
+        "historical": true,
+        "junit_xml_files": 0,
+        "log_binding_status": "DIRECT_PATH_AND_SHA_MATCH",
+        "observed_at": "2026-07-27T14:51:53.193916960Z",
+        "receipt_byte_length": 880,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt2-receipt.json",
+        "receipt_sha256": "8656830bf84eb25f12fc5ab1ffdfeb453c34d73b226bcc08289ccaffd9aaf524",
+        "result": "FAIL",
+        "run_id": "android-report-r4-targeted-attempt2",
+        "skipped": 0,
+        "test_execution_started": false,
+        "tests": 0
+      },
+      {
+        "bound_log_byte_length": 3573,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt3-test-fail.log",
+        "bound_log_sha256": "1a7a27d3539c48eb9ee2c90b1c50d40d8e9451b0337ce577396bf51865fbf539",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+        "declared_log_sha256": "1a7a27d3539c48eb9ee2c90b1c50d40d8e9451b0337ce577396bf51865fbf539",
+        "errors": 0,
+        "exit_code": 1,
+        "failures": 6,
+        "historical": true,
+        "junit_xml_files": 14,
+        "log_binding_status": "DECLARED_REUSED_PATH_SHA_MATCHES_SEPARATELY_PRESERVED_LOG",
+        "observed_at": "2026-07-27T14:54:24.488363+00:00",
+        "receipt_byte_length": 668,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt3-receipt.json",
+        "receipt_sha256": "4ed7dbc3732c9120598886a2dc311618cd34b380c6fc3de83249f80bf374e9ef",
+        "result": "FAIL",
+        "run_id": "android-report-r4-targeted-attempt3",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 82
+      },
+      {
+        "bound_log_byte_length": 2425,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt4-test-fail.log",
+        "bound_log_sha256": "aa47b93994c41cd0bff2d0cea8b5caa5d25a1b53cd77dfc33487fa8bb39baed9",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted.log",
+        "declared_log_sha256": "aa47b93994c41cd0bff2d0cea8b5caa5d25a1b53cd77dfc33487fa8bb39baed9",
+        "errors": 0,
+        "exit_code": 1,
+        "failures": 1,
+        "historical": true,
+        "junit_xml_files": 14,
+        "log_binding_status": "DECLARED_REUSED_PATH_SHA_MATCHES_SEPARATELY_PRESERVED_LOG",
+        "observed_at": "2026-07-27T14:59:17.395956+00:00",
+        "receipt_byte_length": 668,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt4-receipt.json",
+        "receipt_sha256": "dda45a551b4467a63d60d9c574887f281639abb1a88f4c4956e986dbd3775c07",
+        "result": "FAIL",
+        "run_id": "android-report-r4-targeted-attempt4",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 82
+      },
+      {
+        "bound_log_byte_length": 9134,
+        "bound_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-attempt1-fail.log",
+        "bound_log_sha256": "def00872f36b2a5462825414e4ab38b4cee584a466bde63dbb9f0cf3df8744ce",
+        "declared_log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4.log",
+        "declared_log_sha256": "def00872f36b2a5462825414e4ab38b4cee584a466bde63dbb9f0cf3df8744ce",
+        "errors": 0,
+        "exit_code": 1,
+        "failures": 18,
+        "historical": true,
+        "junit_xml_files": 99,
+        "log_binding_status": "DECLARED_REUSED_PATH_SHA_MATCHES_SEPARATELY_PRESERVED_LOG",
+        "observed_at": "2026-07-27T15:01:46.622580+00:00",
+        "receipt_byte_length": 689,
+        "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-unit-r4-attempt1-receipt.json",
+        "receipt_sha256": "cfc1a8b7bc981e3e051e6c3807cb577404d49ddcddcc54eb15d09b20b64d57bb",
+        "result": "FAIL",
+        "run_id": "android-full-debug-unit-r4-attempt1",
+        "skipped": 0,
+        "test_execution_started": true,
+        "tests": 759
+      }
+    ],
+    "separately_preserved_historical_log_match_count": 3,
+    "unreceipted_log_paths": [
+      "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-pending-report-targeted.log"
+    ]
+  }
+}

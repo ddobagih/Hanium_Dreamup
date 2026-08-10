@@ -1,0 +1,145 @@
+{
+  "schema_version": "walksafe.release-control-register.v1",
+  "metadata": {
+    "title": "WalkSafe 릴리스 통제 보조 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "REL-01",
+      "REL-02",
+      "REL-10"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "register_mode": "PREOPENED_APPEND_ONLY",
+  "release_candidates": [],
+  "formal_release_candidate_count": 0,
+  "release_artifacts": [],
+  "release_approvals": [],
+  "approved_stage_roadmap": {
+    "stages": [
+      "DEVELOPMENT",
+      "CONTROLLED_DEMO",
+      "BETA",
+      "RELEASE"
+    ],
+    "controlled_demo_date": "2026-07-26",
+    "controlled_demo_is_release": false,
+    "deployment_model": "MANAGED_CLOUD_STAGING_FIRST",
+    "fixed_project_budget_krw": null,
+    "note": "일정 방향은 확정됐지만 명명된 release candidate와 release artifact는 아직 없다."
+  },
+  "current_readiness": {
+    "status": "NOT_ELIGIBLE",
+    "tst_22_decision": "NOT_RUN",
+    "reason": "명명된 release 후보와 승인 증거가 없고 5개 gate가 모두 미실행이다."
+  },
+  "known_issues": [
+    {
+      "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "affected_scope": [
+        "일반 활동원본 전송",
+        "Android 사용자 앱",
+        "backend"
+      ],
+      "owner_clarification_required": false,
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+      "related_test_status": "NOT_RUN",
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "correction_candidate_approval_status": "NOT_APPROVED",
+      "correction_candidate_effective_status": "NOT_EFFECTIVE",
+      "policy_effect_claimed": false,
+      "resolution": "포착한 정규화 지시를 영향 산출물에 반영하고 새 묶음 승인을 받아 기준선에 결속한다. 같은 선택을 다시 묻지 않는다.",
+      "change_request_id": "REQ-CHG-20260721-002",
+      "waived": false
+    }
+  ],
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "title": "실제 클라우드 저장비 측정",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다.",
+      "evidence_ids": []
+    }
+  ],
+  "entry_contract": {
+    "release_candidate_required_fields": [
+      "release_id",
+      "scope",
+      "source_commit",
+      "build_ids",
+      "model_ids",
+      "config_versions",
+      "migration_ids",
+      "owner",
+      "opened_at",
+      "status"
+    ],
+    "evidence_required_fields": [
+      "evidence_id",
+      "release_id",
+      "artifact_path_or_storage_id",
+      "sha256",
+      "byte_length",
+      "created_at",
+      "issuer",
+      "verification_status"
+    ],
+    "append_only": true
+  },
+  "approval_boundary": {
+    "draft_register_is_release_evidence": false,
+    "release_completed": false,
+    "release_approved": false,
+    "gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

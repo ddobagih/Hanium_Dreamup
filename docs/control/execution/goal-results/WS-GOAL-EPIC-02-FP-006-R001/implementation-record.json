@@ -1,0 +1,142 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP006-PHONE-MOUNTING-IMPLEMENTATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-25T00:14:50+09:00",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "d1aaab83217c88c6d86161172575ad4d42fcbf0c0c30063d7619b27a3256e61d",
+      "before_sha256": "649c21e5d5ee78a31cb674111d64c8b532b26df346b0a30a589758e094dedc1c"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "dc08c1ef35fc5d4bb84fcddc36388e0ecb1fa87249a6a22d95656747ae8a1591",
+      "before_sha256": "75823ce80cb181d704195ff3a9bb74c9727210cf7b1fb799631fc5abfe297754"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicy.kt",
+      "after_sha256": "bdf694e8fea4448ce04f284e8727765cc706bca07ac092bcabebb7d00cd1ed1a"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+      "after_sha256": "a6bdd368f69d4f79595c9469dc3e5f40aa2ee1a17ef5aede315e0642cd404f15",
+      "before_sha256": "239e1da0d3eb3216e9944ce5e2b4759d16cf4630083511a189fb869152bf881c"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "379cb4ad1fc5f4ce581b738f39382884fc5a231b5abf6d1b32716c9868e43a09",
+      "before_sha256": "6060de77579559b43acbc2785e95d0199566dd1b0b4cbe51340b30e5cf7a5869"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "after_sha256": "d3952ddcb4c072048f05b00869c0c4fe976dc565cca607dda37cceb24c660535"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ProductPurposeSurfacesStaticTest.kt",
+      "after_sha256": "b8633d8cee90155d5404fe2f50213f5dfc7028e264acb9ebc9b399d7210d0725",
+      "before_sha256": "410c34a7b021f27efa479fc3f9c73eacce4a160eabd1070aafda055c1b2a9db1"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicyTest.kt",
+      "after_sha256": "2e7604b03d4f6012cb348dd5f0beab7cee1dc453fb7b86d69bad521b34c3644b"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuatorStaticTest.kt",
+      "after_sha256": "81be006463ba9a3532867a90727d3ebf1511879403b8510782db66bb68a3c922",
+      "before_sha256": "463db6fa9781a44f532b7198bed9867778c3f769f6a6bc436d89d77ccf1935e8"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "8f4e8d8b3996ca8fe648ead073877fd41ea601756bbca2af958c04c0470b59da",
+      "before_sha256": "2aa0c0ef40f822db993518c06b8fa239f282ce13aaa5a85229d40520ae547efe"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "e9c10fcec7436dd8b28df4fafc1df1f415adaf75f70398b6b896485c5ab5aaf5",
+      "before_sha256": "e54609115635462b5af5daa4c013823d8d9f015ced136adead7f05147249a0bc"
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_3.py",
+      "after_sha256": "27dde08c2f7828fc138b9f502a31d604fde60c3957e33e87882ee9f05dbb87ac",
+      "before_sha256": "11477dd3087cc0952949dc7979b8f0e9bd67890e76aba13db33361112b74be0a"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph_v2_3.py",
+      "after_sha256": "53f8191567df2f63349fce9816ebb20efd9829fa588593f10f7a5f0356f992ad",
+      "before_sha256": "9737203d13aef27dca7aa103a350d10a52d78701dbf3d588128a53f60a1557ed"
+    },
+    {
+      "path": "scripts/check_walksafe_project_continuation_v2_3.py",
+      "after_sha256": "a28286281f993fb558c7cc1ea46af0ff02973dcf38201957314771c18e51fa04",
+      "before_sha256": "1e9cf9759d5ec56354564b144f75459afcaffdd9bc3cd43a3693ecb149275481"
+    },
+    {
+      "path": "tests/test_walksafe_project_continuation_v2_3.py",
+      "after_sha256": "f11735fa87b8e352c2665fdeacbaca1db41f30e5b4dd67e222fbcb484be9f5b6",
+      "before_sha256": "4e4c89e251d4f471bb7bbbe989bef984e9a198b89f1bf1be2ddec4f91c4e4e10"
+    }
+  ],
+  "record_boundary": {
+    "product_implementation_paths": [
+      "apps/android/USER_GUIDE.md",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicy.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ProductPurposeSurfacesStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicyTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuatorStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt"
+    ],
+    "fp006_successor_completion_support_paths": [
+      "scripts/check_walksafe_goal_graph_v2_3.py",
+      "tests/test_walksafe_goal_graph_v2_3.py",
+      "scripts/check_walksafe_project_continuation_v2_3.py",
+      "tests/test_walksafe_project_continuation_v2_3.py"
+    ],
+    "control_plane_support_purpose": "The v2.3 goal-graph and continuation checker/test changes support the FP-006 successor and completion transition.",
+    "control_plane_support_is_phone_mounting_product_implementation": false
+  },
+  "implemented_controls": [
+    "only chest-forward and necklace-forward are eligible mounting methods; handheld, pocket and unknown fail closed",
+    "current-epoch user confirmation and separately measured camera evidence are both required for start or resume",
+    "the approved mounting profile and camera-quality profile are separate and production profiles remain null until approved",
+    "stale, epoch-mismatched, profile-mismatched, missing or failed evidence cannot enable detection output",
+    "active mounting faults suppress metric, fallback, feedback, navigation and report outputs before correction guidance",
+    "post-fault recovery requires explicit user correction confirmation and fresh post-fault camera evidence",
+    "bounded failed retries latch the central safe stop and cannot automatically restore the prior walk",
+    "PHONE_MOUNTING remains a readiness requirement separate from OFFICIAL_ENVIRONMENT",
+    "the mounting UI exposes two named controls, on-screen and spoken status, and a distinct correction vibration",
+    "the user guide states that WalkSafe does not replace a white cane, guide dog or other existing aid"
+  ],
+  "remaining_implementation_boundaries": [
+    "production phone-mounting and camera-quality profiles are null and unapproved",
+    "approved height, pitch, shake and occlusion thresholds have not been derived from field measurements",
+    "actual user, body-type, device, mount and walking-condition evidence is absent",
+    "TC-FP-006-01 through TC-FP-006-04 and release gates have not been run"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-006-01",
+      "TC-FP-006-02",
+      "TC-FP-006-03",
+      "TC-FP-006-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "phone_mounting_field_test_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "production_phone_mounting_profile": null,
+    "production_camera_quality_profile": null,
+    "approved_production_profile_count": 0,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

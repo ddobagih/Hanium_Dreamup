@@ -1,0 +1,151 @@
+.venv/
+.gradle/
+.kotlin/
+.playwright-cli/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+build/
+*.tsbuildinfo
+*.hprof
+*.apk
+*.aab
+*.apks
+*.jks
+*.keystore
+*.p12
+local.properties
+
+# Current repository boundary
+/docs/submission/
+/templates/\[서식1\] 2026 한이음 드림업 개발보고서 양식.docx
+/templates/\[서식2\] 2026년_제작설계서_일반(개인정보 기재x).pptx
+/templates/개발보고서 양식.docx
+/templates/제작설계서_일반.pptx
+/templates/SUBMISSION_BUILD_MANIFEST.json
+/.gitleaks-current-mirror/
+docs/control/execution/**/gitleaks-current-tree-input/
+/docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016.md
+/scripts/walksafe_v2_5_candidate_validation.py
+/tests/test_walksafe_v2_5_control_candidate_20260730.py
+/daylog/2026-07-01.md
+
+# Model training outputs
+runs/
+weights/
+*.zip
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.gguf
+*.onnx
+*.engine
+*.tflite
+*_saved_model/
+calibration_image_sample_data_*.npy
+calibration_image_sample_data_*.npy.zip
+*.mlpackage/
+*.log
+
+# Local datasets can contain personal or location-sensitive imagery.
+data_sources/raw/
+/datasets/coco/
+/datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/
+datasets/walksafe_kr_v1/BUILD_SUMMARY.md
+datasets/walksafe_kr_v2/
+datasets/**/images/**
+datasets/**/labels/**
+!datasets/**/images/**/
+!datasets/**/images/**/.gitkeep
+!datasets/**/labels/**/
+!datasets/**/labels/**/.gitkeep
+datasets/**/labels/*.cache
+datasets/**/labels/**/*.cache
+
+# Local app artifacts
+apps/web/.next/
+apps/web/node_modules/
+apps/web/walksafe-test-logs/
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/android_debug_logs/
+logs/
+/artifacts/
+/backups/
+# Generated evaluation/report trees can contain field imagery and must never be
+# staged wholesale. Curated submission evidence belongs under docs/submission.
+/reports/
+data/datasets/local_links/
+model/artifacts/pretrained/
+model/artifacts/exports/
+model/artifacts/candidates/
+
+# Runtime artifacts explicitly activated by the WalkSafe 768 contract. Keep
+# training runs and all other candidate/export files ignored.
+!model/artifacts/
+!model/artifacts/candidates/
+!model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/
+!model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt
+!apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite
+!apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite
+!apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite
+
+# Goal execution logs are content-addressed evidence, not local runtime logs.
+!docs/control/execution/goal-results/**/*.log
+!docs/control/execution/goal-gates/**/*.log
+
+# Local voice prototype artifacts
+outputs/*
+!outputs/voice/
+outputs/voice/*
+!outputs/voice/.gitkeep
+!outputs/voice/cache/
+outputs/voice/cache/*
+!outputs/voice/cache/.gitkeep
+!outputs/voice/tts/
+outputs/voice/tts/*
+!outputs/voice/tts/.gitkeep
+!samples/voice/
+samples/voice/stt/*
+!samples/voice/stt/.gitkeep
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.webm
+
+# Local voice virtualenv
+.venv-voice/
+
+# Local review/data artifacts that should not be pushed accidentally
+# Curated external-AI review packages belong under ai_tasks/ instead.
+docs/review/**/chunks/**
+docs/review/**/final_crops/**
+docs/review/**/final_overlays/**
+data_sources/labels/**
+data_sources/manifests/*_error_chunks_*/
+data_sources/manifests/*_materialized_manifest_*.csv
+data_sources/manifests/*_master_manifest*.csv
+data_sources/manifests/*_image_manifest*.csv
+data_sources/manifests/*_filename_sanitize_map*.csv
+data_sources/manifests/*_privacy_location_audit_results*.csv
+data_sources/manifests/*_val_image_error_summary_*.csv
+datasets/*/materialized_manifest.csv
+
+# External-AI working imagery and annotations stay local. Only instructions,
+# manifests, and textual review results are publishable.
+ai_tasks/**/components/images/
+ai_tasks/**/components/labels_initial/
+ai_tasks/**/components/labels_final/
+ai_tasks/**/components/crops/
+ai_tasks/**/components/overlays/
+ai_tasks/**/components/contact_sheets/

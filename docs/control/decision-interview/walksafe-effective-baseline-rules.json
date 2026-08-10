@@ -1,0 +1,958 @@
+{
+  "schema_version": "walksafe.effective-baseline-rules.v1",
+  "candidate": {
+    "id": "walksafe-effective-baseline-candidate-20260719",
+    "version": "0.1.0",
+    "as_of": "2026-07-19",
+    "lifecycle_status": "IN_REVIEW"
+  },
+  "answer_intake": {
+    "external_path": "/home/ddobagi/Downloads/walksafe-feature-policy-decisions-20260718-answers.json",
+    "controlled_path": "docs/control/decision-interview/walksafe-feature-policy-decisions-20260718-answers.json",
+    "sha256": "5797915c804de913159d806ea31ad4803a456e32c8bf282f41527de5e172f93f",
+    "captured_at": "2026-07-19T01:00:03+09:00",
+    "source_class": "EXTERNAL",
+    "artifact_form": "EXTERNAL_RECORD",
+    "evidence_classification": "USER_CONFIRMED",
+    "adoption_trust": "D"
+  },
+  "approval_boundary": {
+    "questionnaire_status": "QUESTIONNAIRE_COMPLETE",
+    "owner_policy_review_status": "READY_FOR_REVIEW",
+    "baseline_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "approved_by": null,
+    "approved_at": null,
+    "baseline_approver_role": "프로젝트관리자(사용자 본인)",
+    "baseline_approval_recorded": false,
+    "note": "이번 후보는 제품책임자 답변을 통합한 검토본이다. 최종 기준선 승인권은 프로젝트관리자인 사용자 본인에게 유지한다. 기술·실측·독립 전문가·생성 증거 gate와 사용자 최종 승인 기록 없이 기준선 또는 출시 가능 상태로 올리지 않는다."
+  },
+  "expected_outcomes": {
+    "canonical_decision_count": 135,
+    "owner_decision_count": 10,
+    "feature_count": 54,
+    "source_normalization_pending_count": 5,
+    "remaining_conflict_feature_ids": [
+      "FP-053"
+    ],
+    "non_recommended_question_ids": [
+      "ODQ-003",
+      "ODQ-011",
+      "ODQ-013",
+      "ODQ-026",
+      "ODQ-029"
+    ]
+  },
+  "role_policies": {
+    "owner_decision": {
+      "owner_role": "제품책임자",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "기술책임자"
+      ],
+      "approver_role": "프로젝트관리자(사용자 본인)",
+      "resolution_status": "RESOLVED",
+      "gate_kind": "OWNER_CONFIRMATION",
+      "gate_status": "PASS",
+      "closure_criteria": "현재 질문 정의에 존재하는 선택값이며 필수 응답·수정 오류가 없고 원본 입력 hash와 일치한다."
+    },
+    "already_confirmed": {
+      "owner_role": "제품책임자",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "기술책임자"
+      ],
+      "approver_role": "프로젝트관리자(사용자 본인)",
+      "resolution_status": "RESOLVED",
+      "gate_kind": "SOURCE_REVALIDATION",
+      "gate_status": "PASS",
+      "closure_criteria": "source hash 일치와 단일 정책문 확인이 모두 필요하다. 단일 값이 없는 항목은 선택값·예외를 작성하고 제품책임자가 다시 확인해야 한다."
+    },
+    "engineering_proposal": {
+      "owner_role": "기술책임자",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "QA책임자"
+      ],
+      "approver_role": "제품책임자",
+      "resolution_status": "PENDING_PROPOSAL",
+      "gate_kind": "ENGINEERING_REVIEW",
+      "gate_status": "NOT_RUN",
+      "closure_criteria": "구현안·대안·실패동작·검증방법·영향 산출물을 제시하고 제품책임자가 채택안을 승인한다."
+    },
+    "measurement_gate": {
+      "owner_role": "QA책임자",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "기술책임자"
+      ],
+      "approver_role": "프로젝트관리자(사용자 본인)",
+      "resolution_status": "PENDING_MEASUREMENT",
+      "gate_kind": "MEASUREMENT",
+      "gate_status": "NOT_RUN",
+      "closure_criteria": "대상 형상·기기·환경·표본·합격선을 고정한 protocol을 실행하고 원자료와 판정 근거를 보존한다."
+    },
+    "expert_review": {
+      "owner_role": "해당 독립 전문가",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "기술책임자"
+      ],
+      "approver_role": "프로젝트관리자(사용자 본인)",
+      "resolution_status": "PENDING_EXPERT_REVIEW",
+      "gate_kind": "EXPERT_REVIEW",
+      "gate_status": "NOT_RUN",
+      "closure_criteria": "법률·개인정보·보안·접근성 등 해당 분야의 독립 검토자가 범위·조건·잔여위험을 서면으로 확인한다."
+    },
+    "generated_evidence": {
+      "owner_role": "빌드·시험자동화담당",
+      "record_owner_role": "문서통제담당",
+      "reviewer_roles": [
+        "QA책임자"
+      ],
+      "approver_role": "프로젝트관리자(사용자 본인)",
+      "resolution_status": "PENDING_EVIDENCE",
+      "gate_kind": "GENERATED_EVIDENCE",
+      "gate_status": "NOT_RUN",
+      "closure_criteria": "대상 source·build·model·config·환경에 결속된 실행 증거를 재생성하고 hash와 결과를 검토한다."
+    }
+  },
+  "policy_review_corrections": [
+    {
+      "id": "PRC-001",
+      "canonical_decision_ids": [
+        "CD-PRODUCT-RELEASE"
+      ],
+      "reason": "정식 운영이라는 제품 목표와 아직 정하지 않은 최초 Play rollout 순서를 분리했다.",
+      "feature_updates": [
+        {
+          "feature_id": "FP-002",
+          "remove_confirmed": [
+            "공식 목표와 첫 공개 단계는 정식 운영이다."
+          ],
+          "append_confirmed": [
+            "공식 제품 목표는 정식 운영이며, 현재 후보가 정식 출시됐다는 뜻은 아니다."
+          ],
+          "append_unresolved": [
+            "사용자 앱의 최초 Play rollout 순서와 단계별 사용자 수"
+          ]
+        },
+        {
+          "feature_id": "FP-051",
+          "set_normal_flow": [
+            "Dev→Demo→Beta→Release gate를 통과한다.",
+            "최초 Play rollout 순서와 대상 규모를 제품책임자가 확정한 뒤 해당 단계로 배포한다.",
+            "활성 보행 중에는 업데이트를 적용하지 않는다.",
+            "문제가 생기면 기능을 안전정지하고 승인된 forward fix를 새 버전으로 배포한다."
+          ],
+          "set_execution_boundary": {
+            "on_device": [
+              "앱·model·config 버전 검사와 세션 중 update 차단"
+            ],
+            "server": [
+              "manifest·최소버전·API 호환·단계배포·실패 기능 차단·forward fix"
+            ],
+            "external": [
+              "Google Play·관리형 signing key"
+            ]
+          },
+          "set_data_handling": {
+            "stored_on_device": [
+              "현재 manifest·update 상태"
+            ],
+            "sent_to_server": [
+              "버전·배포·오류 telemetry"
+            ],
+            "delete_from_device": [
+              "안정화 뒤 구버전 artifact"
+            ],
+            "server_retention": [
+              "release·서명·hash·SBOM·배포·forward-fix와 과거 rollback 결정 이력"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "PRC-002",
+      "canonical_decision_ids": [
+        "CD-IBQ-144"
+      ],
+      "reason": "보안사고 내부 대응은 현재 흐름으로 두고 사용자 통지는 법률 검토 결과에 따른 조건부 흐름으로 분리했다.",
+      "feature_updates": [
+        {
+          "feature_id": "FP-048",
+          "set_normal_flow": [
+            "단말 민감파일과 token을 안전한 저장소에 둔다.",
+            "모든 API는 TLS로 전송한다.",
+            "서버 원본·DB·backup을 암호화하고 최소 권한만 준다.",
+            "secret·인증서를 정기·사건 기준으로 회전한다.",
+            "사고를 탐지하면 내부 격리·조사·복구·재발방지를 수행한다.",
+            "사용자 통지는 법률·Play 의무 검토 결과가 요구할 때 대상·기한·방법을 정해 수행한다."
+          ],
+          "set_user_guidance": {
+            "screen": [
+              "법률 검토가 통지를 요구하는 사고에 한해 영향·필요 조치·문의처를 안내"
+            ],
+            "speech": [
+              "법률 검토가 통지를 요구하고 즉시 앱 사용 중지가 필요한 사고일 때만 접근 가능한 긴급 안내"
+            ],
+            "vibration": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "PRC-003",
+      "canonical_decision_ids": [
+        "CD-IBQ-044",
+        "CD-IBQ-135"
+      ],
+      "reason": "현재 제외된 저시력 지원, 출시 전 검토 대상, 채택 뒤 목표 동작을 서로 다른 단계로 구분했다.",
+      "feature_updates": [
+        {
+          "feature_id": "FP-030",
+          "set_normal_flow": [
+            "보행 중에는 음성 중심으로 조작한다.",
+            "현재 공식 지원에서 제외한 키보드·스위치·색상·대비·확대 범위를 사용자에게 숨기지 않는다.",
+            "로그인·동의 등 필수 화면에 필요한 접근성 범위를 출시 전 다시 결정한다.",
+            "채택한 범위만 최소 터치영역·대비·확대 기준으로 구현하고 시험한다."
+          ],
+          "set_failure_behavior": [
+            "채택한 접근성 범위에서 필수 흐름을 끝낼 수 없거나 범위 결정을 미룬 상태면 접근성 출시 gate를 통과시키지 않는다."
+          ],
+          "set_user_guidance": {
+            "screen": [
+              "현재 확정된 음성 중심 조작과 아직 확정하지 않은 저시력 지원 범위를 구분해 안내"
+            ],
+            "speech": [
+              "보행 조작은 음성으로 제공"
+            ],
+            "vibration": [
+              "중대 위험 보조"
+            ]
+          }
+        },
+        {
+          "feature_id": "FP-049",
+          "set_normal_flow": [
+            "unit·module·API 계약·통합시험을 실행한다.",
+            "실폰에서 가입·동의·권한·탐지·길안내·신고·장애복구 E2E를 실행한다.",
+            "TalkBack과 제품책임자가 채택한 확대·고대비 등 접근성 범위, 소음·오프라인·보안·모델 평가를 실행한다.",
+            "결함·잔여위험·증거 hash를 검토하고 출시 gate를 판정한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PRC-004",
+      "canonical_decision_ids": [
+        "CD-MODEL-LATER-SWAP",
+        "CD-IBQ-120"
+      ],
+      "reason": "현재 통합 모델의 과거 평가 생략과 정식 출시 모델의 독립평가 의무를 시간 단계로 분리했다.",
+      "feature_updates": [
+        {
+          "feature_id": "FP-038",
+          "set_plain_summary": "현재 epoch270 통합 모델은 독립평가를 거치지 않았으므로 정식 안전 모델로 보지 않는다. 정식 출시 모델은 독립평가와 실기기 안전시험을 통과해야 한다.",
+          "set_normal_flow": [
+            "원본과 승인 dataset을 분리한다.",
+            "연속 촬영 sequence가 서로 다른 분할에 섞이지 않게 train·validation·test를 나눈다.",
+            "각 파일·분할·설정·seed hash를 기록한다.",
+            "현재 epoch270 통합 모델은 내부 지표와 책임자 판단만 기록하고 정식 안전성 근거로 사용하지 않는다.",
+            "정식 출시 후보 모델은 고정 test와 독립평가·실기기 안전시험을 통과한 뒤 registry 후보로 올린다."
+          ],
+          "remove_confirmed": [
+            "Delta 답변에 따라 현재 모델 독립평가는 생략하고 승인 지표는 책임자 정성판단을 사용한다."
+          ],
+          "append_confirmed": [
+            "현재 epoch270 통합 모델은 과거 답변에 따라 독립평가 없이 내부 지표와 책임자 판단만 기록한다.",
+            "정식 출시 적격 모델은 독립평가와 실기기 안전시험을 통과해야 한다."
+          ],
+          "remove_conditional": [
+            "독립평가를 생략하면 정식 안전 모델이라는 주장의 근거가 약해지므로 출시 gate에서 다시 검토해야 한다."
+          ]
+        },
+        {
+          "feature_id": "FP-049",
+          "remove_confirmed": [
+            "모델 독립평가는 별도 답변에 따라 생략한다."
+          ],
+          "append_confirmed": [
+            "현재 epoch270 통합 모델의 과거 독립평가 생략은 기록하되 정식 출시 적격 모델에는 독립평가와 실기기 안전시험을 요구한다."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PRC-005",
+      "canonical_decision_ids": [
+        "CD-AUTO-REPORT-FEEDBACK"
+      ],
+      "reason": "개별 자동신고 무통지 정책과 전체 안전정지 때의 서비스 장애 안내를 구분하고, 신고 화면·음성 표현을 현재 결정에 맞췄다.",
+      "feature_updates": [
+        {
+          "feature_id": "FP-031",
+          "set_user_guidance": {
+            "screen": [
+              "개별 자동신고의 과정·성공·실패·이력은 표시하지 않는다. 지속 장애로 전체 안전정지할 때는 신고 결과가 아니라 서비스 장애와 정지 사실만 안내한다."
+            ],
+            "speech": [
+              "개별 신고 결과는 말하지 않고, 신고 기능의 지속 장애로 전체 안전정지할 때만 서비스 장애와 정지 사실을 안내"
+            ],
+            "vibration": []
+          },
+          "remove_confirmed": [
+            "첫 실행 동의에서 자동신고를 고지하고 신고 성공은 별도로 알리지 않는 것이 현재 답변이다."
+          ],
+          "append_confirmed": [
+            "첫 실행 동의 뒤 개별 자동신고의 과정과 성공·실패 결과를 알리지 않고, 사용자 앱에는 신고 이력·정정·삭제 경로를 제공하지 않는다."
+          ],
+          "append_conditional": [
+            "자동신고 무통지와 사용자 이력·정정·삭제 미제공은 법률·개인정보·Google Play 검토를 통과해야 한다."
+          ]
+        },
+        {
+          "feature_id": "FP-032",
+          "set_user_guidance": {
+            "screen": [
+              "관리자에게 상태·중복 연결·재시도·receipt 표시"
+            ],
+            "speech": [
+              "일반 사용자에게 개별 신고 성공·실패 결과를 알리지 않음"
+            ],
+            "vibration": []
+          }
+        },
+        {
+          "feature_id": "FP-033",
+          "set_user_guidance": {
+            "screen": [
+              "관리자 신고 목록·상세·검수·export·감사로그"
+            ],
+            "speech": [
+              "일반 사용자에게 개별 신고 성공·실패 결과를 알리지 않고 관리자만 상태를 확인"
+            ],
+            "vibration": [
+              "관리자 중요 알림 후보"
+            ]
+          },
+          "append_confirmed": [
+            "사용자 앱에는 신고 이력·정정·삭제 경로를 제공하지 않고 관리자만 신고 상태를 조회·변경한다."
+          ]
+        }
+      ]
+    }
+  ],
+  "owner_decisions": [
+    {
+      "question_id": "ODQ-003",
+      "canonical_decision_id": "CD-USER-AGE",
+      "expected_option_id": "teen",
+      "affected_feature_ids": [
+        "FP-004",
+        "FP-010",
+        "FP-013",
+        "FP-015",
+        "FP-046"
+      ],
+      "open_details": [
+        "보호자 신원·관계와 청소년 본인 휴대전화 여부 확인 방식",
+        "보호자 동의 증거·철회·재동의·탈퇴 절차",
+        "미성년자 개인정보 처리의 법률·Google Play 검토"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-004",
+          "append_confirmed": [
+            "첫 버전은 만 14세 이상이 가입할 수 있고 만 18세 미만은 보호자 확인·동의가 필요하다."
+          ],
+          "remove_unresolved": [
+            "최소 가입 연령과 보호자 동의"
+          ]
+        },
+        {
+          "feature_id": "FP-010",
+          "append_confirmed": [
+            "만 18세 미만 가입자는 보호자 확인·동의를 완료해야 계정이 활성화된다."
+          ],
+          "remove_normal_flow": [
+            "모든 조건을 통과하면 보행 화면으로 이동한다."
+          ],
+          "append_normal_flow": [
+            "가입 연령이 만 14세 이상인지 확인하고, 만 18세 미만이면 보호자 확인·동의 단계로 이동한다."
+          ]
+        },
+        {
+          "feature_id": "FP-013",
+          "append_confirmed": [
+            "만 18세 미만 가입에는 보호자 동의를 별도로 남긴다."
+          ],
+          "append_conditional": [
+            "보호자 신원·관계 확인과 동의 철회 절차는 법률·개인정보 검토를 통과해야 한다."
+          ]
+        },
+        {
+          "feature_id": "FP-015",
+          "append_confirmed": [
+            "만 18세 미만 사용자의 보호자 동의 철회 경로를 제공해야 한다."
+          ]
+        },
+        {
+          "feature_id": "FP-046",
+          "append_confirmed": [
+            "만 14세 이상 청소년을 받으며 만 18세 미만은 보호자 동의를 요구한다."
+          ],
+          "append_conditional": [
+            "청소년·보호자 데이터와 동의 증거의 수집·보존·철회는 독립 법률·개인정보 검토가 필요하다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-009",
+      "canonical_decision_id": "CD-EXCLUDED-FEATURES",
+      "expected_option_id": "exclude_both",
+      "affected_feature_ids": [
+        "FP-001",
+        "FP-002"
+      ],
+      "open_details": [
+        "보호자 추적·넘어짐 탐지를 다시 포함할 때는 변경요청과 새 기준선 승인이 필요하다."
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-001",
+          "append_confirmed": [
+            "첫 버전에서는 보호자 추적과 넘어짐 탐지를 모두 제외한다."
+          ]
+        },
+        {
+          "feature_id": "FP-002",
+          "append_confirmed": [
+            "현재 출시 범위에는 보호자 추적과 넘어짐 탐지가 포함되지 않는다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-011",
+      "canonical_decision_id": "CD-DEPTH-UNSUPPORTED",
+      "expected_option_id": "limited",
+      "affected_feature_ids": [
+        "FP-009",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-044"
+      ],
+      "open_details": [
+        "제한 모드 진입 판별과 안내할 탐지 종류·문구",
+        "대체 거리기술을 쓸지 여부와 실기기 호환성·안전시험",
+        "거리 없는 경고가 위험 해제·STOP·신고 근거로 오인되지 않는 검증"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-009",
+          "set_overall_status": "CONFIRMED_WITH_OPEN_DETAILS",
+          "set_start_conditions": [
+            "실행 시 Android API·카메라·온디바이스 음성·거리 기능을 각각 검사해 전체 모드, 거리 제한 모드, 사용 불가를 구분한다."
+          ],
+          "set_normal_flow": [
+            "카메라·음성·거리 기능이 모두 기준을 통과하면 전체 보행 모드로 진행한다.",
+            "카메라와 물체 탐지는 가능하지만 정확한 거리 기능이 없으면 한계를 알리고 거리 제한 모드로 진행한다.",
+            "거리 제한 모드에서는 거리·TTC·위험 해제·STOP·신고 판단 없이 물체 종류만 경고한다.",
+            "카메라나 그 밖의 기본 필수 기능이 없으면 부족한 기능과 사용 불가 이유를 안내하고 시작하지 않는다.",
+            "과거 Web/PWA는 운영 주소에서 차단하고 기록으로만 보존한다."
+          ],
+          "append_confirmed": [
+            "정확한 거리 측정이 안 되는 기기에서는 거리 없는 물체 종류 경고만 제공한다."
+          ],
+          "remove_conflicts": [
+            "ARCore Depth 미지원 기기에도 동일한 전체 기능을 제공한다는 답변은 metric distance가 필요한 위험판정과 충돌한다."
+          ],
+          "remove_unresolved": [
+            "Depth 미지원 시 앱 전체 차단, 제한 기능, 다른 거리센서 중 무엇을 쓸지"
+          ],
+          "append_unresolved": [
+            "제한 모드 진입 판별·허용 탐지 종류·안내 문구와 실기기 안전시험"
+          ]
+        },
+        {
+          "feature_id": "FP-019",
+          "set_start_conditions": [
+            "카메라·모델·runtime 설정이 정상 로드됐다.",
+            "전체 위험판정 모드는 성능·발열·거리센서 기준을 모두 통과했다.",
+            "거리 제한 모드는 카메라·물체 탐지·안내 기준을 통과했지만 정확한 거리 기능은 제공하지 않는다."
+          ],
+          "set_normal_flow": [
+            "카메라 frame을 받고 온디바이스 모델이 객체 종류와 위치를 찾는다.",
+            "정확한 거리 기능이 있으면 거리·진행 방향·TMAP 경로와 합쳐 실제 위험인지 판단하고 필요한 행동만 안내한다.",
+            "정확한 거리 기능이 없으면 제한 모드임을 먼저 알리고 거리·TTC 판단을 건너뛴 채 물체 종류만 경고한다.",
+            "거리 제한 경고는 위험 해제·STOP·자동신고의 근거로 사용하지 않는다."
+          ],
+          "set_required_permissions": [
+            {
+              "name": "카메라",
+              "requirement": "REQUIRED",
+              "plain_reason": "전체 모드와 거리 제한 모드의 물체 탐지 입력"
+            },
+            {
+              "name": "방향·IMU·승인된 거리 기능",
+              "requirement": "CONDITIONAL",
+              "plain_reason": "거리·TTC 기반 전체 위험판정 모드를 쓸 때 필요"
+            }
+          ],
+          "append_confirmed": [
+            "metric distance가 없는 기기는 전체 위험판정 대신 제한된 물체 종류 경고 경로를 사용한다."
+          ]
+        },
+        {
+          "feature_id": "FP-020",
+          "set_start_conditions": [
+            "전체 위험판정은 fresh 탐지, 믿을 수 있는 거리·진행방향·현재 경로가 있을 때만 시작한다.",
+            "거리 제한 모드에서는 이 위험 등급 기능을 실행하지 않고 물체 종류 경고만 별도로 제공한다."
+          ],
+          "set_required_permissions": [
+            {
+              "name": "카메라",
+              "requirement": "REQUIRED",
+              "plain_reason": "물체 탐지 입력"
+            },
+            {
+              "name": "거리·방향 센서",
+              "requirement": "CONDITIONAL",
+              "plain_reason": "전체 위험 등급과 행동 안내를 만들 때 필요"
+            }
+          ],
+          "append_confirmed": [
+            "거리 미지원 제한 모드에서는 거리·TTC 기반 등급이나 안전 해제를 만들지 않고 물체 종류만 경고한다."
+          ]
+        },
+        {
+          "feature_id": "FP-021",
+          "set_overall_status": "CONFIRMED_WITH_OPEN_DETAILS",
+          "set_normal_flow": [
+            "밝기·가림·흔들림·frame freshness를 검사한다.",
+            "전체 위험판정에서는 검증된 metric distance 근거가 있는지 확인하고 품질을 통과한 class만 위험판정에 보낸다.",
+            "거리 기능이 없는 제한 모드에서는 거리 품질을 통과했다고 표시하지 않고 물체 종류만 별도 경고한다.",
+            "카메라 품질 저하는 즉시 사용자에게 알리고 지속되면 정지한다."
+          ],
+          "set_required_permissions": [
+            {
+              "name": "카메라",
+              "requirement": "REQUIRED",
+              "plain_reason": "객체 종류와 영상 품질을 판단한다."
+            },
+            {
+              "name": "Depth 또는 승인된 거리센서",
+              "requirement": "CONDITIONAL",
+              "plain_reason": "거리·TTC 기반 전체 위험판정 모드를 쓸 때 필요하다."
+            }
+          ],
+          "append_confirmed": [
+            "Depth 미지원 기기의 제한 경고는 metric distance가 필요한 위험판정과 분리한다."
+          ],
+          "remove_conflicts": [
+            "Depth 미지원 기기에도 동일 기능을 제공한다는 선택과 metric distance 필수 정책이 충돌한다."
+          ]
+        },
+        {
+          "feature_id": "FP-044",
+          "append_confirmed": [
+            "거리 기능 미지원은 숨은 장애가 아니라 명시적인 제한 모드이며 전체 기능과 같은 안전성을 주장하지 않는다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-013",
+      "canonical_decision_id": "CD-IDENTITY-VERIFY",
+      "expected_option_id": "phone_only",
+      "affected_feature_ids": [
+        "FP-010",
+        "FP-046",
+        "FP-047"
+      ],
+      "open_details": [
+        "SMS·OTP 제공자, 재전송·만료·rate limit과 비용",
+        "전화번호 변경·계정 복구·보존·삭제 절차",
+        "청소년 가입에서 본인 번호와 보호자 번호를 구분하는 방법"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-010",
+          "set_normal_flow": [
+            "서비스 목적과 안전 제한을 설명한다.",
+            "각 동의 항목을 보여주고 동의를 받는다.",
+            "필수 Android 권한을 요청한다.",
+            "가입 연령이 만 14세 이상인지 확인한다. 확인에 쓸 정보와 방법은 별도 세부사항으로 정한다.",
+            "사용자 ID·비밀번호와 휴대전화 번호를 입력한다.",
+            "휴대전화 번호로 받은 인증번호를 확인한다.",
+            "만 18세 미만이면 보호자 확인·동의를 완료한다.",
+            "모든 가입 조건을 통과하면 계정을 활성화하고 로그인한다.",
+            "로그인과 필수 상태 확인을 마치면 보행 화면으로 이동한다."
+          ],
+          "append_confirmed": [
+            "가입 때 휴대전화 문자 인증번호로 번호 소유를 확인한다."
+          ]
+        },
+        {
+          "feature_id": "FP-046",
+          "append_confirmed": [
+            "가입 확인을 위해 휴대전화 번호와 문자 인증 결과를 처리한다."
+          ],
+          "append_conditional": [
+            "전화번호 보존·변경·삭제와 청소년·보호자 번호 구분은 개인정보 검토가 필요하다."
+          ]
+        },
+        {
+          "feature_id": "FP-047",
+          "append_confirmed": [
+            "사용자 가입 확인은 이메일·실명 확인 없이 휴대전화 SMS 인증으로 수행한다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-015",
+      "canonical_decision_id": "CD-REMOTE-LOGOUT",
+      "expected_option_id": "selected",
+      "affected_feature_ids": [
+        "FP-011",
+        "FP-012",
+        "FP-047"
+      ],
+      "open_details": [
+        "관리자도 사용자 기기 세션을 해제할 수 있는지",
+        "기기 식별·재인증·감사로그와 session revocation 전파",
+        "비밀번호 변경 때 기존 기기 session 처리"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-011",
+          "append_confirmed": [
+            "사용자는 분실한 특정 기기 session만 원격으로 끝낼 수 있다."
+          ],
+          "append_normal_flow": [
+            "기기 목록에서 분실 기기를 선택해 해당 session만 해제한다."
+          ]
+        },
+        {
+          "feature_id": "FP-012",
+          "append_confirmed": [
+            "특정 기기만 로그아웃하고 다른 기기 로그인은 유지한다."
+          ],
+          "remove_unresolved": [
+            "분실 기기 원격 로그아웃"
+          ]
+        },
+        {
+          "feature_id": "FP-047",
+          "append_confirmed": [
+            "사용자에게 기기별 session 조회와 선택 해제 기능을 제공한다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-019",
+      "canonical_decision_id": "CD-REBOOT-BEHAVIOR",
+      "expected_option_id": "manual",
+      "affected_feature_ids": [
+        "FP-017",
+        "FP-018"
+      ],
+      "open_details": [
+        "사용자가 앱을 연 뒤 로그인 유지·필수 점검·자동 보행 시작이 이어지는 정확한 상태전이",
+        "앱 crash와 Android OS kill은 재부팅과 분리한 복구 설계",
+        "설치·업데이트·재부팅 회귀시험"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-017",
+          "append_confirmed": [
+            "휴대폰 재부팅 뒤에는 WalkSafe가 자동 실행되지 않으며 사용자가 앱을 직접 열어야 한다."
+          ],
+          "append_normal_flow": [
+            "재부팅 뒤 사용자가 앱을 열면 로그인·권한·센서 상태를 다시 검사한 후 보행 시작 절차로 간다."
+          ]
+        },
+        {
+          "feature_id": "FP-018",
+          "append_confirmed": [
+            "재부팅 자체로 이전 보행 세션을 자동 재개하지 않는다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-026",
+      "canonical_decision_id": "CD-AUTO-REPORT-TIMING",
+      "expected_option_id": "after",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-046"
+      ],
+      "open_details": [
+        "세션 종료 뒤 자동신고에 허용할 Wi-Fi·모바일 통신망",
+        "신고 queue 암호화·만료·중복·재전송과 저장공간 한계",
+        "신고 원본의 보존·학습 재사용에 대한 법률·개인정보 검토"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-031",
+          "append_confirmed": [
+            "자동신고 묶음은 보행 중이나 단순 정지 때 보내지 않고 보행 세션 종료 뒤 전송한다."
+          ],
+          "remove_normal_flow": [
+            "서버에 신고를 만들고 receipt를 확인한다."
+          ],
+          "append_normal_flow": [
+            "신고 후보를 암호화된 로컬 queue에 넣는다.",
+            "보행 세션이 끝나면 queue의 신고를 서버에 만들고 receipt를 확인한다."
+          ]
+        },
+        {
+          "feature_id": "FP-032",
+          "set_normal_flow": [
+            "보행 중에는 위치·시설·시간 조건으로 단말 안의 신고 후보 중복을 먼저 줄이고 pending 상태로 보관한다.",
+            "보행 세션이 끝나면 같은 idempotency key로 신고 후보를 서버에 전송한다.",
+            "서버는 가까운 위치·같은 시설·시간 조건으로 기존 신고를 찾고, 있으면 새 관찰을 연결하며 없으면 new 상태를 만든다.",
+            "응답이 끊기면 같은 idempotency key로 결과를 조회한다.",
+            "관리자가 reviewed→submitted→resolved/rejected로 처리한다."
+          ],
+          "append_confirmed": [
+            "보행 세션 종료 전 자동신고 묶음은 로컬 pending 상태로 보존한다."
+          ]
+        },
+        {
+          "feature_id": "FP-034",
+          "append_confirmed": [
+            "자동신고 원본 이미지·정확 위치·탐지정보는 별도 신고 묶음으로 보존하고 세션 종료 뒤 전송한다."
+          ]
+        },
+        {
+          "feature_id": "FP-035",
+          "append_confirmed": [
+            "일반 활동데이터는 정지 중 전송하지만 자동신고 묶음은 세션 종료 뒤에만 전송한다."
+          ],
+          "append_normal_flow": [
+            "자동신고 queue는 일반 활동데이터 queue와 구분하고 세션 종료 전에는 전송하지 않는다."
+          ]
+        },
+        {
+          "feature_id": "FP-036",
+          "append_confirmed": [
+            "세션 종료 뒤 보낸 신고 원본도 서버 receipt와 hash 확인 전에는 휴대폰에서 삭제하지 않는다."
+          ]
+        },
+        {
+          "feature_id": "FP-046",
+          "append_confirmed": [
+            "자동신고의 원본 이미지·정확 위치·탐지정보 전송 시점은 보행 세션 종료 뒤다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-029",
+      "canonical_decision_id": "CD-UPLOAD-NETWORK",
+      "expected_option_id": "wifi",
+      "affected_feature_ids": [
+        "FP-035",
+        "FP-036",
+        "FP-044",
+        "FP-045"
+      ],
+      "open_details": [
+        "충전·배터리 최소값 등 Wi-Fi 외 upload 조건",
+        "Wi-Fi가 오래 없을 때 단말 보존 상한·만료·사용자 안내",
+        "자동신고 queue도 Wi-Fi 전용 정책을 따르는지"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-035",
+          "set_normal_flow": [
+            "보행 중에는 일반 활동데이터를 휴대폰 대기열에만 추가하고 서버로 보내지 않는다.",
+            "정지 상태가 기준시간 동안 이어지고 Wi-Fi에 연결되면 일반 활동데이터의 낮은 우선순위 upload를 시작한다.",
+            "모바일망만 있거나 Wi-Fi가 없으면 일반 활동데이터를 보내지 않고 암호화된 로컬 queue에 보관한다.",
+            "움직임이 다시 감지되면 진행 중인 일반 활동데이터 upload를 즉시 일시중지하거나 취소한다.",
+            "서버는 미완료 조각을 완료 데이터로 확정하지 않으며 다음 허용 시점에 안전하게 이어 보내거나 다시 보낸다.",
+            "자동신고는 별도 queue에 보관하고 세션 종료 전에는 전송하지 않는다. 세션 종료 뒤 허용할 통신망은 아직 정하지 않았다."
+          ],
+          "append_confirmed": [
+            "일반 학습·활동데이터는 사용자가 정지해 있고 Wi-Fi에 연결됐을 때만 전송한다."
+          ],
+          "remove_unresolved": [
+            "Wi-Fi만·충전 중만·배터리 최소값 등 upload 조건"
+          ],
+          "append_unresolved": [
+            "충전·배터리 최소값 등 Wi-Fi 외 upload 조건"
+          ]
+        },
+        {
+          "feature_id": "FP-036",
+          "append_confirmed": [
+            "Wi-Fi가 없어 미전송인 일반 학습·활동데이터는 서버 확인 전까지 휴대폰에 남긴다."
+          ]
+        },
+        {
+          "feature_id": "FP-044",
+          "append_confirmed": [
+            "모바일망만 있는 상태에서는 일반 학습데이터를 보내지 않고 Wi-Fi를 기다린다."
+          ]
+        },
+        {
+          "feature_id": "FP-045",
+          "append_confirmed": [
+            "Wi-Fi 장기 부재로 queue가 커질 수 있으므로 저장공간 한계와 사용자 안내가 필요하다."
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-032",
+      "canonical_decision_id": "CD-FAILURE-RECOVERY",
+      "expected_option_id": "confirm",
+      "affected_feature_ids": [
+        "FP-017",
+        "FP-018",
+        "FP-023",
+        "FP-043",
+        "FP-044",
+        "FP-045"
+      ],
+      "open_details": [
+        "복구 때 검사할 capability와 연속 정상 횟수·시간",
+        "기존 세션을 이어갈지 새 세션을 만들지",
+        "지속 장애 판정·안전정지 순서와 자원 임계값"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-017",
+          "append_confirmed": [
+            "장애가 복구돼도 기능 상태를 검사하고 사용자 확인을 받은 뒤 보행을 재개한다."
+          ]
+        },
+        {
+          "feature_id": "FP-018",
+          "set_normal_flow": [
+            "상태 변화 원인을 기록한다.",
+            "안전 관련 history(이전 판단 기억)를 필요하면 초기화한다.",
+            "화면·음성으로 새 상태와 가능한 행동을 안내한다.",
+            "재개에 필요한 기능 상태를 검사하고 사용자에게 재개 여부를 확인한 뒤에만 재개한다."
+          ],
+          "set_failure_behavior": [
+            "안전정지 뒤 조용히 자동재개하지 않는다. 검사할 기능과 연속 정상 횟수·시간을 별도로 정하고, 그 검사를 통과한 뒤 사용자 확인을 받는다."
+          ],
+          "append_confirmed": [
+            "장애 복구 뒤 무음 자동재개나 앱 재실행 강제 대신 상태 검사와 사용자 확인을 사용한다."
+          ],
+          "append_unresolved": [
+            "복구 때 검사할 기능과 연속 정상 횟수·시간",
+            "기존 세션을 이어갈지 새 세션으로 시작할지"
+          ]
+        },
+        {
+          "feature_id": "FP-023",
+          "append_confirmed": [
+            "TMAP·GPS 복구 뒤 상태를 검사하고 사용자 확인을 받은 뒤 재개한다."
+          ],
+          "remove_unresolved": [
+            "복구 뒤 사용자 확인 방법"
+          ]
+        },
+        {
+          "feature_id": "FP-043",
+          "append_confirmed": [
+            "지속 장애가 해소되면 재개에 필요한 기능 상태를 검사하고 사용자에게 재개 여부를 물은 뒤 재개한다."
+          ],
+          "remove_unresolved": [
+            "전체 점검 뒤 사용자 확인·앱 재실행 중 어떤 방식으로 복구할지"
+          ],
+          "append_unresolved": [
+            "복구 때 검사할 기능과 연속 정상 횟수·시간"
+          ]
+        },
+        {
+          "feature_id": "FP-044",
+          "set_normal_flow": [
+            "온디바이스 센서·모델·TTS 상태와 서버 연결을 각각 점검한다.",
+            "일시적인 연결 실패 중 미전송 데이터는 queue에 보존한다.",
+            "제한 횟수 재연결 뒤에도 서버 기능이 안 되면 모든 기능을 안전정지한다.",
+            "연결이 돌아오면 재개에 필요한 기능 상태를 검사하고 사용자에게 재개 여부를 확인한 뒤 복구한다."
+          ],
+          "append_confirmed": [
+            "연결 복구 뒤 자동으로 보행을 켜지 않고 상태 검사와 사용자 확인을 거친다."
+          ],
+          "append_unresolved": [
+            "복구 때 검사할 기능과 연속 정상 횟수·시간"
+          ]
+        },
+        {
+          "feature_id": "FP-045",
+          "append_confirmed": [
+            "자원 장애가 회복돼도 재개에 필요한 기능 상태를 검사하고 사용자 확인 뒤 재개한다."
+          ],
+          "remove_normal_flow": [
+            "온도·자원이 회복돼도 전체 기능 점검과 사용자 확인 후 재개한다."
+          ],
+          "append_normal_flow": [
+            "온도·자원이 회복되면 재개에 필요한 기능 상태를 검사하고 사용자 확인 후 재개한다."
+          ],
+          "remove_unresolved": [
+            "회복 후 사용자 확인 방식"
+          ],
+          "append_unresolved": [
+            "회복 때 검사할 기능과 연속 정상 횟수·시간"
+          ]
+        }
+      ]
+    },
+    {
+      "question_id": "ODQ-034",
+      "canonical_decision_id": "CD-SUPPORT-HOURS",
+      "expected_option_id": "09_18",
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-052"
+      ],
+      "open_details": [
+        "공휴일과 평일 18시 이후 P0 장애 대응 범위",
+        "SEV별 첫 응답·복구 목표와 escalation 채널",
+        "관리자 부재·계정 잠김 때 대체 지원 절차"
+      ],
+      "feature_updates": [
+        {
+          "feature_id": "FP-003",
+          "append_confirmed": [
+            "정규 지원시간은 평일 09:00~18:00이다."
+          ],
+          "remove_unresolved": [
+            "현실적인 지원시간과 응답 목표"
+          ],
+          "append_unresolved": [
+            "SEV별 응답·복구 목표와 공휴일·관리자 부재 처리"
+          ]
+        },
+        {
+          "feature_id": "FP-052",
+          "append_confirmed": [
+            "정규 사용자 지원시간은 평일 09:00~18:00이다."
+          ],
+          "remove_unresolved": [
+            "평일의 정확한 시작·종료 시간과 공휴일 처리"
+          ],
+          "append_unresolved": [
+            "공휴일·평일 18시 이후 P0 대응 범위"
+          ]
+        }
+      ]
+    }
+  ]
+}

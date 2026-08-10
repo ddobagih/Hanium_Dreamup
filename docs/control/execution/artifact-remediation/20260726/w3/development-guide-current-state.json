@@ -1,0 +1,1772 @@
+{
+  "schema_version": "walksafe.artifact-remediation.development-guide-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-DEVELOPMENT-GUIDE-CURRENT-STATE-20260726-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "status": "CURRENT_STATE_SUPPLEMENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+  "scope": {
+    "wave_id": "W3",
+    "work_package": "W3-DEV-GUIDE",
+    "artifact_ids": [
+      "DLV-DEV-02",
+      "DLV-DEV-03",
+      "DLV-DEV-04",
+      "DLV-DEV-05",
+      "DLV-DEV-06",
+      "DLV-DEV-08"
+    ],
+    "artifact_count": 6,
+    "artifact_id_set_contract": "SHA256_UTF8_SORTED_IDS_EACH_WITH_TRAILING_LF",
+    "artifact_id_set_sha256": "07843968c7e76c019e1b7071eddcfcd606a2cc619aefadc01ac2a30ea46d6552",
+    "exact_expected_set": true,
+    "predecessor_classification": "INTERNAL_GAP",
+    "update_mode": "ADD_ONLY_SUCCESSOR_SUPPLEMENT",
+    "modified_predecessor_files": false,
+    "gap_disposition_count": 6,
+    "gap_disposition_rule": "EXACTLY_ONE_DISPOSITION_OBJECT_PER_ARTIFACT"
+  },
+  "authority_boundary": {
+    "purpose": "Replace stale DEV content interpretation with exact current repository facts without mutating predecessor baselines or claiming execution.",
+    "source_commit_null_reason": "The current state is bound to exact dirty-worktree path/SHA pairs rather than an inferred commit.",
+    "legacy_draft_register_conflict": "The shared legacy guide declares Draft/unapproved while generated artifact-register rows contain mixed later baseline state. This supplement resolves current content reading only and changes neither state.",
+    "artifact_approval_claimed": false,
+    "content_baseline_changed": false,
+    "deployment_completion_claimed": false,
+    "release_authorization_claimed": false,
+    "predecessor_preservation": "2026-07-21/22 control records and W1/W2 successors remain immutable inputs.",
+    "internal_build_lint_migration_sbom_provenance_integration_evidence_claimed": true,
+    "internal_evidence_scope": "Only the exact named evidence-003, aux-005 and integration-run-004 commands, reused unchanged-source results and local validations.",
+    "formal_actual_device_cross_process_deployment_release_pass_claimed": false
+  },
+  "artifact_coverage": [
+    {
+      "artifact_id": "DLV-DEV-02",
+      "title": "프로젝트 README",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "INTERNAL_INVENTORY_PROVENANCE_EVIDENCE_BOUND",
+      "coverage_sections": [
+        "module_map",
+        "successor_and_review_contract",
+        "source_bindings"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-006"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    {
+      "artifact_id": "DLV-DEV-03",
+      "title": "개발환경 구성 안내",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "INTERNAL_TOOLCHAIN_EXECUTION_EVIDENCE_BOUND_WITH_LOCK_GAPS",
+      "coverage_sections": [
+        "toolchains",
+        "offline_first_workflow.bootstrap"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-002",
+          "W3-DEV-GUIDE-GAP-006"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    {
+      "artifact_id": "DLV-DEV-04",
+      "title": "빌드·실행·시험 안내",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "PASS_INTERNAL_BUILD_LINT_MIGRATION_INTEGRATION_ONLY",
+      "coverage_sections": [
+        "offline_first_workflow.run",
+        "offline_first_workflow.test",
+        "offline_first_workflow.cleanup",
+        "verification_boundary"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-002",
+          "W3-DEV-GUIDE-GAP-004",
+          "W3-DEV-GUIDE-GAP-007",
+          "W3-DEV-GUIDE-GAP-008",
+          "W3-DEV-GUIDE-GAP-009"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    {
+      "artifact_id": "DLV-DEV-05",
+      "title": "기여·코드리뷰 규칙",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "APPEND_ONLY_INTERNAL_EVIDENCE_BOUND_INDEPENDENT_REVIEW_PENDING",
+      "coverage_sections": [
+        "successor_and_review_contract.append_only_rules",
+        "open_gaps"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-003",
+          "W3-DEV-GUIDE-GAP-005",
+          "W3-DEV-GUIDE-GAP-008"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    {
+      "artifact_id": "DLV-DEV-06",
+      "title": "코딩 규칙",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "PASS_INTERNAL_LANGUAGE_CHECKS_ONLY",
+      "coverage_sections": [
+        "coding_rules",
+        "toolchains"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-003",
+          "W3-DEV-GUIDE-GAP-004",
+          "W3-DEV-GUIDE-GAP-005"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    {
+      "artifact_id": "DLV-DEV-08",
+      "title": "환경변수·설정 예제",
+      "predecessor_classification": "INTERNAL_GAP",
+      "coverage_status": "CURRENT_STATE_CONTENT_WITH_FINAL_W3_INTERNAL_EVIDENCE",
+      "approval_status": "NOT_CLAIMED",
+      "execution_status": "PASS_INTERNAL_CONFIG_SOURCE_AND_SECRET_CLEANUP_ONLY",
+      "coverage_sections": [
+        "environment_and_secret_contract",
+        "source_bindings"
+      ],
+      "gap_disposition": {
+        "kind": "OPEN_GAPS",
+        "gap_ids": [
+          "W3-DEV-GUIDE-GAP-001",
+          "W3-DEV-GUIDE-GAP-002",
+          "W3-DEV-GUIDE-GAP-005",
+          "W3-DEV-GUIDE-GAP-006",
+          "W3-DEV-GUIDE-GAP-007",
+          "W3-DEV-GUIDE-GAP-008",
+          "W3-DEV-GUIDE-GAP-009"
+        ]
+      },
+      "internal_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    }
+  ],
+  "module_map": [
+    {
+      "module_id": "MOD-USER-ANDROID",
+      "name": "Android 사용자 앱",
+      "repository_path": "apps/android/app",
+      "build_module": ":app",
+      "language_runtime": [
+        "Kotlin",
+        "Java/JVM 21",
+        "Android SDK 36"
+      ],
+      "responsibility": [
+        "사용자 보행 세션",
+        "단말 카메라·센서·TFLite 추론",
+        "음성·진동·UI 피드백",
+        "통제된 gateway/backend 연동"
+      ],
+      "entry_or_config_paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/build.gradle.kts",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "current_boundary": "실제 기기 설치·센서·성능·현장 안전 검증은 NOT_RUN이다."
+    },
+    {
+      "module_id": "MOD-ADMIN-ANDROID",
+      "name": "Android 관리자 앱",
+      "repository_path": "apps/android/adminapp",
+      "build_module": ":adminapp",
+      "language_runtime": [
+        "Java",
+        "Java/JVM 21",
+        "Android SDK 36"
+      ],
+      "responsibility": [
+        "관리자 인증",
+        "PASSWORD+TOTP",
+        "복구·세션 폐기",
+        "고위험 작업 재인증과 API origin 통제"
+      ],
+      "entry_or_config_paths": [
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+        "apps/android/adminapp/build.gradle.kts"
+      ],
+      "current_boundary": "실제 관리자 단말·분실복구 훈련·production workflow는 NOT_RUN이다."
+    },
+    {
+      "module_id": "MOD-ANDROID-GATEWAY",
+      "name": "Android Gateway",
+      "repository_path": "apps/android-gateway",
+      "build_module": "Node package",
+      "language_runtime": [
+        "TypeScript 6.0.3",
+        "Node >=22 <23"
+      ],
+      "responsibility": [
+        "Android 공개 API",
+        "field 인증·세션",
+        "동의·개인정보 권리",
+        "backend loopback proxy",
+        "프로세스 간 원장 잠금"
+      ],
+      "entry_or_config_paths": [
+        "apps/android-gateway/server.ts",
+        "apps/android-gateway/src/config.ts",
+        "apps/android-gateway/openapi.json"
+      ],
+      "current_boundary": "W3 install/build/start/typecheck/test는 NOT_RUN이며 production 운영을 주장하지 않는다."
+    },
+    {
+      "module_id": "MOD-BACKEND",
+      "name": "FastAPI Backend",
+      "repository_path": "backend",
+      "build_module": "Python package tree",
+      "language_runtime": [
+        "Python interpreter version not repository-pinned",
+        "FastAPI 0.128.8",
+        "SQLAlchemy 2.0.49"
+      ],
+      "responsibility": [
+        "계정·관리자 보안 API",
+        "TMAP 중계",
+        "신고·원본 메타데이터",
+        "PostGIS persistence",
+        "서버 추론 adapter"
+      ],
+      "entry_or_config_paths": [
+        "backend/app/main.py",
+        "backend/app/config.py",
+        "backend/requirements.lock"
+      ],
+      "current_boundary": "설치·서버기동·외부 provider·PostgreSQL 동시성·production은 NOT_RUN이다."
+    },
+    {
+      "module_id": "MOD-DATABASE",
+      "name": "PostgreSQL/PostGIS",
+      "repository_path": "docker-compose.yml + backend/alembic",
+      "build_module": "postgis/postgis:16-3.5 digest-pinned service",
+      "language_runtime": [
+        "PostgreSQL 16 image family",
+        "PostGIS 3.5 image family",
+        "Alembic migrations"
+      ],
+      "responsibility": [
+        "신고·관리자 보안·감사 persistence",
+        "공간자료",
+        "schema migration"
+      ],
+      "entry_or_config_paths": [
+        "docker-compose.yml",
+        "backend/alembic.ini",
+        "backend/alembic/versions/202607260001_admin_security_action_bound_audit.py"
+      ],
+      "current_boundary": "이미지 cache, migration, backup/restore와 production DB 상태는 NOT_RUN이다."
+    },
+    {
+      "module_id": "MOD-MODEL-CONFIG",
+      "name": "모델·런타임 설정",
+      "repository_path": "model + configs + Android assets",
+      "build_module": "Python model tools and runtime configuration",
+      "language_runtime": [
+        "Python interpreter version not repository-pinned",
+        "Ultralytics 8.4.48",
+        "ONNX 1.21.0",
+        "ONNX Runtime 1.26.0"
+      ],
+      "responsibility": [
+        "후보 모델 registry",
+        "TFLite artifact identity",
+        "class/threshold/runtime configuration",
+        "local promotion·rollback record"
+      ],
+      "entry_or_config_paths": [
+        "model/registry/walksafe-model-registry.json",
+        "model/deployments/local-deployment.json",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json"
+      ],
+      "current_boundary": "registry의 후보 차단 사유를 유지하며 모델 승인·독립평가·실기기 성능·배포 적격을 주장하지 않는다."
+    }
+  ],
+  "toolchains": [
+    {
+      "toolchain_id": "TC-NODE",
+      "scope": "android-gateway and repository Node checks",
+      "repository_declared_versions": {
+        "node": "v22.23.1",
+        "npm": "10.9.8",
+        "gateway_engine": ">=22 <23",
+        "typescript": "6.0.3",
+        "types_node": "22.19.15"
+      },
+      "support_status": "EXACT_REPOSITORY_LOCK_AVAILABLE",
+      "installed_environment_check": "NOT_RUN",
+      "w3_internal_observation": {
+        "scope": "Gateway internal build",
+        "observed": "Node v22.22.1; npm 9.2.0",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "NOT_THE_EXACT_NODE_V22.23.1_NPM_10.9.8_TOOLCHAIN_LOCK"
+      }
+    },
+    {
+      "toolchain_id": "TC-ANDROID",
+      "scope": ":app and :adminapp",
+      "repository_declared_versions": {
+        "gradle": "9.3.1",
+        "android_gradle_plugin": "9.1.0",
+        "java_jvm_toolchain": "21",
+        "compile_sdk": "36",
+        "target_sdk": "36",
+        "min_sdk": "26",
+        "kotlin_plugin": "NOT_DIRECTLY_DECLARED",
+        "locked_kotlin_stdlib": "2.2.10"
+      },
+      "support_status": "WRAPPER_AND_DEPENDENCY_LOCKS_AVAILABLE_WITH_KOTLIN_PLUGIN_DECLARATION_GAP",
+      "installed_environment_check": "NOT_RUN",
+      "w3_internal_observation": {
+        "scope": "Android internal build",
+        "observed": "Gradle 9.3.1",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "CONSISTENT_WITH_REPOSITORY_WRAPPER"
+      }
+    },
+    {
+      "toolchain_id": "TC-BACKEND-PYTHON",
+      "scope": "backend",
+      "repository_declared_versions": {
+        "python_interpreter": "NOT_PINNED",
+        "fastapi": "0.128.8",
+        "uvicorn": "0.39.0",
+        "sqlalchemy": "2.0.49",
+        "psycopg": "3.2.13",
+        "pytest": "8.4.2",
+        "ultralytics": "8.4.48",
+        "pillow": "12.2.0"
+      },
+      "support_status": "DISTRIBUTIONS_PINNED_INTERPRETER_SUPPORT_NOT_ESTABLISHED",
+      "installed_environment_check": "NOT_RUN"
+    },
+    {
+      "toolchain_id": "TC-MODEL-PYTHON",
+      "scope": "model",
+      "repository_declared_versions": {
+        "python_interpreter": "NOT_PINNED",
+        "ultralytics": "8.4.48",
+        "onnx": "1.21.0",
+        "onnxruntime": "1.26.0",
+        "huggingface_hub": "1.14.0"
+      },
+      "support_status": "DISTRIBUTIONS_PINNED_INTERPRETER_SUPPORT_NOT_ESTABLISHED",
+      "installed_environment_check": "NOT_RUN"
+    },
+    {
+      "toolchain_id": "TC-DATABASE",
+      "scope": "local PostGIS development service",
+      "repository_declared_versions": {
+        "image": "postgis/postgis:16-3.5",
+        "image_digest": "PINNED_IN_DOCKER_COMPOSE",
+        "docker_compose_cli": "NOT_PINNED"
+      },
+      "support_status": "IMAGE_DIGEST_PINNED_CLI_AND_CACHE_NOT_ESTABLISHED",
+      "installed_environment_check": "NOT_RUN",
+      "w3_internal_observation": {
+        "scope": "PostGIS internal integration",
+        "observed": "digest-bound postgis/postgis:16-3.5 service",
+        "result": "PASS_PREFLIGHT_MIGRATION_SCHEMA_AND_REPEATABILITY",
+        "lock_conformance": "DOCKER_COMPOSE_CLI_VERSION_REMAINS_UNPINNED"
+      }
+    },
+    {
+      "toolchain_id": "TC-SUBMISSION",
+      "scope": "submission artifact tooling only; not backend/model runtime authority",
+      "repository_declared_versions": {
+        "cpython": "3.14.4",
+        "pip": "26.1.1",
+        "distribution_lock_count": 8
+      },
+      "support_status": "EXACT_SEPARATE_TOOLCHAIN_LOCK_AVAILABLE",
+      "installed_environment_check": "NOT_RUN",
+      "w3_internal_observation": {
+        "scope": "Evidence Python tooling",
+        "observed": "Python 3.14.6",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "NOT_THE_SUBMISSION_CPYTHON_3.14.4_LOCK"
+      }
+    }
+  ],
+  "offline_first_workflow": {
+    "policy": {
+      "offline_first_meaning": "Network-free checks are preferred after a controlled, lock-bound bootstrap. A complete first-time offline dependency bootstrap is not present in the repository.",
+      "complete_first_time_offline_bootstrap_status": "NOT_ESTABLISHED",
+      "network_bootstrap_boundary": "npm, pip and Docker may require controlled network/cache population; record source hashes and do not convert download success to build or test PASS.",
+      "execution_status": "PARTIAL_INTERNAL_EXECUTION_EVIDENCE_BOUND",
+      "pass_claimed": false,
+      "named_internal_execution_status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+      "remaining_reason": "Complete first-time offline bootstrap and exact locked Node/submission-Python toolchain execution remain unestablished."
+    },
+    "bootstrap": [
+      {
+        "scope": "backend",
+        "commands": [
+          "python3 -m venv .venv",
+          "source .venv/bin/activate",
+          "python -m pip install -r backend/requirements.lock",
+          "cp backend/.env.example backend/.env",
+          "docker compose up -d db",
+          "python -m alembic -c backend/alembic.ini upgrade head"
+        ],
+        "offline_status": "DEPENDENCY_WHEELHOUSE_AND_IMAGE_CACHE_NOT_REPOSITORY_PROVIDED",
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-gateway",
+        "commands": [
+          "cd apps/android-gateway && npm ci",
+          "cd apps/android-gateway && npm run build"
+        ],
+        "offline_status": "NPM_CACHE_BOOTSTRAP_NOT_REPOSITORY_PROVIDED",
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-user-and-admin",
+        "commands": [
+          "cd apps/android && ./gradlew test --no-daemon",
+          "cd apps/android && ./gradlew assembleDebug --no-daemon"
+        ],
+        "offline_status": "WRAPPER_AND_DEPENDENCY_CACHE_MUST_EXIST_BEFORE_OFFLINE_CHECK",
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "model-tools",
+        "commands": [
+          "python -m pip install -r model/requirements.txt"
+        ],
+        "offline_status": "DEPENDENCY_WHEELHOUSE_NOT_REPOSITORY_PROVIDED",
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "node-toolchain-closure",
+        "commands": [
+          "python3 -I -S -B scripts/check_walksafe_node_toolchain_20260715.py --node-root <LOCKED_NODE_ROOT> --lock configs/walksafe_node_toolchain_lock_20260715.json"
+        ],
+        "offline_status": "CHECK_IS_LOCAL_AFTER_LOCKED_NODE_ROOT_IS_PROVISIONED",
+        "execution_status": "NOT_RUN"
+      }
+    ],
+    "run": [
+      {
+        "scope": "backend",
+        "commands": [
+          "PYTHONPATH=. python -m uvicorn backend.app.main:app --reload --port 8000"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-gateway",
+        "commands": [
+          "cd apps/android-gateway && npm start"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "database",
+        "commands": [
+          "docker compose up -d db"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-user-and-admin",
+        "commands": [],
+        "status": "DEVICE_INSTALL_AND_RUN_COMMAND_NOT_DEFINED_BY_CURRENT_GUIDE",
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "model-tools",
+        "commands": [],
+        "status": "NO_STANDALONE_PRODUCTION_RUN_COMMAND_ESTABLISHED",
+        "execution_status": "NOT_RUN"
+      }
+    ],
+    "test": [
+      {
+        "scope": "android-user",
+        "commands": [
+          "cd apps/android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-admin",
+        "commands": [
+          "cd apps/android && ./gradlew :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug --offline --no-daemon"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-gateway",
+        "commands": [
+          "cd apps/android-gateway && npm run typecheck",
+          "cd apps/android-gateway && npm run build",
+          "cd apps/android-gateway && npm test"
+        ],
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "repository-layers",
+        "commands": [
+          "scripts/run_walksafe_test_layers_20260711.sh validate",
+          "scripts/run_walksafe_test_layers_20260711.sh unit",
+          "scripts/run_walksafe_test_layers_20260711.sh functional",
+          "scripts/run_walksafe_test_layers_20260711.sh integration",
+          "scripts/run_walksafe_test_layers_20260711.sh active-session-control",
+          "scripts/run_walksafe_test_layers_20260711.sh all"
+        ],
+        "required_names_only": [
+          "WALKSAFE_NODE_BIN_DIR",
+          "WALKSAFE_TEST_DATABASE_URL"
+        ],
+        "execution_status": "NOT_RUN"
+      }
+    ],
+    "cleanup": [
+      {
+        "scope": "backend-process",
+        "commands": [],
+        "action": "Send an orderly interrupt to the foreground uvicorn process; retain the execution log.",
+        "destructive": false,
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "database",
+        "commands": [
+          "docker compose stop db"
+        ],
+        "action": "Stop without deleting the named volume; volume deletion requires separate evidence-preservation approval.",
+        "destructive": false,
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-gradle",
+        "commands": [
+          "cd apps/android && ./gradlew --stop"
+        ],
+        "action": "Stop Gradle daemons; retain reports and artifact hashes before deleting build directories.",
+        "destructive": false,
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "android-gateway",
+        "commands": [
+          "cd apps/android-gateway && npm run clean"
+        ],
+        "action": "Remove gateway generated build output only after evidence binding.",
+        "destructive": true,
+        "execution_status": "NOT_RUN"
+      },
+      {
+        "scope": "backup-preview",
+        "commands": [
+          "python3 scripts/prune_walksafe_backups_20260711.py --backup-root <ABSOLUTE_DIR> --trusted-signer-fingerprint <40_HEX>"
+        ],
+        "action": "Preview only. The --apply confirmation path is outside routine developer cleanup.",
+        "destructive": false,
+        "execution_status": "NOT_RUN"
+      }
+    ]
+  },
+  "environment_and_secret_contract": {
+    "values_included": false,
+    "value_exposure_prohibited": true,
+    "catalog": [
+      {
+        "scope": "android-user-build",
+        "names_only": [
+          "WALKSAFE_BUILD_MARKER",
+          "WALKSAFE_GATEWAY_ORIGIN",
+          "WALKSAFE_LONG_LIVED_LOGIN_ENABLED",
+          "WALKSAFE_PRODUCT_ROLE",
+          "WALKSAFE_SOURCE_COMMIT"
+        ],
+        "secret_names": []
+      },
+      {
+        "scope": "android-admin-build",
+        "names_only": [
+          "WALKSAFE_ADMIN_API_ORIGIN",
+          "WALKSAFE_PRODUCT_ROLE"
+        ],
+        "secret_names": []
+      },
+      {
+        "scope": "android-gateway",
+        "names_only": [
+          "BACKEND_API_BASE_URL",
+          "EXPECTED_BACKEND_API_BASE_URL",
+          "EXPECTED_GATEWAY_HOST",
+          "WALKSAFE_ANDROID_GATEWAY_HOST",
+          "WALKSAFE_ANDROID_GATEWAY_PORT",
+          "WALKSAFE_FIELD_ACCESS_TTL_SECONDS",
+          "WALKSAFE_FIELD_LONG_LIVED_SESSIONS_ENABLED",
+          "WALKSAFE_FIELD_REFRESH_ABSOLUTE_TTL_SECONDS",
+          "WALKSAFE_FIELD_REFRESH_IDLE_TTL_SECONDS",
+          "WALKSAFE_PRIVACY_RIGHTS_REQUEST_URL"
+        ],
+        "secret_names": []
+      },
+      {
+        "scope": "backend-env-example",
+        "names_only": [
+          "ALLOWED_IMAGE_CONTENT_TYPES",
+          "ANDROID_DEBUG_LOG_DIR",
+          "ANDROID_DEBUG_LOG_ENABLED",
+          "ANDROID_DEBUG_LOG_RETENTION_DAYS",
+          "CORS_ORIGINS",
+          "DATABASE_CONNECT_TIMEOUT_SECONDS",
+          "DATABASE_STATEMENT_TIMEOUT_MS",
+          "DATABASE_URL",
+          "DETECT_V2_COCO_MODEL_PATH",
+          "DETECT_V2_CUSTOM_TACTILE_MODEL_PATH",
+          "DETECT_V2_IMAGE_SIZE",
+          "DETECT_V2_MODE",
+          "DETECT_V2_RUNTIME_CONFIG_PATH",
+          "DETECT_V2_UNIFIED_MODEL_PATH",
+          "INFERENCE_PROCESS_ISOLATION_ENABLED",
+          "INFERENCE_STARTUP_TIMEOUT_SECONDS",
+          "INFERENCE_TIMEOUT_SECONDS",
+          "MAX_ANDROID_DEBUG_LOG_BYTES",
+          "MAX_REPORT_METADATA_BYTES",
+          "MAX_UPLOAD_BYTES",
+          "MODEL_ARTIFACT_PATH",
+          "MODEL_CLASS_ORDER",
+          "MODEL_CONFIDENCE_THRESHOLD",
+          "MODEL_IMAGE_SIZE",
+          "MODEL_IOU_THRESHOLD",
+          "MODEL_VERSION",
+          "POSTGRES_DB",
+          "POSTGRES_PASSWORD",
+          "POSTGRES_USER",
+          "TMAP_APP_KEY",
+          "TMAP_PEDESTRIAN_API_VERSION",
+          "TMAP_PEDESTRIAN_ROUTE_URL",
+          "TMAP_PEDESTRIAN_SPEED_KMH",
+          "TMAP_POI_PROVIDER",
+          "TMAP_POI_SEARCH_URL",
+          "TMAP_READINESS_LIVE_PROBE_ENABLED",
+          "TMAP_READINESS_PROBE_TIMEOUT_SECONDS",
+          "TMAP_READINESS_SUCCESS_MAX_AGE_SECONDS",
+          "TMAP_TIMEOUT_SECONDS",
+          "UPLOAD_DIR",
+          "WALKING_ROUTE_PROVIDER",
+          "WALKSAFE_ACTOR_RATE_LIMIT_STORE",
+          "WALKSAFE_ADMIN_AUTH_RATE_LIMIT_ATTEMPTS",
+          "WALKSAFE_ADMIN_AUTH_RATE_LIMIT_WINDOW_SECONDS",
+          "WALKSAFE_ADMIN_ID",
+          "WALKSAFE_ADMIN_RECOVERY_TTL_SECONDS",
+          "WALKSAFE_ADMIN_SECURITY_ENABLED",
+          "WALKSAFE_ADMIN_SESSION_TTL_SECONDS",
+          "WALKSAFE_ADMIN_STEP_UP_TTL_SECONDS",
+          "WALKSAFE_ADMIN_TOKEN",
+          "WALKSAFE_ADMIN_TOTP_SECRET",
+          "WALKSAFE_ALLOW_INSECURE_LOCAL_DEV",
+          "WALKSAFE_BACKEND_REPLICAS",
+          "WALKSAFE_BACKEND_WORKERS",
+          "WALKSAFE_BACKUP_TRUSTED_SIGNER_FINGERPRINT",
+          "WALKSAFE_ENVIRONMENT",
+          "WALKSAFE_FIELD_TEST_SECURITY_ENABLED",
+          "WALKSAFE_FIELD_TEST_TOKEN",
+          "WALKSAFE_GATEWAY_SESSION_SECRET",
+          "WALKSAFE_MAINTENANCE_LOCK_PATH",
+          "WALKSAFE_RESTORE_GPG_SIGNER",
+          "WALKSAFE_RESTORE_TRUSTED_SIGNER_FINGERPRINT",
+          "WALKSAFE_SOURCE_COMMIT",
+          "WALKSAFE_TEST_DATABASE_URL"
+        ],
+        "secret_names": [
+          "DATABASE_URL",
+          "POSTGRES_PASSWORD",
+          "TMAP_APP_KEY",
+          "WALKSAFE_ADMIN_TOKEN",
+          "WALKSAFE_ADMIN_TOTP_SECRET",
+          "WALKSAFE_FIELD_TEST_TOKEN",
+          "WALKSAFE_GATEWAY_SESSION_SECRET"
+        ]
+      },
+      {
+        "scope": "compose-database",
+        "names_only": [
+          "POSTGRES_DB",
+          "POSTGRES_PASSWORD",
+          "POSTGRES_PORT",
+          "POSTGRES_USER"
+        ],
+        "secret_names": [
+          "POSTGRES_PASSWORD"
+        ]
+      },
+      {
+        "scope": "test-runner-inputs",
+        "names_only": [
+          "WALKSAFE_GATEWAY_ORIGIN",
+          "WALKSAFE_NEXT_DIST_DIR",
+          "WALKSAFE_NODE_BIN_DIR",
+          "WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN",
+          "WALKSAFE_RUN_ANDROID_DEVICE_TESTS",
+          "WALKSAFE_SOURCE_COMMIT",
+          "WALKSAFE_TEST_DATABASE_URL",
+          "WALKSAFE_TFLITE_PYTHON",
+          "WALKSAFE_TFLITE_SMOKE_IMAGE"
+        ],
+        "secret_names": [
+          "WALKSAFE_TEST_DATABASE_URL"
+        ]
+      }
+    ],
+    "storage_rules": [
+      "Track names and non-secret placeholders only; never store actual secret values in this JSON or Markdown supplement.",
+      "Keep local .env files, credentials, tokens, TOTP seeds and database passwords outside version-controlled documentation, fixtures, manifests, lock files and screenshots.",
+      "Do not compile server or provider secrets into Android BuildConfig, APK/AAB assets or source. Android receives only non-secret origins and role/build metadata.",
+      "Do not emit secrets, authorization headers, precise location, raw image/audio, passwords, TOTP, recovery codes or raw exception messages into logs or evidence.",
+      "Use an approved local credential store or deployment secret mechanism; separate development, test and production credentials.",
+      "On suspected exposure, revoke or rotate first and add a new incident/review record; do not rewrite historical evidence to hide the event.",
+      "Bind non-secret model, threshold, class-order, schema and origin configuration to exact path and SHA-256 before relying on it."
+    ],
+    "validation_error_rule": "Missing, malformed, non-loopback or insecure values must fail closed where the named config source requires them; no production-safe claim is made before W3/W5 execution evidence."
+  },
+  "coding_rules": {
+    "common": [
+      "Keep behavior changes traceable to policy, requirement, design and test IDs.",
+      "Fail closed on absent or untrusted auth, consent, sensor, model, network and database state.",
+      "Give resources and concurrency work an explicit owner, lifetime, cancellation and close point.",
+      "Use named constants and explicit units for thresholds, time, distance, byte size and coordinates.",
+      "Add normal, refusal, revocation, offline, duplicate, timeout and recovery boundary tests for changed behavior.",
+      "Never claim formatter, lint, static-analysis, build or test PASS without an append-only execution record bound to exact source bytes."
+    ],
+    "kotlin": {
+      "scope": "Android user app",
+      "rules": [
+        "Follow the Gradle/JVM 21 and Android module configuration.",
+        "Bind coroutine, callback, camera, sensor, location, microphone and upload work to the walking-session lifecycle.",
+        "Represent UNKNOWN or missing evidence explicitly and cancel unsafe work rather than inferring success.",
+        "Keep server/provider secrets out of application source and BuildConfig."
+      ],
+      "enforcement_commands": [
+        "cd apps/android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon"
+      ],
+      "execution_status": "NOT_RUN"
+    },
+    "java": {
+      "scope": "Android admin app",
+      "rules": [
+        "Follow the Gradle/JVM 21 and Android module configuration.",
+        "Keep authentication, recovery and high-risk action state transitions explicit and deny by default.",
+        "Do not log IDs, passwords, TOTP, recovery codes, access/recovery tokens, device identifiers or raw exception messages.",
+        "Preserve API-origin and step-up checks at every high-risk call site."
+      ],
+      "enforcement_commands": [
+        "cd apps/android && ./gradlew :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug --offline --no-daemon"
+      ],
+      "execution_status": "NOT_RUN"
+    },
+    "typescript": {
+      "scope": "Android Gateway",
+      "rules": [
+        "Use the Node >=22 <23 and TypeScript 6.0.3 package contract.",
+        "Keep request parsing, authorization, privacy, proxy and persistence boundaries typed and fail closed.",
+        "Use bounded retries/timeouts and stable request/correlation identifiers without forwarding secret-bearing input.",
+        "Hold exclusive-file locks for the entire protected mutation lifetime and do not replace the locked inode."
+      ],
+      "enforcement_commands": [
+        "cd apps/android-gateway && npm run typecheck",
+        "cd apps/android-gateway && npm run build",
+        "cd apps/android-gateway && npm test"
+      ],
+      "execution_status": "NOT_RUN"
+    },
+    "python": {
+      "scope": "Backend, migrations, model and repository tooling",
+      "rules": [
+        "Use four-space indentation, explicit boundary types and small single-purpose functions.",
+        "Keep FastAPI request validation, service logic and SQLAlchemy session/transaction ownership separate.",
+        "Represent schema changes as append-only Alembic revisions; never edit an applied migration to rewrite history.",
+        "Keep model/config provenance and SHA binding separate from quality, device performance and deployment eligibility."
+      ],
+      "enforcement_commands": [
+        "scripts/run_walksafe_test_layers_20260711.sh validate",
+        "scripts/run_walksafe_test_layers_20260711.sh unit"
+      ],
+      "execution_status": "NOT_RUN"
+    }
+  },
+  "successor_and_review_contract": {
+    "status": "FINAL_W3_INTERNAL_EVIDENCE_BOUND_INDEPENDENT_REVIEW_PENDING",
+    "append_only_rules": [
+      "Create a new review/execution record for each run; never overwrite a prior result, reviewer decision or failure.",
+      "Bind every review record to exact source/config/lock path and SHA-256, command, environment class, time, result, finding and unresolved risk.",
+      "Do not invent a second person. A self-review must say SELF_REVIEW and cannot close a gate requiring an independent or external reviewer.",
+      "Blocking and major findings remain open until a later append-only correction and re-review record identifies their closure evidence.",
+      "Rollback uses a new revert/change record and new verification evidence; it does not delete the superseded record.",
+      "Secret or personal-data exposure is redacted from the record, rotated/revoked separately and referenced by a non-secret incident ID."
+    ],
+    "successor_read_precedence": [
+      {
+        "order": 1,
+        "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+        "meaning": "W1 compact effective decision successor; composition authority only."
+      },
+      {
+        "order": 2,
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+        "meaning": "W1 current requirements and formal-279 boundary."
+      },
+      {
+        "order": 3,
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "meaning": "W2 current runtime/module architecture and downstream gaps."
+      },
+      {
+        "order": 4,
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.json",
+        "meaning": "W2 current bidirectional design trace."
+      },
+      {
+        "order": 5,
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "meaning": "W2 current interface/data/config boundary."
+      },
+      {
+        "order": 6,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+        "meaning": "This add-only current DEV-02/03/04/05/06/08 content supplement."
+      },
+      {
+        "order": 7,
+        "path": "docs/deliverables/05-implementation/developer-guide.md",
+        "meaning": "Historical predecessor; use only where a later successor does not replace its content interpretation."
+      }
+    ],
+    "predecessor_preservation": {
+      "legacy_guide_modified": false,
+      "artifact_register_modified": false,
+      "w1_files_modified": false,
+      "w2_files_modified": false,
+      "approval_or_baseline_changed": false
+    },
+    "w3_required_review_evidence": [
+      "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+    ]
+  },
+  "verification_boundary": {
+    "w3_execution": {
+      "status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+      "pass_claimed": true,
+      "internal_only": true,
+      "evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+      ]
+    },
+    "formal_test_program": {
+      "planned_count": 279,
+      "status_counts": {
+        "NOT_RUN": 279
+      },
+      "pass_claimed": false
+    },
+    "actual_device_network_database_model_provider": {
+      "status": "PARTIAL_INTERNAL_DATABASE_ONLY_ACTUAL_DEVICE_NETWORK_MODEL_PROVIDER_NOT_RUN",
+      "pass_claimed": false,
+      "internal_database_evidence": "PASS_FRESH_POSTGIS_MIGRATION_SCHEMA_AND_REPEATABILITY"
+    },
+    "release_gates": [
+      {
+        "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SERVER-CAPACITY-STATE-TO-PHONE",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-UNREDACTED-RAW-INDEPENDENT-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-CLOUD-STORAGE-COST-VALIDATION",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ],
+    "unwaived_gate_count": 5,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "allowed_claims": [
+    "The add-only supplement covers exactly DLV-DEV-02, 03, 04, 05, 06 and 08.",
+    "The module map, declared versions, command text and environment names are bound to current exact repository bytes.",
+    "W1/W2 successors take content-reading precedence within their named scope without changing approval or baseline state.",
+    "The final W3 evidence records internal Android/Gateway builds, Android lint, Gateway typecheck, backend/model compile checks, SBOM schema validation, provenance and current-source backend/PostGIS integration PASS within exact named scopes.",
+    "The current backend DB-free 33-test node, fresh migration/schema parity, two sequential exact PostgreSQL nodes, cleanup, unchanged Android/Gateway reuse and deterministic OpenAPI are internally evidence-bound.",
+    "A complete first-time offline dependency bootstrap and exact locked Node/submission-Python execution remain not established."
+  ],
+  "prohibited_claims": [
+    "That all dependency/toolchain downloads are reproducible without network or pre-populated caches.",
+    "That Python runtime compatibility or Docker Compose CLI support is pinned where the repository does not pin it.",
+    "That model quality, actual-device behavior, external providers, production deployment or release is complete.",
+    "That any secret or environment value is present in this supplement.",
+    "That this supplement approves, rebaselines or mutates predecessor artifacts.",
+    "That the internal evidence is formal-test, actual-device, Android-to-Gateway-to-Backend-to-PostGIS cross-process, TMAP, production, deployment, signing, legal approval or release PASS.",
+    "That reused unchanged-source results represent a new actual-device or cross-process execution.",
+    "That the observed Gateway Node/npm or evidence Python versions satisfy the separate exact repository toolchain locks."
+  ],
+  "source_binding_summary": {
+    "source_count": 55,
+    "source_path_set_contract": "SHA256_UTF8_SORTED_PATHS_EACH_WITH_TRAILING_LF",
+    "source_path_set_sha256": "97146b20d1377458efd91f5695487bdd0913ff95dc64c71641e0d6f8b596c1a9",
+    "source_path_sha256_set_contract": "SHA256_UTF8_SORTED_PATH_TAB_SHA256_EACH_WITH_TRAILING_LF",
+    "source_path_sha256_set_sha256": "423145203f9fe1c95e84414b9e1759fbb326674e87d4ed334949462ad2260eed",
+    "all_paths_required": true,
+    "all_sha256_required_to_match": true
+  },
+  "source_bindings": [
+    {
+      "binding_id": "W3-DEV-SRC-001",
+      "role": "AUDIT_BASELINE_INPUT",
+      "path": "docs/control/execution/artifact-audits/20260726/technical-audit.json",
+      "sha256": "daa9d258d9baea8cac9e82b65927b805b805b0dc4977aaa040098500886af856",
+      "allowed_claim": "Six predecessor INTERNAL_GAP reasons and required actions.",
+      "prohibited_claim": "W3 closure, approval, build, test, deployment or release completion."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-002",
+      "role": "WAVE_PLAN_INPUT",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "allowed_claim": "W3 membership and remediation sequencing.",
+      "prohibited_claim": "Execution or closure of a planned wave."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-003",
+      "role": "LEGACY_ARTIFACT_REGISTER",
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+      "allowed_claim": "Registered artifact identity, responsibility and historical state fields.",
+      "prohibited_claim": "That stale guide bytes and current source are mutually consistent or newly approved."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-004",
+      "role": "LEGACY_DEVELOPER_GUIDE",
+      "path": "docs/deliverables/05-implementation/developer-guide.md",
+      "sha256": "3f47059f1491b679d02c149b12eb01061e30c96935dc65f3b964496d2715b8ee",
+      "allowed_claim": "Predecessor guidance and the Draft-versus-register inconsistency being supplemented.",
+      "prohibited_claim": "Current module, toolchain, execution, approval or PASS status without successor evidence."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-005",
+      "role": "LEGACY_QUALITY_EVIDENCE_REGISTER",
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "sha256": "eb37b2293f47009a228f7f405bcceb27b12a6825485581b026ac99a7c27c05bf",
+      "allowed_claim": "Existing code-review and quality-evidence structure.",
+      "prohibited_claim": "A review, lint, build or test execution occurred for W3."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-006",
+      "role": "W1_EFFECTIVE_DECISION_SUCCESSOR",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "allowed_claim": "Current compact decision composition and read precedence.",
+      "prohibited_claim": "Implementation, verification, deployment or release completion."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-007",
+      "role": "W1_REQUIREMENT_SUCCESSOR",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+      "sha256": "615f35910cb1fffab6284aee456e562e6d21e75671f225bd9f06868ad0785dce",
+      "allowed_claim": "Current approved-policy interpretation and formal-test boundary.",
+      "prohibited_claim": "Formal test, actual-device or release PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-008",
+      "role": "W1_INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/independent-review.md",
+      "sha256": "a066e09283c710642efa48e21ee425ec36647e8c112baf3bb6d7fd18a987148d",
+      "allowed_claim": "Append-only W1 review outcome within its named scope.",
+      "prohibited_claim": "Independent review of W3 or closure of downstream gaps."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-009",
+      "role": "W2_ARCHITECTURE_SUCCESSOR",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+      "sha256": "470b4566a0272d5fc5fc028e53a3ee8a8bde19b06b889570ad60adcce53b62ea",
+      "allowed_claim": "Current six-axis runtime and architecture boundary.",
+      "prohibited_claim": "Formal, device, provider, production or release completion."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-010",
+      "role": "W2_DESIGN_TRACE_SUCCESSOR",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.json",
+      "sha256": "c74b4a89610ac439e9ec773427753baa6e4f0e34384be0cb74fb87c16f9c7f72",
+      "allowed_claim": "Current downstream design trace and open-gap references.",
+      "prohibited_claim": "Closure of W3-W9 implementation or verification gaps."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-011",
+      "role": "W2_INTERFACE_DATA_SUCCESSOR",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+      "sha256": "e6eabf259f9eb223976c68b8d9315f5f7caf2abe757c4e4511cf4bcf53fee89d",
+      "allowed_claim": "Current interface, data and environment boundary.",
+      "prohibited_claim": "Production endpoint, data migration or provider validation."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-012",
+      "role": "W2_INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+      "sha256": "a7d0da87529c60be3c416ade6fefc63e55578627f8c411ff63df0ceed4fba888",
+      "allowed_claim": "Append-only W2 review outcome within its named scope.",
+      "prohibited_claim": "Independent review of W3 or approval of this supplement."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-013",
+      "role": "ANDROID_MODULE_SETTINGS",
+      "path": "apps/android/settings.gradle.kts",
+      "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+      "allowed_claim": "Exact inclusion of :app and :adminapp.",
+      "prohibited_claim": "Successful configuration, compilation, installation or device execution."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-014",
+      "role": "ANDROID_ROOT_BUILD",
+      "path": "apps/android/build.gradle.kts",
+      "sha256": "20485875f2123b6dfa69bdb228a06890f440c46c5443bf68b936531fa2b0df28",
+      "allowed_claim": "Declared Android plugin configuration.",
+      "prohibited_claim": "Installed toolchain availability or build PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-015",
+      "role": "ANDROID_WRAPPER_LOCK",
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "1e3d87ddfd70069f68afa0c9ddcaab26913c3baf3d809447b0362d2d49f57325",
+      "allowed_claim": "Declared Gradle wrapper distribution.",
+      "prohibited_claim": "Downloaded wrapper availability or execution PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-016",
+      "role": "USER_ANDROID_BUILD",
+      "path": "apps/android/app/build.gradle.kts",
+      "sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+      "allowed_claim": "User-app SDK, Java, role and build configuration.",
+      "prohibited_claim": "APK correctness, device behavior or release eligibility."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-017",
+      "role": "USER_ANDROID_DEPENDENCY_LOCK",
+      "path": "apps/android/app/gradle.lockfile",
+      "sha256": "9f62f9279f66c03e58ec07193f56fc6b30209906cc3fabc9db52756c037b3aae",
+      "allowed_claim": "Exact declared user-app dependency resolution.",
+      "prohibited_claim": "Dependency retrieval, license clearance or test PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-018",
+      "role": "ADMIN_ANDROID_BUILD",
+      "path": "apps/android/adminapp/build.gradle.kts",
+      "sha256": "009e66fbd276c7aed7935ad0f9bbb9e4950e63ac57b213e7f93d27b4668dbdc6",
+      "allowed_claim": "Admin-app SDK, Java, role, API-origin and security configuration.",
+      "prohibited_claim": "Admin workflow, device security or production PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-019",
+      "role": "ADMIN_ANDROID_DEPENDENCY_LOCK",
+      "path": "apps/android/adminapp/gradle.lockfile",
+      "sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13",
+      "allowed_claim": "Exact declared admin-app dependency resolution.",
+      "prohibited_claim": "Dependency retrieval, license clearance or test PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-020",
+      "role": "GATEWAY_PACKAGE_MANIFEST",
+      "path": "apps/android-gateway/package.json",
+      "sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6",
+      "allowed_claim": "Gateway engine range and repository-defined scripts.",
+      "prohibited_claim": "Installed package closure, runtime availability or script PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-021",
+      "role": "GATEWAY_PACKAGE_LOCK",
+      "path": "apps/android-gateway/package-lock.json",
+      "sha256": "cf595d4b768ec3fb00ccd4223249cfd5b33c25b3940c864878d8dc0f04d075d1",
+      "allowed_claim": "Exact declared gateway dependency resolution.",
+      "prohibited_claim": "Dependency retrieval, license clearance or test PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-022",
+      "role": "GATEWAY_CONFIG_SOURCE",
+      "path": "apps/android-gateway/src/config.ts",
+      "sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7",
+      "allowed_claim": "Gateway environment-variable names and validation boundary.",
+      "prohibited_claim": "Any environment value, production configuration or runtime PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-023",
+      "role": "GATEWAY_ENTRYPOINT",
+      "path": "apps/android-gateway/server.ts",
+      "sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd",
+      "allowed_claim": "Gateway process entrypoint and current module existence.",
+      "prohibited_claim": "Successful startup, availability or production deployment."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-024",
+      "role": "BACKEND_REQUIREMENTS",
+      "path": "backend/requirements.txt",
+      "sha256": "a54ae7931a13504b1be671c645832b422d79320f68fce3fd580d5f94bfa51779",
+      "allowed_claim": "Pinned backend Python distribution versions.",
+      "prohibited_claim": "Python interpreter compatibility, installation or test PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-025",
+      "role": "BACKEND_REQUIREMENTS_LOCK",
+      "path": "backend/requirements.lock",
+      "sha256": "69017e7df8862a09063ab6329535883c28335dd7202caae5d77a5f3dcbc01069",
+      "allowed_claim": "Current backend lock artifact bytes.",
+      "prohibited_claim": "Offline wheel availability, installation or test PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-026",
+      "role": "BACKEND_ENV_EXAMPLE",
+      "path": "backend/.env.example",
+      "sha256": "50531cc334c13bcf58b8707d7bf70a8137c011ee1c30e5f6caff876cabd6483b",
+      "allowed_claim": "Environment-variable names only; no values are copied into this supplement.",
+      "prohibited_claim": "Any actual secret, credential, endpoint value or production configuration."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-027",
+      "role": "BACKEND_CONFIG_SOURCE",
+      "path": "backend/app/config.py",
+      "sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f",
+      "allowed_claim": "Backend environment-variable names and fail-closed validation behavior.",
+      "prohibited_claim": "Any actual value, provider availability or runtime PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-028",
+      "role": "BACKEND_ENTRYPOINT",
+      "path": "backend/app/main.py",
+      "sha256": "4840f7b46ae202f9d433427a6e8f1f04df4296e6ac8eb23ec2cdcf2196e17eb2",
+      "allowed_claim": "FastAPI application entrypoint and route assembly.",
+      "prohibited_claim": "Successful startup, endpoint correctness or production deployment."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-029",
+      "role": "POSTGIS_COMPOSE",
+      "path": "docker-compose.yml",
+      "sha256": "d3ca3c4caf272919712ee21ce8ae59c14894bff8f3270596a06c8601a2df6de5",
+      "allowed_claim": "Digest-pinned PostGIS service shape and loopback development boundary.",
+      "prohibited_claim": "Cached image availability, migration PASS, persistence or production readiness."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-030",
+      "role": "ALEMBIC_CONFIG",
+      "path": "backend/alembic.ini",
+      "sha256": "13b8e011a9dbbaf9ca9e3b289122c89c8baf0f79f89013e4e6cb32a2b1d2c1b2",
+      "allowed_claim": "Migration tool configuration path.",
+      "prohibited_claim": "Migration execution or schema correctness."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-031",
+      "role": "LATEST_ADMIN_AUDIT_MIGRATION",
+      "path": "backend/alembic/versions/202607260001_admin_security_action_bound_audit.py",
+      "sha256": "2b050b47733f0bb7bf564734d48ed8d6da9615fc8150e83a5185b06ca51281f2",
+      "allowed_claim": "Latest named admin high-risk-action audit migration bytes.",
+      "prohibited_claim": "Applied database state or concurrency correctness."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-032",
+      "role": "MODEL_REQUIREMENTS",
+      "path": "model/requirements.txt",
+      "sha256": "f1ed492e19e1a98827b2c32756862f980ca84ef19263d6158af9b000d138e310",
+      "allowed_claim": "Pinned model-tool distribution versions.",
+      "prohibited_claim": "Python interpreter compatibility, model quality or deployment eligibility."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-033",
+      "role": "MODEL_REGISTRY",
+      "path": "model/registry/walksafe-model-registry.json",
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a",
+      "allowed_claim": "Current model candidates, artifact identity and explicit blockers.",
+      "prohibited_claim": "Model approval, independent evaluation, field fitness or release eligibility."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-034",
+      "role": "MODEL_LOCAL_DEPLOYMENT_STATE",
+      "path": "model/deployments/local-deployment.json",
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9",
+      "allowed_claim": "Current local promotion and rollback record.",
+      "prohibited_claim": "Production deployment or field validation."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-035",
+      "role": "ANDROID_MODEL_RUNTIME_CONFIG",
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73",
+      "allowed_claim": "Android-bundled runtime configuration bytes.",
+      "prohibited_claim": "Model accuracy, device performance or field safety."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-036",
+      "role": "NODE_TOOLCHAIN_LOCK",
+      "path": "configs/walksafe_node_toolchain_lock_20260715.json",
+      "sha256": "3b71481dee20943c6a7039315068809c6858c720bfc9df9133d43048b7b7b1a3",
+      "allowed_claim": "Exact Node and npm toolchain closure expected by repository checks.",
+      "prohibited_claim": "That the toolchain is installed or the checker passed in W3."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-037",
+      "role": "SUBMISSION_TOOLCHAIN_LOCK",
+      "path": "configs/submission_toolchain_lock_20260713.json",
+      "sha256": "5ddd5ce86e3080ac278ec9e157e9a3bcb4642c996e1a38be1ba7f77df2a8fc81",
+      "allowed_claim": "Separate submission-artifact Python toolchain closure.",
+      "prohibited_claim": "Backend/model Python runtime support or W3 execution PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-038",
+      "role": "TEST_LAYER_RUNNER",
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "sha256": "4f75501a42118472b4f577f4dd8778de9df9bdf89d08320ba1ac4de9f232b42d",
+      "allowed_claim": "Repository-defined validation/test layers and required environment names.",
+      "prohibited_claim": "That any layer ran or passed for W3."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-039",
+      "role": "NODE_TOOLCHAIN_CHECKER",
+      "path": "scripts/check_walksafe_node_toolchain_20260715.py",
+      "sha256": "dd88cd342addda35bc486440091e39e3b16d064c89e0f79d62fc3c03d21cdcfe",
+      "allowed_claim": "Repository-defined Node closure verification command.",
+      "prohibited_claim": "That the locked Node closure is installed or verified."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-040",
+      "role": "BACKUP_PRUNE_TOOL",
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+      "allowed_claim": "Preview/apply cleanup boundary and explicit destructive confirmation.",
+      "prohibited_claim": "That cleanup, restore or retention execution occurred."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-041",
+      "role": "CURRENT_BACKEND_MODEL_SOURCE",
+      "path": "backend/app/models.py",
+      "sha256": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+      "allowed_claim": "Current exact ORM model bytes used by integration-run-004.",
+      "prohibited_claim": "Formal, production or release correctness."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-042",
+      "role": "CURRENT_BACKEND_TEST_FIXTURE",
+      "path": "backend/tests/conftest.py",
+      "sha256": "2859741708f6bd0fc4d50dc27531cd8459165cb336beaa2a49bdfe0b2390e298",
+      "allowed_claim": "Current exact backend test fixture bytes used by integration-run-004.",
+      "prohibited_claim": "Formal-test or production database PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-043",
+      "role": "CURRENT_BACKEND_ADMIN_TEST",
+      "path": "backend/tests/test_admin_security.py",
+      "sha256": "dff5dca5557201cd33601f49001ddec94bb0f75cd441058a5779a5dd2411b493",
+      "allowed_claim": "Current exact admin security test bytes used by integration-run-004.",
+      "prohibited_claim": "Formal, actual-device or production PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-044",
+      "role": "W3_EVIDENCE_BUILDER",
+      "path": "scripts/build_walksafe_w3_engineering_evidence_20260726.py",
+      "sha256": "404b55e3476478990732dacad10da291704f88e64629c2adecf6cb467b2ae941",
+      "allowed_claim": "Exact tooling bytes that generated W3 engineering evidence.",
+      "prohibited_claim": "Independent review, signing or release approval."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-045",
+      "role": "FINAL_W3_ENGINEERING_EVIDENCE_MANIFEST",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+      "sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5",
+      "allowed_claim": "Final module/lock/fixture/source/SBOM/internal-build evidence composition.",
+      "prohibited_claim": "Formal, device, deployment, signing or release completion."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-046",
+      "role": "FINAL_W3_INTERNAL_BUILD_PROVENANCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/internal-build-provenance.json",
+      "sha256": "56b7ec0a352bdf590846bcda6ec69d7594a68989d1326917c43874ea016e0492",
+      "allowed_claim": "Named internal command results, inputs, logs and outputs.",
+      "prohibited_claim": "Any command or scope not expressly recorded by the provenance."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-047",
+      "role": "FINAL_W3_SOURCE_SNAPSHOT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+      "allowed_claim": "Dirty-worktree exact path/content identity at evidence generation.",
+      "prohibited_claim": "Clean commit, later source identity or release approval."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-048",
+      "role": "FINAL_W3_AUX005_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+      "sha256": "94e4f9a1ca65840ca884397d5ca564385dbda791f256021cf344dd5c6362ee8f",
+      "allowed_claim": "Internal lint/typecheck/compile/SBOM schema/license inventory results and evidence reuse.",
+      "prohibited_claim": "Legal approval, formal, device, deploy or release PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-049",
+      "role": "FINAL_W3_SBOM_VALIDATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/sbom-validation-result.json",
+      "sha256": "ed5048d91819a9e8f5b190f9b782a375e358cc3573b8bc8949135a18d9a1f57b",
+      "allowed_claim": "Local official-schema validation results for SPDX 2.3 and CycloneDX 1.6.",
+      "prohibited_claim": "SBOM legal approval, vulnerability clearance or release approval."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-050",
+      "role": "FINAL_W3_LICENSE_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/license-review.json",
+      "sha256": "428b90d44a9f293d219c06921f1d7a9c829fbf87f5bb2c78a376259b8041f613",
+      "allowed_claim": "Internal license metadata inventory result.",
+      "prohibited_claim": "Legal opinion, license approval or release authorization."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-051",
+      "role": "FINAL_W3_INTEGRATION004_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9",
+      "allowed_claim": "Eleven bound internal integration command receipts and result summary.",
+      "prohibited_claim": "Actual-device, cross-process, TMAP, formal, production or release PASS."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-052",
+      "role": "FINAL_W3_INTEGRATION004_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c",
+      "allowed_claim": "Current internal integration disposition and external boundaries.",
+      "prohibited_claim": "Approval or closure of named external boundaries."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-053",
+      "role": "FINAL_W3_INTEGRATION004_VALIDATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+      "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d",
+      "allowed_claim": "Internal consistency checks for integration-run-004.",
+      "prohibited_claim": "Independent review, formal-test or release completion."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-054",
+      "role": "FINAL_W3_INTEGRATION004_SOURCE_BINDING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-source-binding.json",
+      "sha256": "c44d64f3aa4ae825a81ff8e2925bf5bfaa36624826d82e35426fafab04c75e90",
+      "allowed_claim": "Current backend exact content set and unchanged module reuse decision.",
+      "prohibited_claim": "Clean commit or unrecorded source equality."
+    },
+    {
+      "binding_id": "W3-DEV-SRC-055",
+      "role": "FINAL_W3_INTEGRATION004_BACKEND_SUBJECT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc",
+      "allowed_claim": "Exact backend subject used by final integration execution.",
+      "prohibited_claim": "Later backend source identity or production correctness."
+    }
+  ],
+  "open_gaps": [
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-001",
+      "status": "OPEN",
+      "item": "Final W3 internal evidence is bound, but exact-six successor content still requires independent review and wave disposition.",
+      "owner_roles": [
+        "개발책임자",
+        "기술책임자",
+        "QA책임자",
+        "독립기술검토자"
+      ],
+      "target_wave": "W3",
+      "closure_condition": "W3 validation and independent review bind exactly the six DEV IDs, report zero unresolved blocking/major findings, and the W3 status delta records the reviewed disposition without approval overclaim.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-002",
+      "status": "OPEN",
+      "item": "Named internal build/lint/migration/integration commands passed, but complete first-time offline bootstrap, exact locked Node/submission-Python execution and full planned command coverage remain unestablished.",
+      "owner_roles": [
+        "개발책임자",
+        "빌드책임자",
+        "QA책임자"
+      ],
+      "target_wave": "W3",
+      "closure_condition": "Bind an execution using the exact locked Node/npm and applicable Python runtime, record cache/network/bootstrap and every planned command disposition, and retain failures; internal evidence reuse alone does not close this gap.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-003",
+      "status": "OPEN",
+      "item": "Append-only W3 execution evidence exists; the final independent review of the current exact-six guide subject remains pending.",
+      "owner_roles": [
+        "기술책임자",
+        "QA책임자",
+        "독립기술검토자"
+      ],
+      "target_wave": "W3",
+      "closure_condition": "The W3 independent review identifies reviewer independence, exact subject hashes, findings, dispositions and any later correction evidence without rewriting W1/W2 reviews.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-05",
+        "DLV-DEV-06"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-004",
+      "status": "OPEN",
+      "item": "The formal 279-test program remains NOT_RUN.",
+      "owner_roles": [
+        "QA책임자",
+        "개발책임자"
+      ],
+      "target_wave": "W4",
+      "closure_condition": "All 279 planned formal tests have immutable executions and truthful PASS/FAIL/BLOCKED/SKIP dispositions bound to one controlled candidate; zero tests remain silently unexecuted.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-04",
+        "DLV-DEV-06"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-005",
+      "status": "OPEN",
+      "item": "Internal name-only config and secret cleanup evidence exists; W5 security/privacy validation and legal boundary remain open.",
+      "owner_roles": [
+        "보안책임자",
+        "개인정보책임자",
+        "개발책임자"
+      ],
+      "target_wave": "W5",
+      "closure_condition": "W5 evidence verifies name-only documentation, secret scanning/redaction, Android non-embedding, fail-closed config validation and credential rotation procedure without exposing values.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-006",
+      "status": "OPEN",
+      "item": "Model/config provenance and compile evidence exist; independent model quality, data/evaluation blockers and supported runtime closure remain incomplete.",
+      "owner_roles": [
+        "AI·모델책임자",
+        "개발책임자",
+        "QA책임자"
+      ],
+      "target_wave": "W6",
+      "closure_condition": "W6 binds exact model/config/data/evaluation provenance, resolves or explicitly blocks registry issues, establishes supported Python runtime, and records independent quality evidence without inferring device/release fitness.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-007",
+      "status": "OPEN",
+      "item": "Backend/PostGIS current-source integration passed internally; actual Android devices, full cross-process traffic, network transitions and TMAP remain NOT_RUN.",
+      "owner_roles": [
+        "Android개발책임자",
+        "백엔드개발책임자",
+        "QA책임자",
+        "안전책임자"
+      ],
+      "target_wave": "W7",
+      "closure_condition": "W7 produces append-only actual-device and integration executions for both Android apps and the gateway/backend/database/model boundaries, with failures and unsafe scenarios retained.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-04",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-008",
+      "status": "OPEN",
+      "item": "Internal container and temporary-secret cleanup passed; operational retention, backup/restore and destructive-operation drills remain unexecuted.",
+      "owner_roles": [
+        "운영책임자",
+        "데이터책임자",
+        "QA책임자"
+      ],
+      "target_wave": "W8",
+      "closure_condition": "W8 records preview-first cleanup, evidence preservation, retention, backup and restore/drill results; destructive paths require explicit authorization and do not delete prior evidence.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-08"
+      ]
+    },
+    {
+      "gap_id": "W3-DEV-GUIDE-GAP-009",
+      "status": "OPEN",
+      "item": "Five release gates remain NOT_RUN and unwaived; release remains NOT_ELIGIBLE.",
+      "owner_roles": [
+        "제품책임자",
+        "출시책임자",
+        "보안책임자",
+        "안전책임자"
+      ],
+      "target_wave": "W9",
+      "closure_condition": "W9 closes or validly waives every named gate with authorized evidence, completes final review, and records an explicit release decision; this supplement cannot close the gates.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DEV-04",
+        "DLV-DEV-08"
+      ]
+    }
+  ],
+  "gap_registry_summary": {
+    "gap_count": 9,
+    "unique_gap_count": 9,
+    "artifact_disposition_count": 6,
+    "orphan_gap_count": 0,
+    "duplicate_gap_id_count": 0,
+    "empty_owner_roles_count": 0,
+    "empty_closure_condition_count": 0,
+    "empty_expected_evidence_paths_count": 0,
+    "allowed_target_waves": [
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W8",
+      "W9"
+    ]
+  },
+  "validation_invariants": {
+    "expected_artifact_count": 6,
+    "expected_artifact_ids": [
+      "DLV-DEV-02",
+      "DLV-DEV-03",
+      "DLV-DEV-04",
+      "DLV-DEV-05",
+      "DLV-DEV-06",
+      "DLV-DEV-08"
+    ],
+    "expected_module_count": 6,
+    "expected_source_binding_count": 55,
+    "expected_gap_count": 9,
+    "expected_gap_unique_count": 9,
+    "expected_artifact_disposition_count": 6,
+    "expected_environment_values_included": false,
+    "expected_complete_first_time_offline_bootstrap_status": "NOT_ESTABLISHED",
+    "expected_w3_execution_status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+    "expected_formal_test_count": 279,
+    "expected_formal_not_run_count": 279,
+    "expected_release_gate_count": 5,
+    "expected_unwaived_release_gate_count": 5,
+    "expected_release_status": "NOT_ELIGIBLE",
+    "source_commit_must_equal": null,
+    "expected_final_evidence_and_current_subject_binding_count": 15,
+    "expected_existing_source_binding_hash_mismatch_count_after_refresh": 0
+  },
+  "integrity": {
+    "artifact_count": 6,
+    "artifact_unique_count": 6,
+    "artifact_id_set_sha256": "07843968c7e76c019e1b7071eddcfcd606a2cc619aefadc01ac2a30ea46d6552",
+    "source_binding_count": 55,
+    "source_path_sha256_set_sha256": "423145203f9fe1c95e84414b9e1759fbb326674e87d4ed334949462ad2260eed",
+    "gap_count": 9,
+    "gap_unique_count": 9,
+    "gap_orphan_count": 0,
+    "gap_duplicate_count": 0,
+    "content_fingerprint": {
+      "algorithm": "sha256",
+      "canonicalization": "UTF8_ENSURE_ASCII_FALSE_SORT_KEYS_COMPACT_SEPARATORS_TRAILING_LF",
+      "calculation_rule": "Set /integrity/content_fingerprint/value to null, serialize the entire JSON with ensure_ascii=false, sort_keys=true, separators=(comma,colon), append LF, then SHA-256.",
+      "value": "5eddc7f8fbb84ff02caf9b93773dd07be42c5d78e0cac2da325c33f6278a3072"
+    }
+  },
+  "w3_internal_evidence": {
+    "status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+    "source_commit": null,
+    "worktree_binding": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS",
+    "evidence_20260726_003": {
+      "status": "INTERNAL_EVIDENCE_GENERATED",
+      "covered_dev_artifact_count": 17,
+      "facts": [
+        "Module, lock, fixture, exact source snapshot, SPDX/CycloneDX SBOM and internal build provenance were generated.",
+        "Android user/admin assemble and Gateway build completed as PASSED_INTERNAL_COMMAND in the bound provenance.",
+        "Dirty-worktree source was bound by exact path/content sets; source_commit remains null."
+      ],
+      "manifest_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json"
+    },
+    "aux_execution_20260726_005": {
+      "status": "PASS_INTERNAL_CURRENT_SOURCE_WITH_EXTERNAL_BOUNDARIES",
+      "facts": [
+        "CycloneDX 1.6 and SPDX 2.3 local official-schema validation passed.",
+        "Backend/model compileall passed.",
+        "Android user/admin lint, Gateway typecheck and backend integration results were bound to exact current or unchanged source.",
+        "License metadata inventory passed; legal approval was not claimed."
+      ],
+      "summary_path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json"
+    },
+    "integration_run_20260726_004": {
+      "status": "PASS_INTERNAL_INTEGRATION_WITH_EXTERNAL_BOUNDARIES",
+      "facts": [
+        "Current backend DB-free suite: 33 passed.",
+        "Fresh PostGIS migration and ORM schema parity passed.",
+        "The exact PostgreSQL node passed twice sequentially on one single-use migrated database.",
+        "Container/secret cleanup and repeatability checks passed; command receipts: 11, failed commands: 0.",
+        "Unchanged exact-source results were reused for Android user 728 tests, Android admin 38 tests and Gateway 62 tests.",
+        "OpenAPI deterministic byte identity passed internally."
+      ],
+      "current_state_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json"
+    },
+    "toolchain_observations": [
+      {
+        "scope": "Android internal build",
+        "observed": "Gradle 9.3.1",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "CONSISTENT_WITH_REPOSITORY_WRAPPER"
+      },
+      {
+        "scope": "Gateway internal build",
+        "observed": "Node v22.22.1; npm 9.2.0",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "NOT_THE_EXACT_NODE_V22.23.1_NPM_10.9.8_TOOLCHAIN_LOCK"
+      },
+      {
+        "scope": "Evidence Python tooling",
+        "observed": "Python 3.14.6",
+        "result": "PASSED_INTERNAL_COMMAND",
+        "lock_conformance": "NOT_THE_SUBMISSION_CPYTHON_3.14.4_LOCK"
+      },
+      {
+        "scope": "PostGIS internal integration",
+        "observed": "digest-bound postgis/postgis:16-3.5 service",
+        "result": "PASS_PREFLIGHT_MIGRATION_SCHEMA_AND_REPEATABILITY",
+        "lock_conformance": "DOCKER_COMPOSE_CLI_VERSION_REMAINS_UNPINNED"
+      }
+    ],
+    "claim_boundary": {
+      "internal_named_scope_pass_claimed": true,
+      "formal_test_count": 279,
+      "formal_test_status": "NOT_RUN",
+      "actual_device_status": "NOT_RUN",
+      "android_gateway_backend_postgis_cross_process_status": "NOT_RUN",
+      "network_transition_tmap_status": "NOT_RUN",
+      "deployment_production_status": "NOT_RUN",
+      "signing_status": "NOT_ASSESSED",
+      "release_gate_count": 5,
+      "release_gate_status": "NOT_RUN",
+      "release_gates_waived": false,
+      "release_status": "NOT_ELIGIBLE",
+      "artifact_legal_approval_claimed": false
+    }
+  }
+}

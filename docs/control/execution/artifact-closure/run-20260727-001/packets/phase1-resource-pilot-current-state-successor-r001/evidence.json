@@ -1,0 +1,247 @@
+{
+  "schema_version": "walksafe.controlled-resource-pilot-current-state-successor.v1",
+  "packet_id": "PHASE1-RESOURCE-PILOT-CURRENT-STATE-SUCCESSOR-20260729-R001",
+  "created_on": "2026-07-29",
+  "status": "CONTROLLED_CURRENT_STATE_BINDING_ONLY",
+  "scope": {
+    "subject_count": 4,
+    "subject_paths": [
+      "apps/android/USER_GUIDE.md",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt"
+    ],
+    "subject_paths_are_exhaustive": true,
+    "unlisted_path_or_whole_manifest_bridge_allowed": false,
+    "source_mutation_performed": false
+  },
+  "subjects": [
+    {
+      "path": "apps/android/USER_GUIDE.md",
+      "predecessor_sha256": "d1aaab83217c88c6d86161172575ad4d42fcbf0c0c30063d7619b27a3256e61d",
+      "predecessor_byte_count": 12232,
+      "current_sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b",
+      "current_byte_count": 13833,
+      "bridge_kind": "NON_CAUSAL_ZERO_CREDIT_CURRENT_STATE_BINDING"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "predecessor_sha256": "2a539912516c337c2acb346dacd3a9694368bd7ae1dbc7ee1be0df54be9b0d06",
+      "predecessor_byte_count": 3933,
+      "current_sha256": "489b16b47928ddc4a67d29c4526ecd6afae179ba7a9884e748e25481f0b905f9",
+      "current_byte_count": 4176,
+      "bridge_kind": "NON_CAUSAL_ZERO_CREDIT_CURRENT_STATE_BINDING"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "predecessor_sha256": "5609f9b0cd912b0e00315b16dd27ddd32ee55dce9ee58e085cb754020aba1687",
+      "predecessor_byte_count": 3524,
+      "current_sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+      "current_byte_count": 12485,
+      "bridge_kind": "NON_CAUSAL_ZERO_CREDIT_CURRENT_STATE_BINDING"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "predecessor_sha256": "9b0419c5e055860c960ff6c5297860bff97cf4b2368feba188cc6af4bd3df63d",
+      "predecessor_byte_count": 1600,
+      "current_sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6",
+      "current_byte_count": 16734,
+      "bridge_kind": "NON_CAUSAL_ZERO_CREDIT_CURRENT_STATE_BINDING"
+    }
+  ],
+  "historical_anchor": {
+    "anchor_kind": "FP047_START_REPOSITORY_STATE_DIRTY_PATHS",
+    "document_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP047-20260726-005/19-REPOSITORY_STATE.log",
+    "document_sha256": "85a159407968746aeccd9031a4431dc87c6dc80db2791580db989c878de1e457",
+    "document_byte_count": 599492,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP047-20260726-005",
+    "dirty_path_count": 983,
+    "rows": [
+      {
+        "json_pointer": "/dirty_snapshot/paths/93",
+        "row_projection": {
+          "path": "apps/android/USER_GUIDE.md",
+          "path_role": "CURRENT",
+          "status_kind": "UNTRACKED",
+          "worktree_state": "PRESENT",
+          "worktree_type": "REGULAR_FILE",
+          "worktree_byte_count": 12232,
+          "worktree_sha256": "d1aaab83217c88c6d86161172575ad4d42fcbf0c0c30063d7619b27a3256e61d"
+        }
+      },
+      {
+        "json_pointer": "/dirty_snapshot/paths/136",
+        "row_projection": {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+          "path_role": "CURRENT",
+          "status_kind": "ORDINARY",
+          "worktree_state": "PRESENT",
+          "worktree_type": "REGULAR_FILE",
+          "worktree_byte_count": 3933,
+          "worktree_sha256": "2a539912516c337c2acb346dacd3a9694368bd7ae1dbc7ee1be0df54be9b0d06"
+        }
+      },
+      {
+        "json_pointer": "/dirty_snapshot/paths/142",
+        "row_projection": {
+          "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "path_role": "CURRENT",
+          "status_kind": "UNTRACKED",
+          "worktree_state": "PRESENT",
+          "worktree_type": "REGULAR_FILE",
+          "worktree_byte_count": 3524,
+          "worktree_sha256": "5609f9b0cd912b0e00315b16dd27ddd32ee55dce9ee58e085cb754020aba1687"
+        }
+      },
+      {
+        "json_pointer": "/dirty_snapshot/paths/195",
+        "row_projection": {
+          "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+          "path_role": "CURRENT",
+          "status_kind": "UNTRACKED",
+          "worktree_state": "PRESENT",
+          "worktree_type": "REGULAR_FILE",
+          "worktree_byte_count": 1600,
+          "worktree_sha256": "9b0419c5e055860c960ff6c5297860bff97cf4b2368feba188cc6af4bd3df63d"
+        }
+      }
+    ]
+  },
+  "resource_pilot_anchors": {
+    "subject_manifest": {
+      "document_path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+      "document_sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+      "document_byte_count": 61975,
+      "schema_version": "walksafe.resource-pilot-subject-manifest.v1",
+      "manifest_id": "WS-RP-SUBJECT-ANDROID-20260727-001",
+      "captured_at": "2026-07-27T19:41:59+09:00",
+      "capture_relation_to_execution": "POST_HOC_CURRENT_STATE_ONLY",
+      "execution_time_source_bytes_status": "NOT_CAPTURED",
+      "source_set_entry_count": 253,
+      "source_set_fingerprint_sha256": "8d6d7bb7bd5a3edd30d0a2e2e72934015f92cad07c74c1843a24f0084dc39105",
+      "nonself_integrity_sha256": "e16aa531b2928025de8932b10f43ca889d8acd953b8a420d45baadb9c1e52b88",
+      "rows": [
+        {
+          "json_pointer": "/source_set/entries/7",
+          "row_projection": {
+            "byte_length": 13833,
+            "path": "apps/android/USER_GUIDE.md",
+            "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+          }
+        },
+        {
+          "json_pointer": "/source_set/entries/105",
+          "row_projection": {
+            "byte_length": 4176,
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+            "sha256": "489b16b47928ddc4a67d29c4526ecd6afae179ba7a9884e748e25481f0b905f9"
+          }
+        },
+        {
+          "json_pointer": "/source_set/entries/120",
+          "row_projection": {
+            "byte_length": 12485,
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+            "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6"
+          }
+        },
+        {
+          "json_pointer": "/source_set/entries/215",
+          "row_projection": {
+            "byte_length": 16734,
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+            "sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6"
+          }
+        }
+      ]
+    },
+    "boundary": {
+      "document_path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/resource-pilot-boundary.json",
+      "document_sha256": "d7e38de6a97c1ebb2bec5bb9550a30910ae6be7b2322b8f8c8198aa80698c79a",
+      "document_byte_count": 5135,
+      "schema_version": "walksafe.resource-pilot-boundary.v1",
+      "boundary_id": "WS-RESOURCE-PILOT-BOUNDARY-20260727-001",
+      "nonself_integrity_sha256": "a29f192976f9cd99a630cd35d0a338824534c4e11a225d27c2061138b78042d9",
+      "execution_time_subject_bytes": "NOT_CAPTURED",
+      "subject_manifest_binding_json_pointer": "/subject_manifest_bindings/1",
+      "subject_manifest_binding": {
+        "byte_length": 61975,
+        "captured_at": "2026-07-27T19:41:59+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+        "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+        "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+      },
+      "admission_decision": {
+        "actual_device_credit": false,
+        "admission_status": "CONDITIONAL",
+        "evidence_credit": false,
+        "formal_test_credit": false,
+        "heavy_execution_allowed": false,
+        "next_allowed_level": "MODERATE_SINGLE_LANE",
+        "production_credit": false,
+        "release_credit": false,
+        "resource_pilot_run": true,
+        "single_lane_only": true
+      }
+    }
+  },
+  "current_observations": {
+    "observed_at": "2026-07-29T02:45:37+09:00",
+    "source_mutation_performed": false,
+    "rows": [
+      {
+        "path": "apps/android/USER_GUIDE.md",
+        "file_type": "REGULAR_FILE",
+        "byte_count": 13833,
+        "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "file_type": "REGULAR_FILE",
+        "byte_count": 4176,
+        "sha256": "489b16b47928ddc4a67d29c4526ecd6afae179ba7a9884e748e25481f0b905f9"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+        "file_type": "REGULAR_FILE",
+        "byte_count": 12485,
+        "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+        "file_type": "REGULAR_FILE",
+        "byte_count": 16734,
+        "sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6"
+      }
+    ]
+  },
+  "claim_boundary": {
+    "causal_transition_proven": false,
+    "execution_time_source_identity_proven": false,
+    "test_execution_claimed": false,
+    "boundary_admission_decision_is_historical_projection_only": true,
+    "current_admission_or_execution_authority_granted": false,
+    "current_approval_claimed": false,
+    "current_actual_event_claimed": false,
+    "next_allowed_level_reissued": false,
+    "resource_pilot_run_recredited": false,
+    "subject_paths_are_exhaustive": true,
+    "unlisted_path_or_whole_manifest_bridge_allowed": false,
+    "resource_pilot_evidence_credit": false,
+    "resource_pilot_formal_test_credit": false,
+    "resource_pilot_actual_device_credit": false,
+    "resource_pilot_production_credit": false,
+    "artifact_completion_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "intended_use": "EXACT_PATH_PREDECESSOR_TO_CURRENT_STATE_BRIDGE_ONLY"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "excluded_json_path": "$.integrity",
+    "sha256": "445da8b9eb8cfcab0a07878ec79bb6040ba2e92feddd4933d42d9486c0576579"
+  }
+}

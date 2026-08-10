@@ -1,0 +1,370 @@
+....................EEEEEEEEEEEEE....................................... [ 48%]
+........................................................................ [ 96%]
+......                                                                   [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_active_overlay_is_phase_d_successor_only_without_state_change _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_backlog_completes_extraction_phase_but_keeps_epic_open _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_builder_writes_exactly_eight_new_phase_e_outputs _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_every_top_level_content_hash_rejects_tampering _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_immutable_phase_d_hash_tamper_is_rejected _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_legacy_allowlist_and_openapi_route_tampering_are_rejected _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_missing_focused_path_and_reappearing_next_route_are_rejected _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_phase_d_builder_test_and_eight_outputs_remain_byte_exact _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_phase_d_object_seal_tamper_is_rejected_even_when_file_hash_check_is_mocked _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_r005_changes_exactly_two_direct_and_six_impact_assessments _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_record_captures_exact_gateway_cutover_without_release_overclaim _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_reviewed_statuses_and_formal_boundary_remain_conservative _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+_ ERROR at setup of WalkSafeEpic01PhaseETraceTest.test_snapshot_contains_exactly_forty_one_focused_paths_and_four_absences _
+
+cls = <class 'test_walksafe_epic01_phase_e_android_gateway_trace_20260723.WalkSafeEpic01PhaseETraceTest'>
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.builder = _load_builder()
+>       cls.outputs = cls.builder.build_outputs()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:1300: in build_outputs
+    contract = _gateway_contract()
+               ^^^^^^^^^^^^^^^^^^^
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:388: in _gateway_contract
+    _require(tuple(gateway["public_routes"]) == GATEWAY_API_PATHS, "gateway public routes differ")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+condition = False, message = 'gateway public routes differ'
+
+    def _require(condition: bool, message: str) -> None:
+        if not condition:
+>           raise TraceBuildError(message)
+E           walksafe_epic01_phase_e_trace.TraceBuildError: gateway public routes differ
+
+scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py:173: TraceBuildError
+=========================== short test summary info ============================
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_active_overlay_is_phase_d_successor_only_without_state_change
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_backlog_completes_extraction_phase_but_keeps_epic_open
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_builder_writes_exactly_eight_new_phase_e_outputs
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_every_top_level_content_hash_rejects_tampering
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_immutable_phase_d_hash_tamper_is_rejected
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_legacy_allowlist_and_openapi_route_tampering_are_rejected
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_missing_focused_path_and_reappearing_next_route_are_rejected
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_phase_d_builder_test_and_eight_outputs_remain_byte_exact
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_phase_d_object_seal_tamper_is_rejected_even_when_file_hash_check_is_mocked
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_r005_changes_exactly_two_direct_and_six_impact_assessments
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_record_captures_exact_gateway_cutover_without_release_overclaim
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_reviewed_statuses_and_formal_boundary_remain_conservative
+ERROR tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py::WalkSafeEpic01PhaseETraceTest::test_snapshot_contains_exactly_forty_one_focused_paths_and_four_absences
+137 passed, 6 deselected, 13 errors in 6.12s

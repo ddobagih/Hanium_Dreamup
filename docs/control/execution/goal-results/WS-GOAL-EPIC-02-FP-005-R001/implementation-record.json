@@ -1,0 +1,158 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP005-OFFICIAL-ENVIRONMENT-IMPLEMENTATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-24T20:49:30+09:00",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "75823ce80cb181d704195ff3a9bb74c9727210cf7b1fb799631fc5abfe297754",
+      "before_sha256": "87d937c73491f050625ea9941b1713718a4da7be6e5f1c6ea7af9f93fe5f3e11"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicy.kt",
+      "after_sha256": "7167923da755beef5a36337cc47b536213710a02a7c8fc4693a04977c5db6469",
+      "before_sha256": "e5331d6fae2ffbce37d05f033d735b790e63c8d1b94d561af3a3f9f3034e5a6e"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicy.kt",
+      "after_sha256": "0005c18a68edc1cccbe8e5b5716fb883f9c38ef7fb7c343c757b3d91e4e15d95"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+      "after_sha256": "8ecb306453a80763db0caba8d5665a4403d836ee8ed757d4fdb2b106b9c2cfec",
+      "before_sha256": "5565c6119df0883409359477e29e96ed6a0360bd5f5a4cc37cee104bbcf08c9a"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/CrosswalkReferencePolicy.kt",
+      "after_sha256": "78a4a3c573209bd3562a8596d987467010639adb3e97f565e57023190a0ce765"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+      "after_sha256": "4036a758c8cc0443e8b62c5cdddeeaa4029595da61c6368402bf54b0091d45c3",
+      "before_sha256": "2fe1c8200cb4f1e302be2123df9160297256c3b6d8b7ccf05c7ae5451cd8e39b"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/OfficialEnvironmentPolicy.kt",
+      "after_sha256": "193a25cb8cf43ad799a9e4db40ab306be54cbe5483fffd6d13d14a84d116d681"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "2c703ae451dda201384d0eb3b275a048b059d5e3a6e784642fe22d177219f685",
+      "before_sha256": "fd42fa8001180547b1ba1ece425adf628bb5926898e2e62b10d3736b140f5982"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "6060de77579559b43acbc2785e95d0199566dd1b0b4cbe51340b30e5cf7a5869",
+      "before_sha256": "ae0834115453f67b8b9c0523781d94e19c7d556ac41f30577011e67ec2d9a838"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "e54609115635462b5af5daa4c013823d8d9f015ced136adead7f05147249a0bc",
+      "before_sha256": "3bb4b06a2615aa60b62345b6b867216ec0b05b053f58799f5cd723bd73a8cec4"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityOfficialEnvironmentStaticTest.kt",
+      "after_sha256": "b26117b07daea7363dd4702e1a79941e324a6283b7a5e2d6c67ef85df37dd2cb"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "155de4c6cd4b3363aee6e81460c9989400ce2cdbde8c98596e012d7157a061d0",
+      "before_sha256": "75cd31e0c2d99590c3f35c7218a7cbbdab7b46191ef4ba2831707f216647f6d5"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "after_sha256": "d1a21313f73dd8b18418cf06bf5a985f6c71566978d3f01163a418e9f8202f05",
+      "before_sha256": "93f6d183ac3e2c46e03f01f60d437c30f75a6f9d2cc4320a21348efa445b3563"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicyTest.kt",
+      "after_sha256": "e06efb9d593d841726bd40f3379455a6f8c6b5b46c727992ff3089f6cdecb97e",
+      "before_sha256": "b53630daaf1d021ad8de938ea18b27bb1acf41f01b0ae1cdd41fc2bcb868c7a4"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicyTest.kt",
+      "after_sha256": "0e6f43857edbfac540f6271c51980f695acb435383926cc3a0444e88cd1b230f"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt",
+      "after_sha256": "f5e6b9901df29e5e18d99bbd0e3f5c72d725b9ebf11fe6aefc3c2a8b78647709",
+      "before_sha256": "da7f1c604691ca541c8f7cfd3a679dc866cfafe0bdce5751d111b9e714cecee7"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigatorTest.kt",
+      "after_sha256": "ae963053cfcbab67a7092e3605f8c8570cc519a06c934d48e052f63be85c6cff",
+      "before_sha256": "0d3b049363a276a64cfa5b62fe6939c9cefbf7c402368ef91b757e4ced35a812"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/OfficialEnvironmentPolicyTest.kt",
+      "after_sha256": "63566cf2900693a5d1bebea6757f4f1a66154d6b00521f868126f9cff89ad191"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "after_sha256": "df01fac8e8a6060ce9d0c68ada8b8b3f2109b416e874f0fc44855987a7fade5f",
+      "before_sha256": "eb8a09646210ad57965e2f72e5e813c68d745bfd31ba008d68fb9f7ae5bed542"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "2aa0c0ef40f822db993518c06b8fa239f282ce13aaa5a85229d40520ae547efe",
+      "before_sha256": "52437497f6c2474aef4bef07ac02076c918f3b69fd5af86c473529e29fb55662"
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_3.py",
+      "after_sha256": "11477dd3087cc0952949dc7979b8f0e9bd67890e76aba13db33361112b74be0a",
+      "before_sha256": "c3458544fecdd86a8de222a5672e883e0f1b352e3e2dd95d86a22c038e8e321b"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph_v2_3.py",
+      "after_sha256": "9737203d13aef27dca7aa103a350d10a52d78701dbf3d588128a53f60a1557ed",
+      "before_sha256": "0053d6060357f98d1b24bcd82c12d74180d53ac0cb0848b354221b4cc141d56a"
+    },
+    {
+      "path": "tests/test_walksafe_epic02_trace_v2_2_history.py",
+      "after_sha256": "c17f4ec2d3eb797d822601ff447400b29bb52f7404cad67db601d3a776ab0120",
+      "before_sha256": "2490d06da3194908af64c6043859b8606a9cca1c6c703c38e405ab1efe8c9079"
+    },
+    {
+      "path": "docs/control/walksafe-project-resumption-runbook.md",
+      "after_sha256": "d1d5f09507b5e6c8e4c89c3a9bf0778fa949ef4d1f4e20faa3498d1e80ea18ea",
+      "before_sha256": "6f35ec493848b9fabb19c796b16b2ca004f75d494bbdddace16fd4e0664f9d00"
+    }
+  ],
+  "implemented_controls": [
+    "measured GPS and camera evidence is separate from user-confirmed weather, construction and crowding",
+    "only a bright dry ordinary urban sidewalk with every required factor passing is an internal support candidate",
+    "unknown, stale, epoch-mismatched or unapproved evidence fails closed",
+    "runtime quality loss suppresses walking outputs immediately and reaches a terminal safe stop after bounded retries",
+    "crosswalk information is explicitly non-authoritative and never guarantees a signal, vehicle state or safe crossing",
+    "production official-environment and camera-quality profiles remain unapproved and null",
+    "archived v2.2 completion artifacts are accepted only through an exact receipt-bound before-to-after-to-live successor chain"
+  ],
+  "remaining_implementation_boundaries": [
+    "production official-environment and camera-quality profiles are null and unapproved",
+    "real brightness, occlusion, shake and mounting raw observations are not populated in the production activity",
+    "an independent CameraX camera-quality preflight path is not implemented",
+    "environment field evidence and production approval are still required"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-005-01",
+      "TC-FP-005-02",
+      "TC-FP-005-03",
+      "TC-FP-005-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "environment_field_test_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "production_official_environment_profile": null,
+    "production_camera_quality_profile": null,
+    "approved_production_profile_count": 0,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

@@ -1,0 +1,4 @@
+
+> walksafe-pwa@0.1.0 lint
+> eslint app lib types --max-warnings=0
+

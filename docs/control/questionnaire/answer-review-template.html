@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23006c5b' d='M2 2h12v12H2z'/%3E%3Cpath fill='white' d='M4 8h2l1 2 3-6 2 4h1v2h-2.2L10 8.4 7.2 14 5 10H4z'/%3E%3C/svg%3E">
+  <title>WalkSafe 답변 검토와 Android 기준선 추가 질문</title>
+  <style>
+    :root {
+      --bg: #f3f6f8; --surface: #fff; --text: #17212b; --muted: #536171;
+      --line: #ccd5dd; --accent: #006c5b; --accent-ink: #fff; --soft: #e5f4f0;
+      --danger: #a72020; --danger-soft: #fff0f0; --warn: #7a4b00; --warn-soft: #fff6dd;
+      --info: #174f88; --info-soft: #ebf4ff; --shadow: 0 5px 18px rgb(20 40 55 / 9%);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    button, select, input[type="search"] { min-height: 44px; }
+    button { cursor: pointer; touch-action: manipulation; }
+    button:hover { filter: brightness(.94); }
+    a { color: var(--accent); }
+    :focus-visible { outline: 3px solid #ffb000; outline-offset: 3px; }
+    .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 100; padding: .75rem 1rem; background: #111; color: #fff; }
+    .skip-link:focus { top: 1rem; }
+    .hero { background: #143d3a; color: #fff; padding: clamp(1.25rem, 4vw, 3rem); }
+    .hero-inner, main { width: min(1180px, calc(100% - 2rem)); margin-inline: auto; }
+    .eyebrow { margin: 0 0 .35rem; font-weight: 800; color: #9de6d7; }
+    h1 { margin: 0; max-width: 26ch; font-size: clamp(1.8rem, 5vw, 3rem); line-height: 1.16; word-break: keep-all; overflow-wrap: anywhere; text-wrap: balance; }
+    .lead { max-width: 78ch; margin: .8rem 0; color: #e4f2f0; }
+    .action-row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+    .button { border: 1px solid currentColor; border-radius: .55rem; padding: .55rem .85rem; background: transparent; color: inherit; font-weight: 750; }
+    .button-primary { background: #fff; color: #143d3a; border-color: #fff; }
+    .button-danger { color: #ffd5d5; }
+    main { padding-block: 1.2rem 4rem; }
+    .notice, .panel, .finding, .decision, .followup, .category-review { background: var(--surface); border: 1px solid var(--line); border-radius: .8rem; box-shadow: var(--shadow); }
+    .notice { padding: 1rem; border-left: .45rem solid var(--warn); margin-bottom: 1rem; }
+    .notice strong { display: block; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-block: 1rem; }
+    .metric { background: var(--surface); border: 1px solid var(--line); border-radius: .7rem; padding: .9rem; }
+    .metric b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    .completion { padding: 1rem; border-radius: .7rem; background: var(--danger-soft); color: var(--danger); font-weight: 800; }
+    .completion.complete { background: var(--soft); color: var(--accent); }
+    .storage-warning { margin-top: 1rem; padding: .8rem; background: var(--danger-soft); color: var(--danger); border-radius: .5rem; }
+    section { scroll-margin-top: 1rem; margin-top: 2rem; }
+    h2 { margin: 0 0 .35rem; font-size: clamp(1.4rem, 3vw, 2rem); text-wrap: balance; }
+    h3 { margin: 0; line-height: 1.3; text-wrap: balance; }
+    .section-intro { color: var(--muted); max-width: 80ch; }
+    .android-summary { padding: 1.1rem; border-left: .45rem solid var(--accent); }
+    .badge-row { display: flex; flex-wrap: wrap; gap: .35rem; margin-block: .45rem; }
+    .badge { display: inline-flex; align-items: center; min-height: 1.75rem; padding: .16rem .5rem; border-radius: 999px; background: #edf1f4; color: #304050; font-size: .78rem; font-weight: 800; }
+    .badge-error, .badge-blocker { background: var(--danger-soft); color: var(--danger); }
+    .badge-warning, .badge-high { background: var(--warn-soft); color: var(--warn); }
+    .badge-info, .badge-medium { background: var(--info-soft); color: var(--info); }
+    .badge-scope { background: #f0eaff; color: #58349a; }
+    .badge-critical { background: #2d1b1b; color: #fff; }
+    .findings-grid, .category-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+    .finding, .category-review { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
+    .finding p, .category-review p { margin: .45rem 0; }
+    .plain-list { margin: .35rem 0; padding-left: 1.25rem; }
+    .toolbar { display: grid; grid-template-columns: minmax(12rem, 1fr) repeat(2, minmax(10rem, auto)); gap: .55rem; margin-block: 1rem; }
+    .toolbar label { display: grid; gap: .25rem; font-size: .83rem; font-weight: 750; }
+    .toolbar input, .toolbar select { width: 100%; border: 1px solid var(--line); border-radius: .45rem; padding: .55rem; background: var(--surface); color: var(--text); }
+    .group { margin-block: 1rem; }
+    .group > summary { cursor: pointer; padding: .9rem 1rem; background: #e8efed; border-radius: .7rem; font-weight: 850; }
+    .card-list { display: grid; gap: .8rem; margin-top: .8rem; }
+    .followup, .decision { padding: 1rem; border-left: .35rem solid var(--line); content-visibility: auto; contain-intrinsic-size: auto 36rem; min-width: 0; overflow-wrap: anywhere; }
+    .followup.has-error, .decision.has-error { border-left-color: var(--danger); }
+    .followup.inactive { opacity: .72; background: #eef1f3; }
+    .card-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+    .card-id { margin: 0; color: var(--muted); font: 750 .82rem/1.3 ui-monospace, monospace; }
+    .prompt { font-weight: 700; }
+    .why { color: var(--muted); }
+    .option-list { display: grid; gap: .5rem; margin-block: .75rem; padding: 0; border: 0; min-width: 0; }
+    .option { display: grid; grid-template-columns: auto 1fr; gap: .6rem; padding: .7rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--surface); touch-action: manipulation; }
+    .option input { width: 1.2rem; height: 1.2rem; margin-top: .18rem; }
+    .option:hover { border-color: var(--accent); background: var(--soft); }
+    .option strong, .option span { display: block; }
+    .option small { display: block; color: var(--muted); margin-top: .15rem; }
+    textarea { width: 100%; min-height: 7rem; resize: vertical; border: 1px solid var(--line); border-radius: .5rem; padding: .65rem; background: var(--surface); color: var(--text); }
+    .field-label { display: block; margin-top: .8rem; font-weight: 800; }
+    .help, .result-summary { color: var(--muted); font-size: .9rem; }
+    .error-box, .conflict-item { padding: .65rem; border-radius: .45rem; background: var(--danger-soft); color: var(--danger); margin-top: .55rem; }
+    .selected-answer { padding: .75rem; border-radius: .55rem; background: #eef6f4; }
+    .selected-answer p { margin: .25rem 0; }
+    .readonly-note { white-space: pre-wrap; padding: .7rem; background: #f4f5f6; border-radius: .45rem; }
+    .source-category { margin-top: 1.25rem; }
+    .source-category > header { padding: 1rem; background: #e8efed; border-radius: .7rem; }
+    .empty { padding: 1rem; border: 1px dashed var(--line); border-radius: .6rem; color: var(--muted); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    body.high-contrast { --bg: #000; --surface: #000; --text: #fff; --muted: #e5e5e5; --line: #fff; --accent: #5fffd8; --soft: #062d23; --danger: #ff9797; --danger-soft: #380000; --warn: #ffd369; --warn-soft: #302200; --info: #9bd1ff; --info-soft: #002947; --shadow: none; }
+    body.high-contrast .hero { background: #000; border-bottom: 2px solid #fff; }
+    @media (max-width: 760px) {
+      .summary-grid, .findings-grid, .category-grid { grid-template-columns: 1fr 1fr; }
+      .toolbar { grid-template-columns: 1fr; }
+      .card-head { display: block; }
+    }
+    @media (max-width: 420px) {
+      .hero-inner, main { width: min(100% - 1rem, 1180px); }
+      .summary-grid, .findings-grid, .category-grid { grid-template-columns: minmax(0, 1fr); }
+      .action-row .button { width: 100%; }
+      .followup, .decision { padding: .8rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+    @media print {
+      body { background: #fff; color: #000; font-size: 10pt; }
+      .hero { background: #fff; color: #000; padding: 0; }
+      .hero .lead, .eyebrow { color: #000; }
+      .action-row, .toolbar, .skip-link, .storage-warning { display: none !important; }
+      .hero-inner, main { width: 100%; }
+      .panel, .finding, .decision, .followup, .category-review { box-shadow: none; break-inside: avoid; content-visibility: visible; contain-intrinsic-size: none; }
+      details > * { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="eyebrow">원본 선택은 읽기 전용 · 보완 답변은 delta review</p>
+      <h1 id="page-title">WalkSafe 답변 검토와 Android 기준선 추가 질문</h1>
+      <p class="lead" id="delta-policy"></p>
+      <div class="action-row">
+        <button class="button button-primary" id="export-button" type="button">보완 답변 JSON 내보내기</button>
+        <button class="button" id="print-button" type="button">인쇄</button>
+        <button class="button" id="contrast-button" type="button" aria-pressed="false">고대비 켜기</button>
+        <button class="button button-danger" id="reset-button" type="button">보완 답변 초기화</button>
+      </div>
+      <div class="storage-warning" id="storage-warning" role="alert" hidden></div>
+    </div>
+  </header>
+  <main id="main-content" tabindex="-1">
+    <div class="notice" role="note"><strong>중요</strong><span id="baseline-warning"></span></div>
+    <div class="summary-grid" aria-label="검토 진행 요약">
+      <div class="metric"><span>원본 응답</span><b id="source-progress">—</b></div>
+      <div class="metric"><span>원본 근거 보완 잔여</span><b id="source-note-progress">—</b></div>
+      <div class="metric"><span>필수 추가질문 잔여</span><b id="followup-progress">—</b></div>
+      <div class="metric"><span>추가질문 충돌·메모</span><b id="followup-errors">—</b></div>
+    </div>
+    <p class="completion" id="completion-banner" role="status"></p>
+    <p class="sr-only" id="live-region" aria-live="polite"></p>
+
+    <section aria-labelledby="android-heading">
+      <div class="panel android-summary">
+        <h2 id="android-heading">Android 전환 해석</h2>
+        <h3 id="android-headline"></h3>
+        <p id="android-explanation"></p>
+        <p><strong id="scope-count"></strong> 기존 질문이 Web/PWA 전제 교체 대상으로 표시됐습니다.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="findings-heading">
+      <h2 id="findings-heading">검토 결과</h2>
+      <p class="section-intro">현재 답변이 의미하는 바와 문서 기준선 전에 해결해야 할 문제입니다.</p>
+      <div class="findings-grid" id="findings-list"></div>
+    </section>
+
+    <section aria-labelledby="category-heading">
+      <h2 id="category-heading">16개 영역별 답변 의미</h2>
+      <p class="section-intro">확인된 뜻, 구현·운영 영향, 아직 열린 결정을 영역별로 요약했습니다.</p>
+      <div class="category-grid" id="category-list"></div>
+    </section>
+
+    <section aria-labelledby="followup-heading">
+      <h2 id="followup-heading">Android 기준선 추가 질문</h2>
+      <p class="section-intro" id="followup-intro"></p>
+      <div class="toolbar" aria-label="추가 질문 필터">
+        <label>검색<input id="followup-search" name="followup_search" type="search" autocomplete="off" placeholder="질문·설명 검색…"></label>
+        <label>우선순위<select id="followup-priority" name="followup_priority"><option value="all">전체</option><option value="P0">P0</option><option value="P1">P1</option><option value="P2">P2</option></select></label>
+        <label>상태<select id="followup-status" name="followup_status"><option value="all">전체</option><option value="unanswered">미답변</option><option value="note_error">메모 필요</option><option value="conflict">충돌</option><option value="inactive">비활성</option><option value="answered">답변됨</option></select></label>
+      </div>
+      <p class="result-summary" id="followup-result"></p>
+      <div id="followup-list"></div>
+    </section>
+
+    <section aria-labelledby="source-heading">
+      <h2 id="source-heading">원본 286개 답변 상세</h2>
+      <p class="section-intro">선택값은 바꿀 수 없습니다. 누락된 결정 근거나 모호한 기존 메모만 별도 delta로 보완합니다.</p>
+      <div class="toolbar" aria-label="원본 답변 필터">
+        <label>검색<input id="source-search" name="source_search" type="search" autocomplete="off" placeholder="ID·제목·답변·영향 검색…"></label>
+        <label>영역<select id="source-category" name="source_category"><option value="all">16개 영역 전체</option></select></label>
+        <label>상태<select id="source-status" name="source_status"><option value="all">전체</option><option value="note_missing">필수 근거 보완</option><option value="scope_replaced">Web 전제 교체</option><option value="ambiguous_note">모호한 메모</option><option value="critical">중요 결정</option><option value="nonrecommended">비추천 선택</option><option value="custom">직접 정의</option></select></label>
+      </div>
+      <p class="result-summary" id="source-result"></p>
+      <div id="source-list"></div>
+    </section>
+  </main>
+  <script id="answer-review-data" type="application/json">__WALKSAFE_ANSWER_REVIEW_DATA__</script>
+  <script>
+    "use strict";
+    (() => {
+      const dataElement = document.getElementById("answer-review-data");
+      const liveRegion = document.getElementById("live-region");
+      let report;
+      try { report = JSON.parse(dataElement.textContent); }
+      catch (error) {
+        document.getElementById("baseline-warning").textContent = `검토 데이터를 읽지 못했습니다: ${error.message}`;
+        return;
+      }
+      const followupById = new Map(report.followups.map((item) => [item.id, item]));
+      const decisionById = new Map(report.decisions.map((item) => [item.id, item]));
+      const categoryById = new Map(report.categories.map((item) => [item.id, item]));
+      const activationById = new Map(report.followup_activation_rules.map((item) => [item.question_id, item]));
+      const detailById = new Map(report.followup_detail_requirements.map((item) => [item.question_id, item.prompt]));
+      const consistencyByQuestion = new Map();
+      for (const rule of report.followup_consistency_rules) {
+        for (const condition of rule.when_all) {
+          if (!consistencyByQuestion.has(condition.question_id)) consistencyByQuestion.set(condition.question_id, []);
+          consistencyByQuestion.get(condition.question_id).push(rule.id);
+        }
+      }
+      const storageKey = `walksafe.answer-review:${report.binding.storage_binding_hash}`;
+      const state = {
+        followupAnswers: {}, followupNotes: {}, sourceClarifications: {},
+        followupQuery: "", followupPriority: "all", followupStatus: "all",
+        sourceQuery: "", sourceCategory: "all", sourceStatus: "all"
+      };
+      const elements = Object.fromEntries([
+        "source-progress", "source-note-progress", "followup-progress", "followup-errors",
+        "completion-banner", "storage-warning", "findings-list", "category-list",
+        "followup-list", "followup-result", "source-list", "source-result"
+      ].map((id) => [id, document.getElementById(id)]));
+
+      function make(tag, options = {}) {
+        const element = document.createElement(tag);
+        if (options.className) element.className = options.className;
+        if (options.text !== undefined) element.textContent = options.text;
+        if (options.id) element.id = options.id;
+        if (options.attrs) for (const [key, value] of Object.entries(options.attrs)) element.setAttribute(key, String(value));
+        return element;
+      }
+      function hasOwn(object, key) { return Object.prototype.hasOwnProperty.call(object, key); }
+      function announce(message) {
+        liveRegion.textContent = "";
+        window.setTimeout(() => { liveRegion.textContent = message; }, 20);
+      }
+      function appendList(parent, values) {
+        const list = make("ul", { className: "plain-list" });
+        for (const value of values) list.append(make("li", { text: value }));
+        parent.append(list);
+      }
+      function showStorageWarning(message) {
+        elements["storage-warning"].textContent = message;
+        elements["storage-warning"].hidden = false;
+      }
+      function loadState() {
+        let saved;
+        try { saved = JSON.parse(localStorage.getItem(storageKey) || "null"); }
+        catch (error) { showStorageWarning("자동 저장 내용을 읽지 못했습니다. 내보낸 JSON을 확인해 주세요."); return; }
+        if (!saved || saved.storage_binding_hash !== report.binding.storage_binding_hash) return;
+        for (const [key, target] of [
+          ["followup_answers", state.followupAnswers], ["followup_notes", state.followupNotes],
+          ["source_note_clarifications", state.sourceClarifications]
+        ]) {
+          const value = saved[key];
+          if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+          for (const [id, entry] of Object.entries(value)) {
+            if (typeof entry !== "string" || !entry.trim()) continue;
+            if ((key === "source_note_clarifications" && decisionById.has(id)) || (key !== "source_note_clarifications" && followupById.has(id))) target[id] = entry;
+          }
+        }
+      }
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            storage_binding_hash: report.binding.storage_binding_hash,
+            followup_answers: state.followupAnswers,
+            followup_notes: state.followupNotes,
+            source_note_clarifications: state.sourceClarifications
+          }));
+          elements["storage-warning"].hidden = true;
+        } catch (error) { showStorageWarning("브라우저 자동 저장에 실패했습니다. 보완 답변 JSON을 자주 내보내 주세요."); }
+      }
+      function selectedOption(question, value) { return question.options.find((option) => option.id === value); }
+      function isAnswered(question) { return hasOwn(state.followupAnswers, question.id) && Boolean(selectedOption(question, state.followupAnswers[question.id])); }
+      function isActive(question) {
+        const rule = activationById.get(question.id);
+        if (!rule) return true;
+        const dependencyAnswer = state.followupAnswers[rule.depends_on_question_id];
+        return !rule.inactive_option_ids.includes(dependencyAnswer);
+      }
+      function needsFollowupNote(question) {
+        if (!isActive(question) || !isAnswered(question)) return false;
+        const answer = state.followupAnswers[question.id];
+        return detailById.has(question.id) || answer === "custom" || !question.recommended_option_ids.includes(answer);
+      }
+      function activeConsistencyRules() {
+        return report.followup_consistency_rules.filter((rule) => rule.when_all.every((condition) => {
+          const question = followupById.get(condition.question_id);
+          return question && isActive(question) && condition.option_ids.includes(state.followupAnswers[question.id]);
+        }));
+      }
+      function unresolvedFollowups() {
+        return report.followups.filter((question) => question.required && isActive(question) && !isAnswered(question)).map((question) => question.id);
+      }
+      function followupNoteErrors() {
+        return report.followups.filter((question) => needsFollowupNote(question) && !(state.followupNotes[question.id] || "").trim()).map((question) => question.id);
+      }
+      function remainingSourceNoteErrors() {
+        return report.source.source_note_error_ids.filter((id) => !(state.sourceClarifications[id] || "").trim());
+      }
+
+      function renderStatic() {
+        document.getElementById("page-title").textContent = report.title;
+        document.getElementById("delta-policy").textContent = report.delta_policy;
+        document.getElementById("baseline-warning").textContent = "286개 질문에 값은 모두 입력됐지만, 원본 결정 근거 오류 102개 때문에 완료가 아닙니다. 이 화면의 보완도 원본을 자동 변경하지 않으며 사람이 유지·대체·폐기를 승인해야 합니다.";
+        document.getElementById("android-headline").textContent = report.android_transition.headline;
+        document.getElementById("android-explanation").textContent = report.android_transition.explanation;
+        document.getElementById("scope-count").textContent = `${report.android_transition.scope_replaced_count}개`;
+        document.getElementById("followup-intro").textContent = `${report.followups.length}개 추가 질문입니다. 추천안은 설명만 표시되며 자동 선택되지 않습니다. 비추천·직접 정의 또는 구체값 요구 문항은 결정 메모가 필요합니다.`;
+        elements["findings-list"].replaceChildren(...report.findings.map((finding) => {
+          const card = make("article", { className: "finding", id: `finding-${finding.id}` });
+          const badges = make("div", { className: "badge-row" });
+          badges.append(make("span", { className: `badge badge-${finding.severity.toLowerCase()}`, text: finding.severity }), make("span", { className: "badge", text: finding.area }));
+          card.append(badges, make("h3", { text: `${finding.id} · ${finding.title}` }), make("p", { text: finding.summary }));
+          card.append(make("p", { text: `영향: ${finding.impact}` }), make("p", { text: `권장 조치: ${finding.recommended_action}` }), make("p", { className: "help", text: `관련 원질문: ${finding.question_ids.join(", ")}` }));
+          return card;
+        }));
+        elements["category-list"].replaceChildren(...report.categories.map((category) => {
+          const card = make("article", { className: "category-review" });
+          card.append(make("h3", { text: `${category.order}. ${category.title}` }), make("p", { text: category.review.headline }));
+          card.append(make("strong", { text: "확인된 의미" })); appendList(card, category.review.confirmed_meanings);
+          card.append(make("strong", { text: "구현·운영 영향" })); appendList(card, category.review.implications);
+          card.append(make("strong", { text: "열린 결정" })); appendList(card, category.review.open_points);
+          const badges = make("div", { className: "badge-row" });
+          badges.append(make("span", { className: "badge", text: `원질문 ${category.decision_count}` }), make("span", { className: "badge badge-error", text: `오류 ${category.error_count}` }), make("span", { className: "badge badge-scope", text: `교체 ${category.scope_replaced_count}` }), make("span", { className: "badge badge-critical", text: `중요 ${category.critical_count}` }));
+          card.append(badges);
+          return card;
+        }));
+        const categorySelect = document.getElementById("source-category");
+        for (const category of report.categories) categorySelect.append(make("option", { text: category.title, attrs: { value: category.id } }));
+      }
+
+      function renderFollowups() {
+        const query = state.followupQuery.trim().toLocaleLowerCase("ko");
+        const noteErrors = new Set(followupNoteErrors());
+        const consistency = activeConsistencyRules();
+        const conflictsByQuestion = new Map();
+        for (const rule of consistency) for (const condition of rule.when_all) {
+          if (!conflictsByQuestion.has(condition.question_id)) conflictsByQuestion.set(condition.question_id, []);
+          conflictsByQuestion.get(condition.question_id).push(rule);
+        }
+        let visibleCount = 0;
+        const groupNodes = [];
+        for (const group of report.followup_groups) {
+          const groupQuestions = report.followups.filter((question) => question.group_id === group.id);
+          const cards = [];
+          for (const question of groupQuestions) {
+            const active = isActive(question);
+            const answered = isAnswered(question);
+            const conflicts = conflictsByQuestion.get(question.id) || [];
+            const optionText = question.options.map((option) => `${option.label} ${option.description} ${option.tradeoffs}`).join(" ");
+            const searchable = `${question.id} ${question.title} ${question.prompt} ${question.why_it_matters} ${optionText} ${question.source_question_ids.join(" ")}`.toLocaleLowerCase("ko");
+            let statusMatch = true;
+            if (state.followupStatus === "unanswered") statusMatch = active && !answered;
+            if (state.followupStatus === "answered") statusMatch = active && answered;
+            if (state.followupStatus === "note_error") statusMatch = noteErrors.has(question.id);
+            if (state.followupStatus === "conflict") statusMatch = conflicts.length > 0;
+            if (state.followupStatus === "inactive") statusMatch = !active;
+            if ((query && !searchable.includes(query)) || (state.followupPriority !== "all" && question.priority !== state.followupPriority) || !statusMatch) continue;
+            visibleCount += 1;
+            const card = make("article", { className: `followup${active ? "" : " inactive"}${noteErrors.has(question.id) || conflicts.length ? " has-error" : ""}`, id: `followup-${question.id}` });
+            const head = make("div", { className: "card-head" });
+            const heading = make("div"); heading.append(make("p", { className: "card-id", text: question.id }), make("h3", { text: question.title }));
+            const badges = make("div", { className: "badge-row" });
+            badges.append(make("span", { className: "badge", text: question.priority }), make("span", { className: "badge", text: question.required ? "필수" : "선택" }));
+            if (!active) badges.append(make("span", { className: "badge badge-warning", text: "비활성" }));
+            if (answered) badges.append(make("span", { className: "badge badge-info", text: "답변됨" }));
+            if (noteErrors.has(question.id)) badges.append(make("span", { className: "badge badge-error", text: "결정 메모 필요" }));
+            head.append(heading, badges); card.append(head, make("p", { className: "prompt", text: question.prompt }), make("p", { className: "why", text: question.why_it_matters }));
+            if (!active) card.append(make("p", { className: "error-box", text: activationById.get(question.id).reason + " 저장된 값이 있으면 delta export에 active=false로 남습니다." }));
+            const options = make("fieldset", { className: "option-list" });
+            options.append(make("legend", { className: "sr-only", text: `${question.id} ${question.prompt}` }));
+            for (const option of question.options) {
+              const optionId = `${question.id}-${option.id}`;
+              const label = make("label", { className: "option", attrs: { for: optionId } });
+              const input = make("input", { id: optionId, attrs: { type: "radio", name: `answer-${question.id}`, value: option.id } });
+              input.checked = state.followupAnswers[question.id] === option.id;
+              input.disabled = !active;
+              input.addEventListener("change", () => { state.followupAnswers[question.id] = option.id; saveState(); refresh(); document.getElementById(optionId)?.focus(); announce(`${question.id} 답변을 저장했습니다.`); });
+              const copy = make("span");
+              const title = make("strong", { text: option.label });
+              if (question.recommended_option_ids.includes(option.id)) title.append(" ", make("span", { className: "badge badge-info", text: "추천" }));
+              copy.append(title, make("span", { text: option.description }), make("small", { text: `고려사항: ${option.tradeoffs}` })); label.append(input, copy); options.append(label);
+            }
+            card.append(options, make("p", { className: "help", text: `추천 이유: ${question.recommendation_reason}` }));
+            if (question.conditional_note) card.append(make("p", { className: "help", text: `메모 안내: ${question.conditional_note}` }));
+            if (detailById.has(question.id)) card.append(make("p", { className: "help", text: `구체값 필수: ${detailById.get(question.id)}` }));
+            const noteLabel = make("label", { className: "field-label", text: `결정 메모${needsFollowupNote(question) ? " (필수)" : " (선택)"}`, attrs: { for: `note-${question.id}` } });
+            const detailPrompt = detailById.get(question.id);
+            const notePlaceholder = detailPrompt ? `${detailPrompt.replace(/[.…]+$/u, "")}…` : "선택 근거·구체 값·예외·책임자를 적어 주세요…";
+            const note = make("textarea", { id: `note-${question.id}`, attrs: { name: `note_${question.id}`, autocomplete: "off", placeholder: notePlaceholder } });
+            note.value = state.followupNotes[question.id] || ""; note.disabled = !active;
+            note.addEventListener("input", () => { if (note.value.trim()) state.followupNotes[question.id] = note.value; else delete state.followupNotes[question.id]; saveState(); updateProgress(); });
+            note.addEventListener("blur", renderFollowups);
+            card.append(noteLabel, note);
+            for (const rule of conflicts) card.append(make("p", { className: "conflict-item", text: `${rule.id}: ${rule.message}` }));
+            card.append(make("p", { className: "help", text: `연결 원질문: ${question.source_question_ids.join(", ")}` }));
+            cards.push(card);
+          }
+          if (!cards.length) continue;
+          const details = make("details", { className: "group", attrs: { open: "" } });
+          details.append(make("summary", { text: `${group.order}. ${group.title} · ${cards.length}개 표시` }));
+          const description = make("p", { className: "section-intro", text: group.description });
+          const list = make("div", { className: "card-list" }); list.append(...cards); details.append(description, list); groupNodes.push(details);
+        }
+        elements["followup-list"].replaceChildren(...groupNodes);
+        elements["followup-result"].textContent = `추가 질문 ${report.followups.length}개 중 ${visibleCount}개 표시`;
+      }
+
+      function updateProgress() {
+        const sourceRemaining = remainingSourceNoteErrors();
+        const unresolved = unresolvedFollowups();
+        const notes = followupNoteErrors();
+        const rules = activeConsistencyRules();
+        elements["source-progress"].textContent = `${report.source.answer_count}/${report.source.required_count} · 오류 ${report.source.error_count}`;
+        elements["source-note-progress"].textContent = `${sourceRemaining.length}/${report.source.source_note_error_ids.length}`;
+        elements["followup-progress"].textContent = `${unresolved.length}개`;
+        elements["followup-errors"].textContent = `메모 ${notes.length} · 충돌 ${rules.filter((rule) => rule.severity === "error").length}`;
+        const complete = sourceRemaining.length === 0 && unresolved.length === 0 && notes.length === 0 && !rules.some((rule) => rule.severity === "error");
+        elements["completion-banner"].classList.toggle("complete", complete);
+        elements["completion-banner"].textContent = complete ? "문서 기준선 검토 가능: 모든 필수 보완과 추가 결정이 입력됐고 활성 오류가 없습니다. 사람의 유지·대체·폐기 승인 후 새 기준선을 만드세요." : `아직 미완료: 원본 근거 ${sourceRemaining.length}개, 필수 추가질문 ${unresolved.length}개, 추가 메모 ${notes.length}개, 선택 충돌 ${rules.filter((rule) => rule.severity === "error").length}개가 남았습니다.`;
+      }
+
+      function exportDelta() {
+        const answers = {};
+        for (const question of report.followups) if (isAnswered(question)) answers[question.id] = { answer: state.followupAnswers[question.id], active: isActive(question) };
+        const payload = {
+          review_schema_version: "walksafe.answer-review-delta.v1",
+          delta_policy: report.delta_policy,
+          source_answer_sha256: report.binding.source_answer_sha256,
+          question_set_hash: report.binding.question_set_hash,
+          analysis_sha256: report.binding.analysis_sha256,
+          followups_sha256: report.binding.followups_sha256,
+          storage_binding_hash: report.binding.storage_binding_hash,
+          exported_at: new Date().toISOString(),
+          followup_answers: answers,
+          followup_notes: Object.fromEntries(Object.entries(state.followupNotes).filter(([, value]) => value.trim())),
+          unresolved_required: unresolvedFollowups(),
+          note_errors: followupNoteErrors(),
+          consistency_errors: activeConsistencyRules(),
+          source_note_clarifications: Object.fromEntries(Object.entries(state.sourceClarifications).filter(([, value]) => value.trim())),
+          remaining_source_note_errors: remainingSourceNoteErrors()
+        };
+        const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+        const url = URL.createObjectURL(blob); const link = make("a"); link.href = url; link.download = "walksafe-android-baseline-delta-review.json";
+        document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); announce("보완 답변 delta JSON을 내보냈습니다.");
+      }
+
+      function sourceMatches(decision) {
+        const query = state.sourceQuery.trim().toLocaleLowerCase("ko");
+        const selectedText = decision.selected_options.map((option) => `${option.label} ${option.description} ${option.tradeoffs}`).join(" ");
+        const searchable = `${decision.id} ${decision.title} ${decision.prompt} ${selectedText} ${String(decision.answer)} ${decision.source_note} ${decision.impacts.join(" ")} ${decision.affected_deliverable_types.join(" ")}`.toLocaleLowerCase("ko");
+        if (query && !searchable.includes(query)) return false;
+        if (state.sourceCategory !== "all" && decision.category_id !== state.sourceCategory) return false;
+        const flags = decision.flags;
+        if (state.sourceStatus === "note_missing" && !(flags.source_note_error && !(state.sourceClarifications[decision.id] || "").trim())) return false;
+        if (state.sourceStatus === "scope_replaced" && !flags.scope_replaced) return false;
+        if (state.sourceStatus === "ambiguous_note" && !flags.ambiguous_note) return false;
+        if (state.sourceStatus === "critical" && !flags.critical) return false;
+        if (state.sourceStatus === "nonrecommended" && flags.recommended !== false) return false;
+        if (state.sourceStatus === "custom" && !flags.custom) return false;
+        return true;
+      }
+
+      function renderSource() {
+        let visibleCount = 0;
+        const sections = [];
+        for (const category of report.categories) {
+          const decisions = report.decisions.filter((decision) => decision.category_id === category.id && sourceMatches(decision));
+          if (!decisions.length) continue;
+          visibleCount += decisions.length;
+          const section = make("section", { className: "source-category", attrs: { "aria-labelledby": `source-category-${category.id}` } });
+          const header = make("header"); header.append(make("h3", { id: `source-category-${category.id}`, text: `${category.order}. ${category.title} · ${decisions.length}개 표시` }), make("p", { text: category.review.headline })); section.append(header);
+          const list = make("div", { className: "card-list" });
+          for (const decision of decisions) {
+            const missingRequiredNote = decision.flags.source_note_error && !(state.sourceClarifications[decision.id] || "").trim();
+            const card = make("article", { className: `decision${missingRequiredNote ? " has-error" : ""}`, id: `source-${decision.id}` });
+            const head = make("div", { className: "card-head" });
+            const heading = make("div"); heading.append(make("p", { className: "card-id", text: decision.id }), make("h3", { text: decision.title }));
+            const badges = make("div", { className: "badge-row" });
+            if (decision.flags.source_note_error) badges.append(make("span", { className: "badge badge-error", text: "원본 결정메모 누락" }));
+            if (decision.flags.scope_replaced) badges.append(make("span", { className: "badge badge-scope", text: "Web 전제 교체" }));
+            if (decision.flags.ambiguous_note) badges.append(make("span", { className: "badge badge-warning", text: "메모 모호" }));
+            if (decision.flags.critical) badges.append(make("span", { className: "badge badge-critical", text: "중요" }));
+            if (decision.flags.recommended === false) badges.append(make("span", { className: "badge badge-high", text: "비추천 선택" }));
+            if (decision.flags.custom) badges.append(make("span", { className: "badge badge-info", text: "직접 정의" }));
+            head.append(heading, badges); card.append(head, make("p", { className: "prompt", text: decision.prompt }));
+            const answer = make("div", { className: "selected-answer" });
+            if (decision.selected_options.length) for (const option of decision.selected_options) answer.append(make("strong", { text: `선택: ${option.label}${option.recommended ? " (원 질문 추천안)" : ""}` }), make("p", { text: `뜻: ${option.description}` }), make("p", { className: "help", text: `고려사항: ${option.tradeoffs}` }));
+            else answer.append(make("strong", { text: `입력값: ${String(decision.answer)}` }));
+            card.append(answer);
+            if (decision.source_note) card.append(make("p", { className: "field-label", text: "기존 결정 메모 (읽기 전용)" }), make("div", { className: "readonly-note", text: decision.source_note }));
+            if (decision.flags.source_note_error || decision.flags.ambiguous_note) {
+              const required = decision.flags.source_note_error;
+              const label = make("label", { className: "field-label", text: required ? "기존 결정 근거 보완 (필수)" : "모호한 기존 메모 보충 (선택)", attrs: { for: `clarification-${decision.id}` } });
+              const textarea = make("textarea", { id: `clarification-${decision.id}`, attrs: { name: `clarification_${decision.id}`, autocomplete: "off", placeholder: required ? "구체 값·예외·선택 근거·책임자·검증 방법을 적어 주세요…" : "기존 메모에서 불명확한 범위와 구현 기준을 보충해 주세요…" } });
+              textarea.value = state.sourceClarifications[decision.id] || "";
+              textarea.addEventListener("input", () => { if (textarea.value.trim()) state.sourceClarifications[decision.id] = textarea.value; else delete state.sourceClarifications[decision.id]; saveState(); updateProgress(); });
+              textarea.addEventListener("blur", renderSource);
+              card.append(label, textarea);
+            }
+            if (decision.conflicts.length) for (const conflict of decision.conflicts) card.append(make("p", { className: "conflict-item", text: conflict.message }));
+            card.append(make("p", { className: "help", text: `영향: ${decision.impacts.join(" · ")}` }), make("p", { className: "help", text: `연결 산출물: ${decision.affected_deliverable_types.join(", ")}` }));
+            if (decision.finding_ids.length) card.append(make("p", { className: "help", text: `검토 결과: ${decision.finding_ids.join(", ")}` }));
+            if (decision.followup_ids.length) card.append(make("p", { className: "help", text: `연결 추가질문: ${decision.followup_ids.join(", ")}` }));
+            list.append(card);
+          }
+          section.append(list); sections.push(section);
+        }
+        elements["source-list"].replaceChildren(...sections);
+        if (!sections.length) elements["source-list"].append(make("p", { className: "empty", text: "필터에 맞는 원본 답변이 없습니다." }));
+        elements["source-result"].textContent = `원본 답변 ${report.decisions.length}개 중 ${visibleCount}개 표시`;
+      }
+
+      function refresh() { renderFollowups(); renderSource(); updateProgress(); }
+      function bindFilters() {
+        for (const [id, key, eventName] of [
+          ["followup-search", "followupQuery", "input"], ["followup-priority", "followupPriority", "change"], ["followup-status", "followupStatus", "change"],
+          ["source-search", "sourceQuery", "input"], ["source-category", "sourceCategory", "change"], ["source-status", "sourceStatus", "change"]
+        ]) document.getElementById(id).addEventListener(eventName, (event) => { state[key] = event.target.value; if (id.startsWith("followup")) renderFollowups(); else renderSource(); });
+      }
+      document.getElementById("export-button").addEventListener("click", exportDelta);
+      document.getElementById("print-button").addEventListener("click", () => window.print());
+      document.getElementById("contrast-button").addEventListener("click", (event) => {
+        const active = document.body.classList.toggle("high-contrast"); event.currentTarget.setAttribute("aria-pressed", String(active)); event.currentTarget.textContent = active ? "고대비 끄기" : "고대비 켜기";
+      });
+      document.getElementById("reset-button").addEventListener("click", () => {
+        if (!window.confirm("이 브라우저에 저장된 추가질문 답변·메모·원본 근거 보완을 모두 초기화할까요? 원본 답변 JSON은 바뀌지 않습니다.")) return;
+        state.followupAnswers = {}; state.followupNotes = {}; state.sourceClarifications = {};
+        try { localStorage.removeItem(storageKey); } catch (error) { showStorageWarning("브라우저 저장소 초기화에 실패했습니다."); }
+        refresh(); announce("보완 답변을 초기화했습니다.");
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) { event.preventDefault(); document.getElementById("followup-search").focus(); }
+        if (event.key === "Escape" && document.activeElement === document.getElementById("followup-search")) { state.followupQuery = ""; document.getElementById("followup-search").value = ""; renderFollowups(); }
+      });
+      loadState(); renderStatic(); bindFilters(); refresh();
+    })();
+  </script>
+</body>
+</html>

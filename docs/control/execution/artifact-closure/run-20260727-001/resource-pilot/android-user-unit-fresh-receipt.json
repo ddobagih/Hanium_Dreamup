@@ -1,0 +1,96 @@
+{
+  "capture_boundary": {
+    "current_subject_manifest_relation": "POST_HOC_CURRENT_STATE_ONLY_NOT_EXECUTION_TIME_PROOF",
+    "execution_ended_at": "NOT_CAPTURED",
+    "execution_started_at": "NOT_CAPTURED",
+    "execution_time_subject_manifest": "NOT_CAPTURED",
+    "raw_log_status": "CAPTURED",
+    "tool_versions": {
+      "gradle": "NOT_CAPTURED",
+      "java": "NOT_CAPTURED",
+      "node": "NOT_CAPTURED",
+      "npm": "NOT_CAPTURED"
+    },
+    "xml_manifest_status": "INTERNAL_PASS_HASH_RECORDED"
+  },
+  "command": "./gradlew :app:testDebugUnitTest --rerun-tasks --offline --no-daemon --max-workers=1",
+  "credit_boundary": {
+    "actual_device_credit": false,
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "production_credit": false,
+    "release_credit": false
+  },
+  "decision": {
+    "actual_device_credit": false,
+    "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+    "admission_status": "CONDITIONAL_OBSERVATION_ONLY",
+    "evidence_credit": false,
+    "formal_279_credit": false,
+    "formal_test_credit": false,
+    "fresh_execution_observation": true,
+    "observed_internal_test_output": "PASS",
+    "production_credit": false,
+    "release_credit": false,
+    "resource_pilot_result": "DIAGNOSTIC_ONLY",
+    "subject_identity": "POST_HOC_CURRENT_STATE_ONLY"
+  },
+  "integrity": {
+    "canonical_byte_length": 2891,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "e2f296fec46f4f8db84605078c64a81964f963eafb642ee4149624f15b8537a0"
+  },
+  "limits": {
+    "gradle_jvm_max_mib": 1536,
+    "max_workers": 1,
+    "nice": 10,
+    "timeout_seconds": 900
+  },
+  "observation_classification": {
+    "actual_device_evidence": false,
+    "evidence_grade": false,
+    "formal_evidence": false,
+    "record_class": "DIAGNOSTIC_ADMISSION_OBSERVATION",
+    "release_evidence": false,
+    "scope": "RESOURCE_ADMISSION_ONLY"
+  },
+  "prepared_on": "2026-07-27",
+  "raw_log": {
+    "binding_verified_at": "2026-07-27T19:41:59+09:00",
+    "bytes": 6302,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+    "sha256": "22a6759067a3d2a34a43cd9e10b3e098eff85f2386c468ebe1a8923ff7576ba0",
+    "subject_role": "DIAGNOSTIC_RAW_COMMAND_LOG"
+  },
+  "resource_observation": {
+    "measurement_limitation": "Gradle forked a single-use daemon. The time(1) value does not prove whole-daemon peak RSS and is not used as a memory ceiling result.",
+    "measurement_status": "PARTIAL_GRADLE_DAEMON_RSS_INCOMPLETE",
+    "reported_maximum_resident_set_kib": 127644,
+    "swap_operations": 0,
+    "wall_seconds": 26.31
+  },
+  "result": {
+    "errors": 0,
+    "executed_tasks": 26,
+    "exit_status": 0,
+    "failures": 0,
+    "gradle_result": "BUILD_SUCCESSFUL",
+    "passed": 728,
+    "skipped": 0,
+    "suite_files": 95,
+    "tests": 728,
+    "xml_manifest_sha256": "becc5d0427c46aaccade8ab46ff01bd32dc02842b90c9930c420564e9aec58a0"
+  },
+  "schema_version": "walksafe.resource-pilot-diagnostic-observation.v2",
+  "subject": "apps/android/app",
+  "subject_manifest_binding": {
+    "byte_length": 61975,
+    "captured_at": "2026-07-27T19:41:59+09:00",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+    "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+    "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+  },
+  "timezone": "Asia/Seoul",
+  "working_directory": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android"
+}

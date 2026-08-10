@@ -1,0 +1,70 @@
+{
+  "schema_version": "walksafe.controlled-current-state-successor.v1",
+  "packet_id": "PHASE1-PHONE-MOUNTING-CURRENT-STATE-SUCCESSOR-20260729-R001",
+  "created_on": "2026-07-29",
+  "status": "CONTROLLED_CURRENT_STATE_BINDING_ONLY",
+  "subject": {
+    "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+    "predecessor_sha256": "feea182c229e7bc6eec74afc571e4690b597937eaf20852f4bcdafe9bf5f4d3b",
+    "current_sha256": "cf42f540e32b9228f094d9b4e6e742eb4e180abc818ccde0b5a9944315c2b7bd",
+    "current_byte_count": 24190,
+    "bridge_kind": "NON_CAUSAL_ZERO_CREDIT_CURRENT_STATE_BINDING"
+  },
+  "historical_anchors": [
+    {
+      "anchor_kind": "FP015_IMPLEMENTATION_RECORD_CHANGED_ARTIFACT",
+      "document_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/implementation-record.json",
+      "document_sha256": "696b89c8e95c979e40174cc7e6423fabad54fb137ce6cf75fe4724004f12f8aa",
+      "document_byte_count": 14885,
+      "json_pointer": "/changed_artifacts/23",
+      "row_projection": {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+        "before_sha256": "99cfd48ca29a8036d4b9b0e3cdb0290298114f1ae00fbe3e0172d2cb29ce15b6",
+        "after_sha256": "feea182c229e7bc6eec74afc571e4690b597937eaf20852f4bcdafe9bf5f4d3b",
+        "before_source": "GATE_DIRTY_SNAPSHOT",
+        "change_kind": "MODIFIED"
+      }
+    },
+    {
+      "anchor_kind": "FP047_START_REPOSITORY_STATE_DIRTY_PATH",
+      "document_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP047-20260726-005/19-REPOSITORY_STATE.log",
+      "document_sha256": "85a159407968746aeccd9031a4431dc87c6dc80db2791580db989c878de1e457",
+      "document_byte_count": 599492,
+      "json_pointer": "/dirty_snapshot/paths/169",
+      "row_projection": {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+        "path_role": "CURRENT",
+        "status_kind": "UNTRACKED",
+        "worktree_state": "PRESENT",
+        "worktree_type": "REGULAR_FILE",
+        "worktree_byte_count": 24106,
+        "worktree_sha256": "feea182c229e7bc6eec74afc571e4690b597937eaf20852f4bcdafe9bf5f4d3b"
+      }
+    }
+  ],
+  "current_observation": {
+    "observed_at": "2026-07-29T02:34:05+09:00",
+    "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+    "file_type": "REGULAR_FILE",
+    "byte_count": 24190,
+    "sha256": "cf42f540e32b9228f094d9b4e6e742eb4e180abc818ccde0b5a9944315c2b7bd",
+    "source_mutation_performed": false
+  },
+  "claim_boundary": {
+    "causal_transition_proven": false,
+    "execution_time_source_identity_proven": false,
+    "test_execution_claimed": false,
+    "artifact_completion_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "intended_use": "EXACT_PATH_PREDECESSOR_TO_CURRENT_STATE_BRIDGE_ONLY"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "excluded_json_path": "$.integrity",
+    "sha256": "55755953db29fd1626040e3be331c24cca66f9ec0bff89534a9f478cd9208028"
+  }
+}

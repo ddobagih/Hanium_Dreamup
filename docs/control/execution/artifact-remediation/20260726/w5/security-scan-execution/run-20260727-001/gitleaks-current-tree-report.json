@@ -1,0 +1,42 @@
+[
+ {
+  "RuleID": "generic-api-key",
+  "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+  "StartLine": 140,
+  "EndLine": 140,
+  "StartColumn": 11,
+  "EndColumn": 46,
+  "Match": "local_key\": \"REDACTED\"",
+  "Secret": "REDACTED",
+  "File": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input/scripts/build_latest_model_report_20260710.py",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 3.93626,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input/scripts/build_latest_model_report_20260710.py:generic-api-key:140"
+ },
+ {
+  "RuleID": "generic-api-key",
+  "Description": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+  "StartLine": 1320,
+  "EndLine": 1320,
+  "StartColumn": 6,
+  "EndColumn": 60,
+  "Match": "replacement_secret = \"REDACTED\"",
+  "Secret": "REDACTED",
+  "File": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input/backend/tests/test_admin_security.py",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 3.9917293,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input/backend/tests/test_admin_security.py:generic-api-key:1320"
+ }
+]

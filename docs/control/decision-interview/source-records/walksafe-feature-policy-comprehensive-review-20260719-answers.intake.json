@@ -1,0 +1,65 @@
+{
+  "schema_version": "walksafe.comprehensive-policy-review-answer-intake.v1",
+  "intake_id": "WS-POLICY-COMPREHENSIVE-ANSWER-INTAKE-20260720-001",
+  "intake_version": "1.0.0",
+  "change_reason": "2026-07-20 대화에서 확정한 원본 수집, 권한·세션, 경로 이탈, 자동신고, 휴대폰·서버 용량, 단일 관리자 복구 정책을 최종 검토 답변에 반영한 뒤 프로젝트 통제 입력으로 최초 반입한다.",
+  "answer_intake": {
+    "external_path": "/home/ddobagi/Downloads/walksafe-feature-policy-comprehensive-review-20260719-answers.json",
+    "external_path_usage": "PROVENANCE_ONLY",
+    "controlled_path": "docs/control/decision-interview/source-records/walksafe-feature-policy-comprehensive-review-20260719-answers.json",
+    "sha256": "ef840c33215767d210fc930a8087f09e5eda7b99af695ded5cd9d226d8ab5150",
+    "byte_length": 23731,
+    "captured_at": "2026-07-20T18:40:57+09:00",
+    "controlled_revision": 1,
+    "supersedes_external_sha256": "e4138fcf99aae6eff36a28c9a7ce698c998c9af72ff94908f6164a94b8d6201a",
+    "source_class": "EXTERNAL",
+    "artifact_form": "EXTERNAL_RECORD",
+    "evidence_classification": "USER_CONFIRMED",
+    "adoption_trust": "D"
+  },
+  "answer_metadata": {
+    "schema_version": "walksafe.comprehensive-policy-review-answers.v2",
+    "report_id": "WS-POLICY-COMPREHENSIVE-20260719",
+    "report_binding_sha256": "045aa517bb36a77d68f50486f2bd0748b360a9b4519332301340b5ef56b544ce",
+    "exported_at": "2026-07-20T08:42:57Z",
+    "status": "REVIEW_COMPLETE",
+    "baseline_status": "NOT_APPROVED",
+    "reviewer": "김민호",
+    "reviewed": 76,
+    "accepted": 54,
+    "revision_requested": 22,
+    "held": 0,
+    "non_empty_note_count": 37,
+    "dated_correction_count": 35,
+    "direct_changed_feature_count": 31
+  },
+  "review_source_bindings": [
+    {
+      "id": "SRC-COMPREHENSIVE-PROPOSALS",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-proposals.json",
+      "sha256": "0bd1764fa2361a27362ead0d022ce8ac80c7b0f8a678800309cda4a611f79401"
+    },
+    {
+      "id": "SRC-COMPREHENSIVE-REVIEW-HTML",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-review-20260719.html",
+      "sha256": "edcdf4e34a1c5e40e1dc007f686f32e7e24631fd99f01bde5745527bd8b1110d"
+    }
+  ],
+  "record_controls": {
+    "external_signature_status": "NOT_SIGNED",
+    "confidentiality": "INTERNAL",
+    "personal_data": [
+      "reviewer_name"
+    ],
+    "retention_class": "PROJECT_LIFECYCLE_PLUS_3_YEARS",
+    "notes": "검토자 이름은 결정 책임 추적을 위한 내부 통제정보다. 비밀번호·키·인증서·서비스 최종사용자 개인정보는 포함하지 않는다."
+  },
+  "approval_boundary": {
+    "review_status": "REVIEW_COMPLETE",
+    "baseline_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "approved_by": null,
+    "approved_at": null,
+    "note": "76개 검토 완료는 정책 반영 입력이 준비됐다는 뜻이며 프로젝트 기준선 승인이나 구현·시험 완료를 뜻하지 않는다."
+  }
+}

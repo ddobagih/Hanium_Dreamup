@@ -1,0 +1,157 @@
+{
+  "capture_relation_to_execution": "POST_HOC_CURRENT_STATE_ONLY",
+  "captured_at": "2026-07-27T19:41:59+09:00",
+  "execution_time_source_bytes_status": "NOT_CAPTURED",
+  "integrity": {
+    "canonical_byte_length": 4436,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "6526b5ee080f5fce7e01e5b8fc1c4335cb3119f3d238d0e10f246c3c49db4cf3"
+  },
+  "manifest_id": "WS-RP-SUBJECT-ANDROID-GATEWAY-20260727-001",
+  "prepared_on": "2026-07-27",
+  "schema_version": "walksafe.resource-pilot-subject-manifest.v1",
+  "source_root": "apps/android-gateway",
+  "source_set": {
+    "entries": [
+      {
+        "byte_length": 12553,
+        "path": "apps/android-gateway/README.md",
+        "sha256": "f500d9c2349c0b27019a7583f2ec700c9c35b1baf50966ef77f17eded48844e3"
+      },
+      {
+        "byte_length": 39266,
+        "path": "apps/android-gateway/openapi.json",
+        "sha256": "bee3e05de6287ca420b12816d4cc822cc5666093cd260bfe895cdf28ba070f1f"
+      },
+      {
+        "byte_length": 1435,
+        "path": "apps/android-gateway/package-lock.json",
+        "sha256": "cf595d4b768ec3fb00ccd4223249cfd5b33c25b3940c864878d8dc0f04d075d1"
+      },
+      {
+        "byte_length": 554,
+        "path": "apps/android-gateway/package.json",
+        "sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6"
+      },
+      {
+        "byte_length": 895,
+        "path": "apps/android-gateway/server.ts",
+        "sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd"
+      },
+      {
+        "byte_length": 27970,
+        "path": "apps/android-gateway/src/auth.ts",
+        "sha256": "69da3ab915e7cb0a2ec22eb344cf97578d92b63591a0786e57d075926a451544"
+      },
+      {
+        "byte_length": 15559,
+        "path": "apps/android-gateway/src/backend.ts",
+        "sha256": "00ebc0dff830a40b35e20b5cfb132e50a9ee3d9804f65e0a824f816ff94cdc81"
+      },
+      {
+        "byte_length": 4414,
+        "path": "apps/android-gateway/src/config.ts",
+        "sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7"
+      },
+      {
+        "byte_length": 7420,
+        "path": "apps/android-gateway/src/exclusive-file-lock.ts",
+        "sha256": "aa6a32375dc4d862b53bd6c874f9ff01c993de892c4273969fc0cf932a18848e"
+      },
+      {
+        "byte_length": 34354,
+        "path": "apps/android-gateway/src/field-long-session.ts",
+        "sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be"
+      },
+      {
+        "byte_length": 28944,
+        "path": "apps/android-gateway/src/field-walk-ledger.ts",
+        "sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d"
+      },
+      {
+        "byte_length": 35378,
+        "path": "apps/android-gateway/src/integrated-consent.ts",
+        "sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d"
+      },
+      {
+        "byte_length": 5065,
+        "path": "apps/android-gateway/src/node-adapter.ts",
+        "sha256": "51cefe5398e1f229298243ea897d4249dd198dcf52281c9317fe3d68f5f692c3"
+      },
+      {
+        "byte_length": 44699,
+        "path": "apps/android-gateway/src/privacy-rights.ts",
+        "sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db"
+      },
+      {
+        "byte_length": 3551,
+        "path": "apps/android-gateway/src/request-body.ts",
+        "sha256": "a99d24c7a4dadaf4a98cd2fe5ab5eab5b3a2c7042d93ff97ff9a9981206e4d73"
+      },
+      {
+        "byte_length": 30206,
+        "path": "apps/android-gateway/src/routes.ts",
+        "sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8"
+      },
+      {
+        "byte_length": 2345,
+        "path": "apps/android-gateway/src/telemetry.ts",
+        "sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96"
+      },
+      {
+        "byte_length": 9950,
+        "path": "apps/android-gateway/test/exclusive-file-lock.test.ts",
+        "sha256": "9e44bacbd8114e62c7982694167623280c66f8d6446bb27beb9609d034c7ad96"
+      },
+      {
+        "byte_length": 30316,
+        "path": "apps/android-gateway/test/field-long-session.test.ts",
+        "sha256": "981d7a01031074f7f42c49c2efd4259e9e5af54eea73229d55af21f3a0f48b7c"
+      },
+      {
+        "byte_length": 22960,
+        "path": "apps/android-gateway/test/field-walk-ledger.test.ts",
+        "sha256": "e07cd13f13560ab44506a75eeae1eed796c1f130eff44721a8399f2ebb43a570"
+      },
+      {
+        "byte_length": 30518,
+        "path": "apps/android-gateway/test/gateway-contract.test.ts",
+        "sha256": "77df172ec22fc38919cf94ef413fba880f61a5765d4a14ca38bcd31cc37d2307"
+      },
+      {
+        "byte_length": 11753,
+        "path": "apps/android-gateway/test/integrated-consent.test.ts",
+        "sha256": "b7917c951bbf8412510fc398de3f8746ffeb6e1f7b3d686d02a3ff53a641994d"
+      },
+      {
+        "byte_length": 5387,
+        "path": "apps/android-gateway/test/node-adapter.test.ts",
+        "sha256": "84f33251a9285883e348f77ea462785290a485dadfad076db2755dda9f55b0ad"
+      },
+      {
+        "byte_length": 19241,
+        "path": "apps/android-gateway/test/privacy-rights.test.ts",
+        "sha256": "5475a015d881630991623e7b7ad88edce6da269622308ac25ca78d2be9421790"
+      },
+      {
+        "byte_length": 4066,
+        "path": "apps/android-gateway/test/telemetry.test.ts",
+        "sha256": "13f62070ed2f405df8b249d117f61fd43421cb3c1b48ace3e6f2f544b6750e4b"
+      },
+      {
+        "byte_length": 485,
+        "path": "apps/android-gateway/tsconfig.json",
+        "sha256": "e68e1b7d1b590e7df86b2e2a6fca396590eff0af747b0e4ba236b8aacdecda68"
+      }
+    ],
+    "entry_count": 26,
+    "excluded": [],
+    "fingerprint_sha256": "f0a9389c5c9f95a134d89acaeb76e6d00d810f2d7a6b6ebdd45b6849026a3f44"
+  },
+  "subjects": [
+    "apps/android-gateway"
+  ],
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00"
+}

@@ -1,0 +1,523 @@
+{
+  "review_schema_version": "walksafe.answer-review-delta.v1",
+  "delta_policy": "이 화면의 추가 답변과 근거 보완은 원본 286개 답변을 자동으로 덮어쓰지 않는 delta review입니다. 이후 사람이 유지·대체·폐기 매핑을 승인해야 새 문서 기준선이 됩니다.",
+  "source_answer_sha256": "6e132df56ab5004be1130fdcb31e48be30cc5e3536747d90367253302817df24",
+  "question_set_hash": "91b65e356d033106144beee2b690dc8d4750165db5d16d6d5a5dbb441c290a8e",
+  "analysis_sha256": "7c657f1bb85d294d639d68e71baa06507ce798740e5dc36a79e16b186ba76578",
+  "followups_sha256": "f2f4ce79bbe624740f8abda19a291bd4e51aa10126e885b48d503bdaa3c800cb",
+  "storage_binding_hash": "7c9529d4e026ad2e8711589a51d38bb0044a2f363f240abf7e1c08760bb6c26c",
+  "exported_at": "2026-07-18T02:51:07.966Z",
+  "followup_answers": {
+    "FUP-001": {
+      "answer": "production",
+      "active": true
+    },
+    "FUP-002": {
+      "answer": "shared_core_two_apks",
+      "active": true
+    },
+    "FUP-003": {
+      "answer": "legacy_preserved",
+      "active": true
+    },
+    "FUP-004": {
+      "answer": "inference_only",
+      "active": true
+    },
+    "FUP-005": {
+      "answer": "detect_decide_tts_local",
+      "active": true
+    },
+    "FUP-006": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-007": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-008": {
+      "answer": "new_api_gateway",
+      "active": true
+    },
+    "FUP-009": {
+      "answer": "api31_plus_official",
+      "active": true
+    },
+    "FUP-010": {
+      "answer": "same_full_features",
+      "active": true
+    },
+    "FUP-011": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-012": {
+      "answer": "pause_all_reconfirm",
+      "active": true
+    },
+    "FUP-013": {
+      "answer": "auto_on_launch",
+      "active": true
+    },
+    "FUP-014": {
+      "answer": "bundle_all_or_nothing",
+      "active": true
+    },
+    "FUP-015": {
+      "answer": "all_login_required",
+      "active": true
+    },
+    "FUP-016": {
+      "answer": "talkback_tts_haptic",
+      "active": true
+    },
+    "FUP-017": {
+      "answer": "voice_only",
+      "active": true
+    },
+    "FUP-018": {
+      "answer": "no_mute",
+      "active": true
+    },
+    "FUP-019": {
+      "answer": "bounded_haptic_safe_pause",
+      "active": true
+    },
+    "FUP-020": {
+      "answer": "default_on",
+      "active": true
+    },
+    "FUP-021": {
+      "answer": "silent",
+      "active": true
+    },
+    "FUP-022": {
+      "answer": "admin_only",
+      "active": true
+    },
+    "FUP-023": {
+      "answer": "opt_in_auto_replay",
+      "active": true
+    },
+    "FUP-024": {
+      "answer": "long_term_raw",
+      "active": true
+    },
+    "FUP-025": {
+      "answer": "app_delete_only",
+      "active": true
+    },
+    "FUP-026": {
+      "answer": "raw_long_term",
+      "active": true
+    },
+    "FUP-027": {
+      "answer": "raw_unrestricted",
+      "active": true
+    },
+    "FUP-028": {
+      "answer": "continuous_raw",
+      "active": true
+    },
+    "FUP-029": {
+      "answer": "production",
+      "active": true
+    },
+    "FUP-030": {
+      "answer": "no_independent_eval",
+      "active": true
+    },
+    "FUP-031": {
+      "answer": "owner_judgment",
+      "active": true
+    },
+    "FUP-032": {
+      "answer": "apk_bundled",
+      "active": true
+    },
+    "FUP-033": {
+      "answer": "no_rollback",
+      "active": true
+    },
+    "FUP-035": {
+      "answer": "full_native_gate",
+      "active": true
+    },
+    "FUP-036": {
+      "answer": "developers_only",
+      "active": true
+    },
+    "FUP-037": {
+      "answer": "user_production_admin_private",
+      "active": true
+    },
+    "FUP-038": {
+      "answer": "free_tier_limited",
+      "active": true
+    },
+    "FUP-039": {
+      "answer": "single_admin_mfa",
+      "active": true
+    },
+    "FUP-040": {
+      "answer": "no_user_notice",
+      "active": true
+    },
+    "FUP-041": {
+      "answer": "full_operations",
+      "active": true
+    },
+    "FUP-042": {
+      "answer": "shared_idp_scoped_sessions",
+      "active": true
+    },
+    "FUP-043": {
+      "answer": "account_password",
+      "active": true
+    },
+    "FUP-044": {
+      "answer": "server_proxy_only",
+      "active": true
+    },
+    "FUP-045": {
+      "answer": "stop_all",
+      "active": true
+    },
+    "FUP-046": {
+      "answer": "mvp_directive",
+      "active": true
+    },
+    "FUP-047": {
+      "answer": "automatic_best",
+      "active": true
+    },
+    "FUP-048": {
+      "answer": "warn_continue",
+      "active": true
+    },
+    "FUP-049": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-050": {
+      "answer": "channel_matched_custody",
+      "active": true
+    },
+    "FUP-051": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-052": {
+      "answer": "detailed_default",
+      "active": true
+    },
+    "FUP-053": {
+      "answer": "dedicated_on_device_stt",
+      "active": true
+    },
+    "FUP-054": {
+      "answer": "internal_only",
+      "active": true
+    },
+    "FUP-055": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-056": {
+      "answer": "incremental_existing",
+      "active": true
+    },
+    "FUP-057": {
+      "answer": "portrait_fixed",
+      "active": true
+    },
+    "FUP-058": {
+      "answer": "rename_all_artifacts",
+      "active": true
+    },
+    "FUP-059": {
+      "answer": "out_of_scope",
+      "active": true
+    },
+    "FUP-060": {
+      "answer": "custom",
+      "active": true
+    },
+    "FUP-061": {
+      "answer": "general_sidewalk_crossing_advisory",
+      "active": true
+    },
+    "FUP-062": {
+      "answer": "app_tts_only",
+      "active": true
+    },
+    "FUP-063": {
+      "answer": "safety_privacy_access_block",
+      "active": true
+    },
+    "FUP-064": {
+      "answer": "owner_only",
+      "active": true
+    },
+    "FUP-065": {
+      "answer": "opt_in_wake_word",
+      "active": true
+    },
+    "FUP-066": {
+      "answer": "voice_only",
+      "active": true
+    },
+    "FUP-071": {
+      "answer": "versioned_window_min_supported",
+      "active": true
+    },
+    "FUP-072": {
+      "answer": "forward_fix_only",
+      "active": true
+    },
+    "FUP-073": {
+      "answer": "demo_candidate_field_tuned",
+      "active": true
+    },
+    "FUP-075": {
+      "answer": "custom",
+      "active": true
+    }
+  },
+  "followup_notes": {
+    "FUP-060": "일반적인 도심에서 기존 보조수단 없이 WalkSafe만으로 보행 가능하게 만드는 것이 목표. ",
+    "FUP-061": "일반적인 도심에서 기존 보조수단 없이 WalkSafe만으로 보행 가능하게 만드는 것이 목표. ",
+    "FUP-004": "폰에서 추론을 하고 관련 데이터를 서버에 보낸다. 서버는 추후 데이터를 모아 학습을 진행한다.",
+    "FUP-006": "데이터셋을 얻기 위해 처음에 사용자 약관을 다 얻고 신고 사진을 서버로 전송하고 주기적으로 카메라가 비추는 이미지를 수집하여 서버로 전송하여 원천 데이터셋을 모은다. 추가적인 학습을 위해서 모으는 것이다. ",
+    "FUP-007": "백엔드가 맡아야 하는 부분은 다 맡아야 한다. 최소 운영지표가 아닌 객관적으로 맡아야 하는 부분은 다 맡는다. ",
+    "FUP-053": "어떻게 해야할지 모르겠어. STT 온디바이스로 하고 학습으로 쓸 데이터는 서버로 보내는 형식으로 하고 싶은데. ",
+    "FUP-011": "컴퓨터에 연결된 기종과 갤럭시 s25",
+    "FUP-046": "tmap에서 보도 경로 안내가 뜨니까 그걸 바탕으로 방향을 설명하면 되는 거 아닌가?",
+    "FUP-051": "이동 경로 기록 위치를 서버에 보낸다. 서버는 이걸 데이터화 해서 기간 제한 없이 보관하여 데이터로 활용한다 ",
+    "FUP-029": "정식 운영으로 하고 추후 모델 학습을 통해 개선을 할 것임. ",
+    "FUP-047": "우선순위 정해서 가능한 거 골라서 진행. ",
+    "FUP-035": "unit, module, 통합 테스트 모두 통과도 해야한다. ",
+    "FUP-037": "사용자 앱은 플레이스토어에 출시할 정도로. 관리자앱은 출시 안 하고 개발자들 개인 단말들에 깔아서 쓸거야, ",
+    "FUP-038": "클라우드에 올릴 때는 내가 클라우드 환경 만들어놓고 거기다가 올릴거야 이건 내 허락이 팔요한 작업으로. 마지막에 진행. ",
+    "FUP-049": "사용자가 업데이트를 할 때 업데이트. 업데이트 해야한다고 알리기.",
+    "FUP-055": "피드백들은 관리자앱으로 온다. ",
+    "FUP-071": "정해진 지원 기간 동안 유지한다.",
+    "FUP-075": "어떻게 해야할지 모르겠어. 뭔 말인지도 모르겠어."
+  },
+  "unresolved_required": [],
+  "note_errors": [
+    "FUP-001",
+    "FUP-008",
+    "FUP-009",
+    "FUP-010",
+    "FUP-013",
+    "FUP-014",
+    "FUP-015",
+    "FUP-017",
+    "FUP-018",
+    "FUP-019",
+    "FUP-020",
+    "FUP-021",
+    "FUP-022",
+    "FUP-023",
+    "FUP-024",
+    "FUP-025",
+    "FUP-026",
+    "FUP-027",
+    "FUP-028",
+    "FUP-030",
+    "FUP-031",
+    "FUP-033",
+    "FUP-036",
+    "FUP-039",
+    "FUP-040",
+    "FUP-041",
+    "FUP-043",
+    "FUP-044",
+    "FUP-045",
+    "FUP-048",
+    "FUP-050",
+    "FUP-052",
+    "FUP-054",
+    "FUP-058",
+    "FUP-062",
+    "FUP-064",
+    "FUP-065",
+    "FUP-066",
+    "FUP-072",
+    "FUP-073"
+  ],
+  "consistency_errors": [
+    {
+      "id": "FCR-010",
+      "message": "Android 전체 release gate에는 모델 독립평가가 포함되지만 독립평가를 생략하도록 선택했습니다. 시험 gate 또는 평가 방식을 다시 선택하세요.",
+      "severity": "error",
+      "when_all": [
+        {
+          "option_ids": [
+            "full_native_gate"
+          ],
+          "question_id": "FUP-035"
+        },
+        {
+          "option_ids": [
+            "no_independent_eval"
+          ],
+          "question_id": "FUP-030"
+        }
+      ]
+    },
+    {
+      "id": "FCR-025",
+      "message": "UI는 TalkBack을 포함한다고 정했지만 접근성 출시 gate에서는 앱 TTS만 제공하도록 선택했습니다. 안내 채널 또는 접근성 gate를 다시 선택하세요.",
+      "severity": "error",
+      "when_all": [
+        {
+          "option_ids": [
+            "talkback_tts_haptic"
+          ],
+          "question_id": "FUP-016"
+        },
+        {
+          "option_ids": [
+            "app_tts_only"
+          ],
+          "question_id": "FUP-062"
+        }
+      ]
+    },
+    {
+      "id": "FCR-057",
+      "message": "정식 운영에서 자동신고를 활성화하면서 위치·중복 수치는 Demo 후보로만 두었습니다. 공식 단계, 자동신고 활성화 또는 수치 승인 등급을 다시 선택하세요.",
+      "severity": "error",
+      "when_all": [
+        {
+          "option_ids": [
+            "production"
+          ],
+          "question_id": "FUP-001"
+        },
+        {
+          "option_ids": [
+            "separate_opt_in",
+            "default_on"
+          ],
+          "question_id": "FUP-020"
+        },
+        {
+          "option_ids": [
+            "demo_candidate_field_tuned"
+          ],
+          "question_id": "FUP-073"
+        }
+      ]
+    }
+  ],
+  "source_note_clarifications": {
+    "Q-GOV-002": "단 하나만이 아니라 모두 달성해야해. ",
+    "Q-GOV-003": "정식 운영까지로 정의. "
+  },
+  "remaining_source_note_errors": [
+    "Q-GOV-007",
+    "Q-GOV-010",
+    "Q-USR-002",
+    "Q-USR-003",
+    "Q-USR-004",
+    "Q-USR-005",
+    "Q-USR-006",
+    "Q-USR-009",
+    "Q-USR-010",
+    "Q-USR-011",
+    "Q-PLT-002",
+    "Q-SES-002",
+    "Q-SES-003",
+    "Q-SES-004",
+    "Q-SES-005",
+    "Q-SES-006",
+    "Q-SES-007",
+    "Q-SES-008",
+    "Q-SES-010",
+    "Q-SES-012",
+    "Q-SES-016",
+    "Q-SES-021",
+    "Q-DET-003",
+    "Q-NAV-008",
+    "Q-NAV-015",
+    "Q-NAV-016",
+    "Q-NAV-017",
+    "Q-VOI-003",
+    "Q-VOI-013",
+    "Q-VOI-014",
+    "Q-VOI-015",
+    "Q-RPT-002",
+    "Q-RPT-004",
+    "Q-RPT-005",
+    "Q-RPT-006",
+    "Q-RPT-007",
+    "Q-RPT-009",
+    "Q-RPT-011",
+    "Q-RPT-015",
+    "Q-RPT-019",
+    "Q-RPT-020",
+    "Q-RPT-023",
+    "Q-RPT-025",
+    "Q-RPT-026",
+    "Q-RPT-027",
+    "Q-RPT-029",
+    "Q-RPT-030",
+    "Q-RPT-031",
+    "Q-AIML-001",
+    "Q-AIML-002",
+    "Q-AIML-003",
+    "Q-AIML-004",
+    "Q-AIML-011",
+    "Q-AIML-012",
+    "Q-AIML-016",
+    "Q-AIML-017",
+    "Q-AIML-018",
+    "Q-ARC-012",
+    "Q-PRV-002",
+    "Q-PRV-003",
+    "Q-PRV-004",
+    "Q-PRV-005",
+    "Q-PRV-006",
+    "Q-PRV-008",
+    "Q-PRV-009",
+    "Q-PRV-010",
+    "Q-PRV-011",
+    "Q-PRV-012",
+    "Q-PRV-013",
+    "Q-PRV-014",
+    "Q-PRV-017",
+    "Q-PRV-018",
+    "Q-PRV-019",
+    "Q-PRV-020",
+    "Q-PRV-021",
+    "Q-PRV-024",
+    "Q-PRV-025",
+    "Q-RES-001",
+    "Q-RES-003",
+    "Q-RES-006",
+    "Q-RES-008",
+    "Q-RES-012",
+    "Q-RES-015",
+    "Q-ACC-002",
+    "Q-ACC-004",
+    "Q-ACC-006",
+    "Q-ACC-007",
+    "Q-TST-006",
+    "Q-TST-007",
+    "Q-TST-008",
+    "Q-TST-009",
+    "Q-TST-010",
+    "Q-TST-013",
+    "Q-TST-015",
+    "Q-REL-009",
+    "Q-REL-012",
+    "Q-REL-013",
+    "Q-REL-014",
+    "Q-OPS-015",
+    "Q-OPS-018"
+  ]
+}

@@ -1,0 +1,561 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-01 Phase E 독립 Android API Gateway 추출 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_phase_d_or_approved_baseline": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": false,
+    "claims_gateway_repository_extraction_complete": true,
+    "claims_gateway_deployed": false,
+    "claims_actual_device_connectivity_pass": false,
+    "claims_formal_test_pass": false,
+    "claims_external_url_decommissioned": false,
+    "claims_cached_pwa_disabled": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "phase_d_record_id": "WS-EPIC-01-PHASE-D-LEGACY-WEB-CLOSURE-IMPLEMENTATION-20260723-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-004",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-004",
+    "overlay_predecessor_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "phase_d_builder",
+        "path": "scripts/build_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py",
+        "bytes": 67824,
+        "sha256": "10c18b5487f3d2046e72eab1d6004ea0ef372e5af055c099f20e8c65473ccfbe",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_d_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py",
+        "bytes": 16431,
+        "sha256": "6a00340373022311dda91544e85212161950c06a2677eecc4e1d1ff1b8abccaf",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_d_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.json",
+        "bytes": 20975,
+        "sha256": "f3352011c4ffd796ba7f9207e465396a51bd4e8941807229548e185dd1160481",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_d_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.md",
+        "bytes": 3487,
+        "sha256": "b382c52e47ee66e73f5488c69db36cade7e8bf045ed349d25e390ac47fe7191e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r004",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r004.json",
+        "bytes": 400548,
+        "sha256": "24829b3e297103bf3b3453ae5a05b0ff669cd63d9ab36a4047720340813f1aa9",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r004_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r004.md",
+        "bytes": 1211,
+        "sha256": "f5c84241d2535b92a9d468514b6c18f5686643c842edf7f8d2bf120c8ce9e0e0",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r004",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r004.json",
+        "bytes": 54748,
+        "sha256": "af045e68a86ccc7a6be3f6d01dd0b57a460a028c6a1803346d339329b40db3b0",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r004_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r004.md",
+        "bytes": 703,
+        "sha256": "4765943051e65141e68b0f51408db48780717fd60da3aaac0fee2689e99ef2b5",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_d_active_overlay",
+        "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.json",
+        "bytes": 13271,
+        "sha256": "a158c3cce36e10141b17fbab91a043f8a0c3ce405df0be620c9d03a86253f5bc",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_d_active_overlay_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.md",
+        "bytes": 2425,
+        "sha256": "bbe1d34e080dc029e79d69ab7309bd38bef3fa654ffe1dd91ba8900f1b05ae26",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
+        "bytes": 78419,
+        "sha256": "4c55aadbdf7ec0dddf00d0c5363381b84366cf26b00213e6e58a408e99751e5a"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
+        "bytes": 18002,
+        "sha256": "36383044a552f627359c549a9426521e66416847751e330bef9d02d19e6fac94"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_E_INDEPENDENT_ANDROID_GATEWAY_EXTRACTION",
+    "directly_reassessed_policy_ids": [
+      "FP-007",
+      "FP-009"
+    ],
+    "directly_reassessed_gap_ids": [
+      "GAP-016",
+      "GAP-018"
+    ],
+    "impact_reviewed_policy_ids": [
+      "FP-011",
+      "FP-032",
+      "FP-040",
+      "FP-042",
+      "FP-047",
+      "FP-048"
+    ],
+    "impact_reviewed_gap_ids": [
+      "GAP-020",
+      "GAP-041",
+      "GAP-049",
+      "GAP-051",
+      "GAP-056",
+      "GAP-057"
+    ],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_E_INDEPENDENT_ANDROID_GATEWAY_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "excluded_from_scope": [
+      "unrelated dirty-tree paths",
+      "checkpoint, runbook, test-layer record, and daylog",
+      "Phase A/B/C Android and backend implementation paths not changed by Phase E",
+      "Phase D immutable predecessors",
+      "Phase E generated trace outputs"
+    ],
+    "file_count": 41,
+    "removed_file_count": 4,
+    "path_set_sha256": "89ef61be66c188f099f43bb4127709bbd032afb6d1a4038e767692eff5612a5f",
+    "content_set_sha256": "71bb7797d0b3e9a1f93a416e54aa4f8a6d5895a9d81f8861dea4f8feea3a7e8a",
+    "removed_path_set_sha256": "5e3377c6c26cda3824690cd8f03604f7219d60fee50b40a845b1929d66902039",
+    "files": [
+      {
+        "path": ".github/workflows/quality.yml",
+        "bytes": 3736,
+        "sha256": "9a8969eaf5453a28e9912f485bf7e63ae02c54d3fd18d659cbcd3f7e4c06ee83"
+      },
+      {
+        "path": "README.md",
+        "bytes": 4944,
+        "sha256": "4872261e42e02819ca8f5f7aaea6397b3eefc4538eddec65492134660f890852"
+      },
+      {
+        "path": "apps/README.md",
+        "bytes": 1109,
+        "sha256": "680fe0847b3346f31ee1e5686670bb843d4442db4b58b491621102a715a27567"
+      },
+      {
+        "path": "apps/android/README.md",
+        "bytes": 24718,
+        "sha256": "8b59a46b797a1dfdcc5db5a62bb5e3740b537d160a288315136c80c935901d2b"
+      },
+      {
+        "path": "apps/android/app/build.gradle.kts",
+        "bytes": 4234,
+        "sha256": "77b795314d53e3c3da032c2346cd1bac4d4d91551b35fe3cd0b0e09b45cfe83e"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+        "bytes": 10943,
+        "sha256": "2e65eb3faa370834c5c7d1fe92696966296d995d82e4cbe920a220d747b67869"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+        "bytes": 25243,
+        "sha256": "a44c232b7db2f07907261115b76d80145072abefe57a812679a40021e691faf3"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+        "bytes": 7931,
+        "sha256": "ac8186277ec3f88e0ff848818ef15059a6512ff5f8a7bd24deb1f00dd9259205"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayEndpointPolicyTest.kt",
+        "bytes": 1591,
+        "sha256": "220af4930f360a0a579e0ca817070eebe173bb216f0bd762a02b28bec86c1c35"
+      },
+      {
+        "path": "apps/android-gateway/README.md",
+        "bytes": 3967,
+        "sha256": "10030a919dccd233ad510ec802c494c72acc7f133b951d546bd8f0cbbb6786e5"
+      },
+      {
+        "path": "apps/android-gateway/openapi.json",
+        "bytes": 9617,
+        "sha256": "63c9dad5e789d21c6e5b4f4fbc53dfbc7e3577305beaad73dac576b22d046875"
+      },
+      {
+        "path": "apps/android-gateway/package.json",
+        "bytes": 554,
+        "sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6"
+      },
+      {
+        "path": "apps/android-gateway/package-lock.json",
+        "bytes": 1435,
+        "sha256": "cf595d4b768ec3fb00ccd4223249cfd5b33c25b3940c864878d8dc0f04d075d1"
+      },
+      {
+        "path": "apps/android-gateway/tsconfig.json",
+        "bytes": 485,
+        "sha256": "e68e1b7d1b590e7df86b2e2a6fca396590eff0af747b0e4ba236b8aacdecda68"
+      },
+      {
+        "path": "apps/android-gateway/src/auth.ts",
+        "bytes": 26923,
+        "sha256": "9ca34186455e596920958e15d56c610e68b62474eb78a368a9f38e51418b4011"
+      },
+      {
+        "path": "apps/android-gateway/src/backend.ts",
+        "bytes": 15825,
+        "sha256": "2338834f377890674793f145de3b2e35006c14ff2027ce449014013f93e0f4c6"
+      },
+      {
+        "path": "apps/android-gateway/src/config.ts",
+        "bytes": 1766,
+        "sha256": "a153798c0d168cd6d4a8acd73c5c676168019b92ae8353b9cdd8950e447fd22a"
+      },
+      {
+        "path": "apps/android-gateway/src/node-adapter.ts",
+        "bytes": 5065,
+        "sha256": "51cefe5398e1f229298243ea897d4249dd198dcf52281c9317fe3d68f5f692c3"
+      },
+      {
+        "path": "apps/android-gateway/src/request-body.ts",
+        "bytes": 3551,
+        "sha256": "a99d24c7a4dadaf4a98cd2fe5ab5eab5b3a2c7042d93ff97ff9a9981206e4d73"
+      },
+      {
+        "path": "apps/android-gateway/src/routes.ts",
+        "bytes": 6247,
+        "sha256": "a2b16a9abf25dad7ec8b3f25b15f5d0469f9c86f257d5c9248b611088b5772cf"
+      },
+      {
+        "path": "apps/android-gateway/server.ts",
+        "bytes": 829,
+        "sha256": "b5196586c091b936a2e117416c7ec6aafa10075b8f2b25423f76829f7a101ed5"
+      },
+      {
+        "path": "apps/android-gateway/test/gateway-contract.test.ts",
+        "bytes": 21463,
+        "sha256": "6fe5c93271d3f3589c2b39621c7f9cde9039ca7dff9a9df28200d5a9d8d52498"
+      },
+      {
+        "path": "apps/android-gateway/test/node-adapter.test.ts",
+        "bytes": 5028,
+        "sha256": "970b56328b79cb3a8de895bcbb065c0527f8ea26d6afed3ea9ed47dd9457f56f"
+      },
+      {
+        "path": "apps/web/README.md",
+        "bytes": 4099,
+        "sha256": "939c366d0b4171c76a35975f9ad5a0c2e7e5f1f3bedbaa1c02db1fce2814a2b3"
+      },
+      {
+        "path": "apps/web/legacy-runtime-boundary.ts",
+        "bytes": 153,
+        "sha256": "b3a44aeacf72b201810aeed31cc61961c48b2ca56dc819ce9ee6fdd01c983123"
+      },
+      {
+        "path": "apps/web/package.json",
+        "bytes": 978,
+        "sha256": "323527f9f8c6a97a534b0fae495ac57a91db6d1e1e4b03edc5b18d066fe8c513"
+      },
+      {
+        "path": "apps/web/proxy.ts",
+        "bytes": 403,
+        "sha256": "fb8476308943b4a15e35fb7356d56bcd6d37c2a62278713f8ed8d889717bd16e"
+      },
+      {
+        "path": "apps/web/tsconfig.json",
+        "bytes": 879,
+        "sha256": "863398fd4576e754a2a08a568a2e13da6fedeeeceeaf391032f2d26061b9dbc6"
+      },
+      {
+        "path": "apps/web/tests/api-client-contract-policy.test.ts",
+        "bytes": 31085,
+        "sha256": "0eab44244e0f5cd6efdbda8660af900ae566e79d0d81e14d72ce7ea881810a32"
+      },
+      {
+        "path": "configs/walksafe_product_boundary_20260722.json",
+        "bytes": 11132,
+        "sha256": "126255ccf1411e0d1de07013ed5ab5c0ed02198b838863f43053633df3c70ab6"
+      },
+      {
+        "path": "deploy/README.md",
+        "bytes": 3251,
+        "sha256": "d7d97c2d4f9e3e0699f705e2c84450e4c1dfa322f10c805a11eb6c18e2a5f32b"
+      },
+      {
+        "path": "deploy/config/walksafe-android-gateway.env.example",
+        "bytes": 1767,
+        "sha256": "c1c3446277c2e545ea49ec57a39260366eaf328c2b45da53514d0ab69e89750c"
+      },
+      {
+        "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+        "bytes": 2719,
+        "sha256": "5a816f57a673a65105be32d10c2e900ed32f88d2bb96ce27e9902f4fa6335a5e"
+      },
+      {
+        "path": "deploy/systemd/walksafe-android-gateway.service",
+        "bytes": 2191,
+        "sha256": "b98187c04852f7e1b13aa5bf6e9ec60ab055159c188c3e7e1226a5932ae21b8b"
+      },
+      {
+        "path": "scripts/check_frontend_policy_suite.sh",
+        "bytes": 1002,
+        "sha256": "215965b306aeab3b2eab3c41e6f7f08b0028872b21cf8e531f40e1f90afc3981"
+      },
+      {
+        "path": "scripts/run_walksafe_test_layers_20260711.sh",
+        "bytes": 13679,
+        "sha256": "25cedb72084696968898706034a674291aa09e8dabb7e71cad9fe6b58842909c"
+      },
+      {
+        "path": "tests/test_walksafe_android_product_boundary.py",
+        "bytes": 14101,
+        "sha256": "426e8a9e60d77e40ea4febf917521d8b9365ac49f39683ea432b93aad1b3eb8d"
+      },
+      {
+        "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+        "bytes": 16826,
+        "sha256": "bee4b115e70b1c009aa47e96e67d0d60d3850dfe0e142fe140ac2924371b0591"
+      },
+      {
+        "path": "tests/test_walksafe_android_gateway_boundary_20260723.py",
+        "bytes": 11150,
+        "sha256": "0765fcccad2604b71c41bef4ed25b3f3377654e8afbebb01ecad6836819971b3"
+      },
+      {
+        "path": "scripts/README.md",
+        "bytes": 21820,
+        "sha256": "e6f02c93b9e7fd1e1be5bd5d7a115821de27ed4687b3e8772bb51162fa6f9275"
+      },
+      {
+        "path": "tests/README.md",
+        "bytes": 9483,
+        "sha256": "1a28ee1c7f0642f5c3edaaded335fbe543c958a17e8f8071aa2655db3cd6d9f5"
+      }
+    ],
+    "removed_next_route_paths": [
+      {
+        "path": "apps/web/app/api/field-session/route.ts",
+        "state": "ABSENT_VERIFIED"
+      },
+      {
+        "path": "apps/web/app/api/navigation/walking/route.ts",
+        "state": "ABSENT_VERIFIED"
+      },
+      {
+        "path": "apps/web/app/api/navigation/destinations/search/route.ts",
+        "state": "ABSENT_VERIFIED"
+      },
+      {
+        "path": "apps/web/app/api/reports/v2/route.ts",
+        "state": "ABSENT_VERIFIED"
+      }
+    ],
+    "snapshot_sha256": "04f112cd0bc31a07e4d629d2841be4a01eb2118c0793c8c88f2c44415ca3c30c"
+  },
+  "android_gateway_extraction_contract": {
+    "scope": "INDEPENDENT_ANDROID_API_GATEWAY_REPOSITORY_EXTRACTION",
+    "component": "apps/android-gateway",
+    "runtime": "NODE_22_SINGLE_PROCESS",
+    "official_local_bind": "127.0.0.1:8081",
+    "protected_backend_origin": "http://127.0.0.1:8000",
+    "public_gateway_routes": [
+      "/api/field-session",
+      "/api/navigation/walking",
+      "/api/navigation/destinations/search",
+      "/api/reports/v2"
+    ],
+    "other_gateway_routes": "404_NO_STORE",
+    "legacy_runtime_allowlist": [],
+    "legacy_next_fallback_allowed": false,
+    "removed_next_route_paths": [
+      "apps/web/app/api/field-session/route.ts",
+      "apps/web/app/api/navigation/walking/route.ts",
+      "apps/web/app/api/navigation/destinations/search/route.ts",
+      "apps/web/app/api/reports/v2/route.ts"
+    ],
+    "android": {
+      "debug_default_origin": "http://127.0.0.1:8081",
+      "release_origin_contract": "EXACT_ROOT_HTTPS_SINGLE_ORIGIN"
+    },
+    "ci_state": "INTERNAL_AUTOMATED_REGRESSION_CONFIGURED",
+    "deployment_examples_state": "DRAFT_DEPLOYMENT_EXAMPLE_NOT_APPLIED",
+    "deployment_status": "NOT_RUN",
+    "actual_device_connectivity_status": "NOT_RUN",
+    "formal_test_status": "NOT_RUN",
+    "checker": {
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "sha256": "bee4b115e70b1c009aa47e96e67d0d60d3850dfe0e142fe140ac2924371b0591",
+      "result": "PASS_INTERNAL"
+    },
+    "contract_sha256": "9f94ee0d264ef68fb7edb1c6a79c0fc0e247eac12efedd382d65c33268195be7"
+  },
+  "implemented_controls": [
+    {
+      "control": "INDEPENDENT_NODE_ANDROID_GATEWAY",
+      "result": "정확한 4개 Android API 경로를 담당하는 Node 22 단일 프로세스 Gateway를 Next와 분리했고, 미등록 경로는 404 no-store로 닫는다.",
+      "paths": [
+        "apps/android-gateway/src/config.ts",
+        "apps/android-gateway/src/routes.ts",
+        "apps/android-gateway/src/node-adapter.ts",
+        "apps/android-gateway/server.ts",
+        "apps/android-gateway/openapi.json"
+      ]
+    },
+    {
+      "control": "ANDROID_ENDPOINT_CUTOVER",
+      "result": "Android debug 기본 origin을 127.0.0.1:8081로 전환했고 release는 승인된 정확한 HTTPS root origin 하나만 허용한다.",
+      "paths": [
+        "apps/android/app/build.gradle.kts",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayEndpointPolicyTest.kt",
+        "apps/android/README.md"
+      ]
+    },
+    {
+      "control": "LEGACY_WEB_ZERO_RUNTIME_ALLOWLIST",
+      "result": "Legacy Web runtime 허용목록을 0개로 만들고 과거 Next route 4개를 제거했으며 모든 Legacy runtime 요청을 410으로 닫는다.",
+      "paths": [
+        "apps/web/legacy-runtime-boundary.ts",
+        "apps/web/proxy.ts",
+        "apps/web/tsconfig.json",
+        "apps/web/tests/api-client-contract-policy.test.ts"
+      ]
+    },
+    {
+      "control": "CI_AND_DRAFT_DEPLOYMENT_CONTRACT",
+      "result": "CI에 gateway 회귀를 연결하고 loopback 단일 프로세스·정확한 4경로 TLS ingress 배치 예시를 만들었지만 실제 적용·배포 증거로 주장하지 않는다.",
+      "paths": [
+        ".github/workflows/quality.yml",
+        "deploy/README.md",
+        "deploy/config/walksafe-android-gateway.env.example",
+        "deploy/nginx/walksafe-android-gateway.conf.example",
+        "deploy/systemd/walksafe-android-gateway.service"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "deployment_execution": "NOT_RUN",
+    "actual_device_execution": "NOT_RUN",
+    "historical_external_url_probe_execution": "NOT_RUN",
+    "previously_installed_or_cached_pwa_check": "NOT_RUN",
+    "commands": [
+      {
+        "scope": "독립 Android Gateway typecheck·계약 회귀",
+        "command": "npm --prefix apps/android-gateway run typecheck && npm --prefix apps/android-gateway test",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "Phase E 경계와 변조 방지",
+        "command": "python3 -B scripts/check_walksafe_android_gateway_boundary_20260723.py && python -m pytest tests/test_walksafe_android_gateway_boundary_20260723.py -q",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "Android endpoint JVM 회귀",
+        "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest --tests '*GatewayEndpointPolicyTest'",
+        "status": "PASS_INTERNAL"
+      }
+    ],
+    "interpretation": "저장소 내부 구현·회귀 증거다. 실제 서버 설치, 외부 TLS 주소, 승인 계정, 실제 휴대전화 연결, 279개 정식 시험 또는 출시 증거가 아니다."
+  },
+  "open_issues": [
+    {
+      "id": "EPIC-01-PURPOSE-SURFACES",
+      "status": "OPEN_NEXT",
+      "description": "첫 화면·동의·사용자 안내·출시 설명에 승인된 제품 목적과 안전 한계를 일관되게 표시해야 한다."
+    },
+    {
+      "id": "EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE",
+      "status": "OPEN",
+      "description": "목적지 미설정 상태의 위험 안내 경계와 사용자 흐름을 승인 정책에 맞춰야 한다."
+    },
+    {
+      "id": "PHASE-E-GATEWAY-DEPLOYMENT",
+      "status": "NOT_RUN",
+      "description": "배포 파일은 예시뿐이며 Gateway 설치·서비스 시작·TLS ingress 반영·smoke test를 하지 않았다."
+    },
+    {
+      "id": "PHASE-E-ACTUAL-DEVICE-CONNECTIVITY",
+      "status": "NOT_RUN",
+      "description": "실제 Android 기기에서 외부 HTTPS Gateway와 네 경로 연결을 검증하지 않았다."
+    },
+    {
+      "id": "PHASE-D-HISTORICAL-EXTERNAL-URL-DECOMMISSION",
+      "status": "NOT_RUN",
+      "description": "과거 외부 URL·DNS·Cloudflare 자원의 실제 폐기 또는 접근불가를 확인하지 않았다."
+    },
+    {
+      "id": "PHASE-D-CACHED-PWA-DEACTIVATION",
+      "status": "NOT_RUN",
+      "description": "기존 설치·브라우저 캐시 PWA의 실제 사용자 기기 비활성 여부를 확인하지 않았다."
+    },
+    {
+      "id": "PHASE-E-FORMAL-TESTS",
+      "status": "NOT_RUN",
+      "description": "정식 시험 279개는 모두 미실행이다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "deployment_status": "NOT_RUN",
+    "actual_device_test_status": "NOT_RUN",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-01",
+    "work_item_id": "EPIC-01-PURPOSE-SURFACES",
+    "status": "PLANNED_NEXT_WITHIN_IN_PROGRESS_EPIC",
+    "action": "Android 첫 화면·동의·사용설명·릴리스 설명의 목적문과 안전 한계를 승인 정책에 맞게 구현·정합화한다."
+  },
+  "record_content_sha256": "ae9e65a2ab75f6de267a3406c32eb91d5c8e81fdc251f7a96d8d5be3b0009257"
+}

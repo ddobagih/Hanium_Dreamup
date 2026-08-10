@@ -1,0 +1,129 @@
+{
+  "schema_version": "walksafe.schedule.v1",
+  "metadata": {
+    "title": "WalkSafe 마일스톤 계획",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-07"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "date_policy": "사용자가 확정한 2026-07-26 최종 시연과 실제 승인일만 날짜로 기록한다. 나머지는 선행조건과 완료 조건(exit condition)으로 통제하고 근거가 생기면 김민호가 날짜를 승인한다.",
+  "schedule_owner": {
+    "role": "프로젝트관리자",
+    "person": "김민호"
+  },
+  "critical_path": [
+    "MS-01",
+    "MS-02",
+    "MS-03",
+    "MS-04",
+    "MS-05",
+    "MS-07"
+  ],
+  "buffer_policy": "1인 프로젝트이므로 고정 여유시간을 꾸미지 않는다. 안전·외부검토 작업은 시연 범위에서 분리하고 지연 시 출시 차단을 유지한다.",
+  "milestones": [
+    {
+      "milestone_id": "MS-01",
+      "name": "정책 기준선 확정",
+      "depends_on": [],
+      "status": "COMPLETE",
+      "exit_condition": "승인 receipt·manifest 무결성 통과",
+      "target_date": "2026-07-21",
+      "actual_date": "2026-07-21",
+      "date_basis": "승인 기록"
+    },
+    {
+      "milestone_id": "MS-02",
+      "name": "0~6 Draft 작성·정합성 검토",
+      "depends_on": [
+        "MS-01"
+      ],
+      "status": "IN_PROGRESS",
+      "exit_condition": "0~6 범위 128개 유형 모두 정본 경로·장 위치와 실질 내용 보유",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "Goal 수행 결과로 갱신"
+    },
+    {
+      "milestone_id": "MS-DEMO",
+      "name": "한이음 드림업 최종 통합 시연",
+      "depends_on": [
+        "MS-02"
+      ],
+      "status": "PLANNED",
+      "exit_condition": "통제환경에서 대표 위험안내·길안내·신고 흐름과 제한사항 시연",
+      "target_date": "2026-07-26",
+      "actual_date": null,
+      "date_basis": "사용자 확정일; 출시 승인이 아님"
+    },
+    {
+      "milestone_id": "MS-03",
+      "name": "CB/RB/DB 사람 검토·승인",
+      "depends_on": [
+        "MS-02"
+      ],
+      "status": "PLANNED",
+      "exit_condition": "관리·요구·설계의 사람 승인과 manifest",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "문서 완성도와 검토자 가용성에 따라 결정"
+    },
+    {
+      "milestone_id": "MS-04",
+      "name": "구현 정렬 build",
+      "depends_on": [
+        "MS-03"
+      ],
+      "status": "PLANNED",
+      "exit_condition": "요구·설계와 build 형상 연결",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "구현 Gap 분석 뒤 결정"
+    },
+    {
+      "milestone_id": "MS-05",
+      "name": "정식 시험 실행",
+      "depends_on": [
+        "MS-04"
+      ],
+      "status": "PLANNED",
+      "exit_condition": "필수 case·결함·STR·잔여위험 snapshot",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "시험계획 승인 뒤 결정"
+    },
+    {
+      "milestone_id": "MS-06",
+      "name": "gate·교차 입력 종결",
+      "depends_on": [
+        "MS-04"
+      ],
+      "status": "PLANNED",
+      "exit_condition": "5 gate와 SEC/REL/WS 선행조건 완료",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "외부 검토·실측 가용성에 따라 결정"
+    },
+    {
+      "milestone_id": "MS-07",
+      "name": "출시 준비도·인수",
+      "depends_on": [
+        "MS-05",
+        "MS-06"
+      ],
+      "status": "BLOCKED",
+      "exit_condition": "TST-22 Go와 TST-23 서명",
+      "target_date": null,
+      "actual_date": null,
+      "date_basis": "모든 차단조건 종결 뒤에만 지정"
+    }
+  ]
+}

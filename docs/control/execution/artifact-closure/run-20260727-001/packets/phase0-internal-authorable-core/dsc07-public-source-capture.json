@@ -1,0 +1,104 @@
+{
+  "schema_version": "walksafe.dsc07-public-source-capture.v1",
+  "receipt_id": "WS-DSC07-PUBLIC-SOURCE-CAPTURE-20260727-001",
+  "captured_on": "2026-07-27",
+  "purpose": "DLV-DSC-07의 제한된 공개 문서 비교를 exact HTTP response fingerprint와 결속한다.",
+  "comparison_review_status": "COMPLETED_WITH_LIMITATIONS",
+  "capture_method": {
+    "tool": "curl",
+    "request_count_per_requested_url": 1,
+    "redirect_policy": "FOLLOW_UP_TO_5",
+    "timeout_seconds": 40,
+    "user_agent": "WalkSafe evidence capture/20260727 (+controlled documentation review)",
+    "content_fingerprint_algorithm": "SHA-256",
+    "raw_response_body_repository_retention": "NOT_RETAINED",
+    "long_quote_retention": "PROHIBITED"
+  },
+  "comparison_criteria": [
+    "target_and_platform",
+    "function_and_accessibility",
+    "stated_safety_or_accuracy_limit",
+    "bounded_walksafe_application"
+  ],
+  "sources": [
+    {
+      "source_id": "DSC07-PUBLIC-LOOKOUT",
+      "accessed_at": "2026-07-27T19:19:23+09:00",
+      "requested_url": "https://support.google.com/accessibility/android/answer/9031274?hl=en-GB",
+      "final_url": "https://support.google.com/accessibility/android/answer/9031274?hl=en-GB",
+      "http_status": 200,
+      "media_type": "text/html; charset=UTF-8",
+      "byte_length": 1394261,
+      "sha256_content_fingerprint": "0ca5cc0da52b1c918d1733d08448312684e47942e4ce0a09593a4efee57a3c7e",
+      "title": "Use Lookout to explore your surroundings - Android accessibility Help",
+      "controlled_comparison_facts": [
+        {
+          "criterion": "target_and_platform",
+          "fact": "Android에서 시각장애인과 저시력 사용자를 대상으로 카메라·센서 기반 주변 정보 제공을 설명한다."
+        },
+        {
+          "criterion": "function_and_accessibility",
+          "fact": "객체·텍스트 인식 기능과 TalkBack 사용자의 모드 선택 방법을 설명한다."
+        },
+        {
+          "criterion": "stated_safety_or_accuracy_limit",
+          "fact": "Explore 모드는 beta이고 다른 모드보다 정확도가 낮으며 조명·흐림·해상도·가림이 결과에 영향을 줄 수 있다고 설명한다."
+        }
+      ],
+      "capture_limitations": [
+        "단일 시각의 HTML 응답 fingerprint이며 미래 페이지 내용이나 제공자 변경을 보증하지 않는다.",
+        "응답 본문 전체는 저장소에 보존하지 않아 fingerprint만으로 원문을 복원할 수 없다.",
+        "앱 설치·기능 실행·가격·이용약관·개인정보 약관·라이선스 검토는 수행하지 않았다."
+      ]
+    },
+    {
+      "source_id": "DSC07-PUBLIC-ACCESSIBILITY-SCANNER",
+      "accessed_at": "2026-07-27T19:19:23+09:00",
+      "requested_url": "https://support.google.com/accessibility/android/answer/6376559?hl=en",
+      "final_url": "https://support.google.com/accessibility/android/answer/6376559?hl=en",
+      "http_status": 200,
+      "media_type": "text/html; charset=UTF-8",
+      "byte_length": 1384040,
+      "sha256_content_fingerprint": "2a8db5150471b26772f6298192cac557ff40f88de35893b7ac835ccd4cc4e6c2",
+      "title": "Accessibility Scanner results - Android Accessibility Help",
+      "controlled_comparison_facts": [
+        {
+          "criterion": "target_and_platform",
+          "fact": "Android 사용자 인터페이스의 접근성 검사 결과와 개선 항목을 설명하는 도움말이다."
+        },
+        {
+          "criterion": "function_and_accessibility",
+          "fact": "content label, text scaling, touch target, color contrast 검사를 다루고 content label이 TalkBack 같은 화면읽기 서비스에 사용됨을 설명한다."
+        },
+        {
+          "criterion": "stated_safety_or_accuracy_limit",
+          "fact": "정적 UI 점검 기준을 제공하지만 실제 WalkSafe 실행이나 대상 사용자 시험 결과는 제공하지 않는다."
+        }
+      ],
+      "capture_limitations": [
+        "단일 시각의 HTML 응답 fingerprint이며 미래 페이지 내용이나 제공자 변경을 보증하지 않는다.",
+        "응답 본문 전체는 저장소에 보존하지 않아 fingerprint만으로 원문을 복원할 수 없다.",
+        "도구 설치·WalkSafe 후보 실행·가격·이용약관·개인정보 약관·라이선스 검토는 수행하지 않았다."
+      ]
+    }
+  ],
+  "comparison_summary": [
+    {
+      "criterion": "candidate_role",
+      "google_lookout": "카메라·센서 기반 주변 인식 제품 참고",
+      "accessibility_scanner": "Android UI 접근성 점검 기준 참고",
+      "walksafe_application": "제품 기능 참고와 검증 도구 참고를 구분한다."
+    },
+    {
+      "criterion": "bounded_application",
+      "google_lookout": "beta·영상조건 한계를 근거로 인식 결과의 불확실성 안내와 안전한 재확인을 설계 후보로 유지한다.",
+      "accessibility_scanner": "label·scaling·touch target·contrast를 자동 점검 후보로 사용하되 TalkBack·대상 사용자 시험을 대체하지 않는다.",
+      "walksafe_application": "상표·문구·화면·모델·데이터·asset을 복제하지 않고 내부 요구와 시험 후보만 갱신한다."
+    }
+  ],
+  "global_capture_limitations": [
+    "비교는 두 URL의 단일 HTTP capture와 명시된 네 기준에만 한정한다.",
+    "독립 재조회, 앱 설치, 현장 비교, 성능 측정, 사용자 조사, 가격·약관·개인정보·라이선스 검토는 포함하지 않는다.",
+    "경쟁 우위, 안전성, 정확도, 오프라인 동작, 법률 적합성을 입증하지 않는다."
+  ]
+}

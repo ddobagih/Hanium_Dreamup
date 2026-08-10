@@ -1,0 +1,234 @@
+{
+  "acceptance_contract_binding": {
+    "artifact_form_counts": {
+      "CANONICAL_DOCUMENT": 120,
+      "CONTROLLED_ARTIFACT": 14,
+      "EXTERNAL_RECORD": 9,
+      "GENERATED_EVIDENCE": 42,
+      "REGISTER": 42,
+      "SECTION": 30
+    },
+    "artifact_kind_counts": {
+      "CURRENT_STATE_REGISTER": 42,
+      "EXTERNAL_EVENT_RECORD": 9,
+      "HYBRID_PLAN_AND_EXECUTION_EVIDENCE": 28,
+      "IMPLEMENTATION_EVIDENCE": 14,
+      "PLAN_DEFINITION": 122,
+      "TEST_OR_TOOL_RESULT": 42
+    },
+    "ledger_path": "docs/control/execution/artifact-closure/run-20260727-001/artifact-ledger.json",
+    "non_null_contract_row_count": 257,
+    "required_row_fields": [
+      "artifact_form",
+      "artifact_kind",
+      "subject_of_truth",
+      "completion_mode",
+      "acceptance_contract"
+    ],
+    "review_status": "REMEDIATION_IN_REVIEW",
+    "unsupported_completion_claim_count": 0
+  },
+  "authorization_boundary": {
+    "add_only_successor": true,
+    "execution_completion_claimed": false,
+    "final_n_a_approval_claimed": false,
+    "immutable_snapshot_modified": false,
+    "independent_review_status": "RE_REVIEW_REQUIRED",
+    "phase0_complete": false,
+    "provisional_routing_only": true,
+    "public_beta_or_production_release_approved": false,
+    "release_eligible_claimed": false,
+    "unsupported_completion_claim_count": 0
+  },
+  "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+  "external49": {
+    "count": 49,
+    "meaning": "SOURCE_EXTERNAL_STATUS_REASSESSED_FOR_HANIUM_SCOPE_ONLY",
+    "routes": [
+      {
+        "artifact_type_codes": [
+          "DLV-DES-21",
+          "DLV-DSC-05",
+          "DLV-DSC-06",
+          "DLV-DSC-07",
+          "DLV-DSC-11",
+          "DLV-MGT-03",
+          "DLV-MGT-08",
+          "DLV-REQ-12",
+          "DLV-REQ-13",
+          "DLV-REQ-15",
+          "DLV-SEC-04",
+          "DLV-SEC-05",
+          "DLV-SEC-06",
+          "DLV-SEC-17"
+        ],
+        "count": 14,
+        "final_status_claimed": false,
+        "route": "INTERNAL_AUTHORABLE"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-OPS-17",
+          "DLV-OPS-19",
+          "DLV-OPS-23",
+          "DLV-TST-22"
+        ],
+        "count": 4,
+        "final_status_claimed": false,
+        "route": "CURRENT_STATE_ATTESTABLE"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-CLS-02",
+          "DLV-CLS-04",
+          "DLV-CLS-08",
+          "DLV-CLS-10",
+          "DLV-CLS-11",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-OPS-06",
+          "DLV-OPS-11",
+          "DLV-OPS-13",
+          "DLV-OPS-22",
+          "DLV-REL-13",
+          "DLV-REL-20",
+          "DLV-REL-21",
+          "DLV-TST-23",
+          "DLV-WS-21"
+        ],
+        "count": 17,
+        "final_status_claimed": false,
+        "route": "APPROVED_NA_CANDIDATE"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-AIML-01",
+          "DLV-AIML-02",
+          "DLV-AIML-03"
+        ],
+        "count": 3,
+        "final_status_claimed": false,
+        "route": "USER_FACT_NEEDED"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-AIML-22",
+          "DLV-DSC-09",
+          "DLV-WS-06",
+          "DLV-WS-07",
+          "DLV-WS-09",
+          "DLV-WS-12",
+          "DLV-WS-13",
+          "DLV-WS-14",
+          "DLV-WS-15",
+          "DLV-WS-17",
+          "DLV-WS-20"
+        ],
+        "count": 11,
+        "final_status_claimed": false,
+        "route": "REAL_RUN_NEEDED"
+      }
+    ],
+    "source_status": "EXTERNAL"
+  },
+  "n_a36": {
+    "approval_status": "NOT_APPROVED",
+    "count": 36,
+    "meaning": "SOURCE_N_A_CANDIDATE_PROVISIONALLY_ROUTED_NOT_PROMOTED",
+    "routes": [
+      {
+        "artifact_type_codes": [
+          "DLV-AIML-26",
+          "DLV-DSC-04",
+          "DLV-OPS-18",
+          "DLV-REL-14",
+          "DLV-SEC-14",
+          "DLV-WS-16"
+        ],
+        "count": 6,
+        "final_n_a_claimed": false,
+        "route": "N_A_SUPPORTED"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-CLS-01",
+          "DLV-CLS-03",
+          "DLV-CLS-05",
+          "DLV-CLS-06",
+          "DLV-CLS-12"
+        ],
+        "count": 5,
+        "final_n_a_claimed": false,
+        "route": "INTERNAL_REQUIRED"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-CLS-13",
+          "DLV-SEC-13",
+          "DLV-TST-13"
+        ],
+        "count": 3,
+        "final_n_a_claimed": false,
+        "route": "EXTERNAL_FACT_NEEDED"
+      },
+      {
+        "artifact_type_codes": [
+          "DLV-AIML-18",
+          "DLV-AIML-19",
+          "DLV-AIML-20",
+          "DLV-AIML-25",
+          "DLV-DEV-10",
+          "DLV-DEV-11",
+          "DLV-DEV-13",
+          "DLV-DEV-15",
+          "DLV-OPS-07",
+          "DLV-REL-03",
+          "DLV-REL-04",
+          "DLV-REL-05",
+          "DLV-REL-06",
+          "DLV-REL-07",
+          "DLV-REL-08",
+          "DLV-REL-09",
+          "DLV-SEC-18",
+          "DLV-TST-10",
+          "DLV-TST-12",
+          "DLV-TST-15",
+          "DLV-TST-16",
+          "DLV-TST-17"
+        ],
+        "count": 22,
+        "final_n_a_claimed": false,
+        "route": "SCOPE_CONFLICT"
+      }
+    ],
+    "source_status": "N_A_CANDIDATE"
+  },
+  "policy_questions": {
+    "resolved_count": 0,
+    "unresolved_count": 0
+  },
+  "prepared_on": "2026-07-27",
+  "release_gates": {
+    "count": 5,
+    "scope_effect": "DO_NOT_BLOCK_HANIUM_SUBMISSION_CONTENT; REMAIN_REQUIRED_FOR_APPLICABLE_LATER_RELEASE_SCOPE",
+    "status": "NOT_RUN",
+    "waived_count": 0
+  },
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.artifact-closure.phase0-reclassification.v2",
+  "scope_id": "HANIUM_SUBMISSION_AND_DEMO",
+  "serialization_contract": {
+    "encoding": "UTF-8",
+    "final_lf": true,
+    "json_key_order": "LEXICOGRAPHIC_SORT_KEYS",
+    "line_ending": "LF"
+  },
+  "source_snapshot": {
+    "byte_length": 1097484,
+    "path": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+    "raw_sha256": "481339c99f26055f6bbb008a3f4831c029013d2275e0e4a61cab4f7d30444947",
+    "record_count": 257,
+    "snapshot_id": "WS-FINAL-257-SUCCESSOR-20260727-001"
+  }
+}

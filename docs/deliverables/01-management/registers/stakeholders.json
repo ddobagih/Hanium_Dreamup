@@ -1,0 +1,120 @@
+{
+  "schema_version": "walksafe.stakeholder-register.v1",
+  "metadata": {
+    "title": "WalkSafe 이해관계자 목록",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-09"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "stakeholders": [
+    {
+      "stakeholder_id": "STK-01",
+      "group": "시각장애 사용자",
+      "influence": "HIGH",
+      "interest_or_role": "핵심 사용자·사용성/안전 의견",
+      "engagement": "조사·시험 때 동의·안전계획 아래 참여",
+      "current_gap": "시험 전 동의·안전보호 필요",
+      "assigned_person": null,
+      "authority": null,
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-02",
+      "group": "프로젝트·제품책임자",
+      "influence": "HIGH",
+      "interest_or_role": "정책·범위·변경·출시 최종 결정",
+      "engagement": "매 작업일 문서·위험·결정 확인",
+      "current_gap": "정식 산출물별 승인 기록 필요",
+      "assigned_person": "김민호",
+      "authority": "최종 결정",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-03",
+      "group": "개발·기술책임자",
+      "influence": "HIGH",
+      "interest_or_role": "Android·서버·모델·통합 구현",
+      "engagement": "요구·설계·build 변경 때 참여",
+      "current_gap": "1인 역할 겸임을 기록",
+      "assigned_person": "김민호",
+      "authority": "내부 기술 실행",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-04",
+      "group": "QA·접근성·안전 검토자",
+      "influence": "HIGH",
+      "interest_or_role": "시험 설계·독립 검토",
+      "engagement": "계획 검토와 증거 생성 때 참여",
+      "current_gap": "독립 역할 미배정",
+      "assigned_person": null,
+      "authority": "시험 중단 권고",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-05",
+      "group": "보안·개인정보 검토자",
+      "influence": "HIGH",
+      "interest_or_role": "원본수집·인증·삭제·사고 검토",
+      "engagement": "고위험 설계·출시 전 참여",
+      "current_gap": "독립 출시 검토 미실행",
+      "assigned_person": null,
+      "authority": "출시 차단 의견",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-06",
+      "group": "서비스 관리자",
+      "influence": "HIGH",
+      "interest_or_role": "신고·상태·백업·복구·비용 운영",
+      "engagement": "평일 09:00~18:00 대응",
+      "current_gap": "단일 관리자 복구훈련 미실행",
+      "assigned_person": "김민호",
+      "authority": "운영 중지·복구",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-07",
+      "group": "한이음 멘토·평가/인수 주체",
+      "influence": "MEDIUM",
+      "interest_or_role": "프로젝트 지도·산출물 검토·외부 인수",
+      "engagement": "마일스톤·시연·인수 때 참여",
+      "current_gap": "역할·서명 범위 확인 필요",
+      "assigned_person": null,
+      "authority": "외부 검토·인수",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-08",
+      "group": "TMAP·Google Cloud 제공자",
+      "influence": "MEDIUM",
+      "interest_or_role": "경로·서울리전 저장·외부 서비스",
+      "engagement": "연동·쿼터·장애·비용 검토 때 참여",
+      "current_gap": "실제 계약·쿼터·비용 확인 필요",
+      "assigned_person": null,
+      "authority": "서비스 계약 범위",
+      "delegate": null
+    },
+    {
+      "stakeholder_id": "STK-09",
+      "group": "공공기관 신고 접수자",
+      "influence": "MEDIUM",
+      "interest_or_role": "승인된 손상 점자블록 신고 수령",
+      "engagement": "기관 전달 절차를 합의할 때 참여",
+      "current_gap": "기관별 채널·접수 증거 확인 필요",
+      "assigned_person": null,
+      "authority": "수신·처리 범위",
+      "delegate": null
+    }
+  ],
+  "review_rule": "담당자·권한·참여 방식이 바뀌면 즉시 갱신하고 매주 미배정 독립 역할을 확인한다."
+}

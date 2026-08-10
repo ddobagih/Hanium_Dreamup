@@ -1,0 +1,87 @@
+WALKSAFE_RUN_ID=WS-FP015-FULL-ANDROID-20260726-007
+WALKSAFE_COMMAND_SHA256=ce4944072e18a636f30d8f8a9366a0a0aff3db5e06ec019a18261a4ec31a5c4b
+WALKSAFE_RESOURCE_LIMIT_MEMORY_MAX=4000M
+WALKSAFE_COMMAND_STARTED_AT=2026-07-26T02:06:23+09:00
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:generateDebugRFile
+
+> Task :app:compileDebugKotlin
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:10849:24 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:11037:59 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+
+> Task :app:javaPreCompileDebug
+> Task :app:compileDebugJavaWithJavac
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeDebugJavaResource
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+> Task :app:stripDebugDebugSymbols
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:extractProguardFiles
+> Task :app:generateDebugLintReportModel
+> Task :app:generateDebugUnitTestLintModel
+> Task :app:lintAnalyzeDebug
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebugUnitTest
+
+> Task :app:lintReportDebug
+Wrote HTML report to file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/build/reports/lint-results-debug.html
+
+> Task :app:lintDebug
+
+BUILD SUCCESSFUL in 54s
+53 actionable tasks: 53 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+WALKSAFE_JUNIT_XML_FILES=91
+WALKSAFE_JUNIT_TESTS=665
+WALKSAFE_JUNIT_FAILURES=0
+WALKSAFE_JUNIT_ERRORS=0
+WALKSAFE_JUNIT_SKIPPED=0
+WALKSAFE_JUNIT_XML_CONTENT_SET_SHA256=d084935121446f4bd3ed7c7d25da8d92d70a65b9c9fb6a22f95f0da66bec951f
+WALKSAFE_JUNIT_SUMMARIZER_SHA256=fc2345475f0025d3064492b8715341fedf1a36b2fd52d2fb3d00c85e1707cbde
+WALKSAFE_COMMAND_ENDED_AT=2026-07-26T02:07:17+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0

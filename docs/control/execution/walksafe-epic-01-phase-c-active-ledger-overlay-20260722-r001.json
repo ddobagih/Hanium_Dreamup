@@ -1,0 +1,254 @@
+{
+  "schema_version": "walksafe.active-ledger-event-overlay.v1",
+  "metadata": {
+    "overlay_id": "WS-EPIC-01-PHASE-C-ACTIVE-LEDGER-OVERLAY-20260722-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-22",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-01 Phase C 최소 Active 원장 successor overlay"
+  },
+  "authority_boundary": {
+    "approved_opening_snapshots_preserved": true,
+    "phase_b_overlay_preserved": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_r001_r002_modified": false,
+    "creates_new_artifact_type": false,
+    "changes_lifecycle_or_approval_state": false,
+    "formal_test_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": [
+    {
+      "name": "artifact_register_opening_successor_source",
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "bytes": 3499550,
+      "sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "artifact_change_log_opening_successor_source",
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "bytes": 96734,
+      "sha256": "c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "phase_b_active_overlay_predecessor",
+      "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.json",
+      "bytes": 11779,
+      "sha256": "f38c93b3d194b12c5c348db25147ec7b96d40216df98ab197572151eb1b3ab2a",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "phase_c_record",
+      "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.json",
+      "content_sha256": "c469228bfb0662c5eccfc3a9aa835ff05d28a69a94d8b32e886de3a2c65d6906",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    },
+    {
+      "name": "gap_r003",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r003.json",
+      "content_sha256": "ad64e2a4214e680c21326dfa7e3410e53414b61c20c8d1fdabc4e79b0a6f73e9",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    },
+    {
+      "name": "backlog_r003",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r003.json",
+      "content_sha256": "0fd2557c4830cfd7d8fc2fc0e1e3f47af10b50b0a450a213bd239006b583004b",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    }
+  ],
+  "application_rule": {
+    "effective_for_phase_c_trace": true,
+    "canonical_merge_required_for_next_doc01_snapshot": true,
+    "merge_method": "다음 범용 Active writer가 이 overlay와 Phase B predecessor 지문을 검증한 뒤 DOC-01·DOC-05 및 관련 Active 원장의 새 revision에 한 번 반영한다.",
+    "duplicate_application_forbidden": true,
+    "failure_behavior": "binding이나 predecessor snapshot이 다르면 병합하지 않고 새 overlay revision을 만든다."
+  },
+  "events": [
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-001",
+      "artifact_code": "DOC-01",
+      "artifact_instance_id": "ART-DOC-01-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-01-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-register.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Phase C 구현기록·r003·backlog r003·overlay의 8개 새 경로와 지문을 다음 정식 Active writer에서 등록한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-002",
+      "artifact_code": "DOC-05",
+      "artifact_instance_id": "ART-DOC-05-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-05-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-change-log.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "승인 정책과 r001/r002를 바꾸지 않고 EPIC-01 Phase C 내부 구현 및 GAP-018 집중 재평가 사건을 추가한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-003",
+      "artifact_code": "DSC-14",
+      "artifact_instance_id": "ART-DSC-14-001",
+      "predecessor_opening_snapshot_id": "ART-DSC-14-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/02-discovery/product-registers.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "EPIC-01을 IN_PROGRESS로 유지하고 Phase C 내부 작업 완료 뒤 Legacy Web 기술 폐쇄를 다음 한 가지 행동으로 연결한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-004",
+      "artifact_code": "REQ-16",
+      "artifact_instance_id": "ART-REQ-16-001",
+      "predecessor_opening_snapshot_id": "ART-REQ-16-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/03-requirements/requirements-traceability.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "RQ-FP-009-001을 Phase C 구현기록, GAP-018 PARTIAL, 운영 프로필 0개와 실기기·정식시험 NOT_RUN 경계에 역추적한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-005",
+      "artifact_code": "DES-06",
+      "artifact_instance_id": "ART-DES-06-001",
+      "predecessor_opening_snapshot_id": "ART-DES-06-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/04-design/software-architecture.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "안정적인 실제 미터 프레임, 정확한 승인 프로필·버전, 사전검사 격리와 runtime 재검사를 실패 닫힘 설계 증거에 연결한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-006",
+      "artifact_code": "DEV-15",
+      "artifact_instance_id": "ART-DEV-15-001",
+      "predecessor_opening_snapshot_id": "ART-DEV-15-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Phase C Android 코어·MainActivity 내부 JVM 검증과 실제 기기·정식시험이 아니라는 한계를 기록한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-007",
+      "artifact_code": "SEC-03",
+      "artifact_instance_id": "ART-SEC-03-001",
+      "predecessor_opening_snapshot_id": "ART-SEC-03-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "운영 승인 프로필 목록을 0개로 유지하고 근거 없는 프로필 등록과 FULL 판정을 OPEN 위험으로 관리한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-008",
+      "artifact_code": "TST-19",
+      "artifact_instance_id": "ART-TST-19-001",
+      "predecessor_opening_snapshot_id": "ART-TST-19-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "내부 JVM 검사는 비정식 지표로만 기록하고 정식 279개 시험 PASS 수는 0으로 유지한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEC-ACTIVE-009",
+      "artifact_code": "TST-21",
+      "artifact_instance_id": "ART-TST-21-001",
+      "predecessor_opening_snapshot_id": "ART-TST-21-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "운영 승인 프로필 0개, 실제 기기 NOT_RUN, 5개 gate NOT_RUN·미면제와 Legacy Web 미폐쇄를 잔여위험으로 유지한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003"
+      ]
+    }
+  ],
+  "draft_observations": [
+    {
+      "artifact_code": "DEV-18",
+      "lifecycle_status": "DRAFT",
+      "state_change": false,
+      "observation": "Phase C runtime metric·승인 프로필 모듈은 차기 module-register generator revision에 추가해야 한다. 이번 overlay는 DEV-18을 Active 또는 승인 상태로 올리지 않는다."
+    }
+  ],
+  "open_evidence_boundaries": {
+    "approved_production_profile_ids": [],
+    "approved_production_profile_count": 0,
+    "actual_device_test_status": "NOT_RUN",
+    "formal_test_status": "NOT_RUN"
+  },
+  "formal_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "remaining_gate_ids": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "overlay_content_sha256": "6891e4990e58772e32d9db974dcb754fa7e94136c7a44b043a6bcfae8a0d64f4"
+}

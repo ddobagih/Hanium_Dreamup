@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "INTERNAL_REVIEW_ATTESTATION",
+  "goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+  "reviewer_id": "WS-FP047-INDEPENDENT-REVIEWER-001",
+  "reviewer_task": "/root/fp047_final_evidence_review",
+  "decision": "APPROVED",
+  "reviewed_at": "2026-07-26T19:22:40+09:00",
+  "review_subject_sha256": "fbf1466bedcb54ad2ab1675924584f4bc2d25ca85c89f74ef0ac566268e92d04",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "2762f94a7a27fc0186b9328d8eb38825589322bc66bffcc3f425d6e7b1f0dc4a",
+    "VERIFICATION_RESULT": "ca2c55dd73370c82f5e2919e77ad3476989d71aa56777f9f6459fed3348b40d5",
+    "SUCCESSOR_TRACE": "19330cc36cd4d0f6790d58092bf31f1c77ea004c0da8fb7f472392d7e344b50b"
+  },
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "Corrected the implementation scope claim to product-twenty-six plus tooling-five as one exact-thirty-one content set and regenerated all bound evidence.",
+      "Clarified that the high-risk middleware consumes each nonce in its own committed transaction before the endpoint separately revalidates protected-work state.",
+      "Declared the required X-WalkSafe-Reconfirm-Nonce header on exactly the two HIGH OpenAPI operations.",
+      "Hardened FP-047 completion matching for the actual on-disk exact-thirty-one hashes, exact result and manifest contracts, review provenance, canonical boundaries, execution time ordering and resealed tampering."
+    ],
+    "known_nonblocking_boundaries": [
+      "TC-FP-047-01 through TC-FP-047-07 remain NOT_RUN.",
+      "External PostGIS, reports and PostgreSQL concurrency verification remain NOT_RUN.",
+      "Actual user, administrator and device scenarios and the single-administrator recovery drill remain NOT_RUN.",
+      "External security, legal, privacy and accessibility reviews remain NOT_RUN.",
+      "Production deployment and five unwaived release gates remain NOT_RUN; release remains NOT_ELIGIBLE.",
+      "This is a separate internal review and does not claim external independence."
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "external_postgis_integration_remains_not_run": true,
+    "external_reports_integration_remains_not_run": true,
+    "postgresql_concurrency_verification_remains_not_run": true,
+    "actual_user_tests_remain_not_run": true,
+    "actual_admin_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "single_admin_recovery_drill_remains_not_run": true,
+    "external_security_review_remains_not_run": true,
+    "external_legal_review_remains_not_run": true,
+    "external_privacy_review_remains_not_run": true,
+    "external_accessibility_review_remains_not_run": true,
+    "production_deployment_remains_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

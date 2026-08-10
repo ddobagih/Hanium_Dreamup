@@ -1,0 +1,818 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-IMPLEMENTATION-20260802-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-08-03T01:33:35.801447+09:00",
+  "scope_kind": "EXACT_ORDERED_FP048_IMPLEMENTATION_PATH_SET",
+  "exact_path_count": 106,
+  "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinator.kt",
+      "before_sha256": null,
+      "after_sha256": "957725fe47266ebd8ab763031dd0b2c49b6edc973f0f8ad6bca3e9eedc0e6bfa",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/LocalAead.kt",
+      "before_sha256": null,
+      "after_sha256": "6d83d5d254297bda1c42f0ec2da8d84b78c0aa89f7c41d71eb6a00cb94d725e8",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAead.kt",
+      "before_sha256": null,
+      "after_sha256": "e6748d1f6b1dcb322a040bc951ed669f57b83ddd72c43dd838e9176cfc1e544b",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStore.kt",
+      "before_sha256": null,
+      "after_sha256": "82f2c393fee3223e0215a4399d1fe23d1ac8ea6c05a22668e5f1a530e992027f",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "before_sha256": "01c47e47c8729d095e0deeb2abea5a896807bf443b2400b8860dfe95faf47d4b",
+      "after_sha256": "426c5603c64244deccca3381d9147f5e27c1f6c4ca0d88724c3ec78b37d6a019",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+      "before_sha256": "6327b1a28a595b0c7d35a75493f77a59edb6a25d1374d5d5d277b33374ad8de0",
+      "after_sha256": "17d77bd637d410bf4727262834fb83a5ca3222f2f23f70b12c2477bebd60074d",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/README.md",
+      "before_sha256": "1ead6c692afd62ebd9f929edfb9ffc81bbd662b1878059831261de8f24cb833c",
+      "after_sha256": "800df7b37db79aca262683f0ac00cb32ccc0b6473086b0c9e8e6fb9741e78518",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+      "before_sha256": "746907805a196b3d73dcd4299db2706350953c691e6b23f42e8afee8859dfb07",
+      "after_sha256": "9f892970fec6b7d8b98b6958df6d2b3bae6aa1b172adf4d3e44ebeed5ab8d1e3",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "before_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+      "after_sha256": "f565b7b7c394726361b349ab3a20fa8517c62fdc525ce47a89b226fbfcd5d668",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "before_sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52",
+      "after_sha256": "de5fe5fcfbd2ae70a7d04c7ffae5a1cf9cae1caca5b5d105c502ed6e55e57f09",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/debug/AndroidManifest.xml",
+      "before_sha256": "50d3952ade7ead0dbe802c48634e63b533705c10026cddb718c07f99948df697",
+      "after_sha256": "6f3900fada5fb4ddf8d47a41aca4a1257d8998689a64c4f6929a4e5a3f5fb822",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/res/xml/data_extraction_rules.xml",
+      "before_sha256": "9ccf53e8c648736adbf95a27d70ace297c7e3b56d6e48e878194f98c51b36b21",
+      "after_sha256": "cb029b35db0e976c087100424e16e14a6256b46962398887520e51508c3b5842",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/debug/res/xml/debug_network_security_config.xml",
+      "before_sha256": null,
+      "after_sha256": "9187f485f22fde712aea8de5243664710440a9ee08e9f1b172978eef96a15001",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/LocalAeadTest.kt",
+      "before_sha256": null,
+      "after_sha256": "5407fd21122f626c579315c6613f42c1b9821b07249aafb5f8047690178ed006",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "03c0e5575f0dfed94f540afa41ce090ceb2fa49b42e02dc15cd58e5199438a27",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt",
+      "before_sha256": null,
+      "after_sha256": "cd45c9ff28b64701d0035d6688ddcd5b8b5d47c802f0f222fad63ef7d1d6af10",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "before_sha256": "f3db37cb2e7dcf99dc15a3050def7d18b591615bbe774cc25ef00c3769be10f3",
+      "after_sha256": "bc0b7c7c9721bef66a9bc49bd7baf1aad4de02788c444ffe0c6ef9c6d8592aa7",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/UserNetworkSecurityBoundaryStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "7719d187b999eb52b48402465669f11a256108bdbbaa473914bdf31583a7810a",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+      "before_sha256": "17dce1211a62d8853b56829112738ed9615a9dd7f0d953363a5c01ef760ab820",
+      "after_sha256": "e7dc903c6c4191f825396fe82848ee8e0c05074ceb8eaa3c3b5b9a7ef004499a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+      "before_sha256": "ee77631da711a87b6fa194b1834da396257fa78de5e54a073b8892c43ff1ebb3",
+      "after_sha256": "0854a8826572f5fdb95999b8cfefc4207950f8dc2ca358f6cce3c6b4de4c6eb5",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/TestFieldAead.kt",
+      "before_sha256": null,
+      "after_sha256": "29a1c16aaa4f59563e5f4fb8c28645aa8f5dd66c29ffbcb52bcd4d98d10705d0",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+      "before_sha256": "c83ba6ce541b1639d16cbd6741c39705e8f50f29be32e284c797b46b090b5686",
+      "after_sha256": "eb90470d57d7a99c75ad8967ebe230cf42d7856d616b761bf1efa8de42ece50e",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt",
+      "before_sha256": null,
+      "after_sha256": "3370d9a718860d0ae38e9b3c84dda5e81efc03efdb7b87f04380e45a78a88e33",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/BuildProvenanceStaticTest.kt",
+      "before_sha256": "1f68d6977bf44e828a77d5fe193ee1e713c36fb6ee4cf2e2245b9649a33d1464",
+      "after_sha256": "e116220d92fad78c2ab83407aa091b42ed637255a2260b7608c209249a4da010",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+      "before_sha256": "1be7bbcd8854f8f1b3fb050c1206fd071e3daecf4eccef6e46b29ef8968f2a7e",
+      "after_sha256": "07ab565dd0b6ffee22f1a1f0828fdde03e107d02ec505216b7570239fcb625f2",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionCryptoLifecycleTest.kt",
+      "before_sha256": null,
+      "after_sha256": "49106963f558b4ae64ef5aa539d21702db1e0470b7af61ac545e32b207e384a2",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadInstrumentedTest.kt",
+      "before_sha256": null,
+      "after_sha256": "c03227952e267c6854ce5c5141f00e744f9fba6571ea6d2ab92aa339907435aa",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+      "before_sha256": "46c1fba3167b9fb92b1c61f77645bc283b0b262f146b705ad0dd0b13f5518bc3",
+      "after_sha256": "bfa955ae3723beb6fff649b95600fe5a61d718443201cd8a4289c8210dc9a8bf",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "before_sha256": "fc734bbaa57568858761b32657ecdeb45e935af6a3a1a03496ffe685f4f56803",
+      "after_sha256": "827123f76aa980b20909edf259455e11471bcfb468fc81fa341e7301f5a218b7",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/pull_android_field_sessions_20260710.py",
+      "before_sha256": "f4de249130c027b10fb16e25b6fa611ef8633dba93fa7f9b43d2554fbe7986c0",
+      "after_sha256": "e246013b31ee0659054575fbc68ba33ae27ad368a55b2dcb73202ae57bd6bbf4",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/summarize_android_field_sessions_20260710.py",
+      "before_sha256": "298084585d02c9e8714d55928ddd06a88b2e48222d216d4a0c0d279e39bf1c98",
+      "after_sha256": "84bdc5e3f2328e3ecfd16d109ab04a3484bd517831ea93d6a995d8ef69e6baff",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_android_field_session_summary.py",
+      "before_sha256": "a5b23c385c56eda2e818cc22102a753019ef3467d6672780d2568cf61552face",
+      "after_sha256": "f2051ac2c7cf32427f798b4d43cd3959a5210f1b4176f39e5dc7ccfdafd4d0d1",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_release_evidence_gate.py",
+      "before_sha256": "dca7d332f6b6323d08b7715d2f18920121c2da57e993dd13e03591a8b43e99bc",
+      "after_sha256": "864b595be000698d1f6c73651171579ba494af656b721fb7c5b6c5da3a06617a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/README.md",
+      "before_sha256": "f500d9c2349c0b27019a7583f2ec700c9c35b1baf50966ef77f17eded48844e3",
+      "after_sha256": "0654cbf975d36223d7dead505cc096b6838f17b3357b0d6fcf29a87a504b0bd0",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/package.json",
+      "before_sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6",
+      "after_sha256": "354a45b31ed313a39edadac792346f6dfa40b2db0bdebec0bcd4d9de63e3f95e",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/server.ts",
+      "before_sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd",
+      "after_sha256": "3477c39ffc16be1bb4c3e698e0dddf58f4337cf5a2b26c09452e0f87855de30d",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/encrypted-json-store.ts",
+      "before_sha256": null,
+      "after_sha256": "d0361711326c68eb29267d8bf5e8b04b677a627c43bc7ac7935e7b6fe568cd02",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+      "before_sha256": null,
+      "after_sha256": "8d46d9a5d2d9a693d9544658fb09b7066833885d5d097e6decea8bd31cda8b75",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/auth.ts",
+      "before_sha256": "69da3ab915e7cb0a2ec22eb344cf97578d92b63591a0786e57d075926a451544",
+      "after_sha256": "3b3c03b6a3354b46933039a89ba43ab1e995a1b1a778cf25061ef579804a34b6",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-long-session.ts",
+      "before_sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be",
+      "after_sha256": "99d20a23c78eb153a7b279aaed6133d44f8f7ad64c0fc4399e0c348094f52acb",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-walk-ledger.ts",
+      "before_sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d",
+      "after_sha256": "2f43217194dddfd08fe48fb3322815807f1629cea8b6cbdcbb333f3467d50289",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/integrated-consent.ts",
+      "before_sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+      "after_sha256": "52b0e0e291f6103d02af3516f026dcc0e341eda07ec6f6bb73886cb0fb8f30aa",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/privacy-rights.ts",
+      "before_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+      "after_sha256": "3e13e06a7951cb0230fd69377019a3bb322eaa844a565bc99d67c96a18e351dd",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/config.ts",
+      "before_sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7",
+      "after_sha256": "3cdc31e9398293c6511f67faf58c9a778d16ee48284e0cf336164d3dbb489304",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/exclusive-file-lock.ts",
+      "before_sha256": "aa6a32375dc4d862b53bd6c874f9ff01c993de892c4273969fc0cf932a18848e",
+      "after_sha256": "5c2576142e19eeb858d769e8060ee30dcc9e679a5b657897ceb9d65d69063daa",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/state-encryption-fixture.ts",
+      "before_sha256": null,
+      "after_sha256": "e686039f44db29cba54c2a56d6cd1e48f87b37e44219caff791bfc3ecfd436c7",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/encrypted-json-store.test.ts",
+      "before_sha256": null,
+      "after_sha256": "dcf07f12bf4f22aac3bfe31e5418ef35e5ac5aadc2875ff17105443133ffc4bc",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+      "before_sha256": null,
+      "after_sha256": "40bac4c27a228ac3ca768efd31c94486796dd7c6e8f0253ec1568bcb7f1cef74",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-long-session.test.ts",
+      "before_sha256": "981d7a01031074f7f42c49c2efd4259e9e5af54eea73229d55af21f3a0f48b7c",
+      "after_sha256": "eb30f2ba8311a4f1279928b398cd56fd191a6bcc4fedb418cc15fcec6a97a5fe",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-walk-ledger.test.ts",
+      "before_sha256": "e07cd13f13560ab44506a75eeae1eed796c1f130eff44721a8399f2ebb43a570",
+      "after_sha256": "b126302d3adf0acd9cca8e0f6655034fd0e52bf29b0c3b2d33106696d79c7a5e",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/integrated-consent.test.ts",
+      "before_sha256": "b7917c951bbf8412510fc398de3f8746ffeb6e1f7b3d686d02a3ff53a641994d",
+      "after_sha256": "68269ea94385b0ec854f803a068a8d14b50ba221d122ae59db322b592072ed96",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/privacy-rights.test.ts",
+      "before_sha256": "5475a015d881630991623e7b7ad88edce6da269622308ac25ca78d2be9421790",
+      "after_sha256": "6aa105f228a98432bb6b7940dd5521200fd1455104044e50031a0e0e8a4f16da",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "before_sha256": "77df172ec22fc38919cf94ef413fba880f61a5765d4a14ca38bcd31cc37d2307",
+      "after_sha256": "2b7847efd122b0a786172cc1eb458c4f67a5c4d275dd8e99fa38738e097d742a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/node-adapter.test.ts",
+      "before_sha256": "84f33251a9285883e348f77ea462785290a485dadfad076db2755dda9f55b0ad",
+      "after_sha256": "b37d64e02eb8873ca3b532c954453cfe7b9175fdf3746c73baed8ba6f006c297",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/config/walksafe-android-gateway.env.example",
+      "before_sha256": "12d69ee258bab424bfc201ea544e4461495f226f0079a57326b57f8b419e0c0f",
+      "after_sha256": "ed5064ae2d737b8934b6ee34db987880b18a62986774c8f63e27a0464eb1bff0",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/systemd/walksafe-android-gateway.service",
+      "before_sha256": "b98187c04852f7e1b13aa5bf6e9ec60ab055159c188c3e7e1226a5932ae21b8b",
+      "after_sha256": "516c38de7a5784b3a5e92bb391026bf19f1cf907a1e687b727443d0b23c67fa7",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/.env.example",
+      "before_sha256": "50531cc334c13bcf58b8707d7bf70a8137c011ee1c30e5f6caff876cabd6483b",
+      "after_sha256": "eb18bf896a5f645d28cb77396307f6b9091b9cc3099ee96581642186f693f846",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/README.md",
+      "before_sha256": "b532df887aa0435d7bfaad0a7ee88971ef8b6d267817b090e37a5e5334685827",
+      "after_sha256": "23abd7f29eec5ed222ae163a9112a803d54efb0bbacc6a3ae247ea6eb7cf1d93",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/alembic/versions/202608020001_report_image_encryption.py",
+      "before_sha256": null,
+      "after_sha256": "7d6658fa5ee0063f431c55bd4d2c551b7304b756c12b9a9a1b4c0528099a4362",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/app/config.py",
+      "before_sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f",
+      "after_sha256": "a6706881a89257e16571c0b0abc6381d5428df9ae566c8d26a1a7d3325ee7d62",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/main.py",
+      "before_sha256": "4840f7b46ae202f9d433427a6e8f1f04df4296e6ac8eb23ec2cdcf2196e17eb2",
+      "after_sha256": "3e3a1c21508d2a62de0267731747528986b64772d528fe0251f8721f8c1b449a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/models.py",
+      "before_sha256": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+      "after_sha256": "740ecf37fbe07b77e6fdce4979e9b33fdf6be845e9a3d2ec688840dcb83b1638",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/openapi_contract.py",
+      "before_sha256": "ca01783f5c5906fe67d8d49e7ad3c7ca267d2940f3b3dc2453bcf89f1a61ad56",
+      "after_sha256": "99c64f2599ec4fb0c3eb897b12a72f94481daec43adbf5d4d0bc05149cab1f3c",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/schemas.py",
+      "before_sha256": "f6bd1eeb57f578050f16e1673f84a729beeb502ee7c80fdcadbb7ffb72b62c3d",
+      "after_sha256": "cee3259451139a976ec507958d6ccb36639115530e98c06dce7b84d050c38012",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/field_test_security.py",
+      "before_sha256": "6e5eb3e1823d9aaeb07cd738dc9cdafb4995046a5dcea2036a0ce85fa3a2def7",
+      "after_sha256": "87c724d4a94e0a3585c1067cb1014ae760bcd8f07deb4a007794ee921dceb5ad",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/health.py",
+      "before_sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+      "after_sha256": "f59b6768c2527a9509cb3ee871bf41cd4da832f348bcda4e49a63be3d7b0d06a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/reports.py",
+      "before_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+      "after_sha256": "c3b7d9d7e9e0f1b0f29fadca1cda0cd1de98ade454846ab37d5609f4befa74c1",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/api/uploads.py",
+      "before_sha256": "fa1c8fafffd1951f94e95bc6a5d631557f08c637d57752db1941cb6ac015d4fb",
+      "after_sha256": "d7864f59d0212abaa7b0982ca05fd5d818ceac570facd59d7b23d0f1f9c4709c",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/services/report_image_crypto.py",
+      "before_sha256": null,
+      "after_sha256": "da2016d076e33dfe08403c310dba08f5c402359abe05d265a370d44af8be0fb9",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/app/services/report_image_keys.py",
+      "before_sha256": null,
+      "after_sha256": "2d5b0f062128b0cf5634f1e9997a57ff14ee948d8be658f70783570ea1cc22cd",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/app/services/report_original_access.py",
+      "before_sha256": null,
+      "after_sha256": "014dd04a2cc645f93496d3587c99d1321ac289e0d41f21c1d6e6b264c7031298",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/app/services/report_storage.py",
+      "before_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+      "after_sha256": "384c44d3094f4f5ef3f0a0c252c42ffd85728861d620542f188af15069929566",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/app/services/admin_security.py",
+      "before_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+      "after_sha256": "7582119c083593ca94e8167e5e40a564b613223c311445e87d0cbbae787e3143",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "before_sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24",
+      "after_sha256": "2ce28ce76ef2707de2b12dafd7ae25dc6d3993a76259ace182260f2f00395cf9",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/requirements.lock",
+      "before_sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700",
+      "after_sha256": "74144db0cfcb3d9931cb2493c008abbae0806d922d0173f03e092815e46322e5",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "before_sha256": "2859741708f6bd0fc4d50dc27531cd8459165cb336beaa2a49bdfe0b2390e298",
+      "after_sha256": "68b29a7706d5b474010829da88697f37252843c3673ff1705f088be8ad017055",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_field_test_security.py",
+      "before_sha256": "ad7a2288e4624c1f72affa902983f17eb7d28e6cd53c528fe64153c9d3c59c68",
+      "after_sha256": "dc5c605f6e323f4a4e190f4b91ed0c9f02d20c16f8177d1913c00764f8e73c73",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_health_readiness.py",
+      "before_sha256": "26df879d4bc24554979276b1d02a89bd2d8bd1a47404d86c15189e50d0acfa1e",
+      "after_sha256": "0b478c2f643e51193ba4f47e2b75c656c9b510a5f68e774c219048de52b566a7",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_openapi_contract.py",
+      "before_sha256": "d57d216c374495168944b7f1fd6d04c5cb77b92df15f142bf48a78c096b28f89",
+      "after_sha256": "57ce742e4c24dc398b21963c706437ff6d68857e8737be879a3aaf6287d2d7ce",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_report_image_crypto.py",
+      "before_sha256": null,
+      "after_sha256": "4f0016b664011981b737a5aa7acafe0294cdb2743abf8c22aeb5ffcfaa70534d",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/tests/test_report_image_keyring.py",
+      "before_sha256": null,
+      "after_sha256": "4cf17addd6a1f8bd1991107ec2f957f1fe7fa671df5c7cb331cb2811fd4a6cf4",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/tests/test_report_original_access.py",
+      "before_sha256": null,
+      "after_sha256": "ba432d7fec2e9dcf4f802dc27f037a2c3942553fdcc6e8544aec4eb1b4a73274",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "backend/tests/test_report_policy.py",
+      "before_sha256": "7f7d654167c6bba57b4f3993c0e661ef67f61f6bcdf5735422c84fd1cada5f17",
+      "after_sha256": "36ee6d6a7f2e4c148b26a0d76f02a16e9f9f1f94cb36732d6c572469c88cee67",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_report_storage_reconciliation.py",
+      "before_sha256": "0fbcacd4694ba7188422f3790c0cc8d93c4e7bd33d348210311f8458f59972fa",
+      "after_sha256": "1d2040d955ab655ab360ac77adce022b9ed26c382f65d7b5bcfd77e7a2fa3284",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_reports.py",
+      "before_sha256": "89bf41555aab8796f824ee4f7be669cde717698f250582b3be7c2b327ec8aa43",
+      "after_sha256": "32e6dcae3b0235f4cd202b3b94144fb0a5934f76226ec31f2e835652ffd6fdfe",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_reports_v2.py",
+      "before_sha256": "df02544048725504dcd8de0c53e4b6e755ede635ff6ec1c850d8d64c461f4295",
+      "after_sha256": "c2c30e7421cefbe46fece0285026ee76a59fd71e2e07aa32901f948d2c08c8b7",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_uploads.py",
+      "before_sha256": "300d7e29d6e92f427f7fb3879384408609aa29deff60edab9a3d8d0fd8b83daa",
+      "after_sha256": "9c5953d799a1a51bdca43d8d192239a4bb485ca621ab6b2118f294d926dcdc71",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_admin_security.py",
+      "before_sha256": "dff5dca5557201cd33601f49001ddec94bb0f75cd441058a5779a5dd2411b493",
+      "after_sha256": "3d3a42c5a383a60bf255293491223c45ff12727b1648e57b00e73c726027d2d8",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "contracts/walksafe.openapi.json",
+      "before_sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "after_sha256": "6919ea97ec15dabb083bca9e6e9a392d27a4dba4dc186573e57e2a7beed0cc40",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/generate_walksafe_openapi.py",
+      "before_sha256": "849f0bb411a834f4f2bd147825c49f40cadaa963df67acafedc5f80423c54b02",
+      "after_sha256": "ebf6e074ea96652656c20f9d8124ce898706ecb76793abc3f512f2cede66ac7d",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+      "before_sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa",
+      "after_sha256": "6c58c71cf308b2cab48547d7fa212e255896a37bd27928d780bd2ce3d852797b",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/config/walksafe-backend.env.example",
+      "before_sha256": "2659575135256f605e1234e1ed4ca8eee66996da10dd532f62d95c8266cd769b",
+      "after_sha256": "18aa811a7fbdc7ba23b5dbc35833a08198cf75d11984b06434664eb505b243d3",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/systemd/walksafe-backend.service",
+      "before_sha256": "053b35b035dfef887a85cedbe3db98dd5e2df8557da16b995d146ce179883e14",
+      "after_sha256": "b955b16b5dbc93554b8c483e744ac02bac5d0ac6b7aa0690ecb2a74807f0f21a",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/check_walksafe_backup_source_20260713.py",
+      "before_sha256": "aa26542f273c4afa6d9a94eeeecbdb9de9a94c2f114d611ce521a8008621e19f",
+      "after_sha256": "21408a0ab601a11cebd9b1163558514e4dc3d2598f6aa4a4843a74f758edddd5",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_backup_source.py",
+      "before_sha256": "957bdb90993a38026f7860ae1c01a70acb05c1e8e95c760e643517c30da16c90",
+      "after_sha256": "b5bed28164c6176cd5a438c56236fc7890752f41deef2ed3c07ac79b22723d02",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/check_report_retention_dry_run.py",
+      "before_sha256": "c20efd03308a3ccdbd69ad2a4c608a35a3f4024141fbf4a9b1bfbad34b95f4eb",
+      "after_sha256": "31bd1c85c43ddfd53f4297ebf1c8d5b0e5e1723037647228026359bf0235eefb",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "backend/tests/test_report_retention.py",
+      "before_sha256": "585d7f3fe0cffe68e233c23d347f2d226661b5e32f65434280fdd3f525373396",
+      "after_sha256": "1969a12e8836c545b4722290bda1c2da1cdb63d55542a999fbb922824869315d",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_report_retention_encrypted_objects.py",
+      "before_sha256": null,
+      "after_sha256": "99bfdac46ffccb2dfb1d697d2f3756a12f33a706b04b3e00b6a0ffa736b2cbd1",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/backup_walksafe_data_20260711.sh",
+      "before_sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+      "after_sha256": "e7f7b23667c3c5d461b4ee2fb91761c5bf451d33e20a062f3ea087fda56d5452",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "before_sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+      "after_sha256": "dfd0e3d5173c1528682a8da497be8d78c0edb66c694aae2a3f35954d277620c5",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "before_sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+      "after_sha256": "6e3f9ff83d9e73e8330285940fb1cf973ce96b45ed11806430d3dfa46e61c1db",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/walksafe_backup_integrity.py",
+      "before_sha256": "377b644f726a00c51955400d7f795bb3acb04a6a4c82ec4337757ad088e97eb1",
+      "after_sha256": "54370dcf6df5ce1efdcc813d2300e6cf6ecb55889c5efdb8a67b0abc04b0188a",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_walksafe_backup_integrity.py",
+      "before_sha256": "07760ab8a3cb383182c7ea1e5f9fa27f79250b3d68109b29f3cf9bc19aa64fa1",
+      "after_sha256": "3d0aefc9cc315ae2d316ca5c78c37e0cbc38dc8a88a853299ebad26e4bb7f730",
+      "before_source": "SEQ42_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_walksafe_backup_prune.py",
+      "before_sha256": "8176b919a00caaed8c84a836c80b10ee07bc03bd0d3a94b8dfe11234301ccc0b",
+      "after_sha256": "56d17afa731d7279c7caad61fb006466b87add62bd3dcd2fc5a494de71c47c5c",
+      "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py",
+      "before_sha256": null,
+      "after_sha256": "c7ac40d4d63ce7fbc0596511bc1c68f796ebc07b489d88540462b54ede91a44a",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py",
+      "before_sha256": null,
+      "after_sha256": "1f9fc9c2a3f85c3fe85f386f9682a4963c49cd598a4f6e90088921731182d09c",
+      "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    }
+  ],
+  "before_state_authority": "SEQ42_START_GATE_DIRTY_SNAPSHOT_THEN_PINNED_HEAD",
+  "start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP048-20260802-005",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/implementation-start-gate-receipt.json",
+    "sha256": "faba570d1e8d24651272b52e6ca0190ac43ff97c57bead00bcd5fd60e06951fd"
+  },
+  "repository_state_binding": {
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/19-REPOSITORY_STATE.log",
+    "sha256": "6516933756c6cca92aa34ad05c63fc1ae912151453304dfaa49007beec3e6f5d",
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d"
+  },
+  "execution_event_binding": {
+    "sequence": 42,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+    "event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9"
+  },
+  "execution_session_event": {
+    "sequence": 42,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+    "event_type": "GOAL_STARTED",
+    "event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+    "occurred_at": "2026-08-02T21:42:19+09:00"
+  },
+  "implementation_start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP048-20260802-005",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/implementation-start-gate-receipt.json",
+    "file_sha256": "faba570d1e8d24651272b52e6ca0190ac43ff97c57bead00bcd5fd60e06951fd"
+  },
+  "implemented_controls": [
+    "Android protected authenticated local storage with fail-closed key errors",
+    "Android and Gateway HTTPS-only no-downgrade connection boundary",
+    "separate encrypted server-original, database, backup and key-management boundaries",
+    "active/decrypt-only/compromised key lifecycle without database key material",
+    "purpose/scope/expiry/reconfirmation/audit-bound default-deny original access",
+    "ordered incident detection, impact and containment stopping at unperformed legal and notice decisions"
+  ],
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

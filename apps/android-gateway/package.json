@@ -1,0 +1,21 @@
+{
+  "name": "walksafe-android-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "clean": "node --input-type=module --eval \"import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })\"",
+    "start": "node dist/server.js",
+    "state-encryption-maintenance": "node dist/src/state-encryption-maintenance.js",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.15",
+    "typescript": "6.0.3"
+  }
+}

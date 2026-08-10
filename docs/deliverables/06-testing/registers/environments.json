@@ -1,0 +1,161 @@
+{
+  "schema_version": "walksafe.test-environment-register.v1",
+  "metadata": {
+    "title": "WalkSafe 시험 환경·지원 기기 원장",
+    "version": "0.2.0",
+    "as_of": "2026-07-27",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_AS_OF_BINDING_NOT_PROVISIONED",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "TST-03"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py",
+    "last_refreshed_by": "PHASE1_READY_FOUNDATION_SURGICAL_REFRESH"
+  },
+  "instance_field_contract": {
+    "required_fields": [
+      "environment_instance_id",
+      "environment_id",
+      "owner_role",
+      "source_commit",
+      "provisioned_at",
+      "retire_at",
+      "tool_and_runtime_versions",
+      "network_profile",
+      "test_data_boundary",
+      "secret_source_reference",
+      "verification_evidence_id",
+      "approval_status"
+    ],
+    "identity_rule": "실제 기기 serial·계정·secret 값 대신 가명 ID와 통제 저장소 참조를 쓴다.",
+    "readiness_rule": "필수 필드와 환경 smoke 검증 증거가 없으면 정식 실행에 사용하지 않는다."
+  },
+  "environments": [
+    {
+      "environment_id": "ENV-UNIT-ANDROID",
+      "purpose": "Android JVM 단위시험",
+      "required_bindings": [
+        "source commit",
+        "JDK",
+        "Gradle",
+        "Android plugin",
+        "model-config hash"
+      ],
+      "current_instance_status": "NOT_PROVISIONED_FOR_FORMAL_RUN"
+    },
+    {
+      "environment_id": "ENV-UNIT-SERVER",
+      "purpose": "Python 단위·API 계약시험",
+      "required_bindings": [
+        "source commit",
+        "Python",
+        "requirements lock",
+        "OpenAPI hash"
+      ],
+      "current_instance_status": "NOT_PROVISIONED_FOR_FORMAL_RUN"
+    },
+    {
+      "environment_id": "ENV-INTEGRATION-POSTGIS",
+      "purpose": "격리 PostGIS 통합시험",
+      "required_bindings": [
+        "DB image digest",
+        "migration head",
+        "test-only database identity"
+      ],
+      "current_instance_status": "NOT_PROVISIONED_FOR_FORMAL_RUN"
+    },
+    {
+      "environment_id": "ENV-DEVICE-SUPPORTED",
+      "purpose": "지원 Android 실기기 기능·성능·접근성 시험",
+      "required_bindings": [
+        "manufacturer/model",
+        "device serial pseudonym",
+        "Android/API",
+        "ARCore/depth capability",
+        "APK hash",
+        "model hash",
+        "network"
+      ],
+      "current_instance_status": "PENDING_SUPPORTED_DEVICE_MATRIX"
+    },
+    {
+      "environment_id": "ENV-FIELD-CONTROLLED",
+      "purpose": "통제된 실제 보행·소음·GPS·경로 시험",
+      "required_bindings": [
+        "WS-21 안전계획",
+        "참여자 동의",
+        "안전요원",
+        "장소·날씨·조도",
+        "APK/model/config hash"
+      ],
+      "current_instance_status": "BLOCKED_BY_WS_21_AND_RECOVERY_GATE"
+    },
+    {
+      "environment_id": "ENV-LEGACY-WEB",
+      "purpose": "Web/PWA 과거 동작 비교",
+      "required_bindings": [
+        "source commit",
+        "Node lock",
+        "browser"
+      ],
+      "current_instance_status": "REFERENCE_ONLY"
+    }
+  ],
+  "support_matrix_status": "DRAFT_UNAPPROVED",
+  "approval_boundary": {
+    "formal_test_environment_ready": false,
+    "device_field_test_authorized": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "current_policy_binding": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "manifest_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+    "effective_decision_register_path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+    "effective_decision_register_sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+    "activation_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT",
+    "fp035_overlay_status": "APPROVED_EFFECTIVE_COMMITTED"
+  },
+  "current_source_binding": {
+    "binding_kind": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT",
+    "snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+    "snapshot_sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+    "path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+    "content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+    "file_count": 2960,
+    "stable_file_read_count": 2960,
+    "source_commit": null,
+    "clean_commit_claimed": false
+  },
+  "phase1_ready_foundation_binding": {
+    "artifact_type_code": "DLV-TST-03",
+    "controlled_locator": "docs/deliverables/06-testing/test-plan.md#tst-03",
+    "register_locator": "docs/deliverables/06-testing/registers/environments.json",
+    "content_status": "AS_OF_REGISTER_BOUND_FOR_REVIEW",
+    "formal_environment_status": "NOT_PROVISIONED_FOR_FORMAL_RUN",
+    "review_contract": {
+      "owner_role": "QA_OWNER",
+      "reviewer_roles": [
+        "TECHNICAL_OWNER",
+        "DEVICE_QA_OWNER"
+      ],
+      "approver_role": "PROJECT_SCOPE_OWNER",
+      "status": "NOT_PERFORMED"
+    },
+    "claim_boundary": {
+      "content_binding_prepared": true,
+      "design_or_plan_approved": false,
+      "implementation_conformance_claimed": false,
+      "formal_test_execution_claimed": false,
+      "operational_monitoring_claimed": false,
+      "release_or_completion_claimed": false
+    }
+  }
+}

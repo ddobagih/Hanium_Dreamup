@@ -1,0 +1,397 @@
+{
+  "capture_binding": {
+    "binding_id": "USER-SCOPE-DECISION-CAPTURE-R001",
+    "byte_length": 90089,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+    "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+    "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_OUTPUT"
+  },
+  "checks": [
+    {
+      "check_id": "SCOPE45-CHK-001",
+      "expected": {
+        "binding_id": "USER-SCOPE-DECISION-CAPTURE-R001",
+        "byte_length": 90089,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+        "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+        "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_OUTPUT"
+      },
+      "name": "CAPTURE_PHYSICAL_BINDING",
+      "observation_basis": "IN_MEMORY_FINAL_OUTPUT_BYTES_BEFORE_ADD_ONLY_WRITE",
+      "observed": {
+        "binding_id": "USER-SCOPE-DECISION-CAPTURE-R001",
+        "byte_length": 90089,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+        "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+        "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_OUTPUT"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-002",
+      "expected": {
+        "byte_length": 22897,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+        "sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042"
+      },
+      "name": "R003_REQUEST_PHYSICAL_BINDING",
+      "observation_basis": "PHYSICAL_SHA256_OBSERVED_2026-07-28",
+      "observed": {
+        "byte_length": 22897,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+        "sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-003",
+      "expected": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "name": "R003_DECISION_ITEM_MANIFEST_BOUND",
+      "observed": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-004",
+      "expected": {
+        "byte_length": 2498803,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+        "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052"
+      },
+      "name": "EXACT257_R004_LEDGER_BOUND",
+      "observation_basis": "PHASE1_EXACT257_SUCCESSOR_R004_INDEPENDENT_REVIEW",
+      "observed": {
+        "byte_length": 2498803,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+        "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-005",
+      "expected": [
+        {
+          "byte_length": 110612,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+          "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1"
+        },
+        {
+          "byte_length": 11706,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json",
+          "sha256": "feb497f54b0a52c16e259fa5c4d3ee23c8094df048bfc686e9e42a25e8ef7aa6"
+        }
+      ],
+      "name": "EXACT257_R004_VALIDATION_CHAIN_BOUND",
+      "observation_basis": "PHASE1_EXACT257_SUCCESSOR_R004_INDEPENDENT_REVIEW",
+      "observed": [
+        {
+          "byte_length": 110612,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+          "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1"
+        },
+        {
+          "byte_length": 11706,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json",
+          "sha256": "feb497f54b0a52c16e259fa5c4d3ee23c8094df048bfc686e9e42a25e8ef7aa6"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-006",
+      "expected": {
+        "byte_length": 393682,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4"
+      },
+      "name": "READINESS_EXACT45_SOURCE_BOUND",
+      "observation_basis": "PHASE1_EXTERNAL_INPUT_READINESS_INDEPENDENT_REVIEW_R001",
+      "observed": {
+        "byte_length": 393682,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-007",
+      "expected": {
+        "exact_count": 45,
+        "pairwise_disjoint": true,
+        "partition_counts": {
+          "A22": 22,
+          "B17": 17,
+          "C6": 6
+        },
+        "union_unique_count": 45
+      },
+      "name": "EXACT45_UNIQUE_DISJOINT_EXHAUSTIVE",
+      "observed": {
+        "exact_count": 45,
+        "pairwise_disjoint": true,
+        "partition_counts": {
+          "A22": 22,
+          "B17": 17,
+          "C6": 6
+        },
+        "union_unique_count": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-008",
+      "expected": {
+        "A22": "fb838bc6b8d68c5174e62b2816cbd0f33734a6d9a5a17423e46950a8adfff4ac",
+        "B17": "f2f6a141aa6bf9059b578df3c299ea12ebfc3bbe71d1986f301117d211377f3b",
+        "C6": "537f4b7f94da688dc29f4a3a07b390af306be1c26c49dde3111d44dc29c3d4cb",
+        "exact45": "32288eca0c9f2b09cf133f860511682cff91b692ca0e6889a52938c03b1693ca"
+      },
+      "name": "EXACT45_ID_FINGERPRINTS",
+      "observed": {
+        "A22": "fb838bc6b8d68c5174e62b2816cbd0f33734a6d9a5a17423e46950a8adfff4ac",
+        "B17": "f2f6a141aa6bf9059b578df3c299ea12ebfc3bbe71d1986f301117d211377f3b",
+        "C6": "537f4b7f94da688dc29f4a3a07b390af306be1c26c49dde3111d44dc29c3d4cb",
+        "exact45": "32288eca0c9f2b09cf133f860511682cff91b692ca0e6889a52938c03b1693ca"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-009",
+      "expected": {
+        "IN_SCOPE": 43,
+        "OUT_OF_SCOPE_N_A": 2,
+        "total": 45
+      },
+      "name": "NORMALIZED_DECISION_COUNTS",
+      "observed": {
+        "IN_SCOPE": 43,
+        "OUT_OF_SCOPE_N_A": 2,
+        "total": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-010",
+      "expected": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "name": "OUT_OF_SCOPE_N_A_EXACT2",
+      "observed": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-011",
+      "expected": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_external_verification": false,
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE"
+      },
+      "name": "AUTHORITY_CAPTURE_EXACT",
+      "observed": {
+        "authority_basis": "USER_SELF_ASSERTED_IN_CHAT",
+        "authority_external_verification": false,
+        "decision_maker_identity": "김민호",
+        "decision_maker_role": "PROJECT_SCOPE_OWNER",
+        "signature_method": "ATTRIBUTABLE_TYPED_RESPONSE_CAPTURE"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-012",
+      "expected": {
+        "normalized_decisions_and_rationales_only": true,
+        "raw_conversation_persisted": false,
+        "raw_prompt_persisted": false,
+        "raw_response_persisted": false
+      },
+      "name": "RAW_CONVERSATION_NOT_PERSISTED",
+      "observed": {
+        "normalized_decisions_and_rationales_only": true,
+        "raw_conversation_persisted": false,
+        "raw_prompt_persisted": false,
+        "raw_response_persisted": false
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-013",
+      "expected": {
+        "actual_execution_credit_count": 0,
+        "approval_credit_count": 0,
+        "artifact_closure_credit_count": 0,
+        "canonical_ledger_mutated": false,
+        "canonical_queue_mutated": false,
+        "formal_test_credit_count": 0,
+        "release_credit_count": 0,
+        "scope_decision_state_exit_credit_count": 0,
+        "verified_authority_credit_count": 0
+      },
+      "name": "ZERO_CREDIT_AND_NO_CANONICAL_MUTATION",
+      "observed": {
+        "actual_execution_credit_count": 0,
+        "approval_credit_count": 0,
+        "artifact_closure_credit_count": 0,
+        "canonical_ledger_mutated": false,
+        "canonical_queue_mutated": false,
+        "formal_test_credit_count": 0,
+        "release_credit_count": 0,
+        "scope_decision_state_exit_credit_count": 0,
+        "verified_authority_credit_count": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-014",
+      "expected": {
+        "pending_count": 45,
+        "validated_count": 0
+      },
+      "name": "DOWNSTREAM_COMPATIBILITY_AND_RECEIPT_VALIDATION_PENDING",
+      "observed": {
+        "pending_count": 45,
+        "validated_count": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-015",
+      "expected": {
+        "projection_byte_length": 72543,
+        "sha256": "b9f5cf686a0eade08520c22a111150634813b935ffa9d03cb395681ae8aeb795"
+      },
+      "name": "CAPTURE_NONSELF_INTEGRITY",
+      "observed": {
+        "projection_byte_length": 72543,
+        "sha256": "b9f5cf686a0eade08520c22a111150634813b935ffa9d03cb395681ae8aeb795"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-CHK-016",
+      "detail_path": "/receipt_self_integrity_check",
+      "name": "CHECK_RECEIPT_NONSELF_INTEGRITY",
+      "status": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "downstream_consumer_compatibility_validated": false,
+    "external_authority_verified": false,
+    "receipt_acceptance_by_canonical_consumer": false,
+    "validation_scope": "STRUCTURAL_CRYPTOGRAPHIC_CAPTURE_ONLY",
+    "zero_credit_boundary_preserved": true
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "2908be67a8aaf9a7ee8ede9714d3ea8f6c7cab2a70575aefbcdab42b1f7c4003",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 12447,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/canonical_length",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "projection_rule": "SET ALL projection_null_paths TO null, recursively sort keys, compact JSON, append LF, encode UTF-8",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json"
+  },
+  "prepared_on": "2026-07-28",
+  "receipt_id": "WS-PHASE1-USER-SCOPE-DECISION-CAPTURE-CHECK-20260728-R001",
+  "receipt_self_integrity_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 12447,
+    "content_sha256": "2908be67a8aaf9a7ee8ede9714d3ea8f6c7cab2a70575aefbcdab42b1f7c4003",
+    "encoding": "UTF-8",
+    "final_lf": true,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/canonical_length",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json"
+  },
+  "schema_version": "walksafe.phase1-user-scope-decision-capture-check-receipt.v1",
+  "source_bindings": [
+    {
+      "binding_id": "R003-SCOPE-REQUEST",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 22897,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042",
+      "subject_role": "PHASE1_CONSOLIDATED_USER_INPUT_REQUEST_R003",
+      "verification_basis": "PHYSICAL_SHA256_OBSERVED_2026-07-28"
+    },
+    {
+      "binding_id": "R003-DECISION-ITEM-MANIFEST",
+      "binding_kind": "DECLARED_CONTROL_CONTEXT_SHA256",
+      "byte_length": null,
+      "locator": "phase1-consolidated-user-input-request-r003.md decision-item manifest SHA-256",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "subject_role": "R003_DECISION_ITEM_MANIFEST_CONTROL_CONTEXT",
+      "verification_basis": "USER_REQUIRED_EXACT_SHA256_AND_R003_DECLARATION"
+    },
+    {
+      "binding_id": "EXTERNAL-INPUT-READINESS-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 393682,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+      "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4",
+      "subject_role": "EXACT45_SCOPE_DECISION_READINESS_SOURCE",
+      "verification_basis": "PHASE1_EXTERNAL_INPUT_READINESS_INDEPENDENT_REVIEW_R001"
+    },
+    {
+      "binding_id": "EXACT257-R004-CANONICAL-LEDGER",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 2498803,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_OUTPUT",
+      "verification_basis": "PHASE1_EXACT257_SUCCESSOR_R004_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "EXACT257-R004-EVIDENCE",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 110612,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+      "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_R004_EVIDENCE_OUTPUT",
+      "verification_basis": "PHASE1_EXACT257_SUCCESSOR_R004_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "EXACT257-R004-CHECK-RECEIPT",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 11706,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json",
+      "sha256": "feb497f54b0a52c16e259fa5c4d3ee23c8094df048bfc686e9e42a25e8ef7aa6",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_R004_CHECK_RECEIPT",
+      "verification_basis": "PHASE1_EXACT257_SUCCESSOR_R004_INDEPENDENT_REVIEW"
+    }
+  ],
+  "status": "PASS",
+  "summary": {
+    "check_count": 16,
+    "fail_count": 0,
+    "in_scope_count": 43,
+    "normalized_scope_decision_count": 45,
+    "out_of_scope_n_a_count": 2,
+    "pass_count": 16,
+    "state_exit_credit_count": 0
+  }
+}

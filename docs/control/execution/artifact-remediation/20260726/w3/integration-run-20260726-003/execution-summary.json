@@ -1,0 +1,555 @@
+{
+  "append_only_predecessors": [
+    {
+      "current_state_sha256": "83ee018074364d96c3983b7c8826f04a4bf815b2bfef500b5f83f06d1acea76d",
+      "immutable": true,
+      "run_id": "integration-run-20260726-001"
+    },
+    {
+      "current_state_sha256": "78fd40fe98a878563eaa11ff2e7e498b6422a807c0e2a9a03842745911da6361",
+      "immutable": true,
+      "run_id": "integration-run-20260726-002"
+    }
+  ],
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "cross_process_android_gateway_backend": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "command_receipts": [
+    {
+      "argv": [
+        "env",
+        "-u",
+        "DATABASE_URL",
+        "-u",
+        "WALKSAFE_TEST_DATABASE_URL",
+        "PYTHONPATH=<REPO>",
+        "uv",
+        "run",
+        "--no-project",
+        "<EXACT_UV_ADMIN_RUNTIME>",
+        "python",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "backend/tests/test_admin_security.py",
+        "-k",
+        "not postgres_admin_security_full_recovery_and_high_risk_path"
+      ],
+      "command_id": "backend-admin-dbfree",
+      "content_fingerprint": "d5ea35fa178c75aada354ffc5d63308666781d656e25393f287debca89d1d58f",
+      "cwd": ".",
+      "end": "2026-07-26T16:45:50.886421475Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-dbfree.log",
+      "log_sha256": "779bc2c3a5ecc2ad68620743ab1ae22b9f484a7d3848caa15ce117388377da76",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": {
+        "deselected": 1,
+        "errors": 0,
+        "failed": 0,
+        "passed": 33,
+        "skipped": 0
+      },
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/backend-admin-dbfree.json",
+      "receipt_sha256": "a1d6136f5824b61fbba6eb55d3eb8b1c57e10cfa12c615af5ef4c77918305e4d",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 130464,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:45:49.982719522Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-dbfree.time",
+      "time_log_sha256": "5693cd92611aa80d0ecc4212922d614f2f5f0c6f8b29d706693949aab20a8686",
+      "tool": {
+        "runtime": "UV_ADMIN_RUNTIME"
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4"
+      ],
+      "command_id": "docker-image-preflight",
+      "content_fingerprint": "95dfdeda8c595b2d4f69f92b436c75ebb972cb99cb4540474a47c760a2b154bb",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:02.849033154Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/docker-image-preflight.log",
+      "log_sha256": "0c42ce27eab03a3b70038c862f4991e7ea2d5631871561b3f2f6809d84371beb",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/docker-image-preflight.json",
+      "receipt_sha256": "b0f98fd3155766e6e3a0b38533ef0da940d7febb3a50bc26dd27b26aae5885a9",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 29188,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:02.822444809Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/docker-image-preflight.time",
+      "time_log_sha256": "630171a74184269d9212671d617db76d9d0d9a6640786e81fef58d7110668fd4",
+      "tool": {
+        "runtime": "docker"
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--detach",
+        "--pull=never",
+        "--name",
+        "walksafe-w3-dev21-003-1785084422817139005",
+        "--env-file",
+        "<REDACTED_TEMP_SECRET_FILE>",
+        "--tmpfs",
+        "/var/lib/postgresql/data:rw,noexec,nosuid,size=512m",
+        "--publish",
+        "127.0.0.1::5432",
+        "postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4"
+      ],
+      "command_id": "postgis-container-start",
+      "content_fingerprint": "8b33162077c3b8fdaf45dff2097e19a108a97dc255d0b5eb058a1fb9be1af7fa",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:02.932798513Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-container-start.log",
+      "log_sha256": "0b21bb7586b8ebe9a3df070544be587d044a646d023a169b378ceb7cdca762c0",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/postgis-container-start.json",
+      "receipt_sha256": "c9cd7dd995fac990b1af3d6b3d4e8440eb282589c3755195a51c5d92ff7e3562",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 28880,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:02.850448411Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-container-start.time",
+      "time_log_sha256": "fada997b586c98a04c5f3f06c5fd94ed34b65be7da425f4b9523e7235ba857c3",
+      "tool": {
+        "runtime": "docker"
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "walksafe-w3-dev21-003-1785084422817139005",
+        "pg_isready",
+        "-U",
+        "walksafe_dev21",
+        "-d",
+        "walksafe_dev21_test_003"
+      ],
+      "command_id": "postgis-readiness",
+      "content_fingerprint": "1fbfe869b4d1065778612eb081035509b752533509af66658eb0eaf3c73d54a4",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:04.5359993Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-readiness.log",
+      "log_sha256": "8d27d89199ef6257f0b2eed1f8260f6dea08584a5167b36b0411d8aa0985f031",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/postgis-readiness.json",
+      "receipt_sha256": "5db1ee5dc583e0694182d231b6077abe57a8aa84599d725729b0a3e272deecde",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 29440,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:02.934541132Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-readiness.time",
+      "time_log_sha256": "66df835995a1416c5488adff43f55e410b13c5ba512ac0d75e5324ba6efce4f1",
+      "tool": {
+        "runtime": "docker"
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "port",
+        "walksafe-w3-dev21-003-1785084422817139005",
+        "5432/tcp"
+      ],
+      "command_id": "postgis-port-discovery",
+      "content_fingerprint": "b7776af0785b2b87c0f0b0efbb438cd5c0efec94d003977414d54327e4457f8c",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:04.14945133Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-port-discovery.log",
+      "log_sha256": "29671d7e308166d86b871c69dd06194ef6ee790a1bb4939c95310cbf1dfc31ae",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/postgis-port-discovery.json",
+      "receipt_sha256": "cab48d258c819fe42edac65fbd2ab1e7596e2c27765c7a9af9de4f013742041c",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 28508,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:04.6854701Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-port-discovery.time",
+      "time_log_sha256": "5d4ee507ffb1fa0d4965cb80b3ad911c433cb02cc6eb20188f48f2d25d5fab68",
+      "tool": {
+        "runtime": "docker"
+      }
+    },
+    {
+      "argv": [
+        "env",
+        "DATABASE_URL=UNSET",
+        "WALKSAFE_TEST_DATABASE_URL=<REDACTED>",
+        "uv",
+        "run",
+        "--no-project",
+        "<EXACT_UV_ADMIN_RUNTIME>",
+        "python",
+        "scripts/check_walksafe_test_database_20260713.py"
+      ],
+      "command_id": "test-database-preflight",
+      "content_fingerprint": "76278c8f95659d01e868233e992df5265aaba2f81e51ff19043684679f39baa8",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:04.227277734Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/test-database-preflight.log",
+      "log_sha256": "fc304273e5443c924c80e2249e88ed80253ec1be048bab208df71c0aca6ac50d",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/test-database-preflight.json",
+      "receipt_sha256": "b73513c22e633e7176e011ec6bf78ba4b4efa60fcc54bb45c0400a20cfefe80d",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 60684,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:04.18160718Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/test-database-preflight.time",
+      "time_log_sha256": "00bfa12174e1e634e0871f8f1304bae873e86d3b7b78e9f9c19d48104ce71a11",
+      "tool": {
+        "runtime": "UV_ADMIN_RUNTIME"
+      }
+    },
+    {
+      "argv": [
+        "env",
+        "DATABASE_URL=<REDACTED>",
+        "WALKSAFE_TEST_DATABASE_URL=UNSET",
+        "uv",
+        "run",
+        "--no-project",
+        "<EXACT_UV_ADMIN_RUNTIME>",
+        "python",
+        "-m",
+        "alembic",
+        "-c",
+        "<REPO>/backend/alembic.ini",
+        "upgrade",
+        "head"
+      ],
+      "command_id": "alembic-upgrade-head",
+      "content_fingerprint": "1be590cfee88f218174207d73bc7405d48602cabb34f8a149633ea45e8f30dce",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:04.665798594Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/alembic-upgrade-head.log",
+      "log_sha256": "a2ed8d6813e275e149fb0d97da918bde3576330ea54bbe7aa89ef71e1be64955",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/alembic-upgrade-head.json",
+      "receipt_sha256": "da4341b6242355de99823d5518a2b14ed488302983e1ffa0bea02e99881bd097",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 91392,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:04.228907789Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/alembic-upgrade-head.time",
+      "time_log_sha256": "7859a96ccc34c96ad9748663c723c249260643e3b8401038a790c1204c22e7d7",
+      "tool": {
+        "runtime": "UV_ADMIN_RUNTIME"
+      }
+    },
+    {
+      "argv": [
+        "env",
+        "DATABASE_URL=UNSET",
+        "WALKSAFE_TEST_DATABASE_URL=<REDACTED>",
+        "uv",
+        "run",
+        "--no-project",
+        "<EXACT_UV_ADMIN_RUNTIME>",
+        "python",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "backend/tests/test_admin_security.py::test_postgres_admin_security_full_recovery_and_high_risk_path"
+      ],
+      "command_id": "backend-admin-postgres-node-run-1",
+      "content_fingerprint": "1795a0aef78736f91f93a2aef9fd2c26cf40c8c7b0173a3c0135ec893c0dca21",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:05.556965288Z",
+      "exit_code": 1,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-postgres-node-run-1.log",
+      "log_sha256": "76ccf97dfb2c90fe10cdf771068b8f7cf70971c34e1884fd866a7064cec2d005",
+      "planned_repeat_ordinal": 1,
+      "pytest_counts": {
+        "deselected": 0,
+        "errors": 0,
+        "failed": 1,
+        "passed": 0,
+        "skipped": 0
+      },
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/backend-admin-postgres-node-run-1.json",
+      "receipt_sha256": "0bb03f58c68665ca2b20d8030fb70a96fa64a1ff4e6a51601908e221c847ead5",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 123264,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:04.667299274Z",
+      "status": "FAIL_REPORTED_NO_RETRY",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-postgres-node-run-1.time",
+      "time_log_sha256": "8ffdb46ae6ff865c7a4be76f30979301a4007b2d597a212fdb1735502008612e",
+      "tool": {
+        "runtime": "UV_ADMIN_RUNTIME"
+      }
+    },
+    {
+      "argv": [
+        "docker",
+        "rm",
+        "-f",
+        "walksafe-w3-dev21-003-1785084422817139005"
+      ],
+      "command_id": "postgis-container-cleanup",
+      "content_fingerprint": "c5f18f10d961231c3436534f99d8f3e6f8fb6461bbdb2db8bf106fd463889d03",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:05.736208049Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-container-cleanup.log",
+      "log_sha256": "03e086c0ed899e228d26a5a3590593cdfc8f34151deaa4bfe8e6fcb2e6a9e8ca",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/postgis-container-cleanup.json",
+      "receipt_sha256": "fcde233f468a060a3c33e3f5c99896597d3fd109908ad48959c7268d2c1cad06",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 27960,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:05.558491476Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/postgis-container-cleanup.time",
+      "time_log_sha256": "f0b2289f4623334e92a7e229e7172974d47c6df684e1d7cfeaed859093d2a617",
+      "tool": {
+        "runtime": "docker"
+      }
+    },
+    {
+      "argv": [
+        "truncate-secret",
+        "rm",
+        "<REDACTED_TEMP_SECRET_FILE>",
+        "assert-absent"
+      ],
+      "command_id": "secret-file-removal",
+      "content_fingerprint": "605c8b8534073ad362620f4059c823431fc987e52b5629fa697c3d0196061203",
+      "cwd": ".",
+      "end": "2026-07-26T16:47:05.741783676Z",
+      "exit_code": 0,
+      "log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/secret-file-removal.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "planned_repeat_ordinal": null,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/secret-file-removal.json",
+      "receipt_sha256": "3b1c150d97e9fe993cdfcc932e52b5f3308c0a27f75f9cc3256ce443cbcfbda3",
+      "receipt_sha256_match": true,
+      "resource_peak": {
+        "maximum_resident_set_size_kb": 7588,
+        "measurement_tool": "/usr/bin/time -v"
+      },
+      "start": "2026-07-26T16:47:05.738124408Z",
+      "status": "PASS",
+      "time_log_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/secret-file-removal.time",
+      "time_log_sha256": "926026573e4de3dc444cfd66ee6a53dde9139591ffb0eb933837ee2e48a53332",
+      "tool": {
+        "runtime": "shell"
+      }
+    },
+    {
+      "argv": [
+        "env",
+        "DATABASE_URL=UNSET",
+        "WALKSAFE_TEST_DATABASE_URL=<REDACTED>",
+        "uv",
+        "run",
+        "--no-project",
+        "<EXACT_UV_ADMIN_RUNTIME>",
+        "python",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "backend/tests/test_admin_security.py::test_postgres_admin_security_full_recovery_and_high_risk_path"
+      ],
+      "command_id": "backend-admin-postgres-node-run-2",
+      "content_fingerprint": "55dadb086a7c838ee5bcb23d805c97d12873589f68bfd0e952b51c79102e366f",
+      "cwd": ".",
+      "end": null,
+      "exit_code": null,
+      "log_path": null,
+      "log_sha256": null,
+      "planned_repeat_ordinal": 2,
+      "pytest_counts": null,
+      "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/backend-admin-postgres-node-run-2-not-run.json",
+      "receipt_sha256": "d12a97a819c2b1dfa786eb5aca825703516bfc27444a322f368e6f1a4a8594df",
+      "receipt_sha256_match": true,
+      "resource_peak": null,
+      "start": null,
+      "status": "NOT_RUN_BLOCKED_BY_RUN_1_FAILURE",
+      "time_log_path": null,
+      "time_log_sha256": null,
+      "tool": {
+        "runtime": "UV_ADMIN_RUNTIME"
+      }
+    }
+  ],
+  "document_id": "WALKSAFE-W3-DEV21-INTEGRATION-EXECUTION-SUMMARY-20260726-003",
+  "execution_mode": "SERIAL_SINGLE_HEAVY_PROCESS_NO_RETRY",
+  "finding": {
+    "classification": "POSTGRES_TEST_HARNESS_PATCH_TARGET_MISSING",
+    "evidence": [
+      "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-postgres-node-run-1.log",
+      "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/receipts/backend-admin-postgres-node-run-1.json"
+    ],
+    "failed_command_id": "backend-admin-postgres-node-run-1",
+    "failed_stage": "test harness dependency injection before domain-path completion",
+    "finding_id": "W3-DEV21-FINDING-002",
+    "observed_after_schema_parity_assertion": true,
+    "observed_error": "monkeypatch target backend.app.services.admin_security.SessionLocal does not exist",
+    "product_or_source_fix_applied_in_run": false,
+    "retry_count": 0,
+    "severity": "BLOCKING_FOR_DEV21_OK",
+    "status": "OPEN"
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "b5ab2b3def18ac87c52e357c11b9b1f791451d68a6f7688c4271dd43bb3c6fd4"
+    }
+  },
+  "prepared_on": "2026-07-27",
+  "resolved_gaps": [
+    {
+      "basis": "Current backend DB-free suite 33 passed, one PostgreSQL node planned separately.",
+      "gap_id": "W3-DEV21-GAP-001",
+      "status": "RESOLVED_INTERNAL"
+    },
+    {
+      "basis": "Exact fresh-DB node progressed beyond migrated-registry and compare_metadata empty-diff assertions before failing at a later missing monkeypatch target.",
+      "evidence": [
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/logs/backend-admin-postgres-node-run-1.log"
+      ],
+      "gap_id": "W3-DEV21-GAP-005",
+      "status": "RESOLVED_INTERNAL_SCHEMA_PARITY"
+    }
+  ],
+  "result": "INTERNAL_INTEGRATION_FAILED_POSTGRES_TEST_HARNESS_BINDING",
+  "results": {
+    "alembic_upgrade_head": "PASS",
+    "cleanup": {
+      "container": "PASS",
+      "secret": "PASS"
+    },
+    "database_preflight": "PASS",
+    "db_free": {
+      "deselected": 1,
+      "passed": 33,
+      "status": "PASS"
+    },
+    "postgres_node_run_1": {
+      "failed": 1,
+      "status": "FAIL"
+    },
+    "postgres_node_run_2": {
+      "status": "NOT_RUN_BLOCKED_BY_RUN_1_FAILURE"
+    },
+    "repeatability": "NOT_VERIFIED",
+    "schema_parity": "PASS_OBSERVED_BEFORE_LATER_FAILURE"
+  },
+  "reused_evidence": {
+    "aux003_postgis_roundtrip": {
+      "status": "PASS_INTERNAL_EPHEMERAL_MIGRATION_ROUNDTRIP",
+      "summary_sha256": "3921208d4b5ee4efc09227f4008ffd425cfc74b4fc113930a9ddf4927d66477a"
+    },
+    "run001_gateway_android": {
+      "admin": {
+        "receipt_sha256": "695de382418e5f9f25d55e29d9a0dd9e52c4d1f18d43c9dd44970654997e910b",
+        "tests": 38
+      },
+      "gateway": {
+        "receipt_sha256": "79cae4f38d8ccd990aa99b1f15a0a80ca40838e868d9e41cc5e2e02b2901ab6d",
+        "tests": 62
+      },
+      "source_module_hashes_equal": true,
+      "user": {
+        "receipt_sha256": "e4d0a386bdfc7863045f4b73b0c6175a1dfd183bcad16c33006f286845da5420",
+        "tests": 728
+      }
+    },
+    "w2_openapi": {
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "status": "PASS_INTERNAL_DETERMINISTIC_BYTE_IDENTICAL"
+    }
+  },
+  "run_id": "integration-run-20260726-003",
+  "schema_version": "walksafe.w3-dev21-integration-execution-summary.v3",
+  "source_binding": {
+    "backend_content_fingerprint": "e608f182d179c8d59c2d012ad847a3c8251175cbabcb3fbc8c9462512cdd4720",
+    "backend_content_set_sha256": "de4853de5fde719b9ca3fbf8cc66a79279b384a98638cba1e7fae6791c8b0de2",
+    "backend_path_set_sha256": "fbaec473e28e7c3cf9d1cdf3be191976ffdb4efa1cc996e9f7e37d323cd7790a",
+    "backend_subject_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/current-backend-subject.json",
+    "backend_subject_raw_sha256": "e1820c18b65c25ca949531bb82c57afe6e76548702ae07f00275fb83842125b5",
+    "binding_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/current-source-binding.json",
+    "binding_sha256": "16b28515e03080a4f66aab54754596cda024c2c1a78fcd28984967aaf31807ed",
+    "changed_source_sha256": {
+      "backend/app/models.py": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+      "backend/tests/conftest.py": "2859741708f6bd0fc4d50dc27531cd8459165cb336beaa2a49bdfe0b2390e298",
+      "backend/tests/test_admin_security.py": "e67b9dca8a27d550c92b44a88ec8eca219087afce4d0f1bcdfb8e86dfbb27730"
+    },
+    "unchanged_reusable_modules": {
+      "adminapp": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+      "android-gateway": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+      "app": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585"
+    }
+  },
+  "source_commit": null,
+  "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_BINDINGS"
+}

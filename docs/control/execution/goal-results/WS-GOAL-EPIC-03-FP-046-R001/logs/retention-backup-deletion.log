@@ -1,0 +1,6 @@
+WALKSAFE_FP046_COMMAND .venv/bin/python -m pytest -p no:cacheprovider -q tests/test_report_retention_operational_safety.py tests/test_report_retention_encrypted_objects.py tests/test_walksafe_backup_integrity.py
+WALKSAFE_FP046_STARTED_AT 2026-08-10T06:54:15+09:00
+92 passed in 4.98s
+WALKSAFE_FP046_SUMMARY passed=92 failed=0 errors=0 skipped=0
+WALKSAFE_FP046_EXIT_CODE 0
+WALKSAFE_FP046_ENDED_AT 2026-08-10T06:54:21+09:00

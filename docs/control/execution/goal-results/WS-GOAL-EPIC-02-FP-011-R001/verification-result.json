@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP011-LONG-LIVED-LOGIN-VERIFICATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-25T12:31:00+09:00",
+  "checks": [
+    {
+      "name": "FP-011 focused Android long-lived tests",
+      "command": "./gradlew :app:testDebugUnitTest --tests '*GatewayFieldSessionTest' --tests '*AndroidGatewaySessionStoreStaticTest' --tests '*PermissionSessionPolicyTest' --tests '*WalkSessionReadinessTest' --tests '*MainActivityLongLivedLoginStaticTest' --offline --no-daemon --max-workers=4 -Pkotlin.compiler.execution.strategy=in-process --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/logs/focused-android-tests.log",
+      "output_sha256": "8439836cc2c9192cd2f563ca3615666a82fc516b673810a7d3c46950b3683c1c",
+      "executed_at": "2026-07-25T12:25:30+09:00"
+    },
+    {
+      "name": "full Android unit/build/lint verification",
+      "command": "./gradlew -Dorg.gradle.jvmargs='-Xmx1536m -XX:MaxMetaspaceSize=1024m' --offline --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --max-workers=4 -Pkotlin.compiler.execution.strategy=in-process --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/logs/full-android-verification.log",
+      "output_sha256": "420c24c691cb07277e3c75156abe962a12e9779bf02968f615b3ae0ef6867815",
+      "executed_at": "2026-07-25T12:30:00+09:00"
+    },
+    {
+      "name": "Android Gateway long-lived-session build, typecheck and tests",
+      "command": "cd apps/android-gateway && npm run typecheck && npm test",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/logs/android-gateway-verification.log",
+      "output_sha256": "0f6601d0b8ad2878809ce48606206a556f3892d3957930687e606d62eb359543",
+      "executed_at": "2026-07-25T12:30:01+09:00"
+    },
+    {
+      "name": "FP-011 deterministic trace regression",
+      "command": "python3 -m py_compile scripts/build_walksafe_fp011_long_lived_login_trace_20260725.py && LOCKED_PY=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python; \"$LOCKED_PY\" -m pytest -q tests/test_walksafe_fp011_long_lived_login_trace_20260725.py",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/logs/control-plane-verification.log",
+      "output_sha256": "e11f2b06d97ec156fae44379bdca7aaf2c3ca31b269b3930af9f6c3756aee509",
+      "executed_at": "2026-07-25T12:30:38+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "focused_tests": "PASS",
+    "full_unit_tests": "PASS",
+    "debug_build": "PASS",
+    "lint": "PASS",
+    "gateway_build_typecheck_tests": "PASS",
+    "trace_builder_tests": "PASS",
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "evidence_boundary": {
+    "repository_internal": true,
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "remote_device_revoke_drill_status": "NOT_RUN",
+    "account_lock_drill_status": "NOT_RUN",
+    "security_incident_drill_status": "NOT_RUN",
+    "production_long_lived_login_enabled": false,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

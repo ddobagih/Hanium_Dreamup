@@ -1,0 +1,185 @@
+{
+  "schema_version": "walksafe.security-risk-register.v1",
+  "metadata": {
+    "register_id": "WS-SECURITY-RISK-REGISTER-001",
+    "title": "WalkSafe 보안 위험대장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "SEC-03"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "rules": {
+    "append_only": true,
+    "closure_requires_evidence_or_approved_exception": true,
+    "empty_or_open_rows_do_not_prove_security": true,
+    "review_cadence": "사건 발생 즉시, 활성 프로젝트 동안 최소 월 1회"
+  },
+  "risks": [
+    {
+      "risk_id": "SR-001",
+      "title": "무가림 원본의 유출·목적 외 접근",
+      "asset": "영상·음성·정확 위치·센서·신고 원본",
+      "threat": "계정·저장소·백업 접근 탈취 또는 내부 오용",
+      "likelihood": "MEDIUM",
+      "impact": "CRITICAL",
+      "inherent_rating": "CRITICAL",
+      "controls": [
+        "최초 동의",
+        "전송·저장 암호화",
+        "키 분리",
+        "최소권한",
+        "접근·복사·삭제 감사",
+        "유한 보존"
+      ],
+      "verification_refs": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "SEC-10",
+        "SEC-12",
+        "SEC-14"
+      ],
+      "owner_role": "보안·개인정보책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    },
+    {
+      "risk_id": "SR-002",
+      "title": "단일 관리자 휴대전화 분실·복구 실패",
+      "asset": "관리자 세션·권한·복구자료·고위험 작업",
+      "threat": "기기 분실 또는 복구수단 동시 상실",
+      "likelihood": "MEDIUM",
+      "impact": "HIGH",
+      "inherent_rating": "HIGH",
+      "controls": [
+        "MFA/패스키",
+        "외부 복구코드·보안키",
+        "원격 세션 폐기",
+        "고위험 작업 동결"
+      ],
+      "verification_refs": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "owner_role": "프로젝트책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    },
+    {
+      "risk_id": "SR-003",
+      "title": "신고 중복·스팸·관리자 오판",
+      "asset": "자동·수동 신고, 기관 전달, 사용자 상태",
+      "threat": "반복·조작 신고 또는 근거 없는 승인·기각",
+      "likelihood": "MEDIUM",
+      "impact": "HIGH",
+      "inherent_rating": "HIGH",
+      "controls": [
+        "고정 신고번호",
+        "idempotency",
+        "rate limit",
+        "유사도 검수",
+        "사유·actor 감사",
+        "정정·항소"
+      ],
+      "verification_refs": [
+        "WS-02",
+        "WS-03",
+        "WS-19",
+        "WS-20"
+      ],
+      "owner_role": "보안·개인정보책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    },
+    {
+      "risk_id": "SR-004",
+      "title": "휴대전화 대기자료 포화·유실",
+      "asset": "미전송 신고·원본·동의·삭제·보안기록",
+      "threat": "바이트 상한 미정 또는 잘못된 삭제순서",
+      "likelihood": "HIGH",
+      "impact": "HIGH",
+      "inherent_rating": "HIGH",
+      "controls": [
+        "우선 삭제순서",
+        "신고·권리기록 우선보호",
+        "새 자료 생성 보류",
+        "실시간 안전기능 자원 분리"
+      ],
+      "verification_refs": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+      ],
+      "owner_role": "기술책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    },
+    {
+      "risk_id": "SR-005",
+      "title": "TMAP 장애·오래된 경로 안내",
+      "asset": "경로·회전·도착·이탈 상태",
+      "threat": "timeout·quota·GPS 불신에서 오래된 안내 지속",
+      "likelihood": "MEDIUM",
+      "impact": "CRITICAL",
+      "inherent_rating": "CRITICAL",
+      "controls": [
+        "최초 경로 로컬 저장",
+        "연속 이탈 판정",
+        "의심 시 회전안내 중지",
+        "사용자 선택 뒤만 재호출"
+      ],
+      "verification_refs": [
+        "WS-06",
+        "WS-07",
+        "WS-18",
+        "WS-20"
+      ],
+      "owner_role": "접근성·안전책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    },
+    {
+      "risk_id": "SR-006",
+      "title": "FP-035 이동통신망 정규화 지시의 묶음 승인 대기",
+      "asset": "일반 활동원본 전송 정책·동의·구현",
+      "threat": "포착된 정규화 지시와 다르거나 묶음 승인 전에 확정된 이동통신망 전송 구현",
+      "likelihood": "MEDIUM",
+      "impact": "HIGH",
+      "inherent_rating": "HIGH",
+      "controls": [
+        "CR-0002 정규화 지시 포착·묶음 승인 대기",
+        "보행 중 일반 활동원본 전송 금지",
+        "정지 뒤 명시 선택 사용자만 이동통신망 허용",
+        "미선택 사용자는 Wi-Fi만 허용",
+        "묶음 승인 전 관련 정식 시험 NOT_RUN"
+      ],
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "verification_refs": [
+        "CR-0002",
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "owner_role": "제품책임자",
+      "status": "OPEN",
+      "residual_rating": "NOT_ASSESSED",
+      "acceptance_ref": null
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "open": 6,
+    "closed": 0,
+    "accepted": 0,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

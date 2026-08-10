@@ -1,0 +1,15 @@
+{
+  "schema_version": "walksafe.validation-receipt.v1",
+  "command_scope": "android-lint-debug-r4",
+  "observed_at": "2026-07-27T15:06:33.696494+00:00",
+  "gradle_exit_code": 0,
+  "result": "PASS",
+  "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-lint-r4.log",
+  "log_sha256": "d7cb7493cb40965999427b6972cd8835fa0a1a32e2c05c90ac2ac6d2b2954e5d",
+  "resource_policy": {
+    "parallel_heavy_lanes": 1,
+    "gradle_max_workers": 1,
+    "gradle_xmx": "1536m",
+    "offline": true
+  }
+}

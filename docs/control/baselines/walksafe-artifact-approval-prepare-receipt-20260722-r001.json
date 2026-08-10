@@ -1,0 +1,173 @@
+{
+  "schema_version": "walksafe.artifact-approval-prepare-receipt.v1",
+  "metadata": {
+    "transaction_id": "WS-ARTIFACT-BASELINE-APPROVAL-TRANSACTION-20260722-001",
+    "receipt_version": "1.0.0",
+    "prepared_at": "2026-07-22T14:03:17+09:00",
+    "transaction_status": "PREPARED_ALL_PHASES_VERIFIED_NOT_LIVE"
+  },
+  "approval_binding": {
+    "approval_record_content_sha256": "f0d83889eb784a7407ed11ab4de8ea360a6f44bbcd113ada984812a550d6a437",
+    "statement_text_sha256": "23dc7a77091f5ee0e66848c84ffec11837ad58f3701a85706665a84a49a95667"
+  },
+  "prepared_output_bindings": [
+    {
+      "path": "docs/control/baselines/walksafe-artifact-pretransition-snapshot-20260722-r001.json",
+      "byte_length": 3689548,
+      "file_sha256": "1e1fe3ea0b23c8d8d9264bfeac7ffb8750aa175bc9b8b17b569962dc466f54a7"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+      "byte_length": 117401,
+      "file_sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "byte_length": 8054,
+      "file_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json",
+      "byte_length": 207279,
+      "file_sha256": "0b6695b40ef54aa279671da60809dc3cacea9bc95f96b0620d45dc7e9aba5b48"
+    }
+  ],
+  "prepared_output_binding_sha256": "a945ce7c9b984c23c1a67f085f9ad42b8d2e0999e5243e12430451d3b8df46f4",
+  "phase_results": [
+    {
+      "phase": 0,
+      "phase_kind": "FP035_CORRECTION_AND_POLICY_1_0_1",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 1,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 2,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 3,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 4,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 5,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 6,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 7,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 8,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 9,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 10,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 11,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 12,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 13,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 14,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 15,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 16,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 17,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 18,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 19,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 20,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 21,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    },
+    {
+      "phase": 22,
+      "phase_kind": "ARTIFACT_LOGICAL_APPROVAL_STAGE",
+      "status": "STAGED_VERIFIED_NO_LIVE_WRITE"
+    }
+  ],
+  "counts": {
+    "versioned_approved": 102,
+    "active_approved": 27,
+    "not_approved": 128,
+    "artifact_total": 257
+  },
+  "control_commit": {
+    "doc01_updated": false,
+    "doc05_updated": false,
+    "commit_receipt_status": "NOT_CREATED_YET",
+    "required_next_step": "RUN_SEPARATE_ATOMIC_CONTROL_MATERIALIZER"
+  },
+  "safety_boundary": {
+    "canonical_doc01_or_doc05_modified_by_this_generator": false,
+    "implementation_modified": false,
+    "gate_count": 5,
+    "gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "content_sha256": "000bc59fc1127b7d2a6ccabc20c3c2ec6ae304a4fe8bdf3db84257f2469d6ec2"
+}

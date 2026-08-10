@@ -1,0 +1,80 @@
+{
+  "argv": [
+    "./gradlew",
+    ":adminapp:testDebugUnitTest",
+    "--offline",
+    "--no-daemon",
+    "--max-workers=1"
+  ],
+  "command_id": "android-admin-unit",
+  "cwd": "apps/android",
+  "end": "2026-07-26T16:21:49.982046190Z",
+  "environment_constraints": {
+    "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx1536m",
+    "max_workers": 1,
+    "network": "OFFLINE"
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "a8bcc92ce20cbf0bd44e5768e0d0b6d8a5e5e258e641f98ce964d2aaaddfad46"
+    }
+  },
+  "junit_counts": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 38,
+    "skipped": 0,
+    "tests": 38,
+    "xml_files": 6
+  },
+  "junit_results": [
+    {
+      "bytes": 649,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminEndpointPolicyTest.xml",
+      "sha256": "c8cdcdc913487a8dd51ecdf4d0c01047382a7d27102fc7a27fdbb9125714362a"
+    },
+    {
+      "bytes": 1077,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminHighRiskActionGateTest.xml",
+      "sha256": "1742cb240054a1e653ffa76bf5de65edea2c13e8faf9bdee7f5facd2f3ca1569"
+    },
+    {
+      "bytes": 1014,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicyTest.xml",
+      "sha256": "167dafaa6ee79457d77a32dffb700e31392c27635ec5df2b2f8dbf8c203ae09e"
+    },
+    {
+      "bytes": 1060,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityBoundaryStaticTest.xml",
+      "sha256": "55c276d5fe7b37157c317c1e4f20a557d1ff314315e6a07190ff68b9506b2777"
+    },
+    {
+      "bytes": 2348,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml",
+      "sha256": "b453b307d207e97931268821e7025c6096bc1432102e9e477bc7d760545d97fc"
+    },
+    {
+      "bytes": 2664,
+      "path": "adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityHttpClientTest.xml",
+      "sha256": "1f1abadfe5ba3b10e14a19de93dd0dd92959a638f78feb9f5798db2249b3c23a"
+    }
+  ],
+  "log_path": "logs/android-admin-unit.log",
+  "log_sha256": "b03bf76161733ca1d998fdd8583a4219591d5ddd78006173173863cd8327396e",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 620664,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-integration-command-receipt.v1",
+  "start": "2026-07-26T16:21:45.817963032Z",
+  "status": "PASS",
+  "time_log_path": "logs/android-admin-unit.time",
+  "time_log_sha256": "b760a7b00e98c97c1abb95a1e948de2499cbab53fad25b4bfd2dd1301cf0ed12",
+  "tool": {
+    "gradle_wrapper": "./gradlew",
+    "java": "openjdk version \"21.0.11\" 2026-04-21"
+  }
+}

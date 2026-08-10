@@ -1,0 +1,176 @@
+{
+  "checks": [
+    {
+      "check_id": "APPEND-ONLY-PREDECESSORS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CURRENT-BACKEND-SUBJECT",
+      "status": "PASS"
+    },
+    {
+      "check_id": "UNCHANGED-MODULE-REUSE",
+      "status": "PASS"
+    },
+    {
+      "check_id": "DBFREE-33-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "FRESH-POSTGIS-PREFLIGHT-MIGRATION",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-NODE-RUN1-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-NODE-RUN2-SAME-DB-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCHEMA-GAP-RESOLVED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "HARNESS-GAP-RESOLVED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CLEANUP-GAP-RESOLVED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "CONTAINER-SECRET-CLEANUP",
+      "status": "PASS"
+    },
+    {
+      "check_id": "ALL-11-RECEIPTS-PASS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-ONE-DEV21-OK-RECOMMENDATION",
+      "status": "PASS"
+    },
+    {
+      "check_id": "EXACT-SIX-COVERAGE",
+      "status": "PASS"
+    },
+    {
+      "check_id": "ONLY-W4-W8-EXTERNAL-GAPS",
+      "status": "PASS"
+    },
+    {
+      "check_id": "FORMAL-GATE-RELEASE-BOUNDARY",
+      "status": "PASS"
+    },
+    {
+      "check_id": "COMMON-CONTENT-FINGERPRINTS",
+      "status": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "cross_process_android_gateway_backend": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  },
+  "command_receipt_bindings": [
+    {
+      "command_id": "backend-admin-dbfree",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-dbfree.json",
+      "sha256": "5e66a8fb0055ca658ddf1fffdfc0414870c0547733335b47cb9885aafb8bdec6"
+    },
+    {
+      "command_id": "docker-image-preflight",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/docker-image-preflight.json",
+      "sha256": "40a418774d89944d4bfe51edf037d182288870f25fbaccaca12ee3c83d6af133"
+    },
+    {
+      "command_id": "postgis-container-start",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/postgis-container-start.json",
+      "sha256": "3d4c184b29b1dce8844ebb96423f66ab6bd518cade5a7001e781fa0c89f77d24"
+    },
+    {
+      "command_id": "postgis-readiness",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/postgis-readiness.json",
+      "sha256": "146d02180f06f8225e4f4ce7370d1c6f4ddaaf2e97695ed09aaf203fe0842d70"
+    },
+    {
+      "command_id": "postgis-port-discovery",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/postgis-port-discovery.json",
+      "sha256": "70b7ebf6bef77346734b19a847dddb25a9b94ca1e077d9780dee1119ba15b9ec"
+    },
+    {
+      "command_id": "test-database-preflight",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/test-database-preflight.json",
+      "sha256": "ff8763ce41426cae7a007cb9239fbaca8a9bc461e17b3306e22c9eda69d434bc"
+    },
+    {
+      "command_id": "alembic-upgrade-head",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/alembic-upgrade-head.json",
+      "sha256": "aafa55368483c3fedd6e8b095cceb0a0255313a58ceae13591e889349f2add8e"
+    },
+    {
+      "command_id": "backend-admin-postgres-node-run-1",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-postgres-node-run-1.json",
+      "sha256": "e7c6e1549730e49ff3f1ef217008732ff8c0d6fcea1779fd218c5ad867a21270"
+    },
+    {
+      "command_id": "backend-admin-postgres-node-run-2",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-postgres-node-run-2.json",
+      "sha256": "aab8fdde540cb64883d2250c2e22d42318ab144159b26615c8b071670254caa5"
+    },
+    {
+      "command_id": "postgis-container-cleanup",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/postgis-container-cleanup.json",
+      "sha256": "1e12c0156992c3bf20dcd9e18f6457e9e6403fd923b7af539b116f5cfe793855"
+    },
+    {
+      "command_id": "secret-file-removal",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/secret-file-removal.json",
+      "sha256": "c86f8efc09f3a5f5857f5752d73b9019b65f3d7289ccdc60b4217944ca558912"
+    }
+  ],
+  "document_id": "WALKSAFE-W3-DEV21-LOCAL-VALIDATION-20260726-004",
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "4632d6ccb25424365ee6e63e41beb3aee59891ab8885147038dfb24f338be708"
+    }
+  },
+  "meaning": "Internal evidence consistency and DEV21 internal integration PASS; external/formal boundaries remain open.",
+  "output_bindings": [
+    {
+      "bytes": 22656,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "role": "EXECUTION_SUMMARY",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+    },
+    {
+      "bytes": 7374,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "role": "CURRENT_STATE_JSON",
+      "sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c"
+    },
+    {
+      "bytes": 1208,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.md",
+      "role": "CURRENT_STATE_MARKDOWN",
+      "sha256": "48470e6ac71e7344b2653e132f55d9d381b6dbcf68fb76dfde0841c89fa1df49"
+    }
+  ],
+  "prepared_on": "2026-07-27",
+  "schema_version": "walksafe.w3-dev21-local-validation.v4",
+  "status": "PASS"
+}

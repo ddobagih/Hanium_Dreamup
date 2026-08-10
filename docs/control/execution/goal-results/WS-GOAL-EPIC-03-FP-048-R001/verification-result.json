@@ -1,0 +1,216 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-VERIFICATION-20260802-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-08-03T01:36:00.069186+09:00",
+  "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+  "checks": [
+    {
+      "lane_id": "ANDROID_PROTECTED_STORAGE",
+      "name": "Android protected local storage",
+      "status": "PASS",
+      "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --tests 'kr.co.hanium.dreamup.walksafe.security.*' --tests 'kr.co.hanium.dreamup.walksafe.fieldlog.*' --tests 'kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionStoreStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.network.UserNetworkSecurityBoundaryStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.report.AndroidAccountDeletionFallbackMarkerTest' --tests 'kr.co.hanium.dreamup.walksafe.report.MainActivityReportUploadStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.AndroidReportSuccessorStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityAccountDeletionStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalRestartStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.MainActivityWithdrawalStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.PersistentReportQueueDisabledStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.PriorityUserOnboardingStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.AccountDeletionResetCoordinatorTest' --tests 'kr.co.hanium.dreamup.walksafe.BuildProvenanceStaticTest' --tests 'kr.co.hanium.dreamup.walksafe.network.AndroidGatewaySessionCryptoLifecycleTest' && cd ../.. && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/build_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py --root . --emit-android-junit-xml && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_android_field_session_summary.py tests/test_release_evidence_gate.py && cd apps/android && ./gradlew :app:compileDebugAndroidTestKotlin :app:assembleDebug :app:lintDebug --offline --no-daemon --rerun-tasks",
+      "command_sha256": "bacab812f68731346a93066a0e0008c0870e1d35d18d22f9ba4286721c926996",
+      "run_id": "fp048-android-protected-storage-d2460f252567da5e",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/android-protected-storage.log",
+      "output_sha256": "bdb1dba28f3cf72219e4f8590433d4a7cb5ba01f6805828a0887c60103d38280",
+      "started_at": "2026-08-03T01:33:35.801447+09:00",
+      "executed_at": "2026-08-03T01:34:54.999691+09:00",
+      "execution_event_sequence": 42,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+      "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+      "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+      "binding_markers_exact_once": true,
+      "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+      "observed_assertions": {
+        "WALKSAFE_ANDROID_JUNIT_SUITES": "19",
+        "WALKSAFE_ANDROID_JUNIT_TESTS": "147",
+        "WALKSAFE_ANDROID_JUNIT_FAILURES": "0",
+        "WALKSAFE_ANDROID_JUNIT_ERRORS": "0",
+        "WALKSAFE_ANDROID_JUNIT_SKIPPED": "0",
+        "WALKSAFE_ANDROID_HOST_PYTEST_PASSED": "303",
+        "WALKSAFE_ANDROID_BUILD_STATUS": "PASS"
+      }
+    },
+    {
+      "lane_id": "HTTPS_NO_DOWNGRADE",
+      "name": "Android and Gateway HTTPS/no-downgrade boundary",
+      "status": "PASS",
+      "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --tests 'kr.co.hanium.dreamup.walksafe.network.UserNetworkSecurityBoundaryStaticTest' && cd ../android-gateway && npm run typecheck && npm test",
+      "command_sha256": "32d311ae0f2fe03c2fd0e31f71852cdb79acdb3cd5aef6bb5cd21e050de08456",
+      "run_id": "fp048-https-no-downgrade-2d3ca48809758d4b",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/https-no-downgrade.log",
+      "output_sha256": "b9585755c2a0c6c0b53b7f9b05d75a778946d8241776cead4172a85f24e4def3",
+      "started_at": "2026-08-03T01:35:01.491462+09:00",
+      "executed_at": "2026-08-03T01:35:27.383808+09:00",
+      "execution_event_sequence": 42,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+      "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+      "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+      "binding_markers_exact_once": true,
+      "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+      "observed_assertions": {
+        "WALKSAFE_ANDROID_HTTPS_STATIC_STATUS": "PASS",
+        "WALKSAFE_GATEWAY_TESTS": "77",
+        "WALKSAFE_GATEWAY_PASS": "77",
+        "WALKSAFE_GATEWAY_FAIL": "0",
+        "WALKSAFE_GATEWAY_TYPECHECK_STATUS": "PASS"
+      }
+    },
+    {
+      "lane_id": "SERVER_ORIGINAL_DB_BACKUP_BOUNDARY",
+      "name": "Server original, database and backup encryption boundary",
+      "status": "PASS",
+      "command": "PYTHONPATH=backend /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q backend/tests --ignore=backend/tests/test_reports.py --ignore=backend/tests/test_reports_v2.py --ignore=backend/tests/test_actor_rate_limit_store.py --ignore=backend/tests/test_test_storage_isolation.py && PYTHONPATH=backend /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q tests/test_report_retention_operational_safety.py tests/test_report_retention_encrypted_objects.py && PYTHONPATH=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/lib/python3.12/site-packages /home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14 -B -m pytest -p no:cacheprovider -q tests/test_walksafe_backup_integrity.py tests/test_walksafe_backup_prune.py",
+      "command_sha256": "2934073d1663bda5f67a815a1ba85d4b8e5ac2e5e1cbade40ead9c6b66fbe926",
+      "run_id": "fp048-server-original-db-backup-boundary-c90c7033f52467ae",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/server-original-db-backup-boundary.log",
+      "output_sha256": "a708576421c7d1faa2418bac4eaf90be9cab9eb022bafe4d648dbbcfdbe042f3",
+      "started_at": "2026-08-03T01:35:33.526529+09:00",
+      "executed_at": "2026-08-03T01:35:41.472636+09:00",
+      "execution_event_sequence": 42,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+      "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+      "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+      "binding_markers_exact_once": true,
+      "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+      "observed_assertions": {
+        "WALKSAFE_BACKEND_INTERNAL_PASSED": "441",
+        "WALKSAFE_BACKEND_INTERNAL_SKIPPED": "11",
+        "WALKSAFE_RETENTION_INTERNAL_PASSED": "38",
+        "WALKSAFE_BACKUP_INTERNAL_PASSED": "64",
+        "WALKSAFE_DATABASE_INTEGRATION_STATUS": "NOT_RUN",
+        "WALKSAFE_BACKUP_RESTORE_STATUS": "NOT_RUN"
+      }
+    },
+    {
+      "lane_id": "KEY_LIFECYCLE_ORIGINAL_ACCESS",
+      "name": "Key lifecycle and purpose-bound original access",
+      "status": "PASS",
+      "command": "PYTHONPATH=backend /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q backend/tests/test_report_image_crypto.py backend/tests/test_report_image_keyring.py backend/tests/test_report_original_access.py backend/tests/test_report_storage_reconciliation.py backend/tests/test_uploads.py backend/tests/test_report_policy.py backend/tests/test_field_test_security.py backend/tests/test_health_readiness.py backend/tests/test_admin_security.py backend/tests/test_openapi_contract.py tests/test_report_retention_encrypted_objects.py",
+      "command_sha256": "53651ff2d37124fa93a7fd3bb73704064bcf8b48d193e6f429dc76b0f8f7a28d",
+      "run_id": "fp048-key-lifecycle-original-access-0360d11dba5bb16a",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/key-lifecycle-original-access.log",
+      "output_sha256": "9a0e9847bfdad5b3a613b48b40a978fe4394940d5d668559ff23103f246328c9",
+      "started_at": "2026-08-03T01:35:47.607197+09:00",
+      "executed_at": "2026-08-03T01:35:53.795775+09:00",
+      "execution_event_sequence": 42,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+      "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+      "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+      "binding_markers_exact_once": true,
+      "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+      "observed_assertions": {
+        "WALKSAFE_BACKEND_FOCUSED_PASSED": "254",
+        "WALKSAFE_BACKEND_FOCUSED_SKIPPED": "11",
+        "WALKSAFE_EXTERNAL_KMS_STATUS": "NOT_RUN"
+      }
+    },
+    {
+      "lane_id": "INCIDENT_STATE_NOTICE_DECISION",
+      "name": "Incident state and notification-decision boundary",
+      "status": "PASS",
+      "command": "PYTHONPATH=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/lib/python3.12/site-packages /home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14 -B -m pytest -p no:cacheprovider -q tests/test_walksafe_backup_integrity.py tests/test_walksafe_backup_prune.py",
+      "command_sha256": "e84bd72e16b6e7b5ee70f3d2b2aed75bb587a19e188a8debb58ea76ceaa60fb8",
+      "run_id": "fp048-incident-state-notice-decision-616f0f9fd8f3c62f",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/incident-state-notice-decision.log",
+      "output_sha256": "6825802268a54c9934c592bac15465a7acc50fe7c4573726b6685fbb80b6ec3a",
+      "started_at": "2026-08-03T01:35:59.536477+09:00",
+      "executed_at": "2026-08-03T01:36:00.069186+09:00",
+      "execution_event_sequence": 42,
+      "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+      "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+      "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+      "binding_markers_exact_once": true,
+      "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+      "observed_assertions": {
+        "WALKSAFE_INCIDENT_INTERNAL_STATUS": "PASS",
+        "WALKSAFE_INCIDENT_TEST_UNIVERSE_PASSED": "64",
+        "WALKSAFE_LEGAL_REVIEW_STATUS": "NOT_RUN",
+        "WALKSAFE_PRIVACY_REVIEW_STATUS": "NOT_RUN",
+        "WALKSAFE_NOTIFICATION_EXECUTION_STATUS": "NOT_RUN"
+      }
+    }
+  ],
+  "lane_receipts": [
+    {
+      "lane_id": "ANDROID_PROTECTED_STORAGE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/android-protected-storage-receipt.json",
+      "sha256": "b3c053cd1f13c8cdbe2d98b236158c41da52166419111b51bee90d33fc06fe47",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/android-protected-storage.log",
+      "log_sha256": "bdb1dba28f3cf72219e4f8590433d4a7cb5ba01f6805828a0887c60103d38280"
+    },
+    {
+      "lane_id": "HTTPS_NO_DOWNGRADE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/https-no-downgrade-receipt.json",
+      "sha256": "3be93f9ce630a60489d0f722ba9784dbeb256cbca127ef3fb37d9aba659b822e",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/https-no-downgrade.log",
+      "log_sha256": "b9585755c2a0c6c0b53b7f9b05d75a778946d8241776cead4172a85f24e4def3"
+    },
+    {
+      "lane_id": "SERVER_ORIGINAL_DB_BACKUP_BOUNDARY",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/server-original-db-backup-boundary-receipt.json",
+      "sha256": "f4d442651baeeaff00251eb97b22a410ed1962608f31ec7ae4e2cad8ce039bad",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/server-original-db-backup-boundary.log",
+      "log_sha256": "a708576421c7d1faa2418bac4eaf90be9cab9eb022bafe4d648dbbcfdbe042f3"
+    },
+    {
+      "lane_id": "KEY_LIFECYCLE_ORIGINAL_ACCESS",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/key-lifecycle-original-access-receipt.json",
+      "sha256": "b0431e16561bd83904b7273613b91c3da1ab056baa8b4404dd9bb593b16436d6",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/key-lifecycle-original-access.log",
+      "log_sha256": "9a0e9847bfdad5b3a613b48b40a978fe4394940d5d668559ff23103f246328c9"
+    },
+    {
+      "lane_id": "INCIDENT_STATE_NOTICE_DECISION",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/incident-state-notice-decision-receipt.json",
+      "sha256": "c6423d247edf95da2ca14bc7f80182726f02363510954c59ad6b8fec0e8f3ce9",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/incident-state-notice-decision.log",
+      "log_sha256": "6825802268a54c9934c592bac15465a7acc50fe7c4573726b6685fbb80b6ec3a"
+    }
+  ],
+  "verification_input_manifest": [
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "byte_count": 18873,
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+    }
+  ],
+  "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+  "lane_receipt_content_set_sha256": "675481401ebbfcd237ab53c5431704f4f1a9855182dcd7f9c650bdaee5cf8abe",
+  "internal_lane_count": 5,
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

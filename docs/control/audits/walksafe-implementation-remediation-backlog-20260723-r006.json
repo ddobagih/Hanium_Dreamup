@@ -1,0 +1,1419 @@
+{
+  "schema_version": "walksafe.implementation-remediation-backlog.v1",
+  "metadata": {
+    "backlog_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-006",
+    "version": "0.6.0",
+    "status": "DRAFT_DIAGNOSTIC_COMPLETE",
+    "prepared_at": "2026-07-23T08:30:00+09:00",
+    "predecessor_backlog_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+  },
+  "gap_report_content_sha256": "f777a3feda129b854e532ccd4bdfcb955db5f5615f9341c04942e60b3f7ebadb",
+  "estimation_rule": "구현 공수와 외부 검증 공수를 분리한다. S는 한 구성요소의 좁은 수정, M은 여러 구성요소 또는 계약 변경, L은 앱·서버·자료처럼 여러 시스템을 함께 바꾸거나 실기기·현장·독립검토가 필요한 범위다. 일정·비용 약속은 아니다.",
+  "target_completion_model": {
+    "IMPLEMENTATION_READY": "EPIC-01~11이 앞으로 달성해야 할 목표다. 구현과 내부 검토를 마치되 정식 시험·현장검증·출시 게이트는 EPIC-12에서 확인한다.",
+    "VERIFICATION_COMPLETE": "EPIC-12가 앞으로 달성해야 할 목표다. 고정된 구현 후보로 정식 시험과 5개 출시 게이트를 모두 완료한다.",
+    "cycle_prevention": "구현 작업은 미실행 출시 게이트를 EPIC-12로 넘길 수 있으므로, 구현과 검증이 서로의 완료를 기다리지 않는다."
+  },
+  "current_status_model": {
+    "IN_PROGRESS": "일부 내부 구현과 검증을 남겼지만 작업 묶음의 IMPLEMENTATION_READY 조건은 아직 충족하지 않았다.",
+    "PLANNED": "아직 착수 또는 완료를 주장할 실행 증거가 없는 계획 상태다."
+  },
+  "priority_rule": {
+    "P0": "안전·개인정보·인증·출시 차단 수준이다. P0끼리의 실제 순서는 wave와 next_action_sequence를 따른다.",
+    "P1": "정식 제품·운영에 필요. P0 설계와 병행하거나 직후 해결한다.",
+    "P2": "출시 전 품질·운영 완성도를 높이는 항목이다.",
+    "P3": "출시 차단은 아니며 기준선 충족 뒤 정리·최적화한다."
+  },
+  "execution_order": [
+    "EPIC-01",
+    "EPIC-02",
+    "EPIC-03",
+    "EPIC-04",
+    "EPIC-05",
+    "EPIC-06",
+    "EPIC-07",
+    "EPIC-08",
+    "EPIC-10",
+    "EPIC-09",
+    "EPIC-11",
+    "EPIC-12"
+  ],
+  "next_action_sequence": [
+    {
+      "order": 1,
+      "epic_id": "EPIC-01",
+      "wave": 0,
+      "source_policy_id": "FP-003",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "운영 관리자 자격정보와 외부 복구수단을 비밀관리 절차로 프로비저닝하고, 서버키·서명키·복구자료를 휴대전화 밖에 암호화 보관해 복원을 확인한다. 고정 형상과 실제 등록 기기로 분실 복구훈련과 연결 정식 시험을 실행한다."
+    },
+    {
+      "order": 2,
+      "epic_id": "EPIC-01",
+      "wave": 0,
+      "source_policy_id": "FP-002",
+      "priority": "P0",
+      "status": "EVIDENCE_MISSING",
+      "action": "시연, 제한된 사용자시험, 정식 공개의 세 단계를 나누고 단계마다 시작·종료 조건을 정한다. 같은 앱·서버·모델·설정 묶음으로 시험한 기록과 승인 없이는 다음 단계로 넘어가지 못하게 한다."
+    },
+    {
+      "order": 3,
+      "epic_id": "EPIC-01",
+      "wave": 0,
+      "source_policy_id": "FP-007",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "사용자·관리자 앱의 실제 서명과 분리 배포 채널을 구성하고 승인 지원기기 설치본에서 Gateway 연결 및 관련 정식 시험을 실행한다."
+    },
+    {
+      "order": 4,
+      "epic_id": "EPIC-01",
+      "wave": 0,
+      "source_policy_id": "FP-009",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "과거 외부 URL·DNS·Cloudflare 자원의 폐기 또는 접근불가와 기존 설치·캐시 PWA 비활성을 확인하고, 승인 기기 프로필을 등록해 실기기·정식 시험을 실행한다."
+    },
+    {
+      "order": 5,
+      "epic_id": "EPIC-01",
+      "wave": 0,
+      "source_policy_id": "FP-001",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "목적지를 선택하지 않은 상태에서도 가까운 위험 안내가 작동하도록 길안내와 위험안내의 경로 의존 조건을 분리하고 검증한다. 그 뒤 실제 Android 기기와 대상 사용자가 네 표면의 같은 의미와 접근성을 확인하고 TC-FP-001-01~04를 실행해 원자료·결함 연결을 남긴다."
+    },
+    {
+      "order": 6,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-017",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "준비→보행 중→일시정지→재검사→사용자 확인 후 재개 상태기계를 만들고 잠금·홈 버튼·통화·앱 전환 뒤 사용자 확인 전 자동 재개를 막는다."
+    },
+    {
+      "order": 7,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-018",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "권한·센서·경로·음성안내·모델을 재검사한 뒤에만 사용자가 보행을 재개하게 하고 재부팅·강제종료 뒤 이전 보행 자동복원을 금지한다."
+    },
+    {
+      "order": 8,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "권한·로그인·동의를 서로 다른 상태로 저장하고 철회·만료·앱 이탈·재부팅마다 종속 기능을 정확히 중지·재확인한다."
+    },
+    {
+      "order": 9,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-004",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "지원 사용자·장착·환경·안전 제한을 Android 온보딩과 시험 시나리오에 연결하고, 지원하지 않는 조건에서는 기능을 안전정지한다."
+    },
+    {
+      "order": 10,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-005",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "지원 사용자·장착·환경·안전 제한을 Android 온보딩과 시험 시나리오에 연결하고, 지원하지 않는 조건에서는 기능을 안전정지한다."
+    },
+    {
+      "order": 11,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-006",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "지원 사용자·장착·환경·안전 제한을 Android 온보딩과 시험 시나리오에 연결하고, 지원하지 않는 조건에서는 기능을 안전정지한다."
+    },
+    {
+      "order": 12,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-010",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "연령 확인, 전화번호 확인, 가입, 통합 동의, 권한, 사용훈련을 순서가 있는 첫 실행 상태기계로 구현한다."
+    },
+    {
+      "order": 13,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-011",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "Android 보안 저장소 기반 접근용·회전 갱신용 로그인 증명과 만료·재발급·재사용 탐지·기기별 원격 폐기를 구현한다."
+    },
+    {
+      "order": 14,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-013",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "원본수집·자동신고·이동통신망·학습재사용을 각각 버전 관리하는 통합 동의 화면과 서버 관리대장을 만들고 동의하지 않은 항목은 수집·전송하지 않는다."
+    },
+    {
+      "order": 15,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-015",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "동의 철회나 계정 삭제가 시작되면 해당 수집·자동신고·학습재사용을 즉시 중지하고 휴대전화 미전송 자료를 삭제하며 서버 저장자료 삭제요청과 완료확인을 연결한다."
+    },
+    {
+      "order": 16,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-014",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "카메라·위치·마이크 권한마다 허용 기능과 중지 기능을 분리하고, 거부·일시허용 만료·설정 변경 뒤에는 전체 상태를 다시 검사한 후 사용자가 명시적으로 재개하게 한다."
+    },
+    {
+      "order": 17,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-016",
+      "priority": "P1",
+      "status": "CONFLICTING",
+      "action": "정상 보행 화면을 읽기 전용 카메라·안전상태로 분리하고 개발 입력을 정식 배포본에서 제거하며 뒤로가기 즉시 일시중지와 종료 확인을 구현한다."
+    },
+    {
+      "order": 18,
+      "epic_id": "EPIC-02",
+      "wave": 1,
+      "source_policy_id": "FP-012",
+      "priority": "P1",
+      "status": "MISSING",
+      "action": "계정별 기기·세션 원장을 만들고 여러 기기 로그인은 허용하되 동시에 한 보행만 활성화되도록 서버 동시 보행 잠금과 원격 로그아웃을 구현한다."
+    },
+    {
+      "order": 19,
+      "epic_id": "EPIC-03",
+      "wave": 1,
+      "source_policy_id": "FP-047",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "운영 사용자 기기별 회전 세션과 별도 관리자 추가 인증·고위험 재확인·원격폐기·복구를 계정 기반 역할검사와 감사로그로 통합한다."
+    },
+    {
+      "order": 20,
+      "epic_id": "EPIC-03",
+      "wave": 1,
+      "source_policy_id": "FP-008",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "사용자 앱과 별개 앱 식별값·서명·세션을 쓰는 Android 관리자 앱을 만들고 로그인, 검수, 기관 전달, 감사까지 관리자 흐름을 분리한다."
+    },
+    {
+      "order": 21,
+      "epic_id": "EPIC-03",
+      "wave": 1,
+      "source_policy_id": "FP-046",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "동의·철회·전체삭제 요청/서버 연결 기능과 저장소별 삭제 연계 처리, 부분실패 재시도, 백업 복원 뒤 삭제 완료 표식 재적용, 3년 삭제영수증을 구현한다."
+    },
+    {
+      "order": 22,
+      "epic_id": "EPIC-03",
+      "wave": 1,
+      "source_policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "별도 Android 관리자 앱에 추가 본인확인/패스키, 별도 복구수단, 세션 폐기, 고위험 작업 재인증·동결과 감사로그를 구현한다."
+    },
+    {
+      "order": 23,
+      "epic_id": "EPIC-03",
+      "wave": 1,
+      "source_policy_id": "FP-048",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "휴대전화·서버 원본·데이터베이스·백업 암호화와 열쇠 분리·회전·감사를 구현하고 실제 배포 TLS·기기 및 독립 보안 검토를 수행한다."
+    },
+    {
+      "order": 24,
+      "epic_id": "EPIC-04",
+      "wave": 2,
+      "source_policy_id": "FP-022",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "남은 거리는 GPS와 저장 TMAP 경로를 기준으로, 보폭은 보조 검증으로 사용한다. GPS·경로 끝·보폭을 함께 본 뒤 사용자 확인으로 도착을 확정한다."
+    },
+    {
+      "order": 25,
+      "epic_id": "EPIC-04",
+      "wave": 2,
+      "source_policy_id": "FP-023",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "경로를 암호화해 종료 또는 24시간까지 보관하고, 이탈 때 회전안내 중지→설명→새 경로/재확인/보행종료 선택의 승인된 10단계를 구현한다."
+    },
+    {
+      "order": 26,
+      "epic_id": "EPIC-04",
+      "wave": 2,
+      "source_policy_id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "TMAP 경로, GPS, 진행방향, 보폭의 책임을 분리하고 도착은 사용자 확인으로, 이탈은 승인된 10단계 선택 흐름으로 구현한다."
+    },
+    {
+      "order": 27,
+      "epic_id": "EPIC-04",
+      "wave": 2,
+      "source_policy_id": "FP-024",
+      "priority": "P1",
+      "status": "EVIDENCE_MISSING",
+      "action": "TMAP 경로를 주 기준으로 유지하면서 휴대전화가 확인한 점자블록은 방향을 확정할 수 있을 때만 보조한다. 손상 점자블록은 경로 지시와 분리해 신고 후보로 처리하고 불확실하면 안내하지 않는다."
+    },
+    {
+      "order": 28,
+      "epic_id": "EPIC-05",
+      "wave": 2,
+      "source_policy_id": "FP-019",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "배포 적격으로 승인된 모델·탐지대상·판단 기준값만 정식 배포본에서 활성화하고 관측번호·연결확실성 추적 기록과 반복 실패 전체 안전정지를 구현한다."
+    },
+    {
+      "order": 29,
+      "epic_id": "EPIC-05",
+      "wave": 2,
+      "source_policy_id": "FP-020",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "STOP 문구를 ‘멈추세요. 주변을 확인하세요.’로 고정하고 WARNING 고유 진동, 불확실 후보 무안내, 좌우 추정 지시 금지를 계약시험으로 잠근다."
+    },
+    {
+      "order": 30,
+      "epic_id": "EPIC-05",
+      "wave": 2,
+      "source_policy_id": "FP-021",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "밝기·가림·흔들림·카메라각 사전 품질 확인 관문과 탐지대상별 거리·신뢰도 확인 관문을 구현하고 거리 미지원 제한모드는 실기기 사전시험과 사용자 확인 뒤에만 허용한다."
+    },
+    {
+      "order": 31,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-025",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "활성 보행에서만 작동하는 ‘길라잡이’ 호출어, 단말내 오프라인 한국어 음성인식, 듣기 시작·끝 신호와 원음·음성인식 보존 생명주기를 구현한다."
+    },
+    {
+      "order": 32,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-027",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "보행 시작 전 오프라인 한국어 음성안내를 확인하고 제한 재시도 후에도 실패하면 화면·진동으로 알린 뒤 모든 보행 기능을 안전정지한다."
+    },
+    {
+      "order": 33,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-029",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "권한 거부·지속 장애를 한 접근 가능한 안전정지 화면으로 통합하고 종료·설정·재검사 후 명시 재개를 Android 화면읽기 기능으로 완결한다."
+    },
+    {
+      "order": 34,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-028",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "가입·동의·권한·보행·일시중지·복구·종료·삭제요청 화면의 읽는 순서, 버튼 역할, 상태변경 알림과 포커스를 Android 화면읽기 기능으로 완결하고 화면읽기만으로 전 과정을 시험한다."
+    },
+    {
+      "order": 35,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-030",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "큰 글자, 충분한 색상 대비, 넓은 터치영역, 읽는 순서와 상태 설명을 모든 사용자 화면에 적용하고 Android 화면읽기 기능만으로 가입부터 보행 종료·복구까지 완주 시험한다."
+    },
+    {
+      "order": 36,
+      "epic_id": "EPIC-06",
+      "wave": 2,
+      "source_policy_id": "FP-026",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "승인 명령 목록과 상태전이를 모두 구현하고 판단 확실성이 없거나 낮아도 실행하지 않으며 비가역 명령은 음성·Android 화면읽기 기능으로 확인받는다."
+    },
+    {
+      "order": 37,
+      "epic_id": "EPIC-07",
+      "wave": 2,
+      "source_policy_id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "승인된 영상·음성·정확 위치·센서·경로·신고·성능 원본 자료 구조와 암호화 수집, 수신확인서, 보존·삭제 자동 처리 작업을 구현한다."
+    },
+    {
+      "order": 38,
+      "epic_id": "EPIC-07",
+      "wave": 2,
+      "source_policy_id": "NPC-DATA-LIFECYCLE",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "승인된 영상·음성·정확 위치·센서·경로·신고·성능 원본 자료 구조와 암호화 수집, 수신확인서, 보존·삭제 자동 처리 작업을 구현한다."
+    },
+    {
+      "order": 39,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-031",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "자동신고 동의를 지속 설정으로 저장하고 반복관측 후보는 보행 종료 뒤 암호화 전송 대기함에 넣어 허용된 통신망에서만 조용히 전송한다."
+    },
+    {
+      "order": 40,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-032",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "고정 신고번호와 암호화 영속 대기열, 서버 idempotency·상태조회·수신확인·부분실패 복구를 구현하고 응답 유실과 동시 재시도를 시험한다."
+    },
+    {
+      "order": 41,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-035",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "보행 중에는 인터넷 연결 전송 자체를 금지하고, 정지 뒤 Wi-Fi 또는 이동통신망 사용에 대한 명시적 동의일 때만 이어보내며 움직임 재개 즉시 중단한다."
+    },
+    {
+      "order": 42,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "NPC-AUTO-REPORT",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "보행 중 전송 금지, 종료 후 Wi-Fi 우선, 이동통신망 사용에 대한 명시적 동의, 재부팅 후 이어보내기와 조용한 용량 보류를 구현한다."
+    },
+    {
+      "order": 43,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-034",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "영상·색상 영상·거리·깊이 정보·음성·음성인식·정확 위치·센서·경로·탐지·신고·성능을 수집 시 압축 원본으로 묶는 보행 1회·구간 자료 구조와 암호화 저장을 구현한다."
+    },
+    {
+      "order": 44,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-036",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "원본 조각별 SHA-256 수신확인서와 서버 영속 확인 뒤 단말 사본 삭제를 연결하고 14일·7일·3년·35일 등 승인된 저장소별 보존·삭제 자동 처리 작업을 구현한다."
+    },
+    {
+      "order": 45,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "NPC-PHONE-QUEUE-CAPACITY",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "보행 중 전송 금지, 종료 후 Wi-Fi 우선, 이동통신망 사용에 대한 명시적 동의, 재부팅 후 이어보내기와 조용한 용량 보류를 구현한다."
+    },
+    {
+      "order": 46,
+      "epic_id": "EPIC-08",
+      "wave": 3,
+      "source_policy_id": "FP-033",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "Android 관리자 앱에 접수·검수·기각사유·기관제출·기관수신·해결 상태를 분리하고 제출본 판본과 수신증거를 감사로그에 남긴다."
+    },
+    {
+      "order": 47,
+      "epic_id": "EPIC-10",
+      "wave": 3,
+      "source_policy_id": "FP-037",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "후보 모델은 명명된 통제 시연에서만 사용하고 정식 배포본 위험안내·자동신고·기관 반출은 승인 모델·앱·설정 한 묶음일 때만 허용한다."
+    },
+    {
+      "order": 48,
+      "epic_id": "EPIC-10",
+      "wave": 3,
+      "source_policy_id": "FP-039",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "앱·서버·모델·탐지대상·판단 기준값·설정·데이터베이스 세대를 하나의 서명 구성 목록으로 묶고 승인된 이전 정상 조합으로만 중간 상태 없이 되돌아가도록 구현·훈련한다."
+    },
+    {
+      "order": 49,
+      "epic_id": "EPIC-10",
+      "wave": 3,
+      "source_policy_id": "FP-038",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "출처·동의 관리대장과 내용 지문, 촬영 순서가 섞이지 않은 분할, 잠긴 독립시험셋, 독립평가·실폰시험·철회자료 제거를 완료한다."
+    },
+    {
+      "order": 50,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-043",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "카메라·거리·위치·위험판정·음성안내 실패를 중앙 안전상태 제어기에 모아 핵심 기능 불신 시 모두 정지하고 사용자 재확인 뒤에만 재개한다."
+    },
+    {
+      "order": 51,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-044",
+      "priority": "P0",
+      "status": "CONFLICTING",
+      "action": "30일 암호화 영속 전송 대기함, 보행 중 전송 금지, 정지+통신망 동의, 중복 처리 방지값·정보 유효시간·용량 계약을 구현하고 비행기모드·재부팅·전송 대기함이 가득 찬 상태을 시험한다."
+    },
+    {
+      "order": 52,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-045",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "저장공간·배터리·발열·영상 취득 후 지난 시간·추론지연을 감시해 승인된 축소 순서와 전체 정지 기준을 적용하고 실제 지원폰 장시간 측정으로 수치를 확정한다."
+    },
+    {
+      "order": 53,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "원본 대용량 파일 저장소와 데이터베이스 메타데이터를 분리하고 70/85/95/100% 용량정책, 백업·복원·비용 측정과 단말 동기화를 구현한다."
+    },
+    {
+      "order": 54,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "NPC-SERVER-STORAGE-CAPACITY",
+      "priority": "P0",
+      "status": "MISSING",
+      "action": "원본 대용량 파일 저장소와 데이터베이스 메타데이터를 분리하고 70/85/95/100% 용량정책, 백업·복원·비용 측정과 단말 동기화를 구현한다."
+    },
+    {
+      "order": 55,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-040",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "운영 계정 기반 사용자·관리자 역할검사와 모든 서버 기능을 Gateway 규칙으로 통일하고 쓰기 idempotency·자원분리·오류 계약을 구현·검증한다."
+    },
+    {
+      "order": 56,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-041",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "계정·동의·신고 메타데이터 데이터베이스와 암호화 열쇠 관리서비스 암호화 대용량 파일 저장소를 분리하고 원본 구성 목록·수신확인서·자료 구조 전환·삭제 완료 표식을 구현한다."
+    },
+    {
+      "order": 57,
+      "epic_id": "EPIC-09",
+      "wave": 4,
+      "source_policy_id": "FP-042",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "안전 요청과 대용량 작업의 내구성 자원 분리, 쓰기 idempotency, 일일 사용량·월비용 한도와 초과 대체 안내를 구현·측정한다."
+    },
+    {
+      "order": 58,
+      "epic_id": "EPIC-11",
+      "wave": 5,
+      "source_policy_id": "FP-051",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "서명된 불변 정식 배포본 구성 목록, 단계 배포, 활성 보행 중 갱신 연기, 신규 세션 새 보행 긴급 차단과 데이터 무손실 호환 가능한 이전 정상 상태로 되돌리기를 실제로 훈련한다."
+    },
+    {
+      "order": 59,
+      "epic_id": "EPIC-11",
+      "wave": 5,
+      "source_policy_id": "FP-053",
+      "priority": "P0",
+      "status": "PARTIAL",
+      "action": "주 저장소·백업 저장소 사용량·비용 자동 처리 작업, 70/85/95/100% 동작, 35일 백업 순환과 격리 복원시험을 구현하고 월 비용을 실측한다."
+    },
+    {
+      "order": 60,
+      "epic_id": "EPIC-11",
+      "wave": 5,
+      "source_policy_id": "FP-052",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "보행 안전상태, 신고 전송, 저장공간, 외부 서비스, 모델·앱 판본을 한 운영 현황판에 모으고 단계별 알림·자동차단·담당자 호출·비상대응 절차를 실제 장애훈련으로 검증한다."
+    },
+    {
+      "order": 61,
+      "epic_id": "EPIC-11",
+      "wave": 5,
+      "source_policy_id": "FP-054",
+      "priority": "P1",
+      "status": "PARTIAL",
+      "action": "진행 중 보행의 안전 종료·신규 보행 차단·안전한 자료 구조 전환·이전 정상 상태로 되돌리기·서비스 종료·자료 이관/삭제 절차를 한 출시 후보 묶음에서 훈련해 실행 증거를 남긴다."
+    },
+    {
+      "order": 62,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "FP-049",
+      "priority": "P0",
+      "status": "EVIDENCE_MISSING",
+      "action": "하나의 불변 출시 후보 묶음을 지정해 자동·실폰 처음부터 끝까지의 전체 과정·접근성·현장·개인정보·보안 시험을 모두 실행하고 중대결함 0과 5개 확인 관문 종료 뒤 TST-22를 판단한다."
+    },
+    {
+      "order": 63,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "FP-050",
+      "priority": "P0",
+      "status": "EVIDENCE_MISSING",
+      "action": "지원폰별 전체 기능 동시 장시간 성능·열·배터리·전송 대기함을 측정하고 안전요원·중단계획 아래 목표사용자 현장시험을 수행한다."
+    },
+    {
+      "order": 64,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "action": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다."
+    },
+    {
+      "order": 65,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "action": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다."
+    },
+    {
+      "order": 66,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "action": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다."
+    },
+    {
+      "order": 67,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "action": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다."
+    },
+    {
+      "order": 68,
+      "epic_id": "EPIC-12",
+      "wave": 6,
+      "source_policy_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "priority": "P0",
+      "status": "BLOCKED",
+      "action": "게이트별 측정·독립검토·복구훈련을 실제로 수행하고 승인된 증거와 결론을 연결한다. 문서 작성이나 단위시험으로 대체하지 않는다."
+    }
+  ],
+  "epics": [
+    {
+      "epic_id": "EPIC-01",
+      "title": "제품 경계와 Web 앱 오염 제거",
+      "priority": "P0",
+      "wave": 0,
+      "source_policy_ids": [
+        "FP-001",
+        "FP-002",
+        "FP-003",
+        "FP-007",
+        "FP-009"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-003",
+        "FP-002",
+        "FP-007",
+        "FP-009",
+        "FP-001"
+      ],
+      "gap_ids": [
+        "GAP-010",
+        "GAP-011",
+        "GAP-012",
+        "GAP-016",
+        "GAP-018"
+      ],
+      "dependencies": [],
+      "owner_roles": [
+        "Android 기술책임자"
+      ],
+      "effort_mix": {
+        "M": 5
+      },
+      "current_status": "IN_PROGRESS",
+      "current_status_reason": "Phase F에서 첫 화면·동의·사용설명·릴리스 설명의 제품 목적과 안전 한계를 내부 정합화했지만 목적지 없는 위험안내·운영 서명·배포·실기기·접근성·정식 시험이 남아 IMPLEMENTATION_READY가 아니다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1,
+      "completed_internal_phases": [
+        "PHASE_A_PRODUCT_BOUNDARY_INTERNAL",
+        "PHASE_B_ADMIN_AUTH_RECOVERY_INTERNAL",
+        "PHASE_C_RUNTIME_METRIC_PREFLIGHT_INTERNAL",
+        "PHASE_D_LEGACY_WEB_EXTERNAL_CLOSURE_INTERNAL",
+        "PHASE_E_ANDROID_GATEWAY_EXTRACTION_INTERNAL",
+        "PHASE_F_PRODUCT_PURPOSE_AND_SAFETY_SURFACES_INTERNAL"
+      ],
+      "phase_b_policy_status": {
+        "source_policy_id": "FP-003",
+        "gap_id": "GAP-012",
+        "status": "PARTIAL",
+        "formal_test_status": "NOT_RUN",
+        "recovery_gate_status": "NOT_RUN"
+      },
+      "open_internal_work": [
+        "EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE"
+      ],
+      "phase_c_policy_status": {
+        "source_policy_id": "FP-009",
+        "gap_id": "GAP-018",
+        "status": "PARTIAL",
+        "formal_test_status": "NOT_RUN",
+        "actual_device_test_status": "NOT_RUN",
+        "approved_production_profile_count": 0
+      },
+      "phase_d_policy_status": [
+        {
+          "source_policy_id": "FP-007",
+          "gap_id": "GAP-016",
+          "status_before": "CONFLICTING",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-009",
+          "gap_id": "GAP-018",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        }
+      ],
+      "legacy_web_technical_closure_status": "COMPLETE_WITHOUT_RUNTIME_ALLOWLIST_INTERNAL",
+      "phase_e_policy_status": [
+        {
+          "source_policy_id": "FP-007",
+          "gap_id": "GAP-016",
+          "review_kind": "DIRECT_REASSESSMENT",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-009",
+          "gap_id": "GAP-018",
+          "review_kind": "DIRECT_REASSESSMENT",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-011",
+          "gap_id": "GAP-020",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "MISSING",
+          "status_after": "MISSING",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-032",
+          "gap_id": "GAP-041",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "CONFLICTING",
+          "status_after": "CONFLICTING",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-040",
+          "gap_id": "GAP-049",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-042",
+          "gap_id": "GAP-051",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-047",
+          "gap_id": "GAP-056",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "CONFLICTING",
+          "status_after": "CONFLICTING",
+          "formal_test_status": "NOT_RUN"
+        },
+        {
+          "source_policy_id": "FP-048",
+          "gap_id": "GAP-057",
+          "review_kind": "IMPACT_REVIEW",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        }
+      ],
+      "android_gateway_extraction_status": "INTERNAL_IMPLEMENTATION_VERIFIED_NOT_DEPLOYED",
+      "gateway_deployment_status": "NOT_RUN",
+      "gateway_actual_device_status": "NOT_RUN",
+      "phase_f_policy_status": [
+        {
+          "source_policy_id": "FP-001",
+          "gap_id": "GAP-010",
+          "review_kind": "DIRECT_REASSESSMENT",
+          "status_before": "PARTIAL",
+          "status_after": "PARTIAL",
+          "formal_test_status": "NOT_RUN"
+        }
+      ],
+      "purpose_surfaces_status": "INTERNAL_IMPLEMENTATION_VERIFIED",
+      "rel17_user_guide_status": "DRAFT_NOT_APPROVED",
+      "rel09_release_description_status": "PLANNED_NOT_RUN_NOT_PUBLISHED"
+    },
+    {
+      "epic_id": "EPIC-02",
+      "title": "안전한 보행 상태와 권한",
+      "priority": "P0",
+      "wave": 1,
+      "source_policy_ids": [
+        "NPC-PERMISSION-SESSION-LIFECYCLE",
+        "FP-004",
+        "FP-005",
+        "FP-006",
+        "FP-010",
+        "FP-011",
+        "FP-012",
+        "FP-013",
+        "FP-014",
+        "FP-015",
+        "FP-016",
+        "FP-017",
+        "FP-018"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-017",
+        "FP-018",
+        "NPC-PERMISSION-SESSION-LIFECYCLE",
+        "FP-004",
+        "FP-005",
+        "FP-006",
+        "FP-010",
+        "FP-011",
+        "FP-013",
+        "FP-015",
+        "FP-014",
+        "FP-016",
+        "FP-012"
+      ],
+      "gap_ids": [
+        "GAP-006",
+        "GAP-013",
+        "GAP-014",
+        "GAP-015",
+        "GAP-019",
+        "GAP-020",
+        "GAP-021",
+        "GAP-022",
+        "GAP-023",
+        "GAP-024",
+        "GAP-025",
+        "GAP-026",
+        "GAP-027"
+      ],
+      "dependencies": [
+        "EPIC-01"
+      ],
+      "owner_roles": [
+        "Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 11,
+        "M": 2
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1
+    },
+    {
+      "epic_id": "EPIC-03",
+      "title": "계정·관리자 앱·보안",
+      "priority": "P0",
+      "wave": 1,
+      "source_policy_ids": [
+        "NPC-SINGLE-ADMIN-RECOVERY",
+        "FP-008",
+        "FP-046",
+        "FP-047",
+        "FP-048"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-047",
+        "FP-008",
+        "FP-046",
+        "NPC-SINGLE-ADMIN-RECOVERY",
+        "FP-048"
+      ],
+      "gap_ids": [
+        "GAP-008",
+        "GAP-017",
+        "GAP-055",
+        "GAP-056",
+        "GAP-057"
+      ],
+      "dependencies": [
+        "EPIC-01"
+      ],
+      "owner_roles": [
+        "보안·개인정보책임자"
+      ],
+      "effort_mix": {
+        "L": 5
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 2
+    },
+    {
+      "epic_id": "EPIC-04",
+      "title": "경로·도착·이탈 사용자 결정 흐름",
+      "priority": "P0",
+      "wave": 2,
+      "source_policy_ids": [
+        "NPC-NAVIGATION-ROUTE-DIRECTION",
+        "FP-022",
+        "FP-023",
+        "FP-024"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-022",
+        "FP-023",
+        "NPC-NAVIGATION-ROUTE-DIRECTION",
+        "FP-024"
+      ],
+      "gap_ids": [
+        "GAP-007",
+        "GAP-031",
+        "GAP-032",
+        "GAP-033"
+      ],
+      "dependencies": [
+        "EPIC-02"
+      ],
+      "owner_roles": [
+        "Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 3,
+        "M": 1
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1
+    },
+    {
+      "epic_id": "EPIC-05",
+      "title": "객체탐지·위험안내 안전성",
+      "priority": "P0",
+      "wave": 2,
+      "source_policy_ids": [
+        "FP-019",
+        "FP-020",
+        "FP-021"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-019",
+        "FP-020",
+        "FP-021"
+      ],
+      "gap_ids": [
+        "GAP-028",
+        "GAP-029",
+        "GAP-030"
+      ],
+      "dependencies": [
+        "EPIC-02"
+      ],
+      "owner_roles": [
+        "AI·Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 3
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 2
+    },
+    {
+      "epic_id": "EPIC-06",
+      "title": "음성·진동·접근성",
+      "priority": "P0",
+      "wave": 2,
+      "source_policy_ids": [
+        "FP-025",
+        "FP-026",
+        "FP-027",
+        "FP-028",
+        "FP-029",
+        "FP-030"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-025",
+        "FP-027",
+        "FP-029",
+        "FP-028",
+        "FP-030",
+        "FP-026"
+      ],
+      "gap_ids": [
+        "GAP-034",
+        "GAP-035",
+        "GAP-036",
+        "GAP-037",
+        "GAP-038",
+        "GAP-039"
+      ],
+      "dependencies": [
+        "EPIC-02"
+      ],
+      "owner_roles": [
+        "Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 6
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 3
+    },
+    {
+      "epic_id": "EPIC-07",
+      "title": "원본 수집·보존·삭제",
+      "priority": "P0",
+      "wave": 2,
+      "source_policy_ids": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "ordered_source_policy_ids": [
+        "NPC-RAW-ORIGINAL-COLLECTION",
+        "NPC-DATA-LIFECYCLE"
+      ],
+      "gap_ids": [
+        "GAP-001",
+        "GAP-002"
+      ],
+      "dependencies": [
+        "EPIC-02",
+        "EPIC-03"
+      ],
+      "owner_roles": [
+        "보안·개인정보책임자"
+      ],
+      "effort_mix": {
+        "L": 2
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 4
+    },
+    {
+      "epic_id": "EPIC-08",
+      "title": "자동신고 암호화 전송 대기함과 전송",
+      "priority": "P0",
+      "wave": 3,
+      "source_policy_ids": [
+        "NPC-PHONE-QUEUE-CAPACITY",
+        "NPC-AUTO-REPORT",
+        "FP-031",
+        "FP-032",
+        "FP-033",
+        "FP-034",
+        "FP-035",
+        "FP-036"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "NPC-AUTO-REPORT",
+        "FP-034",
+        "FP-036",
+        "NPC-PHONE-QUEUE-CAPACITY",
+        "FP-033"
+      ],
+      "gap_ids": [
+        "GAP-004",
+        "GAP-005",
+        "GAP-040",
+        "GAP-041",
+        "GAP-042",
+        "GAP-043",
+        "GAP-044",
+        "GAP-045"
+      ],
+      "dependencies": [
+        "EPIC-02",
+        "EPIC-03",
+        "EPIC-07"
+      ],
+      "owner_roles": [
+        "Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 8
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1
+    },
+    {
+      "epic_id": "EPIC-10",
+      "title": "AI 모델 수명주기",
+      "priority": "P0",
+      "wave": 3,
+      "source_policy_ids": [
+        "FP-037",
+        "FP-038",
+        "FP-039"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-037",
+        "FP-039",
+        "FP-038"
+      ],
+      "gap_ids": [
+        "GAP-046",
+        "GAP-047",
+        "GAP-048"
+      ],
+      "dependencies": [
+        "EPIC-05",
+        "EPIC-07"
+      ],
+      "owner_roles": [
+        "AI·Android 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 3
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 2
+    },
+    {
+      "epic_id": "EPIC-09",
+      "title": "서버 저장·용량·장애대응",
+      "priority": "P0",
+      "wave": 4,
+      "source_policy_ids": [
+        "NPC-SERVER-STORAGE-CAPACITY",
+        "NPC-SERVER-CAPACITY-STATE-SYNC",
+        "FP-040",
+        "FP-041",
+        "FP-042",
+        "FP-043",
+        "FP-044",
+        "FP-045"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-043",
+        "FP-044",
+        "FP-045",
+        "NPC-SERVER-CAPACITY-STATE-SYNC",
+        "NPC-SERVER-STORAGE-CAPACITY",
+        "FP-040",
+        "FP-041",
+        "FP-042"
+      ],
+      "gap_ids": [
+        "GAP-003",
+        "GAP-009",
+        "GAP-049",
+        "GAP-050",
+        "GAP-051",
+        "GAP-052",
+        "GAP-053",
+        "GAP-054"
+      ],
+      "dependencies": [
+        "EPIC-03",
+        "EPIC-07",
+        "EPIC-08"
+      ],
+      "owner_roles": [
+        "백엔드·운영 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 6,
+        "M": 2
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1
+    },
+    {
+      "epic_id": "EPIC-11",
+      "title": "Android 릴리스·운영·복구 구현 준비",
+      "priority": "P0",
+      "wave": 5,
+      "source_policy_ids": [
+        "FP-051",
+        "FP-052",
+        "FP-053",
+        "FP-054"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-051",
+        "FP-053",
+        "FP-052",
+        "FP-054"
+      ],
+      "gap_ids": [
+        "GAP-060",
+        "GAP-061",
+        "GAP-062",
+        "GAP-063"
+      ],
+      "dependencies": [
+        "EPIC-09",
+        "EPIC-10"
+      ],
+      "owner_roles": [
+        "백엔드·운영 기술책임자"
+      ],
+      "effort_mix": {
+        "L": 3,
+        "M": 1
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "IMPLEMENTATION_READY",
+      "implementation_done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "release_verification_done_when": "EPIC-12에서 연결된 정식 시험과 출시 게이트를 별도로 완료해야 한다.",
+      "deferred_release_gate_ids": [
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "코드·인터페이스·단위/구성요소 인수조건을 구현하고 검토한다. 아직 실행하지 않은 현장·독립검토·출시 게이트는 EPIC-12에 넘기며, 그것 때문에 이 구현 준비 상태를 서로 기다리게 하지 않는다.",
+      "rank_within_wave": 1
+    },
+    {
+      "epic_id": "EPIC-12",
+      "title": "정식 시험·현장 검증·5개 게이트",
+      "priority": "P0",
+      "wave": 6,
+      "source_policy_ids": [
+        "FP-049",
+        "FP-050",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "ordered_source_policy_ids": [
+        "FP-049",
+        "FP-050",
+        "GATE-CLOUD-COST-MEASUREMENT",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "gap_ids": [
+        "GAP-058",
+        "GAP-059",
+        "GAP-064",
+        "GAP-065",
+        "GAP-066",
+        "GAP-067",
+        "GAP-068"
+      ],
+      "dependencies": [
+        "EPIC-04",
+        "EPIC-05",
+        "EPIC-06",
+        "EPIC-08",
+        "EPIC-09",
+        "EPIC-10",
+        "EPIC-11"
+      ],
+      "owner_roles": [
+        "QA책임자"
+      ],
+      "effort_mix": {
+        "L": 7
+      },
+      "current_status": "PLANNED",
+      "current_status_reason": "아직 이 작업 묶음의 구현·정식 검증 완료 증거를 만들지 않았다.",
+      "target_completion_level": "VERIFICATION_COMPLETE",
+      "implementation_done_when": "해당 없음. 앞 작업 묶음에서 구현 준비가 끝난 뒤 정식 검증만 수행한다.",
+      "release_verification_done_when": "연결된 279개 정식 시험 중 해당 범위를 승인 환경에서 실행하고, 5개 게이트를 모두 닫으며, P0/P1 결함이 열려 있지 않다.",
+      "deferred_release_gate_ids": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+      ],
+      "done_when": "연결된 279개 정식 시험 중 해당 범위를 승인 환경에서 실행하고, 5개 게이트를 모두 닫으며, P0/P1 결함이 열려 있지 않다.",
+      "rank_within_wave": 1
+    }
+  ],
+  "authorization_boundary": {
+    "implementation_change_authorized": false,
+    "baseline_change_authorized": false,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gates_waived": false,
+    "formal_test_completion_claimed": false,
+    "deployment_completion_claimed": false,
+    "actual_device_completion_claimed": false
+  },
+  "source_predecessor": {
+    "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r005.json",
+    "file_sha256": "d0479054d9a0a374ebe34dc0726f791c4e81095cfd3d4ca834bd1340be60d298",
+    "preserved_unchanged": true
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-01",
+    "work_item_id": "EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE",
+    "source_policy_id": "FP-001",
+    "status": "PLANNED_NEXT_WITHIN_IN_PROGRESS_EPIC",
+    "action": "목적지를 선택하지 않은 상태에서도 가까운 위험 안내가 작동하도록 길안내와 위험안내의 경로 의존 조건을 분리하고 검증한다."
+  },
+  "backlog_content_sha256": "41a426ad53d6e9fc948602d3b634ed2620ba8e40ad9aae05749b9ac9d8048885"
+}

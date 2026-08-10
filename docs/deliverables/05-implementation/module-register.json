@@ -1,0 +1,3748 @@
+{
+  "approval_boundary": {
+    "implementation_completion_claimed": false,
+    "module_inventory_complete_for_current_tracked_tree": false,
+    "module_inventory_completion_reason": "모듈별 세부 소유·인터페이스·배포 단위와 중복 경계를 사람이 검토해야 한다.",
+    "policy_alignment_complete": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "assignment_metrics": {
+    "multiply_assigned_file_count": 16,
+    "multiply_assigned_sample_paths": [
+      "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+      "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+      "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileFrameCoordinator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidance.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicy.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt"
+    ],
+    "source_file_count": 588,
+    "unassigned_file_count": 0,
+    "unassigned_sample_paths": []
+  },
+  "fp008_artifact_trace_successor": {
+    "gap_id": "GAP-017",
+    "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+    "input_bindings": [
+      {
+        "byte_length": 25263,
+        "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-IMPLEMENTATION-20260803-001",
+        "name": "fp008_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/implementation-record.json",
+        "relation": "FP008_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "d5d7eca6873b5b5744c6ad8a0f55b41f0b4a94cb0aa109381a9b05c6b64aee9b"
+      },
+      {
+        "byte_length": 12250,
+        "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-VERIFICATION-20260803-001",
+        "name": "fp008_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/verification-result.json",
+        "relation": "FP008_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "916e79d6b7a63e9c1648125a09e2a26cb6ffd7f6779887e10ad7c7ddd1b26fad"
+      },
+      {
+        "byte_length": 509405,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260809-024",
+        "name": "fp008_gap017_r024_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260809-r024.json",
+        "relation": "GAP017_R024_SUCCESSOR_RESULT",
+        "sha256": "e9e95998875660663ad7d573cf193ad7b80de12fc64a1d5ecda1285ff71b38e0"
+      }
+    ],
+    "physical_path": "docs/deliverables/05-implementation/module-register.json",
+    "policy_id": "FP-008",
+    "predecessor_sha256": "9fce017a938ff163f2f863047e280bf0dff2fe100914db6208bcca5c7ede3284",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json",
+      "docs/deliverables/00-control/artifact-register.json"
+    ],
+    "successor_id": "WS-FP008-ARTIFACT-TRACE-SUCCESSOR-20260803-001",
+    "trace_boundary": {
+      "actual_device_credit_count": 0,
+      "actual_device_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_verification_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "planned_test_ids": [
+        "TC-FP-008-01",
+        "TC-FP-008-02",
+        "TC-FP-008-03",
+        "TC-FP-008-04"
+      ],
+      "production_credit_count": 0,
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_FP008_ARTIFACT_TRACE_ONLY"
+    }
+  },
+  "fp008_successor_content_sha256": "29634879e15896b3e8cc82521b008d0cb40ef007de47f8dfbe0541d035e1e0b1",
+  "fp046_artifact_trace_successor": {
+    "gap_id": "GAP-055",
+    "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+    "input_bindings": [
+      {
+        "byte_length": 36254,
+        "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-IMPLEMENTATION-20260810-001",
+        "name": "fp046_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/implementation-record.json",
+        "relation": "FP046_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6"
+      },
+      {
+        "byte_length": 3809,
+        "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-VERIFICATION-20260810-001",
+        "name": "fp046_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/verification-result.json",
+        "relation": "FP046_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+      },
+      {
+        "byte_length": 533282,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260810-025",
+        "name": "fp046_gap055_r025_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json",
+        "relation": "GAP055_R025_SUCCESSOR_RESULT",
+        "sha256": "082a688ae32b068418d007111560802be3376deeee6cad526432a69b9d0321a1"
+      }
+    ],
+    "physical_path": "docs/deliverables/05-implementation/module-register.json",
+    "policy_id": "FP-046",
+    "predecessor_sha256": "bdbb190c64665f07afedbddcb3d31d41a5b140ebb9e466288b17445e3d4f3e08",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json",
+      "docs/deliverables/00-control/artifact-register.json"
+    ],
+    "successor_id": "WS-FP046-ARTIFACT-TRACE-SUCCESSOR-20260810-001",
+    "trace_boundary": {
+      "actual_device_credit_count": 0,
+      "actual_device_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_verification_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "planned_test_ids": [
+        "TC-FP-046-01",
+        "TC-FP-046-02",
+        "TC-FP-046-03",
+        "TC-FP-046-04",
+        "TC-FP-046-05"
+      ],
+      "production_credit_count": 0,
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_FP046_ARTIFACT_TRACE_ONLY"
+    }
+  },
+  "fp046_successor_content_sha256": "a8239078215639073681d341001f69f639d80f5767ae0f0f1b6ad498ddbd6eab",
+  "fp048_artifact_trace_successor": {
+    "builder": {
+      "byte_length": 163993,
+      "path": "scripts/build_walksafe_fp048_artifact_trace_successor_20260802.py",
+      "sha256": "33452d417f49cbd2693d243145be128605099efefe0684a4d3dff9a171d035f2"
+    },
+    "claim_boundary": {
+      "actual_device_credit_count": 0,
+      "actual_device_status": "NOT_RUN",
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_verification_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "production_credit_count": 0,
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_FP048_SOURCE_AND_AUTOMATED_VERIFICATION_ONLY"
+    },
+    "input_bindings": [
+      {
+        "byte_length": 39009,
+        "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-IMPLEMENTATION-20260802-001",
+        "name": "fp048_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/implementation-record.json",
+        "relation": "FP048_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "1990e550ffaab170dded19d4db9ac35fcff13594efd9c553e563fc76ee35fb39"
+      },
+      {
+        "byte_length": 15344,
+        "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-VERIFICATION-20260802-001",
+        "name": "fp048_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/verification-result.json",
+        "relation": "FP048_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "499b2dd4651b7efa73a2d8904daa4aaea0eca6ac94e6734d4c6660fe0dc3160c"
+      },
+      {
+        "byte_length": 518931,
+        "name": "fp048_gap057_r023_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.json",
+        "relation": "GAP057_R023_SUCCESSOR_RESULT",
+        "report_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260802-023",
+        "sha256": "34d4b8a4a05ac346e48293344dbf17e10cb65a792e85c5df42f69a7d63c09f82"
+      }
+    ],
+    "predecessor": {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48"
+    },
+    "prepared_on": "2026-08-02",
+    "publication_concurrency_contract": {
+      "contract_id": "WALKSAFE-FP048-COOPERATIVE-SINGLE-PUBLISHER-V1",
+      "cooperative_contention_behavior": "SERIALIZE_UNDER_THE_SAME_REPOSITORY_INODE_LOCK",
+      "lock_primitive": "FLOCK_EX_ON_HELD_REPOSITORY_ROOT_FD",
+      "lock_scope": "PREFLIGHT_THROUGH_POST_CLEANUP_SUCCESSOR_CHECK",
+      "required_identity_checks": [
+        "HELD_LOCK_FD",
+        "REPOSITORY_ROOT_PATH",
+        "HELD_OUTPUT_DIRECTORY_FDS",
+        "TRANSACTION_MEMBER_RETAINED_FD_AND_PATH_BEFORE_AND_AFTER_MUTATION"
+      ],
+      "supported_concurrency_model": "ONE_AUTHORIZED_PUBLISHER_HOLDING_THE_REPOSITORY_INODE_EXCLUSIVE_LOCK",
+      "unexpected_identity_change_behavior": "FAIL_CLOSED_WITHOUT_FOREIGN_OVERWRITE",
+      "unsupported_threat_model": [
+        "SAME_UID_ACTOR_IGNORING_THE_COOPERATIVE_LOCK",
+        "HOSTILE_BASENAME_REPLACEMENT_INSIDE_A_TRUSTED_SYSCALL_BOUNDARY"
+      ]
+    },
+    "successor_id": "WS-FP048-ARTIFACT-TRACE-SUCCESSOR-20260802-001"
+  },
+  "fp048_successor_content_sha256": "53011d9b038142638b1f0196eb5e747c130b97168bc7197cdc442ac76e74c107",
+  "known_source_policy_issues": [
+    {
+      "affected_module_ids": [
+        "MOD-ANDROID-USER",
+        "MOD-BACKEND"
+      ],
+      "approval_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "approval_boundary": "사용자 정규화 지시는 포착했으나 새 산출물 묶음 승인 전이므로 관련 구현 확정과 정식 시험 실행은 시작하지 않는다.",
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "correction_candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+      "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_and_test_readiness": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "normalized_policy": {
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다."
+      },
+      "owner_clarification_required": false,
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "status": "OPEN_OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL"
+    }
+  ],
+  "metadata": {
+    "approval_status": "NOT_APPROVED",
+    "artifact_type_ids": [
+      "DEV-18"
+    ],
+    "as_of": "2026-07-21",
+    "freshness_status": "CURRENT_DRAFT",
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py",
+    "lifecycle_status": "DRAFT",
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "title": "WalkSafe 프로그램·모듈 목록",
+    "verification_status": "NOT_RUN",
+    "version": "0.1.0"
+  },
+  "modules": [
+    {
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "build_artifacts": [
+        "Android 사용자 앱 APK/AAB — 아직 정식 build hash 없음"
+      ],
+      "bundled_approval_dependency_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "current_fact": "Android 소스와 단위·기기 시험 코드가 존재한다.",
+      "deployment_artifacts": [
+        "사용자 앱 설치본 — 아직 미승인"
+      ],
+      "deprecation_status": "ACTIVE_PRODUCT_CANDIDATE",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19",
+        "DES-22"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-04",
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-14",
+          "design_id": "DES-14",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-14",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-15",
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-19",
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-22",
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19",
+        "DES-22"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "formal_branch_implementation_and_test_frozen": true,
+      "fp035_dependency_relation": "DIRECT_MOBILE_NETWORK_BRANCH_IMPLEMENTATION_DEPENDENCY",
+      "fp046_internal_trace": {
+        "actual_device_credit_count": 0,
+        "actual_device_status": "NOT_RUN",
+        "approval_credit_count": 0,
+        "artifact_approval_claimed": false,
+        "external_evidence_credit_count": 0,
+        "external_verification_status": "NOT_RUN",
+        "formal_test_credit_count": 0,
+        "formal_test_status": "NOT_RUN",
+        "internal_implementation_status": "PASS",
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-ANDROID-USER",
+        "planned_test_ids": [
+          "TC-FP-046-01",
+          "TC-FP-046-02",
+          "TC-FP-046-03",
+          "TC-FP-046-04",
+          "TC-FP-046-05"
+        ],
+        "producer_inputs": [
+          {
+            "byte_length": 36254,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-IMPLEMENTATION-20260810-001",
+            "name": "fp046_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/implementation-record.json",
+            "relation": "FP046_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6"
+          },
+          {
+            "byte_length": 3809,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-VERIFICATION-20260810-001",
+            "name": "fp046_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/verification-result.json",
+            "relation": "FP046_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+          },
+          {
+            "byte_length": 533282,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260810-025",
+            "name": "fp046_gap055_r025_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json",
+            "relation": "GAP055_R025_SUCCESSOR_RESULT",
+            "sha256": "082a688ae32b068418d007111560802be3376deeee6cad526432a69b9d0321a1"
+          }
+        ],
+        "production_credit_count": 0,
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "review_or_completion_inputs_included": false,
+        "scope": "REPOSITORY_INTERNAL_FP046_ARTIFACT_TRACE_ONLY",
+        "source_content_set_sha256": "9fc167c05f52571eec86f9a5f253a86de58a87190fabbb7d0443e3e340d8dc0d",
+        "source_file_count": 47,
+        "source_files": [
+          {
+            "byte_length": 918382,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "fd4c89497f99f215a0ef7f057aaf9968698156e2c941160399b573c06645ea55"
+          },
+          {
+            "byte_length": 11621,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinator.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "f058aa6c4e2d15ce5fa5fd0508d978ceae774092a29c225120a6cdeea072c262"
+          },
+          {
+            "byte_length": 18732,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9"
+          },
+          {
+            "byte_length": 80735,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "fb55fc401d368ff90f5e045f8b1db59012f4c63a648a37b0c7b87a12935b4b93"
+          },
+          {
+            "byte_length": 1328,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentFence.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "9a659d97e155a69494837a158b641b6816a153db79657906a3dcfa60cb4d9889"
+          },
+          {
+            "byte_length": 7428,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionDualAuthority.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "906d6d2f252fb54fe432ff1413d7a65e480b082169edf5ce3bcb64c5f067b944"
+          },
+          {
+            "byte_length": 23116,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentAuthority.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "9d16f7083bd1d4ccaf4c9cb21d0e90fafd75159b4898be61b1b585d6f6284d67"
+          },
+          {
+            "byte_length": 1059,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionCallExecution.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "a21d3a6c9a9fd8501190f29128cc44e1a1753cf1d19cf0333a47c89d93f035c6"
+          },
+          {
+            "byte_length": 10049,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionRev0RecoveryPolicy.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "f51f482596782be685a16e148906a3522d8de010bac5da624d7e6bba3965a1c4"
+          },
+          {
+            "byte_length": 10862,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "f95764d03352132e19d4bb39b23bd98182538d277722a7ce28606159b88bba3b"
+          },
+          {
+            "byte_length": 20253,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "52ed367849a96ce3b54a5140f22f82dfa5caeeb72b76a52013e7737e0f28aef0"
+          },
+          {
+            "byte_length": 12301,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinator.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "159c27032a85536aef86b4ad8c4fddfe17d6873ed06afb871ec269565c0a8369"
+          },
+          {
+            "byte_length": 43189,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "da4188391201d2bc41ffe38dee98aef8939eba8068b522b2d14b02d3073b0fb3"
+          },
+          {
+            "byte_length": 305,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicy.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "a72c9926533bd1c5a5bcf6a22b1ce292195b2a3e03a82790e3e023c498b80acf"
+          },
+          {
+            "byte_length": 36759,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "552e79498675ae997e4abf353e27350265447cf82aa414ef2d361b7c16773424"
+          },
+          {
+            "byte_length": 18483,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStore.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "47a4786428b4829c1d0b083ff6ef3930930a996e109da049f16f72cca16b435a"
+          },
+          {
+            "byte_length": 52160,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "019acc8700645b37cd0872d7ebaddf09be6e18e9140fd2c93bcf5921dbc4ea4f"
+          },
+          {
+            "byte_length": 59164,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "1528ccbf3996ea8f9575742d4381c63687336bbb8c402be1ced7ccd496c577b4"
+          },
+          {
+            "byte_length": 10110,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "d25568bd88c7957667686cd8ef09b860f0f7bfabadaf55447471d5f8cfeea820"
+          },
+          {
+            "byte_length": 4175,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "57fef7f0a979c706dec8fdc11095aa60b51b5f9294022245643f91e9ffbcb4e0"
+          },
+          {
+            "byte_length": 15845,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "abbf159f05bc21352e9bb5f6b842788423a9bb6f40bf15daa65b6473280f655f"
+          },
+          {
+            "byte_length": 16842,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "3bb534c89d088c23b3755c5573801ff6bf0f3a1cf57876be655e9158abedf62b"
+          },
+          {
+            "byte_length": 81446,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "044569e8d714a15eb0759ec9ba24466298621c53ab03c9429c018d8cd35fdcd6"
+          },
+          {
+            "byte_length": 15879,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "e5ace9dc4d2a04a2d1bede20c61209c1481a4fa6a07d33297f6edd41dde92b7d"
+          },
+          {
+            "byte_length": 4701,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentFenceTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "5483a48652bfd21772ffb161a387e3b62a999f2ab297631a5991bf014b662d13"
+          },
+          {
+            "byte_length": 2704,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionCallExecutionTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "4ce7ffcd73340c7893f1e57478d07cdf08b3a84b0f21162f9ee2efb9c374faed"
+          },
+          {
+            "byte_length": 22472,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionDualAuthorityTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "143feefcdf0c277497ec9e8da4c76397b6b0b4c3d6891270bd48fc640360915a"
+          },
+          {
+            "byte_length": 33040,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentAuthorityTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "724f1e4aaf0529d1519cdad26a653bfb505fe30230b349fea553402bfaf0b025"
+          },
+          {
+            "byte_length": 23254,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionAuthorityRestartTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "57a4afe303515a8307222cdb6deaae1d5cacce64b76913a5ea4ab4fea14efe1d"
+          },
+          {
+            "byte_length": 16369,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionRev0RecoveryPolicyTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "7a8abb06862872284c0eb288555b41a1cee7431a08f934123e0d135e8d6a549c"
+          },
+          {
+            "byte_length": 23182,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "4473942b731b283d3997a0f14c859c7996b06beb9edd0458d3fdfb53c8207227"
+          },
+          {
+            "byte_length": 5356,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "39e580756ada64963fdcd7a2abe9fdaa964db4b5f9f155d5d30e7fd1483eb317"
+          },
+          {
+            "byte_length": 16329,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinatorTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "fcb09ce8f278e6e936800366691e283f491cc9bd19bc37b558a0a1b300281f98"
+          },
+          {
+            "byte_length": 41210,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "a9b6c144d225d05fa2f80c70f0b455088e284a301a81d78666e294af448affa5"
+          },
+          {
+            "byte_length": 1414,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicyTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "e1649a6976f368cbc522844942cebd7e8046eb63585925be5c381adbbf6bc99d"
+          },
+          {
+            "byte_length": 30792,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "0d3f7c0c169093a94266497a8e70206b9171da17582639717da8d4197bbee3a6"
+          },
+          {
+            "byte_length": 17658,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "ef1b0144d1253729d69d47f4a0ea3da9e0ab6ab9b81ea8a93e000c9900e3fb50"
+          },
+          {
+            "byte_length": 6983,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "24e1559039980fd12d045c85c77c5a0122c8a83efc10f03c3423148ae82b893b"
+          },
+          {
+            "byte_length": 7218,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "8a59d7b118055da200e57a907718912723a92770954851b16278a41b3184759b"
+          },
+          {
+            "byte_length": 15240,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityLongLivedLoginStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "1eecb70cd6c01715449693aef12071f0b92508c1e59d67bacfec94d58adf6f3f"
+          },
+          {
+            "byte_length": 16337,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "2075a97642224dd4a554c1cb5846260104432a845cce12717ddecf1aab6726f7"
+          },
+          {
+            "byte_length": 20492,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "5d4f6eb776e51bc54c9ae2aad422c26ec31ac819309a0267c7263cbe91897b85"
+          },
+          {
+            "byte_length": 22699,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "5a75e52d9858faff0f98abcf8a5b935353a3d0aa5d0dfff015314fa0117b3535"
+          },
+          {
+            "byte_length": 17288,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "98484f9ecdf47d663803246afa0e4c22384059c0efcafed1b3b875bd1f58cff7"
+          },
+          {
+            "byte_length": 40009,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "665cdd9d6c4e5f6ab40b12a89e2d60518aab9fe5441f962b52c4bd7f28468348"
+          },
+          {
+            "byte_length": 17762,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "dd16b1f3471c60f5c4a2b436aa257a6955663b0e8083d8f1a4f05258d78a988b"
+          },
+          {
+            "byte_length": 10099,
+            "group_id": "ANDROID_USER_APP_PRIVACY",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "135be93137f46f04ae6853d8b68f048927a0749f4a741d77b4300353e6e8d3ab"
+          }
+        ],
+        "successor_id": "WS-FP046-ARTIFACT-TRACE-SUCCESSOR-20260810-001"
+      },
+      "fp048_internal_trace": {
+        "actual_device_status": "NOT_RUN",
+        "external_verification_status": "NOT_RUN",
+        "formal_test_status": "NOT_RUN",
+        "implementation_result": {
+          "byte_length": 39009,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-IMPLEMENTATION-20260802-001",
+          "name": "fp048_implementation_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/implementation-record.json",
+          "relation": "FP048_INTERNAL_IMPLEMENTATION_RESULT",
+          "sha256": "1990e550ffaab170dded19d4db9ac35fcff13594efd9c553e563fc76ee35fb39"
+        },
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-ANDROID-USER",
+        "production_deployment_status": "NOT_RUN",
+        "release_status": "NOT_ELIGIBLE",
+        "source_content_set_sha256": "a300659de2dd6504eb099ee7a1465a7aae21b65b4d22c984eed9856fe1db1d15",
+        "source_file_count": 29,
+        "source_files": [
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 11441,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinator.kt",
+            "sha256": "957725fe47266ebd8ab763031dd0b2c49b6edc973f0f8ad6bca3e9eedc0e6bfa"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 10165,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/LocalAead.kt",
+            "sha256": "6d83d5d254297bda1c42f0ec2da8d84b78c0aa89f7c41d71eb6a00cb94d725e8"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 3448,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAead.kt",
+            "sha256": "e6748d1f6b1dcb322a040bc951ed669f57b83ddd72c43dd838e9176cfc1e544b"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 17317,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStore.kt",
+            "sha256": "82f2c393fee3223e0215a4399d1fe23d1ac8ea6c05a22668e5f1a530e992027f"
+          },
+          {
+            "before_sha256": "01c47e47c8729d095e0deeb2abea5a896807bf443b2400b8860dfe95faf47d4b",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 43055,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+            "sha256": "426c5603c64244deccca3381d9147f5e27c1f6c4ca0d88724c3ec78b37d6a019"
+          },
+          {
+            "before_sha256": "6327b1a28a595b0c7d35a75493f77a59edb6a25d1374d5d5d277b33374ad8de0",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 51099,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+            "sha256": "17d77bd637d410bf4727262834fb83a5ca3222f2f23f70b12c2477bebd60074d"
+          },
+          {
+            "before_sha256": "1ead6c692afd62ebd9f929edfb9ffc81bbd662b1878059831261de8f24cb833c",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 4844,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/README.md",
+            "sha256": "800df7b37db79aca262683f0ac00cb32ccc0b6473086b0c9e8e6fb9741e78518"
+          },
+          {
+            "before_sha256": "746907805a196b3d73dcd4299db2706350953c691e6b23f42e8afee8859dfb07",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 18533,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+            "sha256": "9f892970fec6b7d8b98b6958df6d2b3bae6aa1b172adf4d3e44ebeed5ab8d1e3"
+          },
+          {
+            "before_sha256": "17f5fe510c41e6a89f4ccc02693ed346388b357120247af365cd50dbc41f757e",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 768053,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+            "sha256": "f565b7b7c394726361b349ab3a20fa8517c62fdc525ce47a89b226fbfcd5d668"
+          },
+          {
+            "before_sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 2124,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/AndroidManifest.xml",
+            "sha256": "de5fe5fcfbd2ae70a7d04c7ffae5a1cf9cae1caca5b5d105c502ed6e55e57f09"
+          },
+          {
+            "before_sha256": "50d3952ade7ead0dbe802c48634e63b533705c10026cddb718c07f99948df697",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 208,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/debug/AndroidManifest.xml",
+            "sha256": "6f3900fada5fb4ddf8d47a41aca4a1257d8998689a64c4f6929a4e5a3f5fb822"
+          },
+          {
+            "before_sha256": "9ccf53e8c648736adbf95a27d70ace297c7e3b56d6e48e878194f98c51b36b21",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 1050,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/main/res/xml/data_extraction_rules.xml",
+            "sha256": "cb029b35db0e976c087100424e16e14a6256b46962398887520e51508c3b5842"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 342,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/debug/res/xml/debug_network_security_config.xml",
+            "sha256": "9187f485f22fde712aea8de5243664710440a9ee08e9f1b172978eef96a15001"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 10516,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/LocalAeadTest.kt",
+            "sha256": "5407fd21122f626c579315c6613f42c1b9821b07249aafb5f8047690178ed006"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 1303,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadStaticTest.kt",
+            "sha256": "03c0e5575f0dfed94f540afa41ce090ceb2fa49b42e02dc15cd58e5199438a27"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 14389,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt",
+            "sha256": "cd45c9ff28b64701d0035d6688ddcd5b8b5d47c802f0f222fad63ef7d1d6af10"
+          },
+          {
+            "before_sha256": "f3db37cb2e7dcf99dc15a3050def7d18b591615bbe774cc25ef00c3769be10f3",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 8962,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+            "sha256": "bc0b7c7c9721bef66a9bc49bd7baf1aad4de02788c444ffe0c6ef9c6d8592aa7"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 2985,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/UserNetworkSecurityBoundaryStaticTest.kt",
+            "sha256": "7719d187b999eb52b48402465669f11a256108bdbbaa473914bdf31583a7810a"
+          },
+          {
+            "before_sha256": "17dce1211a62d8853b56829112738ed9615a9dd7f0d953363a5c01ef760ab820",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 39999,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+            "sha256": "e7dc903c6c4191f825396fe82848ee8e0c05074ceb8eaa3c3b5b9a7ef004499a"
+          },
+          {
+            "before_sha256": "ee77631da711a87b6fa194b1834da396257fa78de5e54a073b8892c43ff1ebb3",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 4927,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+            "sha256": "0854a8826572f5fdb95999b8cfefc4207950f8dc2ca358f6cce3c6b4de4c6eb5"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 6129,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/TestFieldAead.kt",
+            "sha256": "29a1c16aaa4f59563e5f4fb8c28645aa8f5dd66c29ffbcb52bcd4d98d10705d0"
+          },
+          {
+            "before_sha256": "c83ba6ce541b1639d16cbd6741c39705e8f50f29be32e284c797b46b090b5686",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 18191,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+            "sha256": "eb90470d57d7a99c75ad8967ebe230cf42d7856d616b761bf1efa8de42ece50e"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 13534,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt",
+            "sha256": "3370d9a718860d0ae38e9b3c84dda5e81efc03efdb7b87f04380e45a78a88e33"
+          },
+          {
+            "before_sha256": "1f68d6977bf44e828a77d5fe193ee1e713c36fb6ee4cf2e2245b9649a33d1464",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 5232,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/BuildProvenanceStaticTest.kt",
+            "sha256": "e116220d92fad78c2ab83407aa091b42ed637255a2260b7608c209249a4da010"
+          },
+          {
+            "before_sha256": "1be7bbcd8854f8f1b3fb050c1206fd071e3daecf4eccef6e46b29ef8968f2a7e",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 15614,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+            "sha256": "07ab565dd0b6ffee22f1a1f0828fdde03e107d02ec505216b7570239fcb625f2"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 10956,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionCryptoLifecycleTest.kt",
+            "sha256": "49106963f558b4ae64ef5aa539d21702db1e0470b7af61ac545e32b207e384a2"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 6899,
+            "change_kind": "ADDED",
+            "path": "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadInstrumentedTest.kt",
+            "sha256": "c03227952e267c6854ce5c5141f00e744f9fba6571ea6d2ab92aa339907435aa"
+          },
+          {
+            "before_sha256": "46c1fba3167b9fb92b1c61f77645bc283b0b262f146b705ad0dd0b13f5518bc3",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 9435,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+            "sha256": "bfa955ae3723beb6fff649b95600fe5a61d718443201cd8a4289c8210dc9a8bf"
+          },
+          {
+            "before_sha256": "fc734bbaa57568858761b32657ecdeb45e935af6a3a1a03496ffe685f4f56803",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 16309,
+            "change_kind": "MODIFIED",
+            "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+            "sha256": "827123f76aa980b20909edf259455e11471bcfb468fc81fa341e7301f5a218b7"
+          }
+        ],
+        "successor_id": "WS-FP048-ARTIFACT-TRACE-SUCCESSOR-20260802-001",
+        "verification_result": {
+          "byte_length": 15344,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-VERIFICATION-20260802-001",
+          "name": "fp048_verification_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/verification-result.json",
+          "relation": "FP048_INTERNAL_VERIFICATION_RESULT",
+          "sha256": "499b2dd4651b7efa73a2d8904daa4aaea0eca6ac94e6734d4c6660fe0dc3160c"
+        }
+      },
+      "implementation_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "inputs": [
+        "카메라·센서·위치",
+        "사용자 명령",
+        "서버·TMAP 응답",
+        "승인된 모델·설정"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "Kotlin",
+        "Gradle Kotlin DSL",
+        "XML",
+        "TFLite asset"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "module_id": "MOD-ANDROID-USER",
+      "name": "Android 사용자 앱",
+      "normalized_mobile_data_policy": {
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다."
+      },
+      "outputs": [
+        "위험 안내",
+        "길안내",
+        "암호화된 신고·원본 대기자료"
+      ],
+      "owner_role": "Android 개발책임자",
+      "paths": [
+        "apps/android"
+      ],
+      "policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "policy_refs": [
+        "FP-007",
+        "FP-019",
+        "FP-020",
+        "FP-022",
+        "FP-031",
+        "FP-035"
+      ],
+      "policy_role": "사용자용 정식 제품 후보: 탐지·길안내·음성·진동·신고",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-007-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-007-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-007-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-019-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-019-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-019-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-020-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-020-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-020-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-022-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-022-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-022-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-031-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-031-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-031-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-035-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-035-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-035-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-007-001",
+        "RQ-FP-019-001",
+        "RQ-FP-020-001",
+        "RQ-FP-022-001",
+        "RQ-FP-031-001",
+        "RQ-FP-035-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "사용자의 보행 세션, 단말 추론, 길안내, 음성·진동, 신고 후보를 처리한다.",
+      "sample_paths": [
+        "apps/android/.gitignore",
+        "apps/android/README.md",
+        "apps/android/app/README.md",
+        "apps/android/app/build.gradle.kts",
+        "apps/android/app/gradle.lockfile",
+        "apps/android/app/proguard-rules.pro",
+        "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteDeviceSmokeTest.kt",
+        "apps/android/app/src/debug/AndroidManifest.xml",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/CameraFallbackTestOverride.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugFrameCaptureUploaderFactory.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugMetadataLogUploaderFactory.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpFrameCaptureUploader.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploader.kt",
+        "apps/android/app/src/main/AndroidManifest.xml",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+        "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AndroidRiskSelectionPolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/ArCoreAvailabilityPolicy.kt"
+      ],
+      "source_issue_ids": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "tracked_file_count": 151
+    },
+    {
+      "alignment_status": "INTERNAL_FP008_VERIFIED_FORMAL_NOT_RUN",
+      "build_artifacts": [
+        "별도 관리자 APK/AAB 후보 — assembleDebug 내부 검증, 정식 서명·배포 아님"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "별도 apps/android/adminapp 소스와 FP-008 저장소 내부 자동 검증 결과가 존재한다.",
+      "deployment_artifacts": [
+        "관리자 앱 설치본 — NOT_DEPLOYED"
+      ],
+      "deprecation_status": "ACTIVE_PRODUCT_CANDIDATE_NOT_DEPLOYED",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-04",
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-14",
+          "design_id": "DES-14",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-14",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-15",
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-19",
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp008_internal_trace": {
+        "actual_device_credit_count": 0,
+        "actual_device_status": "NOT_RUN",
+        "approval_credit_count": 0,
+        "artifact_approval_claimed": false,
+        "external_evidence_credit_count": 0,
+        "external_verification_status": "NOT_RUN",
+        "formal_test_credit_count": 0,
+        "formal_test_status": "NOT_RUN",
+        "internal_implementation_status": "PASS",
+        "internal_verification_status": "PASS",
+        "planned_test_ids": [
+          "TC-FP-008-01",
+          "TC-FP-008-02",
+          "TC-FP-008-03",
+          "TC-FP-008-04"
+        ],
+        "predecessor_fields": {
+          "alignment_status": "IMPLEMENTATION_GAP_REVIEW_REQUIRED",
+          "build_artifacts": [
+            "별도 관리자 APK/AAB — 구현 경계 없음"
+          ],
+          "current_fact": "정책상 별도 정식 제품이나 현재 저장소에서 독립 앱 경계를 확인하지 못했다.",
+          "deployment_artifacts": [
+            "관리자 앱 설치본 — 없음"
+          ],
+          "deprecation_status": "REQUIRED_BUT_NOT_IMPLEMENTED",
+          "languages": [
+            "Kotlin — 계획"
+          ],
+          "paths": [
+            "apps/android/admin"
+          ]
+        },
+        "producer_inputs": [
+          {
+            "byte_length": 25263,
+            "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-IMPLEMENTATION-20260803-001",
+            "name": "fp008_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/implementation-record.json",
+            "relation": "FP008_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "d5d7eca6873b5b5744c6ad8a0f55b41f0b4a94cb0aa109381a9b05c6b64aee9b"
+          },
+          {
+            "byte_length": 12250,
+            "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-VERIFICATION-20260803-001",
+            "name": "fp008_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/verification-result.json",
+            "relation": "FP008_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "916e79d6b7a63e9c1648125a09e2a26cb6ffd7f6779887e10ad7c7ddd1b26fad"
+          },
+          {
+            "byte_length": 509405,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260809-024",
+            "name": "fp008_gap017_r024_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260809-r024.json",
+            "relation": "GAP017_R024_SUCCESSOR_RESULT",
+            "sha256": "e9e95998875660663ad7d573cf193ad7b80de12fc64a1d5ecda1285ff71b38e0"
+          }
+        ],
+        "production_credit_count": 0,
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "review_or_completion_inputs_included": false,
+        "scope": "REPOSITORY_INTERNAL_FP008_ARTIFACT_TRACE_ONLY",
+        "source_file_count": 40,
+        "source_files": [
+          {
+            "byte_length": 3237,
+            "path": "apps/android/adminapp/README.md",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "642338176659264549b13ffb60547a981dc66e60e418c2cb8cf4df380623cbdf"
+          },
+          {
+            "byte_length": 4445,
+            "path": "apps/android/adminapp/build.gradle.kts",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "8c36f8af65ba6a291b2a6f9174a3572c61880d2f6b666f52230d81d426d3085e"
+          },
+          {
+            "byte_length": 40829,
+            "path": "apps/android/adminapp/gradle.lockfile",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13"
+          },
+          {
+            "byte_length": 82,
+            "path": "apps/android/adminapp/proguard-rules.pro",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "8d4eaac33b650616549287d6a0f3c166a9a130612b55015a5f480bcecb0cf129"
+          },
+          {
+            "byte_length": 878,
+            "path": "apps/android/adminapp/src/main/AndroidManifest.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb"
+          },
+          {
+            "byte_length": 214,
+            "path": "apps/android/adminapp/src/debug/AndroidManifest.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "371e6b693f3e126f24f205d4c596b39371b7a9b176ad80f47468aebeb69cb8db"
+          },
+          {
+            "byte_length": 342,
+            "path": "apps/android/adminapp/src/debug/res/xml/admin_debug_network_security_config.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "9187f485f22fde712aea8de5243664710440a9ee08e9f1b172978eef96a15001"
+          },
+          {
+            "byte_length": 491,
+            "path": "apps/android/adminapp/src/main/res/xml/admin_data_extraction_rules.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "d0566a2aca46b7dd502650911f774119a0feb462850892e1d22445931f7e54c5"
+          },
+          {
+            "byte_length": 34089,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "2722d196becabe0ed443687cff67e30b2b529a9fe68f5967e36cf70dd943c92b"
+          },
+          {
+            "byte_length": 9993,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncoding.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "2c784b60fca59a4030936e2a29047196ac5a30caaef454dc36cafcb148f6b7c1"
+          },
+          {
+            "byte_length": 8468,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyStore.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "56b6b7f5811a17d4b3ab17e1ea094cb3ad795b3801ac35ac37141b2b9da09172"
+          },
+          {
+            "byte_length": 18998,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProof.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "9c48183a3e9e16f333b366391b725ed726b946939a87db975fdef87df47ace47"
+          },
+          {
+            "byte_length": 1389,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicy.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "1ee7614e6509fd5ef433637b0c3d1b71ec906c25015117629d7d49a4febb7bb7"
+          },
+          {
+            "byte_length": 4261,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "6949628589e4615d9ae52ca86fc09f774bb39221c03abfbeb2cba4e8d8a17101"
+          },
+          {
+            "byte_length": 4613,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminInstitutionDelivery.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "977029ba93813214c0b441e568f65594323eca9db620f0043066deba895fb73c"
+          },
+          {
+            "byte_length": 5930,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsApi.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "d2169fa6d10e97af1c642b6a08edccd8dfc6f30565d1123518a308dc33fa05e6"
+          },
+          {
+            "byte_length": 26084,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClient.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "fe1a706c191fbe30204688e36fbb77a0591edc243a2603e880fbe11f28ead9f9"
+          },
+          {
+            "byte_length": 3043,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicy.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "27a2e45431301319be1ebff7fe73a2da8ae0dd96fda9e74149b7915533ed5061"
+          },
+          {
+            "byte_length": 3947,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminReportDecision.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "174ba67379a693e5c22da6bab24f621fb90422abc01aa3d64081519c5fc7c8a5"
+          },
+          {
+            "byte_length": 4817,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "22b126d131d4b9229bdb7d71c03c408bfa323424520e6480fee0aba30b89f9ab"
+          },
+          {
+            "byte_length": 1752,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApiException.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "7d73f3ad6edc3593eddfecf817d6bc181cd7d6bdb8031b65cea49e2779e27b97"
+          },
+          {
+            "byte_length": 22516,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "56516ba689e1a2fc87d14091cb53e6b4352dd7743e8e702dc0578949bf5cbae4"
+          },
+          {
+            "byte_length": 27356,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "03ac3e35a8a7c3d6ee7141cb1ce972b6aaffb9e3e2ab9b56c64c9d84267c0d85"
+          },
+          {
+            "byte_length": 572,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityState.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "3384bfec42bed0162580f8feecf66b75a5319dedb2bb2c7f10b1f2b7fa460b1d"
+          },
+          {
+            "byte_length": 3229,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0"
+          },
+          {
+            "byte_length": 9799,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJson.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "07bee52b1e71294d5687ffc7f184c78ffe90c40a6bc29964838254734b2161f9"
+          },
+          {
+            "byte_length": 711,
+            "path": "apps/android/adminapp/src/main/res/values/strings.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "98099d169625286a6ed2f24a885939d34257459db8882a0350c7bb113f095756"
+          },
+          {
+            "byte_length": 274,
+            "path": "apps/android/adminapp/src/main/res/values/styles.xml",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "b55e90d6a20aac934bcc4fd3e474c842d1fb4807d4b984a80de03959b529f649"
+          },
+          {
+            "byte_length": 4381,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncodingTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "264aefb9a9cb0ebd15329430383a32b390f04f4dd44dd7fd22f4e0443678dcb2"
+          },
+          {
+            "byte_length": 1943,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyDescriptorTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "fd3d2e67fe76f18367a63f8905beac9f1590fb62424fa99cb49ae2e8a319259e"
+          },
+          {
+            "byte_length": 8748,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProofTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "0bf98628d4eba4854fac92dc531b18189aa02ab2856f364b4fa923d13187b1f3"
+          },
+          {
+            "byte_length": 1325,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicyTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "4f8d0128e881bdef0b3480d3d38ff7164ba70470f3b98e5d4b1b20ddb2a13cd5"
+          },
+          {
+            "byte_length": 3720,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "d644fda5184b3d33c2393d44d22e746ff3820be0abb758119cde0f5cbabb7c85"
+          },
+          {
+            "byte_length": 6194,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationModelsTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "92973a01efa6523e4ce942dfef79b91a5388293e0b06ba9d1065bcfe23ce7302"
+          },
+          {
+            "byte_length": 18760,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClientTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "ddf3c7567cc489bc195c1ccab5b46e56ed4aec561834bff60c2ccdde890c5fa1"
+          },
+          {
+            "byte_length": 4042,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "3443252c3cb3397c37636eb57a1a365aeb649bd64675fe2613749d6186739851"
+          },
+          {
+            "byte_length": 5967,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "e5ff4be6ed5b4734e6e2dad02acb40cfaa1e6a8b6a04dd01bf8f00fd9f5395fc"
+          },
+          {
+            "byte_length": 22424,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "b1e6b21f7a793f54ee3a680b584d0341f42d998d77e439da5513fa438e6f88d2"
+          },
+          {
+            "byte_length": 23662,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "5632bf0e918f31d3a110dbff3fbed9c8a67faee78829ff8a59b4f556eab39a7c"
+          },
+          {
+            "byte_length": 1855,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJsonTest.java",
+            "role": "FP008_IMPLEMENTATION_SOURCE",
+            "sha256": "401901e3f34e513af01bd280c8d395ec4be89804944036ef7ff7cd9d12e39ea9"
+          }
+        ],
+        "successor_id": "WS-FP008-ARTIFACT-TRACE-SUCCESSOR-20260803-001"
+      },
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "신고·검수 대기자료",
+        "관리자 인증·권한"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "IMPLEMENTATION_MISSING",
+      "languages": [
+        "Java",
+        "Gradle",
+        "XML"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-ANDROID-ADMIN",
+      "name": "Android 관리자 앱",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "검수 결정",
+        "기관 전달 상태",
+        "감사 기록"
+      ],
+      "owner_role": "Android 관리자 앱 개발책임자",
+      "paths": [
+        "apps/android/adminapp"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-008",
+        "FP-047",
+        "FP-048",
+        "FP-050",
+        "FP-051"
+      ],
+      "policy_role": "관리자용 정식 제품",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-008-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-008-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-008-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-047-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-047-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-047-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-048-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-048-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-048-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-050-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-050-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-050-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-051-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-051-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-051-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-008-001",
+        "RQ-FP-047-001",
+        "RQ-FP-048-001",
+        "RQ-FP-050-001",
+        "RQ-FP-051-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "검수·승인·기관 전달·권한·감사 기록을 관리자에게 제공한다.",
+      "sample_paths": [],
+      "source_issue_ids": [],
+      "tracked_file_count": 0
+    },
+    {
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "build_artifacts": [
+        "서버 image/build — 아직 정식 hash 없음"
+      ],
+      "bundled_approval_dependency_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "current_fact": "FastAPI, migration, 계약 및 시험 후보가 존재한다.",
+      "deployment_artifacts": [
+        "backend systemd/Docker 후보"
+      ],
+      "deprecation_status": "ACTIVE_SERVICE_CANDIDATE",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-19",
+        "DES-22"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-05",
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-09",
+          "design_id": "DES-09",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-09",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-10",
+          "design_id": "DES-10",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-10",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-11",
+          "design_id": "DES-11",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-11",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-12",
+          "design_id": "DES-12",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-12",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-13",
+          "design_id": "DES-13",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-13",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-19",
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-22",
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-19",
+        "DES-22"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": true,
+      "fp035_dependency_relation": "RELATED_DOWNSTREAM_UPLOAD_CONTRACT_DEPENDENCY",
+      "fp046_internal_trace": {
+        "actual_device_credit_count": 0,
+        "actual_device_status": "NOT_RUN",
+        "approval_credit_count": 0,
+        "artifact_approval_claimed": false,
+        "external_evidence_credit_count": 0,
+        "external_verification_status": "NOT_RUN",
+        "formal_test_credit_count": 0,
+        "formal_test_status": "NOT_RUN",
+        "internal_implementation_status": "PASS",
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-BACKEND",
+        "planned_test_ids": [
+          "TC-FP-046-01",
+          "TC-FP-046-02",
+          "TC-FP-046-03",
+          "TC-FP-046-04",
+          "TC-FP-046-05"
+        ],
+        "producer_inputs": [
+          {
+            "byte_length": 36254,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-IMPLEMENTATION-20260810-001",
+            "name": "fp046_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/implementation-record.json",
+            "relation": "FP046_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6"
+          },
+          {
+            "byte_length": 3809,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-VERIFICATION-20260810-001",
+            "name": "fp046_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/verification-result.json",
+            "relation": "FP046_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+          },
+          {
+            "byte_length": 533282,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260810-025",
+            "name": "fp046_gap055_r025_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json",
+            "relation": "GAP055_R025_SUCCESSOR_RESULT",
+            "sha256": "082a688ae32b068418d007111560802be3376deeee6cad526432a69b9d0321a1"
+          }
+        ],
+        "production_credit_count": 0,
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "review_or_completion_inputs_included": false,
+        "scope": "REPOSITORY_INTERNAL_FP046_ARTIFACT_TRACE_ONLY",
+        "source_content_set_sha256": "8f9e46ecc394e89a08ee8b5a7a6b7e2a5ad36a4e7ccbe70d4dc74895396d3a42",
+        "source_file_count": 24,
+        "source_files": [
+          {
+            "byte_length": 93636,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/alembic/versions/202608090001_fp046_privacy_lifecycle.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "c9355ebff4f00df13bbf0ddc159f07708da5d141fa3aba95f36828a025b7ae9a"
+          },
+          {
+            "byte_length": 6071,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/main.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "ea5b36b2d4e3c350f5e0c6c0b68c7ba794c09355f0c60b7b5c7b180430e6de34"
+          },
+          {
+            "byte_length": 61140,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/models.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "e9bcb568426f53ca55d6aa2e33a5e64887d66694fd4243b78a6e848b10ce1b8d"
+          },
+          {
+            "byte_length": 30813,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/schemas.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "a3c430bb17809a347d1e2cc6cc6572363e6a772c45acdd48c2109748a5077f50"
+          },
+          {
+            "byte_length": 17003,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/openapi_contract.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "3bfc0c703d7e80bc812a988dc8be2aaf422195c7f3123617d5c32651c6f62a99"
+          },
+          {
+            "byte_length": 13663,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/api/privacy.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "95e359ddca44b1cc5e35eba5db2ccf9e1f2ebeeb714ba9bacc4df13e07ea3f0b"
+          },
+          {
+            "byte_length": 61567,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/services/privacy_lifecycle.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "8043cf5c548b19d5258ba2abbf55dd33a37481acdc37d7f9156835026500ca32"
+          },
+          {
+            "byte_length": 14836,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_privacy_lifecycle.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "9379374339b867d43a0a9b3a7871e81c3c0fa3516bb1c49f9274388cdb649757"
+          },
+          {
+            "byte_length": 89130,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_fp046_postgres_integration.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "d3a05d37810a3b19dd67c71e4810ffb97ee8b23a579b3125df3cdea76449163d"
+          },
+          {
+            "byte_length": 206469,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "contracts/walksafe.openapi.json",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "4665cb039a5bd6ea7fb5c6ba43137b25ce6d2206753bbe3255d74c0898a67120"
+          },
+          {
+            "byte_length": 5116,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/.env.example",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "b7354adea2c8fc2db481a1f61712ec1631f411dd6274e9cc6286070459edbbf8"
+          },
+          {
+            "byte_length": 17114,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/api/health.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "38003ebb36f2b1d7e2a72c417a9ccfe699525694d93237ca32670ca381443dd6"
+          },
+          {
+            "byte_length": 99900,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/api/reports.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "ec7d2fec00676fd54ee2278ba8b77dbc393e3d13cc68df9c060374445831b922"
+          },
+          {
+            "byte_length": 41463,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/config.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "643da32d5e1dfb0a5d2455917225fde41197599744efa1e5427627382ded5b6c"
+          },
+          {
+            "byte_length": 47738,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/field_test_security.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "fd21a5e9a1c7c7fc9e667192767fdb259c5afd35499c85b2fb3a20a88cf89a46"
+          },
+          {
+            "byte_length": 6124,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/request_limits.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "2115d37b3993c1222c03279352af1bb3940854e9b8e05c9eb58de1ebf9f804ce"
+          },
+          {
+            "byte_length": 5782,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/services/duplicates.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "c789c675073c36450ee8105c6fef8728a58eb62e7e75e87bf4833af1616a3025"
+          },
+          {
+            "byte_length": 4787,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/app/services/actor_rate_limit.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "14b5c6b5bc71103639d61755a14748e6fee53764e5db1217d28a6c01e763012d"
+          },
+          {
+            "byte_length": 9590,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/conftest.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "ec35c7eac2cfe443c70b409174389db5db241fa39c3f9d20bc967d5b252b638d"
+          },
+          {
+            "byte_length": 44779,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_field_test_security.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "634b275f328df2c66f1056eb583d3c6f44215034cc6cb431d4036ed0fbf705b0"
+          },
+          {
+            "byte_length": 25338,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_health_readiness.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "510a28701666a25bc6ade6e2b2adbbdfa1360b7315f9724ebca5f310394db84a"
+          },
+          {
+            "byte_length": 7279,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_openapi_contract.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "d6cf5a97f3deb1cd1431e1df933504c04b0730e25c76ecdb99a7efed3798ab6c"
+          },
+          {
+            "byte_length": 22330,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_reports.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "7ff10bb428fcfd5977b7c51076488c6bd6eec3152f2255f297a5b47c57e98a83"
+          },
+          {
+            "byte_length": 63833,
+            "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+            "path": "backend/tests/test_reports_v2.py",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "ec767beba14fc4b54ff0c1f602f9e616cecf18ffafb193073fba6fd2c3edf607"
+          }
+        ],
+        "successor_id": "WS-FP046-ARTIFACT-TRACE-SUCCESSOR-20260810-001"
+      },
+      "fp048_internal_trace": {
+        "actual_device_status": "NOT_RUN",
+        "external_verification_status": "NOT_RUN",
+        "formal_test_status": "NOT_RUN",
+        "implementation_result": {
+          "byte_length": 39009,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-IMPLEMENTATION-20260802-001",
+          "name": "fp048_implementation_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/implementation-record.json",
+          "relation": "FP048_INTERNAL_IMPLEMENTATION_RESULT",
+          "sha256": "1990e550ffaab170dded19d4db9ac35fcff13594efd9c553e563fc76ee35fb39"
+        },
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-BACKEND",
+        "production_deployment_status": "NOT_RUN",
+        "release_status": "NOT_ELIGIBLE",
+        "source_content_set_sha256": "b4ba68744c16da6a56f2b55f4f64465f13501c299489ef2f6a5a39cf3bb00665",
+        "source_file_count": 35,
+        "source_files": [
+          {
+            "before_sha256": "50531cc334c13bcf58b8707d7bf70a8137c011ee1c30e5f6caff876cabd6483b",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 4588,
+            "change_kind": "MODIFIED",
+            "path": "backend/.env.example",
+            "sha256": "eb18bf896a5f645d28cb77396307f6b9091b9cc3099ee96581642186f693f846"
+          },
+          {
+            "before_sha256": "b532df887aa0435d7bfaad0a7ee88971ef8b6d267817b090e37a5e5334685827",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 5503,
+            "change_kind": "MODIFIED",
+            "path": "backend/README.md",
+            "sha256": "23abd7f29eec5ed222ae163a9112a803d54efb0bbacc6a3ae247ea6eb7cf1d93"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 10941,
+            "change_kind": "ADDED",
+            "path": "backend/alembic/versions/202608020001_report_image_encryption.py",
+            "sha256": "7d6658fa5ee0063f431c55bd4d2c551b7304b756c12b9a9a1b4c0528099a4362"
+          },
+          {
+            "before_sha256": "4497fd6c4f15010fdc3fd03f5d55e790630c5bd81ce9a154ebf1785172a83a9f",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 39797,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/config.py",
+            "sha256": "a6706881a89257e16571c0b0abc6381d5428df9ae566c8d26a1a7d3325ee7d62"
+          },
+          {
+            "before_sha256": "4840f7b46ae202f9d433427a6e8f1f04df4296e6ac8eb23ec2cdcf2196e17eb2",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 4361,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/main.py",
+            "sha256": "3e3a1c21508d2a62de0267731747528986b64772d528fe0251f8721f8c1b449a"
+          },
+          {
+            "before_sha256": "9d36113078c0ad88991a9cbb0ab2e2ba52ec6419f561f7669df01123bbd2aa87",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 23502,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/models.py",
+            "sha256": "740ecf37fbe07b77e6fdce4979e9b33fdf6be845e9a3d2ec688840dcb83b1638"
+          },
+          {
+            "before_sha256": "ca01783f5c5906fe67d8d49e7ad3c7ca267d2940f3b3dc2453bcf89f1a61ad56",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 7180,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/openapi_contract.py",
+            "sha256": "99c64f2599ec4fb0c3eb897b12a72f94481daec43adbf5d4d0bc05149cab1f3c"
+          },
+          {
+            "before_sha256": "f6bd1eeb57f578050f16e1673f84a729beeb502ee7c80fdcadbb7ffb72b62c3d",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 16537,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/schemas.py",
+            "sha256": "cee3259451139a976ec507958d6ccb36639115530e98c06dce7b84d050c38012"
+          },
+          {
+            "before_sha256": "6e5eb3e1823d9aaeb07cd738dc9cdafb4995046a5dcea2036a0ce85fa3a2def7",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 20310,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/field_test_security.py",
+            "sha256": "87c724d4a94e0a3585c1067cb1014ae760bcd8f07deb4a007794ee921dceb5ad"
+          },
+          {
+            "before_sha256": "87523956f38449f18a5e1abd555980800b15f3e092be5b2571323b63b22c580a",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 15703,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/api/health.py",
+            "sha256": "f59b6768c2527a9509cb3ee871bf41cd4da832f348bcda4e49a63be3d7b0d06a"
+          },
+          {
+            "before_sha256": "3d0ac2ac5fd5156a3922e9281074a3abff057ea7df3e15a93e93aa68be89eda2",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 84199,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/api/reports.py",
+            "sha256": "c3b7d9d7e9e0f1b0f29fadca1cda0cd1de98ade454846ab37d5609f4befa74c1"
+          },
+          {
+            "before_sha256": "fa1c8fafffd1951f94e95bc6a5d631557f08c637d57752db1941cb6ac015d4fb",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 3049,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/api/uploads.py",
+            "sha256": "d7864f59d0212abaa7b0982ca05fd5d818ceac570facd59d7b23d0f1f9c4709c"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 11167,
+            "change_kind": "ADDED",
+            "path": "backend/app/services/report_image_crypto.py",
+            "sha256": "da2016d076e33dfe08403c310dba08f5c402359abe05d265a370d44af8be0fb9"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 31684,
+            "change_kind": "ADDED",
+            "path": "backend/app/services/report_image_keys.py",
+            "sha256": "2d5b0f062128b0cf5634f1e9997a57ff14ee948d8be658f70783570ea1cc22cd"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 20145,
+            "change_kind": "ADDED",
+            "path": "backend/app/services/report_original_access.py",
+            "sha256": "014dd04a2cc645f93496d3587c99d1321ac289e0d41f21c1d6e6b264c7031298"
+          },
+          {
+            "before_sha256": "089f4a2cff62df46f9acd46c7db961d4a28e7d78c64dc9b8dbd86e013cabe499",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 25001,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/services/report_storage.py",
+            "sha256": "384c44d3094f4f5ef3f0a0c252c42ffd85728861d620542f188af15069929566"
+          },
+          {
+            "before_sha256": "4745144f85d28b7674a84e21a2c62dbeaa28781a408c7ee705e16388a38eb039",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 75201,
+            "change_kind": "MODIFIED",
+            "path": "backend/app/services/admin_security.py",
+            "sha256": "7582119c083593ca94e8167e5e40a564b613223c311445e87d0cbbae787e3143"
+          },
+          {
+            "before_sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 277,
+            "change_kind": "MODIFIED",
+            "path": "backend/requirements.txt",
+            "sha256": "2ce28ce76ef2707de2b12dafd7ae25dc6d3993a76259ace182260f2f00395cf9"
+          },
+          {
+            "before_sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 160767,
+            "change_kind": "MODIFIED",
+            "path": "backend/requirements.lock",
+            "sha256": "74144db0cfcb3d9931cb2493c008abbae0806d922d0173f03e092815e46322e5"
+          },
+          {
+            "before_sha256": "2859741708f6bd0fc4d50dc27531cd8459165cb336beaa2a49bdfe0b2390e298",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 7951,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/conftest.py",
+            "sha256": "68b29a7706d5b474010829da88697f37252843c3673ff1705f088be8ad017055"
+          },
+          {
+            "before_sha256": "ad7a2288e4624c1f72affa902983f17eb7d28e6cd53c528fe64153c9d3c59c68",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 37572,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_field_test_security.py",
+            "sha256": "dc5c605f6e323f4a4e190f4b91ed0c9f02d20c16f8177d1913c00764f8e73c73"
+          },
+          {
+            "before_sha256": "26df879d4bc24554979276b1d02a89bd2d8bd1a47404d86c15189e50d0acfa1e",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 25179,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_health_readiness.py",
+            "sha256": "0b478c2f643e51193ba4f47e2b75c656c9b510a5f68e774c219048de52b566a7"
+          },
+          {
+            "before_sha256": "d57d216c374495168944b7f1fd6d04c5cb77b92df15f142bf48a78c096b28f89",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 3954,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_openapi_contract.py",
+            "sha256": "57ce742e4c24dc398b21963c706437ff6d68857e8737be879a3aaf6287d2d7ce"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 4862,
+            "change_kind": "ADDED",
+            "path": "backend/tests/test_report_image_crypto.py",
+            "sha256": "4f0016b664011981b737a5aa7acafe0294cdb2743abf8c22aeb5ffcfaa70534d"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 18964,
+            "change_kind": "ADDED",
+            "path": "backend/tests/test_report_image_keyring.py",
+            "sha256": "4cf17addd6a1f8bd1991107ec2f957f1fe7fa671df5c7cb331cb2811fd4a6cf4"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 19974,
+            "change_kind": "ADDED",
+            "path": "backend/tests/test_report_original_access.py",
+            "sha256": "ba432d7fec2e9dcf4f802dc27f037a2c3942553fdcc6e8544aec4eb1b4a73274"
+          },
+          {
+            "before_sha256": "7f7d654167c6bba57b4f3993c0e661ef67f61f6bcdf5735422c84fd1cada5f17",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 21867,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_report_policy.py",
+            "sha256": "36ee6d6a7f2e4c148b26a0d76f02a16e9f9f1f94cb36732d6c572469c88cee67"
+          },
+          {
+            "before_sha256": "0fbcacd4694ba7188422f3790c0cc8d93c4e7bd33d348210311f8458f59972fa",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 22295,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_report_storage_reconciliation.py",
+            "sha256": "1d2040d955ab655ab360ac77adce022b9ed26c382f65d7b5bcfd77e7a2fa3284"
+          },
+          {
+            "before_sha256": "89bf41555aab8796f824ee4f7be669cde717698f250582b3be7c2b327ec8aa43",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 22352,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_reports.py",
+            "sha256": "32e6dcae3b0235f4cd202b3b94144fb0a5934f76226ec31f2e835652ffd6fdfe"
+          },
+          {
+            "before_sha256": "df02544048725504dcd8de0c53e4b6e755ede635ff6ec1c850d8d64c461f4295",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 62561,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_reports_v2.py",
+            "sha256": "c2c30e7421cefbe46fece0285026ee76a59fd71e2e07aa32901f948d2c08c8b7"
+          },
+          {
+            "before_sha256": "300d7e29d6e92f427f7fb3879384408609aa29deff60edab9a3d8d0fd8b83daa",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 4486,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_uploads.py",
+            "sha256": "9c5953d799a1a51bdca43d8d192239a4bb485ca621ab6b2118f294d926dcdc71"
+          },
+          {
+            "before_sha256": "dff5dca5557201cd33601f49001ddec94bb0f75cd441058a5779a5dd2411b493",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 73956,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_admin_security.py",
+            "sha256": "3d3a42c5a383a60bf255293491223c45ff12727b1648e57b00e73c726027d2d8"
+          },
+          {
+            "before_sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 133034,
+            "change_kind": "MODIFIED",
+            "path": "contracts/walksafe.openapi.json",
+            "sha256": "6919ea97ec15dabb083bca9e6e9a392d27a4dba4dc186573e57e2a7beed0cc40"
+          },
+          {
+            "before_sha256": "957bdb90993a38026f7860ae1c01a70acb05c1e8e95c760e643517c30da16c90",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 14474,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_backup_source.py",
+            "sha256": "b5bed28164c6176cd5a438c56236fc7890752f41deef2ed3c07ac79b22723d02"
+          },
+          {
+            "before_sha256": "585d7f3fe0cffe68e233c23d347f2d226661b5e32f65434280fdd3f525373396",
+            "before_source": "SEQ42_PINNED_HEAD",
+            "byte_length": 58305,
+            "change_kind": "MODIFIED",
+            "path": "backend/tests/test_report_retention.py",
+            "sha256": "1969a12e8836c545b4722290bda1c2da1cdb63d55542a999fbb922824869315d"
+          }
+        ],
+        "successor_id": "WS-FP048-ARTIFACT-TRACE-SUCCESSOR-20260802-001",
+        "verification_result": {
+          "byte_length": 15344,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-VERIFICATION-20260802-001",
+          "name": "fp048_verification_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/verification-result.json",
+          "relation": "FP048_INTERNAL_VERIFICATION_RESULT",
+          "sha256": "499b2dd4651b7efa73a2d8904daa4aaea0eca6ac94e6734d4c6660fe0dc3160c"
+        }
+      },
+      "implementation_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "inputs": [
+        "인증 요청",
+        "TMAP 요청",
+        "신고·원본",
+        "삭제·검수 요청"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "Python",
+        "SQL",
+        "OpenAPI JSON"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "module_id": "MOD-BACKEND",
+      "name": "백엔드·PostGIS",
+      "normalized_mobile_data_policy": {
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다."
+      },
+      "outputs": [
+        "API 응답",
+        "DB·원본 저장 상태",
+        "감사 기록"
+      ],
+      "owner_role": "백엔드 개발책임자",
+      "paths": [
+        "backend",
+        "contracts"
+      ],
+      "policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "policy_refs": [
+        "FP-011",
+        "FP-022",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-048"
+      ],
+      "policy_role": "계정·TMAP 중계·신고·원본과 원본 저장 메타데이터·관리 API",
+      "related_policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "replacement_module_id": null,
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-011-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-011-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-011-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-022-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-022-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-022-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-031-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-031-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-031-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-034-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-034-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-034-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-035-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-035-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-035-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-048-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-048-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-048-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-011-001",
+        "RQ-FP-022-001",
+        "RQ-FP-031-001",
+        "RQ-FP-034-001",
+        "RQ-FP-035-001",
+        "RQ-FP-048-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "계정, 지도 중계, 신고, 원본·메타데이터 저장, 삭제, 관리 API를 처리한다.",
+      "sample_paths": [
+        "backend/.env.example",
+        "backend/README.md",
+        "backend/__init__.py",
+        "backend/alembic.ini",
+        "backend/alembic/README.md",
+        "backend/alembic/env.py",
+        "backend/alembic/versions/202605120001_create_reports.py",
+        "backend/alembic/versions/202607110001_report_query_indexes.py",
+        "backend/alembic/versions/202607110002_report_data_constraints.py",
+        "backend/alembic/versions/202607110003_backend_safety_controls.py",
+        "backend/alembic/versions/202607110004_append_only_audit_tables.py",
+        "backend/alembic/versions/202607130001_guard_audit_truncate.py",
+        "backend/alembic/versions/202607130002_unique_export_audit_digest.py",
+        "backend/alembic/versions/202607130003_report_read_audits.py",
+        "backend/alembic/versions/202607130004_shared_actor_rate_limits.py",
+        "backend/alembic/versions/202607160001_report_duplicate_check_audit.py",
+        "backend/app/README.md",
+        "backend/app/__init__.py",
+        "backend/app/api/README.md",
+        "backend/app/api/__init__.py"
+      ],
+      "source_issue_ids": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "tracked_file_count": 77
+    },
+    {
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "build_artifacts": [
+        "TFLite·학습모델 후보 — release 결속 전"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "TFLite 자산과 Python 학습·검증 도구가 존재한다.",
+      "deployment_artifacts": [
+        "Android model asset 후보"
+      ],
+      "deprecation_status": "ACTIVE_MODEL_CANDIDATE",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-07",
+        "DES-24"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-07",
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-24",
+          "design_id": "DES-24",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-24",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-07",
+        "DES-24"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "승인 데이터셋",
+        "학습 설정",
+        "모델 후보"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "Python",
+        "TFLite",
+        "PyTorch artifact"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-MODEL",
+      "name": "객체 탐지 모델·학습 도구",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "평가 결과",
+        "TFLite 모델",
+        "모델 hash"
+      ],
+      "owner_role": "AI·ML 개발책임자",
+      "paths": [
+        "model",
+        "apps/android/app/src/main/assets/models"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-034"
+      ],
+      "policy_role": "휴대전화 추론과 서버 학습·평가 후보",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-019-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-019-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-019-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-020-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-020-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-020-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-021-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-021-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-021-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-034-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-034-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-034-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-019-001",
+        "RQ-FP-020-001",
+        "RQ-FP-021-001",
+        "RQ-FP-034-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "객체 탐지 모델의 학습·평가·변환 후보와 단말 배포 자산을 관리한다.",
+      "sample_paths": [
+        "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+        "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "model/README.md",
+        "model/artifacts/README.md",
+        "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "model/deployments/README.md",
+        "model/deployments/local-deployment.json",
+        "model/registry/README.md",
+        "model/registry/walksafe-model-registry.json",
+        "model/requirements.txt",
+        "model/sample_yolo_failures.py",
+        "model/test_two_model_runtime.py",
+        "model/train_yolo.py",
+        "model/two_model_runtime.py",
+        "model/validate_yolo_dataset.py"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 16
+    },
+    {
+      "alignment_status": "BOUNDARY_REVIEW_REQUIRED",
+      "build_artifacts": [
+        "Android 음성 기능·Python 음성 서비스 후보"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "Android 및 Python 음성 관련 코드가 함께 존재한다.",
+      "deployment_artifacts": [
+        "voice systemd 후보"
+      ],
+      "deprecation_status": "BOUNDARY_REVIEW_REQUIRED",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-15",
+        "DES-22"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-04",
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-15",
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-22",
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-15",
+        "DES-22"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "마이크 입력",
+        "명령 문구",
+        "안내 문장"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "Kotlin",
+        "Python"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-VOICE",
+      "name": "음성 처리 후보",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "의도",
+        "음성 안내",
+        "오류·성능 기록"
+      ],
+      "owner_role": "음성 기능 개발책임자",
+      "paths": [
+        "voice",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-025",
+        "FP-026",
+        "FP-027",
+        "FP-028",
+        "FP-029"
+      ],
+      "policy_role": "호출어·STT·의도·TTS의 단말 우선 처리",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-025-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-025-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-025-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-026-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-026-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-026-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-027-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-027-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-027-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-028-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-028-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-028-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-029-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-029-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-029-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-025-001",
+        "RQ-FP-026-001",
+        "RQ-FP-027-001",
+        "RQ-FP-028-001",
+        "RQ-FP-029-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "호출어·음성인식·의도·음성안내 후보를 처리하며 단말 우선 책임 경계를 검토한다.",
+      "sample_paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileFrameCoordinator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidance.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt",
+        "voice/README.md",
+        "voice/__init__.py",
+        "voice/inference_process.py",
+        "voice/intents.py",
+        "voice/model_integrity.py",
+        "voice/phrases.py",
+        "voice/quality-requirements.lock"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 28
+    },
+    {
+      "alignment_status": "LEGACY_REFERENCE_ONLY",
+      "build_artifacts": [
+        "Web/PWA 과거 빌드 — 정식 제품 아님"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "Next.js/PWA 구현과 시험 후보가 존재한다.",
+      "deployment_artifacts": [
+        "Web 환경·nginx·systemd 파일 — 과거 참고"
+      ],
+      "deprecation_status": "LEGACY_REFERENCE_ONLY",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-07"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-02",
+          "design_id": "DES-02",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-02",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-05",
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-06",
+          "design_id": "DES-06",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-06",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-07",
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-07"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "과거 Web/PWA 입력"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "TypeScript",
+        "React",
+        "Next.js"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-WEB-LEGACY",
+      "name": "Web/PWA 과거 구현",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "과거 버전 비교 결과"
+      ],
+      "owner_role": "기술책임자",
+      "paths": [
+        "apps/web"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-009"
+      ],
+      "policy_role": "과거 참고자료이며 정식 사용자·관리자 제품이 아님",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": "MOD-ANDROID-USER",
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-009-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-009-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-009-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-009-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "과거 동작을 비교할 때만 참고하며 Android 정식 제품의 완료·합격 근거로 쓰지 않는다.",
+      "sample_paths": [
+        "apps/web/.env.example",
+        "apps/web/README.md",
+        "apps/web/app/README.md",
+        "apps/web/app/_walksafe/README.md",
+        "apps/web/app/_walksafe/absolute-heading.ts",
+        "apps/web/app/_walksafe/admin-heatmap.ts",
+        "apps/web/app/_walksafe/assist-session-lifecycle.ts",
+        "apps/web/app/_walksafe/camera-policy.ts",
+        "apps/web/app/_walksafe/components/AssistPanel.tsx",
+        "apps/web/app/_walksafe/components/AssistiveAnnouncement.tsx",
+        "apps/web/app/_walksafe/components/CameraSurface.tsx",
+        "apps/web/app/_walksafe/components/GatewaySessionGate.tsx",
+        "apps/web/app/_walksafe/components/README.md",
+        "apps/web/app/_walksafe/components/TestCapturePanel.tsx",
+        "apps/web/app/_walksafe/config.ts",
+        "apps/web/app/_walksafe/depth-estimator.ts",
+        "apps/web/app/_walksafe/detection-availability.ts",
+        "apps/web/app/_walksafe/detection-presence-policy.ts",
+        "apps/web/app/_walksafe/feedback.ts",
+        "apps/web/app/_walksafe/gps-freshness.ts"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 140
+    },
+    {
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "build_artifacts": [
+        "CI 결과·container 후보 — 정식 빌드 생성 이력(provenance) 없음"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "systemd, nginx, Docker Compose, GitHub Actions 후보가 존재한다.",
+      "deployment_artifacts": [
+        "systemd/nginx/Docker Compose 후보"
+      ],
+      "deprecation_status": "REVALIDATION_REQUIRED",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-05",
+        "DES-23",
+        "DES-25",
+        "DES-27"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-05",
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-23",
+          "design_id": "DES-23",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-23",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-25",
+          "design_id": "DES-25",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-25",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-27",
+          "design_id": "DES-27",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-27",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-05",
+        "DES-23",
+        "DES-25",
+        "DES-27"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "source·lock·환경 설정",
+        "배포 대상"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "YAML",
+        "systemd unit",
+        "nginx configuration",
+        "Docker Compose"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-DEPLOY",
+      "name": "배포 설정 후보",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "build·검사 결과",
+        "서버 프로세스"
+      ],
+      "owner_role": "배포·운영 개발책임자",
+      "paths": [
+        "deploy",
+        ".github/workflows",
+        "docker-compose.yml"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-002",
+        "FP-044",
+        "FP-053"
+      ],
+      "policy_role": "서버·품질 자동화의 구현 후보",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-002-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-002-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-002-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-044-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-044-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-044-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "RQ-FP-053-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-053-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-053-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-002-001",
+        "RQ-FP-044-001",
+        "RQ-FP-053-001"
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "서버 실행·이관·자동검사를 재현하는 배포·CI 후보를 관리한다.",
+      "sample_paths": [
+        ".github/workflows/android-device-acceptance.yml",
+        ".github/workflows/quality.yml",
+        "deploy/config/walksafe-backend.env.example",
+        "deploy/config/walksafe-report-retention.env.example",
+        "deploy/config/walksafe-voice.env.example",
+        "deploy/config/walksafe-web.env.example",
+        "deploy/nginx/walksafe-web.conf.example",
+        "deploy/systemd/walksafe-backend-migrate.service",
+        "deploy/systemd/walksafe-backend.service",
+        "deploy/systemd/walksafe-log-retention.service",
+        "deploy/systemd/walksafe-log-retention.timer",
+        "deploy/systemd/walksafe-report-retention.service",
+        "deploy/systemd/walksafe-report-retention.timer",
+        "deploy/systemd/walksafe-voice.service",
+        "deploy/systemd/walksafe-web.service",
+        "docker-compose.yml"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 16
+    },
+    {
+      "alignment_status": "SCOPE_CLASSIFICATION_REQUIRED",
+      "build_artifacts": [
+        "도구 실행 결과 — 제품 artifact와 분리"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "스크립트·시험·고정 설정이 존재하나 제품·과거 참고·제출 도구의 세부 분류가 더 필요하다.",
+      "deployment_artifacts": [],
+      "deprecation_status": "SCOPE_CLASSIFICATION_REQUIRED",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-07"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-07",
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-07"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "implementation_blockers": [],
+      "inputs": [
+        "코드·의존성 버전 고정 파일(lock)·고정 시험자료(fixture)·정책 기준"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "DRAFT_REVIEW_REQUIRED",
+      "languages": [
+        "Python",
+        "Shell",
+        "JSON",
+        "YAML"
+      ],
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-ENGINEERING-TOOLING",
+      "name": "빌드·검증·제출 도구",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "검사 결과",
+        "build·제출 후보",
+        "운영 자료"
+      ],
+      "owner_role": "개발·QA 책임자",
+      "paths": [
+        "scripts",
+        "tests",
+        "configs"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [],
+      "policy_role": "제품 코드와 분리해 관리하는 빌드·검증·제출 지원 도구",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [],
+      "requirement_refs": [],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "responsibility": "빌드·검사·백업·제출·고정 시험자료 도구를 실행하고 재현 입력을 제공한다.",
+      "sample_paths": [
+        "configs/README.md",
+        "configs/submission_exact8_requirements.lock",
+        "configs/submission_installer_requirements.lock",
+        "configs/submission_toolchain_lock_20260713.json",
+        "configs/walksafe_node_toolchain_lock_20260715.json",
+        "configs/walksafe_product_quality_policy_20260713.json",
+        "configs/walksafe_two_model_runtime_20260522.yaml",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json",
+        "configs/walksafe_unified_epoch270_field_20260711.json",
+        "scripts/README.md",
+        "scripts/aihub_label_first_download_20260602.sh",
+        "scripts/audit_project_classification_20260708.py",
+        "scripts/audit_submission_visual_privacy_20260711.py",
+        "scripts/audit_walksafe_test_report_contamination_20260711.py",
+        "scripts/backup_walksafe_data_20260711.sh",
+        "scripts/build_design_documents_20260710.py",
+        "scripts/build_latest_model_report_20260710.py",
+        "scripts/build_midterm_design_ppt_20260712.py",
+        "scripts/build_midterm_design_ppt_practical_deliverables_20260712.py",
+        "scripts/build_midterm_design_ppt_template_faithful_20260712.py"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 176
+    },
+    {
+      "alignment_status": "INTERNAL_FP048_VERIFIED_FORMAL_NOT_RUN",
+      "build_artifacts": [
+        "Node.js/TypeScript build 후보 — 정식 build·배포 hash 아님"
+      ],
+      "bundled_approval_dependency_refs": [],
+      "change_tracking_refs": [],
+      "correction_candidate_binding": null,
+      "current_fact": "Node.js/TypeScript Gateway 소스와 FP-048 내부 자동 검증 결과가 존재한다.",
+      "deployment_artifacts": [
+        "Gateway 서비스 후보 — NOT_DEPLOYED"
+      ],
+      "deprecation_status": "ACTIVE_SERVICE_CANDIDATE_NOT_DEPLOYED",
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-09",
+        "DES-19"
+      ],
+      "design_links": [
+        {
+          "anchor": "des-01",
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-03",
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-05",
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-06",
+          "design_id": "DES-06",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-06",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-09",
+          "design_id": "DES-09",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-09",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "anchor": "des-19",
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-09",
+        "DES-19"
+      ],
+      "design_trace_status": "INTERNAL_CONFORMANCE_LINKED_DRAFT_DESIGN",
+      "direct_policy_correction_candidate_refs": [],
+      "formal_branch_implementation_and_test_frozen": false,
+      "fp035_dependency_relation": null,
+      "fp046_internal_trace": {
+        "actual_device_credit_count": 0,
+        "actual_device_status": "NOT_RUN",
+        "approval_credit_count": 0,
+        "artifact_approval_claimed": false,
+        "external_evidence_credit_count": 0,
+        "external_verification_status": "NOT_RUN",
+        "formal_test_credit_count": 0,
+        "formal_test_status": "NOT_RUN",
+        "internal_implementation_status": "PASS",
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-ANDROID-GATEWAY",
+        "planned_test_ids": [
+          "TC-FP-046-01",
+          "TC-FP-046-02",
+          "TC-FP-046-03",
+          "TC-FP-046-04",
+          "TC-FP-046-05"
+        ],
+        "producer_inputs": [
+          {
+            "byte_length": 36254,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-IMPLEMENTATION-20260810-001",
+            "name": "fp046_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/implementation-record.json",
+            "relation": "FP046_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6"
+          },
+          {
+            "byte_length": 3809,
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-VERIFICATION-20260810-001",
+            "name": "fp046_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/verification-result.json",
+            "relation": "FP046_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+          },
+          {
+            "byte_length": 533282,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260810-025",
+            "name": "fp046_gap055_r025_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json",
+            "relation": "GAP055_R025_SUCCESSOR_RESULT",
+            "sha256": "082a688ae32b068418d007111560802be3376deeee6cad526432a69b9d0321a1"
+          }
+        ],
+        "production_credit_count": 0,
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "review_or_completion_inputs_included": false,
+        "scope": "REPOSITORY_INTERNAL_FP046_ARTIFACT_TRACE_ONLY",
+        "source_content_set_sha256": "143c81314c350aeee9351b8e1e7b13d5f940d9e9352b8a3807634d36ce2bad80",
+        "source_file_count": 18,
+        "source_files": [
+          {
+            "byte_length": 15589,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/README.md",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "80597353e299cc5bf109240c3031646e76e09387573576dff67cc917ee953dff"
+          },
+          {
+            "byte_length": 2174,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/server.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "7001e4a12ed237663d32627aee456613a8afe0eb292ab4e0bfe83be2991f0e20"
+          },
+          {
+            "byte_length": 44898,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/integrated-consent.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "af25e39189f27119eaec4d6dccdaaafe063bd2b091d0c52498b877c3998ca7d1"
+          },
+          {
+            "byte_length": 45793,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/privacy-rights.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "8fcd87b40738450ed77743426bdd5a5038afdb64097b37e257593292805615e2"
+          },
+          {
+            "byte_length": 59158,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/privacy-deletion-v2.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "f9f72adb639c9a395cb7fc4bebfe857f75a39aa0169bbc85cfd70f070da8c2c5"
+          },
+          {
+            "byte_length": 19438,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/integrated-consent.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "1b2d9842a19148acb8125a0a1881a007f6f73fb78101a95ff77c3616ea0e7aa4"
+          },
+          {
+            "byte_length": 19931,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/privacy-rights.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "fa49e585a2faf063250df8c88fa8fdad4dbe1f767c1d072d4c9d409d4cbc80a6"
+          },
+          {
+            "byte_length": 22911,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/privacy-deletion-v2.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "6dab2c36004da0a66dee6416af114cf836f0c6eef29bea2f0095e23a4c4bd5bd"
+          },
+          {
+            "byte_length": 2059,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/privacy-deletion-v2-crash.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "4d0a16c5193baec0b873ec083bc89263a4ec6ea3f6e2864d2df1a1d700d5072f"
+          },
+          {
+            "byte_length": 3046,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/privacy-deletion-v2-crash-worker.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "07088f2b52a4130a5f15800530fdb1a2592131785b78ceca609e6e7fe4c60e76"
+          },
+          {
+            "byte_length": 64835,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/openapi.json",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "be9f0758f7ae80bd7e1532b0e33cafedf157f9c213628bd61b4324da84f06ae8"
+          },
+          {
+            "byte_length": 32122,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/auth.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "8b2410a1fae8dd6b013cb5ffa20e690af3721ba5d5ba70279bf980f8dd389ed2"
+          },
+          {
+            "byte_length": 18504,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/backend.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "c2218bcd08001e43681ca4acc919f449c85bf403add7ebaf9a8b34c1b3e55b71"
+          },
+          {
+            "byte_length": 35272,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/field-long-session.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "f7b86df929ffbfa3cfaf1409c7a95db78d35dbc9d39ec921aaf4930f44821d14"
+          },
+          {
+            "byte_length": 38187,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/src/routes.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "804705498f65983300782fa4549b11f700ca0a964ede32a90f620a66140bc407"
+          },
+          {
+            "byte_length": 31594,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/field-long-session.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "4e3c0bd978c41595e64323c9e1b92a0ef3ffef38cdf95c973b18c170e6b7cde2"
+          },
+          {
+            "byte_length": 47958,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/gateway-contract.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "b6e141da1a50fede21890dadcc6899646d92c044061975582c856338f6907fbe"
+          },
+          {
+            "byte_length": 5656,
+            "group_id": "ANDROID_GATEWAY_PRIVACY",
+            "path": "apps/android-gateway/test/node-adapter.test.ts",
+            "role": "FP046_FINAL_SOURCE_CONTENT",
+            "sha256": "99d5e52d3d313d21e8a191700cd3cef67c000b401dd8f60ebcaa437ea757bccb"
+          }
+        ],
+        "successor_id": "WS-FP046-ARTIFACT-TRACE-SUCCESSOR-20260810-001"
+      },
+      "fp048_internal_trace": {
+        "actual_device_status": "NOT_RUN",
+        "external_verification_status": "NOT_RUN",
+        "formal_test_status": "NOT_RUN",
+        "implementation_result": {
+          "byte_length": 39009,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-IMPLEMENTATION-20260802-001",
+          "name": "fp048_implementation_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/implementation-record.json",
+          "relation": "FP048_INTERNAL_IMPLEMENTATION_RESULT",
+          "sha256": "1990e550ffaab170dded19d4db9ac35fcff13594efd9c553e563fc76ee35fb39"
+        },
+        "internal_verification_status": "PASS",
+        "module_id": "MOD-ANDROID-GATEWAY",
+        "production_deployment_status": "NOT_RUN",
+        "release_status": "NOT_ELIGIBLE",
+        "source_content_set_sha256": "20aaed0f0d08dd3996c1cf075cb0e74df7ec40e818d2495d0ce163816436c4da",
+        "source_file_count": 21,
+        "source_files": [
+          {
+            "before_sha256": "f500d9c2349c0b27019a7583f2ec700c9c35b1baf50966ef77f17eded48844e3",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 14954,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/README.md",
+            "sha256": "0654cbf975d36223d7dead505cc096b6838f17b3357b0d6fcf29a87a504b0bd0"
+          },
+          {
+            "before_sha256": "c4aa0b7770443c7299286b4c1e8db8df3777973306e9848c85cbe61c018999e6",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 639,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/package.json",
+            "sha256": "354a45b31ed313a39edadac792346f6dfa40b2db0bdebec0bcd4d9de63e3f95e"
+          },
+          {
+            "before_sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 1561,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/server.ts",
+            "sha256": "3477c39ffc16be1bb4c3e698e0dddf58f4337cf5a2b26c09452e0f87855de30d"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 21950,
+            "change_kind": "ADDED",
+            "path": "apps/android-gateway/src/encrypted-json-store.ts",
+            "sha256": "d0361711326c68eb29267d8bf5e8b04b677a627c43bc7ac7935e7b6fe568cd02"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 16078,
+            "change_kind": "ADDED",
+            "path": "apps/android-gateway/src/state-encryption-maintenance.ts",
+            "sha256": "8d46d9a5d2d9a693d9544658fb09b7066833885d5d097e6decea8bd31cda8b75"
+          },
+          {
+            "before_sha256": "69da3ab915e7cb0a2ec22eb344cf97578d92b63591a0786e57d075926a451544",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 30594,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/auth.ts",
+            "sha256": "3b3c03b6a3354b46933039a89ba43ab1e995a1b1a778cf25061ef579804a34b6"
+          },
+          {
+            "before_sha256": "699946e740a43c92e80aa393045fed32825f558c10e8653d77f0a6b6c49497be",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 35189,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/field-long-session.ts",
+            "sha256": "99d20a23c78eb153a7b279aaed6133d44f8f7ad64c0fc4399e0c348094f52acb"
+          },
+          {
+            "before_sha256": "4988c3f9382fc352eec6f69a6915904e44270799eec26ae393e12c2bb2a4f36d",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 29869,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/field-walk-ledger.ts",
+            "sha256": "2f43217194dddfd08fe48fb3322815807f1629cea8b6cbdcbb333f3467d50289"
+          },
+          {
+            "before_sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 36974,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/integrated-consent.ts",
+            "sha256": "52b0e0e291f6103d02af3516f026dcc0e341eda07ec6f6bb73886cb0fb8f30aa"
+          },
+          {
+            "before_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 45610,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/privacy-rights.ts",
+            "sha256": "3e13e06a7951cb0230fd69377019a3bb322eaa844a565bc99d67c96a18e351dd"
+          },
+          {
+            "before_sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 6124,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/config.ts",
+            "sha256": "3cdc31e9398293c6511f67faf58c9a778d16ee48284e0cf336164d3dbb489304"
+          },
+          {
+            "before_sha256": "aa6a32375dc4d862b53bd6c874f9ff01c993de892c4273969fc0cf932a18848e",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 7954,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/src/exclusive-file-lock.ts",
+            "sha256": "5c2576142e19eeb858d769e8060ee30dcc9e679a5b657897ceb9d65d69063daa"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 2388,
+            "change_kind": "ADDED",
+            "path": "apps/android-gateway/test/state-encryption-fixture.ts",
+            "sha256": "e686039f44db29cba54c2a56d6cd1e48f87b37e44219caff791bfc3ecfd436c7"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 11523,
+            "change_kind": "ADDED",
+            "path": "apps/android-gateway/test/encrypted-json-store.test.ts",
+            "sha256": "dcf07f12bf4f22aac3bfe31e5418ef35e5ac5aadc2875ff17105443133ffc4bc"
+          },
+          {
+            "before_sha256": null,
+            "before_source": "SEQ42_PINNED_HEAD_ABSENT",
+            "byte_length": 10645,
+            "change_kind": "ADDED",
+            "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+            "sha256": "40bac4c27a228ac3ca768efd31c94486796dd7c6e8f0253ec1568bcb7f1cef74"
+          },
+          {
+            "before_sha256": "981d7a01031074f7f42c49c2efd4259e9e5af54eea73229d55af21f3a0f48b7c",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 31288,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/field-long-session.test.ts",
+            "sha256": "eb30f2ba8311a4f1279928b398cd56fd191a6bcc4fedb418cc15fcec6a97a5fe"
+          },
+          {
+            "before_sha256": "e07cd13f13560ab44506a75eeae1eed796c1f130eff44721a8399f2ebb43a570",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 23858,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/field-walk-ledger.test.ts",
+            "sha256": "b126302d3adf0acd9cca8e0f6655034fd0e52bf29b0c3b2d33106696d79c7a5e"
+          },
+          {
+            "before_sha256": "b7917c951bbf8412510fc398de3f8746ffeb6e1f7b3d686d02a3ff53a641994d",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 11918,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/integrated-consent.test.ts",
+            "sha256": "68269ea94385b0ec854f803a068a8d14b50ba221d122ae59db322b592072ed96"
+          },
+          {
+            "before_sha256": "5475a015d881630991623e7b7ad88edce6da269622308ac25ca78d2be9421790",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 19820,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/privacy-rights.test.ts",
+            "sha256": "6aa105f228a98432bb6b7940dd5521200fd1455104044e50031a0e0e8a4f16da"
+          },
+          {
+            "before_sha256": "77df172ec22fc38919cf94ef413fba880f61a5765d4a14ca38bcd31cc37d2307",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 30683,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/gateway-contract.test.ts",
+            "sha256": "2b7847efd122b0a786172cc1eb458c4f67a5c4d275dd8e99fa38738e097d742a"
+          },
+          {
+            "before_sha256": "84f33251a9285883e348f77ea462785290a485dadfad076db2755dda9f55b0ad",
+            "before_source": "SEQ42_START_GATE_DIRTY_SNAPSHOT",
+            "byte_length": 5552,
+            "change_kind": "MODIFIED",
+            "path": "apps/android-gateway/test/node-adapter.test.ts",
+            "sha256": "b37d64e02eb8873ca3b532c954453cfe7b9175fdf3746c73baed8ba6f006c297"
+          }
+        ],
+        "successor_id": "WS-FP048-ARTIFACT-TRACE-SUCCESSOR-20260802-001",
+        "verification_result": {
+          "byte_length": 15344,
+          "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-VERIFICATION-20260802-001",
+          "name": "fp048_verification_result",
+          "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/verification-result.json",
+          "relation": "FP048_INTERNAL_VERIFICATION_RESULT",
+          "sha256": "499b2dd4651b7efa73a2d8904daa4aaea0eca6ac94e6734d4c6660fe0dc3160c"
+        }
+      },
+      "implementation_blockers": [],
+      "inputs": [
+        "Android HTTPS 요청",
+        "외부 keyring",
+        "backend 응답"
+      ],
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "inventory_status": "FP048_INTERNAL_CHANGED_SOURCE_SNAPSHOT_ONLY",
+      "languages": [
+        "TypeScript",
+        "Node.js"
+      ],
+      "link_validation_status": "INTERNAL_ONLY_FORMAL_NOT_RUN",
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_formal_test_status": null,
+      "mobile_network_branch_implementation_status": null,
+      "module_id": "MOD-ANDROID-GATEWAY",
+      "name": "독립 Android API Gateway",
+      "normalized_mobile_data_policy": null,
+      "outputs": [
+        "인증·동의·보행·신고·삭제 중계",
+        "암호화 영속상태",
+        "감사 이벤트"
+      ],
+      "owner_role": "Android Gateway 개발책임자",
+      "paths": [
+        "apps/android-gateway"
+      ],
+      "policy_correction_candidate_refs": [],
+      "policy_refs": [
+        "FP-048"
+      ],
+      "policy_role": "Android 사용자 앱과 backend 사이의 독립 보안·세션·개인정보 경계",
+      "related_policy_correction_candidate_refs": [],
+      "replacement_module_id": null,
+      "required_activation_event": null,
+      "requirement_links": [
+        {
+          "anchor": "RQ-FP-048-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "requirement_id": "RQ-FP-048-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-048-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_refs": [
+        "RQ-FP-048-001"
+      ],
+      "requirement_trace_status": "INTERNAL_SOURCE_LINKED_DRAFT_REQUIREMENT",
+      "responsibility": "세션·동의·보행·신고·삭제 요청의 암호화 영속상태와 fail-close 경계를 처리한다.",
+      "sample_paths": [
+        "apps/android-gateway/README.md",
+        "apps/android-gateway/package.json",
+        "apps/android-gateway/server.ts",
+        "apps/android-gateway/src/encrypted-json-store.ts",
+        "apps/android-gateway/src/state-encryption-maintenance.ts",
+        "apps/android-gateway/src/auth.ts",
+        "apps/android-gateway/src/field-long-session.ts",
+        "apps/android-gateway/src/field-walk-ledger.ts",
+        "apps/android-gateway/src/integrated-consent.ts",
+        "apps/android-gateway/src/privacy-rights.ts",
+        "apps/android-gateway/src/config.ts",
+        "apps/android-gateway/src/exclusive-file-lock.ts",
+        "apps/android-gateway/test/state-encryption-fixture.ts",
+        "apps/android-gateway/test/encrypted-json-store.test.ts",
+        "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+        "apps/android-gateway/test/field-long-session.test.ts",
+        "apps/android-gateway/test/field-walk-ledger.test.ts",
+        "apps/android-gateway/test/integrated-consent.test.ts",
+        "apps/android-gateway/test/privacy-rights.test.ts",
+        "apps/android-gateway/test/gateway-contract.test.ts"
+      ],
+      "source_issue_ids": [],
+      "tracked_file_count": 21
+    }
+  ],
+  "platform_boundary": {
+    "formal_products": [
+      "Android 사용자 앱",
+      "Android 관리자 앱"
+    ],
+    "legacy_reference": [
+      "Web/PWA"
+    ],
+    "services": [
+      "백엔드",
+      "PostgreSQL/PostGIS",
+      "대용량 원본 저장소",
+      "TMAP"
+    ]
+  },
+  "schema_version": "walksafe.dev-module-register.v1",
+  "trace_integration_boundary": {
+    "declared_links_include_downstream_hashes": false,
+    "post_generation_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+    "structural_link_validation_is_not_approval": true
+  }
+}

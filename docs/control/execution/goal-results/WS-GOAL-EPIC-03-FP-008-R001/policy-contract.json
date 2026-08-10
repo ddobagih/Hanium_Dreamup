@@ -1,0 +1,466 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-POLICY-CONTRACT-20260809-001",
+  "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "policy_id": "FP-008",
+  "gap_id": "GAP-017",
+  "kind": "INTERNAL_POLICY_CONTRACT",
+  "status": "CONTRACT_DEFINED",
+  "source_binding": {
+    "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
+    "sha256": "2654fe5f595aefaecf974a4de70bad7946c2385cba9716200f2d2f49d849dd8e"
+  },
+  "product_boundary": {
+    "supported_surface": "ANDROID_ADMIN_APP_AND_BACKEND",
+    "separate_from_user_app": {
+      "application_id": true,
+      "signing_boundary": true,
+      "session_namespace": true
+    },
+    "registered_admin_device_required": true,
+    "additional_admin_authentication_required": true,
+    "institution_delivery_mode": "MANUAL_RECORD_ONLY",
+    "outbound_institution_dispatch": false
+  },
+  "admin_device_proof": {
+    "proof_schema_version": "walksafe.admin-device-proof.v2",
+    "challenge_purposes": [
+      "LOGIN",
+      "ACTION",
+      "RECOVERY_COMPLETE"
+    ],
+    "challenge_request": {
+      "method": "POST",
+      "path": "/admin/security/device-proof/challenges",
+      "exact_fields": [
+        "action",
+        "admin_id",
+        "body_sha256",
+        "correlation_id",
+        "device_id",
+        "device_key_marker",
+        "device_key_version",
+        "method",
+        "path",
+        "purpose",
+        "query_sha256",
+        "read_purpose",
+        "session_id"
+      ],
+      "all_exact_fields_present": true,
+      "unknown_fields_rejected": true,
+      "nullable_fields": [
+        "action",
+        "read_purpose",
+        "session_id"
+      ],
+      "purpose_is_challenge_type": true,
+      "separate_challenge_type_field_forbidden": true
+    },
+    "signed_payload_exact_fields": [
+      "action",
+      "admin_id",
+      "body_sha256",
+      "challenge_id",
+      "correlation_id",
+      "device_id",
+      "device_key_marker",
+      "device_key_version",
+      "expires_at_epoch_ms",
+      "issued_at_epoch_ms",
+      "method",
+      "nonce",
+      "path",
+      "purpose",
+      "query_sha256",
+      "read_purpose",
+      "schema_version",
+      "session_id"
+    ],
+    "challenge_response_exact_fields": [
+      "action",
+      "admin_id",
+      "body_sha256",
+      "challenge_id",
+      "correlation_id",
+      "device_id",
+      "device_key_marker",
+      "device_key_version",
+      "expires_at_epoch_ms",
+      "issued_at_epoch_ms",
+      "method",
+      "nonce",
+      "path",
+      "purpose",
+      "query_sha256",
+      "read_purpose",
+      "schema_version",
+      "session_id",
+      "signing_payload"
+    ],
+    "physical_key_rule": {
+      "all_exact_fields_present": true,
+      "unknown_fields_rejected": true,
+      "nullable_fields": [
+        "action",
+        "read_purpose",
+        "session_id"
+      ],
+      "session_id_null_for_purposes": [
+        "LOGIN",
+        "RECOVERY_COMPLETE"
+      ],
+      "session_id_required_for_purposes": [
+        "ACTION"
+      ],
+      "action_and_read_purpose_by_operation": {
+        "LOGIN": {
+          "action": null,
+          "read_purpose": null
+        },
+        "RECOVERY_COMPLETE": {
+          "action": null,
+          "read_purpose": null
+        },
+        "REPORT_DECISION_POST": {
+          "purpose": "ACTION",
+          "method": "POST",
+          "action": "report.review.decide",
+          "read_purpose": null
+        },
+        "DELIVERY_EVENT_POST": {
+          "purpose": "ACTION",
+          "method": "POST",
+          "action": "report.delivery.create",
+          "read_purpose": null
+        },
+        "DECISION_HISTORY_GET": {
+          "purpose": "ACTION",
+          "method": "GET",
+          "action": null,
+          "read_purpose": "report.review_decisions"
+        },
+        "DELIVERY_HISTORY_GET": {
+          "purpose": "ACTION",
+          "method": "GET",
+          "action": null,
+          "read_purpose": "report.delivery_events"
+        }
+      }
+    },
+    "canonical_json": {
+      "encoding": "UTF-8",
+      "sort_keys": true,
+      "separators": [
+        ",",
+        ":"
+      ],
+      "ensure_ascii": false,
+      "signing_payload_representation": "JSON_STRING_NOT_BASE64",
+      "signed_bytes": "UTF8_BYTES_OF_SIGNING_PAYLOAD",
+      "response_signing_payload_must_equal_canonical_exact18": true
+    },
+    "request_binding": {
+      "method": "UPPERCASE_HTTP_METHOD",
+      "path": "ABSOLUTE_REQUEST_PATH",
+      "body_sha256": {
+        "algorithm": "SHA-256",
+        "input": "EXACT_TRANSMITTED_BODY_BYTES",
+        "output": "LOWERCASE_HEX_64"
+      },
+      "query_sha256": {
+        "algorithm": "SHA-256",
+        "input": "CANONICAL_QUERY_UTF8_BYTES",
+        "output": "LOWERCASE_HEX_64",
+        "absent_query_input": "EMPTY_BYTES"
+      },
+      "correlation_id_required": true,
+      "session_id_bound_when_present": true,
+      "read_purpose_bound_for_protected_read": true
+    },
+    "canonical_query_v1": {
+      "decoded_input": "ORDERED_UTF8_NAME_VALUE_PAIRS",
+      "malformed_percent_encoding": "REJECT",
+      "invalid_utf8": "REJECT",
+      "duplicate_pairs": "PRESERVE",
+      "blank_names_and_values": "PRESERVE",
+      "plus_character": "LITERAL_PLUS_NOT_SPACE",
+      "percent_encoding": "RFC3986_UTF8_UNRESERVED_ONLY_UPPERCASE_HEX",
+      "space_encoding": "%20",
+      "pair_sort": "ENCODED_NAME_THEN_ENCODED_VALUE_ASCII_BYTEWISE",
+      "pair_format": "ENCODED_NAME_EQUALS_ENCODED_VALUE",
+      "pair_separator": "&",
+      "vectors": [
+        {
+          "name": "absent_or_empty",
+          "pairs": [],
+          "canonical": "",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "duplicates_blank_unicode_space_and_plus",
+          "pairs": [
+            [
+              "tag",
+              "b"
+            ],
+            [
+              "q",
+              "한 글"
+            ],
+            [
+              "empty",
+              ""
+            ],
+            [
+              "tag",
+              "a"
+            ],
+            [
+              "plus",
+              "a+b"
+            ]
+          ],
+          "canonical": "empty=&plus=a%2Bb&q=%ED%95%9C%20%EA%B8%80&tag=a&tag=b",
+          "sha256": "0cb34d7f20d8a37fd1861e6f30b2311e1c551f46ad9c34105c62fd0eacd5cfc6"
+        },
+        {
+          "name": "blank_name_duplicate_sort_and_unreserved_tilde",
+          "pairs": [
+            [
+              "b",
+              "2"
+            ],
+            [
+              "a",
+              "~"
+            ],
+            [
+              "b",
+              "1"
+            ],
+            [
+              "",
+              ""
+            ]
+          ],
+          "canonical": "=&a=~&b=1&b=2",
+          "sha256": "c88f73c4de91f58377bb88d5a00ea106498f105d322450cf9bc477efdc3caab2"
+        }
+      ]
+    },
+    "freshness_and_replay": {
+      "ttl_ms": 120000,
+      "expires_minus_issued_must_equal_ttl": true,
+      "acceptance_window": "ISSUED_AT_LE_NOW_AND_NOW_LT_EXPIRES_AT",
+      "nonce_random_bytes": 32,
+      "nonce_encoding": "BASE64URL_NO_PADDING",
+      "nonce_encoded_length": 43,
+      "challenge_single_use": true,
+      "nonce_single_use": true,
+      "mismatch_or_replay": "FAIL_CLOSED"
+    },
+    "device_key_and_signature": {
+      "algorithm": "ECDSA_P256_SHA256",
+      "public_key_format": "SPKI_DER",
+      "device_key_marker": "SHA256_SPKI_DER_LOWERCASE_HEX_64",
+      "signature_format": "ASN1_DER",
+      "signature_encoding": "BASE64URL_NO_PADDING",
+      "signature_transport": "DETACHED_FROM_EXACT19_BODY"
+    },
+    "proof_vector": {
+      "exact18": {
+        "action": null,
+        "admin_id": "admin-001",
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "challenge_id": "11111111-1111-4111-8111-111111111111",
+        "correlation_id": "22222222-2222-4222-8222-222222222222",
+        "device_id": "device-001",
+        "device_key_marker": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_key_version": 1,
+        "expires_at_epoch_ms": 1700000120000,
+        "issued_at_epoch_ms": 1700000000000,
+        "method": "GET",
+        "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "path": "/api/admin/reports",
+        "purpose": "ACTION",
+        "query_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "read_purpose": "report.review_decisions",
+        "schema_version": "walksafe.admin-device-proof.v2",
+        "session_id": "33333333-3333-4333-8333-333333333333"
+      },
+      "signing_payload_sha256": "43dd9899c2d8ab5ed3f0a71b33856e828e7b57203792959490739390fa2ba8e6"
+    }
+  },
+  "report_decision": {
+    "request_exact_fields": [
+      "decision",
+      "reason",
+      "duplicate_of_report_id",
+      "location_reviewed",
+      "photo_reviewed",
+      "privacy_reviewed"
+    ],
+    "unknown_fields_rejected": true,
+    "decisions": [
+      "APPROVED",
+      "REJECTED",
+      "DUPLICATE"
+    ],
+    "reason": "NON_BLANK_REQUIRED",
+    "review_flags": {
+      "fields": [
+        "location_reviewed",
+        "photo_reviewed",
+        "privacy_reviewed"
+      ],
+      "type": "BOOLEAN",
+      "approved_requires_all_true": true
+    },
+    "duplicate_target": {
+      "required_only_for": "DUPLICATE",
+      "null_for_other_decisions": true,
+      "must_exist": true,
+      "must_not_reference_self": true
+    },
+    "server_derived_fields": [
+      "admin_id",
+      "decided_at",
+      "correlation_id",
+      "revision"
+    ],
+    "history": "APPEND_ONLY",
+    "effective_decision": "LATEST_REVISION"
+  },
+  "manual_delivery": {
+    "request_exact_fields": [
+      "institution",
+      "channel",
+      "recipient",
+      "status",
+      "external_receipt_id",
+      "reason",
+      "evidence_sha256",
+      "observed_at",
+      "expected_revision",
+      "idempotency_key"
+    ],
+    "unknown_fields_rejected": true,
+    "allowed_statuses": [
+      "SUBMITTED",
+      "ACKNOWLEDGED",
+      "RESOLVED",
+      "FAILED"
+    ],
+    "initial_transitions": [
+      "SUBMITTED",
+      "FAILED"
+    ],
+    "transitions": {
+      "FAILED": [
+        "FAILED",
+        "SUBMITTED"
+      ],
+      "SUBMITTED": [
+        "ACKNOWLEDGED",
+        "FAILED"
+      ],
+      "ACKNOWLEDGED": [
+        "RESOLVED"
+      ],
+      "RESOLVED": []
+    },
+    "report_eligibility": {
+      "latest_decision_must_equal": "APPROVED",
+      "latest_location_reviewed_must_equal": true,
+      "latest_photo_reviewed_must_equal": true,
+      "latest_privacy_reviewed_must_equal": true,
+      "recheck_before_every_delivery_append": true
+    },
+    "history": "APPEND_ONLY",
+    "status_readback_required": true,
+    "external_receipt_id": "NULL_OR_NON_BLANK_STRING",
+    "reason": "NON_BLANK_REQUIRED",
+    "evidence_sha256": "NULL_OR_LOWERCASE_HEX_64",
+    "observed_at": "RFC3339_UTC",
+    "expected_revision": "INTEGER_GREATER_THAN_OR_EQUAL_TO_ZERO",
+    "idempotency_key": "UUID",
+    "optimistic_concurrency": {
+      "expected_revision_must_match_latest": true,
+      "revision_conflict": "REJECT"
+    },
+    "idempotency": {
+      "scope": "REPORT_AND_IDEMPOTENCY_KEY",
+      "same_key_same_request": "RETURN_ORIGINAL_RESULT",
+      "same_key_different_request": "REJECT_CONFLICT",
+      "retry_check_precedes_revision_check": true
+    },
+    "side_effect": {
+      "record_only": true,
+      "external_send_performed": false,
+      "external_receipt_generation_performed": false
+    },
+    "server_derived_fields": [
+      "admin_id",
+      "recorded_at",
+      "correlation_id",
+      "revision"
+    ]
+  },
+  "audit_and_failure_isolation": {
+    "protected_read_audit_required": true,
+    "decision_audit_required": true,
+    "delivery_audit_required": true,
+    "audit_actor_from_verified_session": true,
+    "admin_failure": {
+      "admin_alert_required": true,
+      "internal_audit_required": true,
+      "normally_operating_user_walk_continues": true
+    },
+    "shared_realtime_safety_impact": {
+      "affected_feature_only_safe_stop": true,
+      "user_reason_notice_required": true
+    }
+  },
+  "acceptance_boundary": {
+    "planned_tests": [
+      {
+        "id": "TC-FP-008-01",
+        "intent": "UNREGISTERED_DEVICE_OR_NON_ADMIN_ACCESS_DENIED",
+        "formal_status": "NOT_RUN"
+      },
+      {
+        "id": "TC-FP-008-02",
+        "intent": "DECISION_REASON_AND_ADMIN_AUDIT_RECORDED",
+        "formal_status": "NOT_RUN"
+      },
+      {
+        "id": "TC-FP-008-03",
+        "intent": "MANUAL_DELIVERY_RECEIPT_AND_STATUS_RETRIEVABLE",
+        "formal_status": "NOT_RUN"
+      },
+      {
+        "id": "TC-FP-008-04",
+        "intent": "ADMIN_FAILURE_ISOLATED_WITH_CONDITIONAL_SAFE_STOP",
+        "formal_status": "NOT_RUN"
+      }
+    ],
+    "actual_device_status": "NOT_RUN",
+    "external_institution_status": "NOT_RUN",
+    "external_authentication_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "independent_external_security_review_status": "NOT_RUN",
+    "independent_external_privacy_review_status": "NOT_RUN",
+    "formal_test_status": "NOT_RUN",
+    "gap_before_internal_reassessment": "MISSING",
+    "maximum_gap_after_internal_reassessment": "PARTIAL",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF8_SORT_KEYS_COMPACT_ENSURE_ASCII_FALSE",
+    "excluded_path": "integrity.content_sha256",
+    "content_sha256": "0df8628350afd07fcc19e97edb0fa19a91ad3a2296262f79d84c42d4b8246914"
+  }
+}

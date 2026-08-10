@@ -1,0 +1,54 @@
+{
+  "schema_version": "walksafe.test-metrics-register.v1",
+  "metadata": {
+    "title": "WalkSafe 시험 커버리지·품질지표",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "TST-19"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "snapshot_boundary": {
+    "status": "GENERATED_PRE_EXECUTION_SNAPSHOT",
+    "execution_source_pattern": "docs/deliverables/06-testing/evidence/executions/<run-id>.json",
+    "manual_edit_allowed": false,
+    "note": "실행 뒤에는 append-only 실행 파일에서 새 revision을 집계한다. 이 0건 초안을 직접 고치지 않는다."
+  },
+  "design_metrics": {
+    "planned_test_case_count": 279,
+    "policy_feature_count": 54,
+    "common_policy_count": 9,
+    "remaining_gate_count": 5,
+    "policy_sources_with_planned_case": 68
+  },
+  "execution_metrics": {
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "formal_execution_coverage_percent": 0.0
+  },
+  "pre_execution_policy_blockers": {
+    "blocked_test_case_count": 4,
+    "source_issue_id": "ISS-POLICY-FP035-NETWORK-001",
+    "status": "NOT_RUN_OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+    "normalized_policy": {
+      "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+      "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+      "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+    },
+    "plain_explanation": "FP-035의 세 가지 네트워크 동작은 사용자 지시로 정규화됐다. 다만 새 산출물 묶음 승인 전이므로 관련 시험 4개는 실행 결과가 아니라 NOT_RUN 사전 대기 계획이다."
+  },
+  "quality_metrics_status": "NOT_MEASURED",
+  "warning": "실행 결과의 차단 수는 0개지만 정규화 지시 포착 뒤 묶음 승인 대기 중인 FP-035 계획은 4개다. 계획된 case 수는 품질 달성률이 아니며, 정확한 build에서 실행된 증거만 execution metric에 포함한다."
+}

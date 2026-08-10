@@ -1,0 +1,792 @@
+{
+  "schema_version": "walksafe.artifact-remediation.mgt-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W1-MGT-CURRENT-STATE-20260726-001",
+  "version": "1.0.0",
+  "kind": "NON_DESTRUCTIVE_SUCCESSOR_SUPPLEMENT",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T20:29:12.395+09:00",
+  "observed_source_time_basis": "FP035_ANDROID_INTERNAL_UNIT_TEST_XML_TIMESTAMP",
+  "lifecycle_status": "DRAFT_SUCCESSOR_SUPPLEMENT",
+  "scope": {
+    "wave": "W1",
+    "packet_id": "W1-MGT-CONTENT",
+    "artifact_type_count": 6,
+    "artifact_type_ids": [
+      "DLV-MGT-06",
+      "DLV-MGT-07",
+      "DLV-MGT-14",
+      "DLV-MGT-15",
+      "DLV-MGT-16",
+      "DLV-MGT-17"
+    ]
+  },
+  "non_destructive_boundary": {
+    "legacy_canonical_documents_modified": false,
+    "legacy_builders_modified": false,
+    "legacy_registers_modified": false,
+    "artifact_register_modified": false,
+    "artifact_state_or_approval_changed": false,
+    "checkpoint_modified": false,
+    "release_decision_changed": false,
+    "predecessor_references": [
+      "docs/deliverables/01-management/project-management-plan.md",
+      "docs/deliverables/01-management/project-control-registers.md",
+      "docs/deliverables/01-management/registers/wbs.json",
+      "docs/deliverables/01-management/registers/schedule.json",
+      "docs/deliverables/01-management/registers/raid.json",
+      "docs/deliverables/01-management/registers/decisions.json",
+      "docs/deliverables/01-management/registers/change-requests.json",
+      "docs/deliverables/01-management/registers/dashboard.json"
+    ],
+    "interpretation": "This record is a later current-state projection and evidence supplement. It does not rewrite, approve, baseline, transition or silently correct any predecessor."
+  },
+  "claim_boundary": {
+    "allowed": [
+      "The committed 2026-07-22 application covers 129 artifact types: 102 approved baselined and 27 active opening snapshots.",
+      "The immutable audit baseline records 257 artifact types as OK 59, INTERNAL_GAP 123, EXTERNAL 39 and N/A_CANDIDATE 36.",
+      "The compact decision successor composes base 135 decisions with one approved FP-035 replacement overlay while preserving 135 effective decisions and 428 feature edges.",
+      "FP-047 internal policy-conformance reassessment passed and GAP-056 remains PARTIAL.",
+      "The current FP-035 Android activity-original upload implementation passed seventeen internal unit tests in the bound local result file.",
+      "The projected RAID current state is 12 total, 11 open and 1 resolved.",
+      "A separate internal technical review approved the final FP-035 code scope with blocking 0, major 0 and minor 0."
+    ],
+    "prohibited": [
+      "This supplement changes an artifact approval, baseline, lifecycle state, canonical register or release decision.",
+      "FP-035 or FP-047 completed formal, actual-device, actual-user, field, external-integration, production or release verification.",
+      "The r021 or immutable artifact-audit counts were recomputed after the FP-035 Android internal unit change.",
+      "The 2026-07-26 demonstration occurred or any milestone without exit evidence has an actual completion date.",
+      "The five remaining release gates were executed or waived.",
+      "WalkSafe is release eligible.",
+      "The internal technical review is user approval, external independence, formal acceptance or release authorization."
+    ]
+  },
+  "current_authority_snapshot": {
+    "policy": {
+      "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "baseline_status": "BASELINED",
+      "effective_status": "EFFECTIVE_BY_BUNDLED_OWNER_APPROVAL",
+      "application_status": "COMMITTED"
+    },
+    "artifact_inventory": {
+      "artifact_type_count": 257,
+      "approved_baselined": 102,
+      "active_opening_snapshot": 27,
+      "approved_scope_count": 129,
+      "draft_pending": 53,
+      "planned_not_run": 75,
+      "not_approved_count": 128
+    },
+    "artifact_audit_baseline": {
+      "OK": 59,
+      "INTERNAL_GAP": 123,
+      "EXTERNAL": 39,
+      "N/A_CANDIDATE": 36,
+      "total": 257,
+      "recomputed_by_this_supplement": false
+    },
+    "implementation_gap_r021": {
+      "assessment_count": 68,
+      "status_counts": {
+        "BLOCKED": 5,
+        "CONFLICTING": 16,
+        "EVIDENCE_MISSING": 4,
+        "MISSING": 11,
+        "PARTIAL": 32,
+        "IMPLEMENTED": 0
+      },
+      "priority_counts": {
+        "P0": 58,
+        "P1": 10
+      },
+      "implemented_and_formally_verified_count": 0,
+      "recomputed_after_fp035_internal_unit_change": false
+    },
+    "release_boundary": {
+      "remaining_gate_count": 5,
+      "release_gate_status": "NOT_RUN",
+      "release_gates_waived": false,
+      "formal_test_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE"
+    }
+  },
+  "artifacts": [
+    {
+      "artifact_type_id": "DLV-MGT-06",
+      "display_code": "MGT-06",
+      "title": "WBS: 작업분해구조",
+      "successor_status": "CURRENT_EXECUTION_PROJECTION_IN_PROGRESS",
+      "approval_status_change_claimed": false,
+      "wbs_projection": {
+        "legacy_work_package_count": 8,
+        "legacy_work_packages": [
+          {
+            "wbs_id": "WBS-0",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "DOC-01 and DOC-05 remain in Wave1 current-state reconciliation."
+          },
+          {
+            "wbs_id": "WBS-1",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "Management and discovery artifacts still contain audited internal gaps."
+          },
+          {
+            "wbs_id": "WBS-2",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "Requirement current-state reconciliation is active in Wave1."
+          },
+          {
+            "wbs_id": "WBS-3",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "Internal tests exist but formal test execution remains NOT_RUN."
+          },
+          {
+            "wbs_id": "WBS-4",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "Design state and implementation evidence still require reconciliation."
+          },
+          {
+            "wbs_id": "WBS-5",
+            "projected_status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "reason": "FP-047 is internally reassessed, while the overall r021 implementation scope remains open."
+          },
+          {
+            "wbs_id": "WBS-6",
+            "projected_status": "PLANNED",
+            "completion_claimed": false,
+            "reason": "Formal test execution is NOT_RUN; internal unit and repository checks are not formal execution."
+          },
+          {
+            "wbs_id": "WBS-7",
+            "projected_status": "BLOCKED",
+            "completion_claimed": false,
+            "reason": "Five release gates remain NOT_RUN and unwaived."
+          }
+        ],
+        "successor_work_packages": [
+          {
+            "wbs_id": "WBS-8",
+            "name": "257개 산출물 정확성·정합성 보완",
+            "artifact_scope": "257 artifact types",
+            "status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "internal_gap_count_at_audit_baseline": 123,
+            "internal_wave_count": 10,
+            "completion_condition": "Internal gaps are re-audited and external or applicability-only work is separated without unsupported status promotion."
+          },
+          {
+            "wbs_id": "WBS-8.1",
+            "name": "Wave1 관리 현재상태 후속 보완",
+            "artifact_scope": "DLV-MGT-06/07/14/15/16/17",
+            "status": "IN_PROGRESS",
+            "completion_claimed": false,
+            "packet_id": "W1-MGT-CONTENT",
+            "completion_condition": "The six management projections and bindings pass local invariants and later independent Wave1 review."
+          }
+        ],
+        "fp047_internal_slice": {
+          "goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+          "source_policy_id": "FP-047",
+          "gap_id": "GAP-056",
+          "receipt_result": "PASS",
+          "accepted_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+          "gap_status": "PARTIAL",
+          "completed_at": "2026-07-26T19:22:40+09:00",
+          "formal_test_status": "NOT_RUN",
+          "actual_device_status": "NOT_RUN",
+          "actual_user_status": "NOT_RUN",
+          "single_admin_recovery_drill_status": "NOT_RUN",
+          "external_review_status": "NOT_RUN",
+          "production_deployment_status": "NOT_RUN",
+          "release_status": "NOT_ELIGIBLE"
+        }
+      },
+      "allowed_claims": [
+        "Current work-package projection includes the artifact-remediation program and the bounded FP-047 internal slice."
+      ],
+      "prohibited_claims": [
+        "Any legacy WBS row or the full implementation, formal-test or release work package is completed by this supplement."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-MGT-07",
+      "display_code": "MGT-07",
+      "title": "일정·마일스톤 계획",
+      "successor_status": "CURRENT_SCHEDULE_PROJECTION_IN_PROGRESS",
+      "approval_status_change_claimed": false,
+      "schedule_projection": {
+        "milestones": [
+          {
+            "milestone_id": "MS-01",
+            "projected_status": "COMPLETE",
+            "target_date": "2026-07-21",
+            "actual_date": "2026-07-21",
+            "boundary": "Initial policy baseline completion; later 1.0.1 revision is a separate event."
+          },
+          {
+            "milestone_id": "MS-02",
+            "projected_status": "IN_PROGRESS",
+            "target_date": null,
+            "actual_date": null
+          },
+          {
+            "milestone_id": "MS-DEMO",
+            "projected_status": "PLANNED",
+            "target_date": "2026-07-26",
+            "actual_date": null,
+            "actual_evidence_status": "NOT_RECORDED"
+          },
+          {
+            "milestone_id": "MS-03",
+            "projected_status": "IN_PROGRESS",
+            "target_date": null,
+            "actual_date": null,
+            "boundary": "A 129-type approval application exists, but the milestone exit is not inferred from that count alone."
+          },
+          {
+            "milestone_id": "MS-04",
+            "projected_status": "IN_PROGRESS",
+            "target_date": null,
+            "actual_date": null,
+            "boundary": "FP-047 internal slice completed; overall implementation alignment remains open."
+          },
+          {
+            "milestone_id": "MS-05",
+            "projected_status": "PLANNED",
+            "target_date": null,
+            "actual_date": null,
+            "formal_test_status": "NOT_RUN"
+          },
+          {
+            "milestone_id": "MS-06",
+            "projected_status": "PLANNED",
+            "target_date": null,
+            "actual_date": null,
+            "release_gate_status": "NOT_RUN"
+          },
+          {
+            "milestone_id": "MS-07",
+            "projected_status": "BLOCKED",
+            "target_date": null,
+            "actual_date": null,
+            "release_status": "NOT_ELIGIBLE"
+          }
+        ],
+        "verified_progress_events": [
+          {
+            "event_id": "PE-POLICY-1.0.1",
+            "event": "FP-035 correction approved and policy baseline 1.0.1 established",
+            "approved_at": "2026-07-22T14:03:17+09:00",
+            "applied_at": "2026-07-22T14:22:21+09:00"
+          },
+          {
+            "event_id": "PE-ARTIFACT-APPROVAL-129",
+            "event": "Artifact baseline application committed",
+            "occurred_at": "2026-07-22T14:22:21+09:00",
+            "approved_scope_count": 129,
+            "not_approved_count": 128
+          },
+          {
+            "event_id": "PE-FP047-INTERNAL",
+            "event": "FP-047 internal policy-conformance reassessment accepted",
+            "occurred_at": "2026-07-26T19:22:40+09:00",
+            "result": "PASS",
+            "gap_status": "PARTIAL"
+          },
+          {
+            "event_id": "PE-FP035-ANDROID-INTERNAL-UNIT",
+            "event": "FP-035 Android activity-original upload policy internal unit suite passed",
+            "occurred_at": "2026-07-26T20:29:12.395+09:00",
+            "test_count": 17,
+            "failure_count": 0,
+            "error_count": 0,
+            "formal_or_device_verification_claimed": false
+          }
+        ],
+        "actual_date_rule": "A progress event does not populate a milestone actual_date unless the complete milestone exit condition has evidence."
+      },
+      "allowed_claims": [
+        "Verified approval, FP-047 and FP-035 internal progress events occurred at their bound times."
+      ],
+      "prohibited_claims": [
+        "MS-DEMO or any milestone with null actual_date completed."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-MGT-14",
+      "display_code": "MGT-14",
+      "title": "RAID: 위험·가정·이슈·의존성 관리대장",
+      "successor_status": "CURRENT_RAID_PROJECTION",
+      "approval_status_change_claimed": false,
+      "raid_projection": {
+        "legacy_row_count": 11,
+        "projected_row_count": 12,
+        "row_transitions": [
+          {
+            "raid_id": "RAID-005",
+            "projected_status": "OPEN",
+            "internal_control_status": "PASS",
+            "single_admin_recovery_drill_status": "NOT_RUN",
+            "waived": false,
+            "reason": "FP-047 internal controls do not close the actual recovery drill gate."
+          },
+          {
+            "raid_id": "RAID-011",
+            "projected_status": "RESOLVED",
+            "resolved_at": "2026-07-22T14:22:21+09:00",
+            "resolution": "PB-WALKSAFE-FEATURE-POLICY-1.0.1 approved and applied the exact FP-035 network rule.",
+            "historical_conflict_preserved": true,
+            "waived": false,
+            "residual_exposure": "Implementation and verification exposure is tracked separately in RAID-012 and CR-0002."
+          },
+          {
+            "raid_id": "RAID-012",
+            "kind": "RISK",
+            "title": "FP-035 승인 규칙의 하위 산출물·실기기·정식시험 검증",
+            "projected_status": "OPEN",
+            "source_change_request_id": "CR-0002",
+            "affected_artifact_codes": [
+              "REQ-03",
+              "REQ-06",
+              "DES-04",
+              "DES-13",
+              "DES-20"
+            ],
+            "android_internal_unit_status": "PASS",
+            "formal_test_status": "NOT_RUN",
+            "actual_device_network_transition_status": "NOT_RUN",
+            "production_status": "NOT_RUN",
+            "waived": false,
+            "response": "Keep unsupported upload paths fail-closed and complete downstream trace, device transition and formal verification before closure."
+          }
+        ],
+        "summary": {
+          "total": 12,
+          "open": 11,
+          "resolved": 1,
+          "gate_count": 5,
+          "waived_gate_count": 0
+        }
+      },
+      "allowed_claims": [
+        "The policy conflict represented by RAID-011 is resolved and the remaining delivery risk is projected separately."
+      ],
+      "prohibited_claims": [
+        "RAID-005, RAID-012 or any release gate is closed or waived."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-MGT-15",
+      "display_code": "MGT-15",
+      "title": "의사결정 기록",
+      "successor_status": "CURRENT_COMPOSITE_DECISION_SUCCESSOR_BOUND",
+      "approval_status_change_claimed": false,
+      "decision_projection": {
+        "successor_register_id": "WS-EFFECTIVE-DECISION-REGISTER-CURRENT-20260726-001",
+        "successor_register_version": "1.0.1",
+        "successor_register_path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+        "successor_register_sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+        "lifecycle_status": "ACTIVE",
+        "composition_status": "CURRENT_COMPOSITE",
+        "base_decision_count": 135,
+        "approved_replacement_overlay_count": 1,
+        "replacement_decision_id": "CD-UPLOAD-NETWORK",
+        "effective_decision_count": 135,
+        "decision_feature_edge_count": 428,
+        "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "correction_approval_status": "APPROVED_AS_EXACT_OVERLAY",
+        "application_status": "COMMITTED",
+        "separate_register_reapproval_claimed": false,
+        "legacy_decisions_pointer_modified": false
+      },
+      "allowed_claims": [
+        "The compact successor supplies the current approved FP-035 replacement decision without increasing the effective decision count."
+      ],
+      "prohibited_claims": [
+        "The legacy aligned register or MGT decision pointer was overwritten, or the successor proves implementation or release completion."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-MGT-16",
+      "display_code": "MGT-16",
+      "title": "변경요청·변경이력",
+      "successor_status": "CR0002_APPROVED_APPLIED_INTERNAL_UNIT_AND_TECHNICAL_REVIEW_PASS_VERIFICATION_OPEN",
+      "approval_status_change_claimed": false,
+      "change_request_projection": {
+        "change_request_id": "CR-0002",
+        "projected_status": "APPROVED_APPLIED_DOWNSTREAM_VERIFICATION_OPEN",
+        "approval_status": "APPROVED",
+        "approved_at": "2026-07-22T14:03:17+09:00",
+        "applied_at": "2026-07-22T14:22:21+09:00",
+        "resulting_policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "policy_application_status": "COMMITTED",
+        "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+        "direct_artifact_codes": [
+          "REQ-03",
+          "REQ-06",
+          "DES-04",
+          "DES-13",
+          "DES-20"
+        ],
+        "android_internal_implementation": {
+          "status": "PASS_INTERNAL_UNIT_AND_TECHNICAL_REVIEW_SCOPE",
+          "policy_source_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+          "caller_source_path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+          "unit_test_source_path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+          "unit_test_result_path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicyTest.xml",
+          "test_count": 17,
+          "skipped_count": 0,
+          "failure_count": 0,
+          "error_count": 0,
+          "tested_at": "2026-07-26T20:29:12.395+09:00",
+          "covered_internal_rules": [
+            "walking blocks activity-original upload on every network",
+            "stationary Wi-Fi permits the activity-original upload branch",
+            "stationary cellular requires explicit cellular opt-in",
+            "unspecified preference falls back to Wi-Fi-only queueing",
+            "OTHER and OFFLINE fail closed for the activity-original upload branch",
+            "inactive session or unknown motion evidence fails closed even on Wi-Fi",
+            "stationary evidence requires an observation window without a new step",
+            "a new step returns the evidence state to walking and cancels in-flight work",
+            "admission check and enqueue are atomic with concurrent close and cancellation",
+            "close and cancellation before admission prevent check and enqueue",
+            "inactive transition closes admission and cancels from confirmed stationary state",
+            "the first sensor sample closes admission and starts a new stationary evidence window",
+            "tracking stop closes admission, resets motion evidence and cancels both uploaders",
+            "tracking restart requires a new first sensor sample before stationary admission",
+            "walk start or resume invalidates scheduled work and cancels the active HTTP connection"
+          ],
+          "technical_independent_review": {
+            "reviewer_task": "/root/w1_technical_review",
+            "role": "SEPARATE_INTERNAL_TECHNICAL_REVIEWER",
+            "decision": "APPROVED",
+            "blocking_findings": 0,
+            "major_findings": 0,
+            "minor_findings": 0,
+            "review_result_materialized_as_separate_file": false,
+            "user_approval_claimed": false,
+            "external_independence_claimed": false,
+            "formal_acceptance_claimed": false
+          }
+        },
+        "downstream_trace_status": "IN_PROGRESS",
+        "formal_test_status": "NOT_RUN",
+        "actual_device_network_transition_status": "NOT_RUN",
+        "field_test_status": "NOT_RUN",
+        "production_status": "NOT_RUN",
+        "implementation_commit": null,
+        "closed_at": null,
+        "closure_claimed": false,
+        "candidate_history_mutated": false,
+        "actual_device_sensor_status": "NOT_RUN",
+        "actual_socket_cancellation_status": "NOT_RUN"
+      },
+      "allowed_claims": [
+        "CR-0002 policy approval and application are effective; the bound Android internal unit scope passed and a separate internal technical review approved that code scope with zero findings."
+      ],
+      "prohibited_claims": [
+        "CR-0002 is closed, all downstream artifacts are reconciled, the internal technical review is user or external approval, or formal/device/sensor/network/socket/field/production verification passed."
+      ]
+    },
+    {
+      "artifact_type_id": "DLV-MGT-17",
+      "display_code": "MGT-17",
+      "title": "진행상태 대시보드",
+      "successor_status": "CURRENT_FACTUAL_DASHBOARD_SUPPLEMENT",
+      "approval_status_change_claimed": false,
+      "dashboard_projection": {
+        "observed_at": "2026-07-26T20:29:12.395+09:00",
+        "policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+        "policy_status": "BASELINED_EFFECTIVE",
+        "decision_state": {
+          "base_decisions": 135,
+          "approved_replacement_overlays": 1,
+          "effective_decisions": 135,
+          "feature_edges": 428
+        },
+        "artifact_state": {
+          "total": 257,
+          "approved_baselined": 102,
+          "active_opening_snapshot": 27,
+          "approved_scope": 129,
+          "draft_pending": 53,
+          "planned_not_run": 75,
+          "not_approved": 128
+        },
+        "audit_state": {
+          "OK": 59,
+          "INTERNAL_GAP": 123,
+          "EXTERNAL": 39,
+          "N/A_CANDIDATE": 36,
+          "total": 257,
+          "status_delta_claimed": false
+        },
+        "r021_state": {
+          "BLOCKED": 5,
+          "CONFLICTING": 16,
+          "EVIDENCE_MISSING": 4,
+          "MISSING": 11,
+          "PARTIAL": 32,
+          "IMPLEMENTED": 0,
+          "total": 68,
+          "post_fp035_reassessment_claimed": false
+        },
+        "current_internal_progress": {
+          "fp047": {
+            "internal_control_status": "PASS",
+            "gap_id": "GAP-056",
+            "gap_status": "PARTIAL",
+            "formal_test_status": "NOT_RUN"
+          },
+          "fp035": {
+            "policy_status": "APPROVED_APPLIED",
+            "android_internal_unit_status": "PASS",
+            "android_internal_unit_test_count": 17,
+            "formal_test_status": "NOT_RUN",
+            "actual_device_status": "NOT_RUN",
+            "downstream_trace_status": "IN_PROGRESS",
+            "technical_independent_review_status": "APPROVED_INTERNAL_TECHNICAL_REVIEW_ZERO_FINDINGS",
+            "user_approval_claimed": false,
+            "actual_device_sensor_status": "NOT_RUN",
+            "actual_device_network_status": "NOT_RUN",
+            "actual_socket_cancellation_status": "NOT_RUN"
+          }
+        },
+        "raid_state": {
+          "total": 12,
+          "open": 11,
+          "resolved": 1
+        },
+        "wave_state": {
+          "internal_wave_count": 10,
+          "current_wave": "W1",
+          "current_packet": "W1-MGT-CONTENT",
+          "status": "IN_PROGRESS"
+        },
+        "formal_test_execution_count": 0,
+        "remaining_gate_count": 5,
+        "release_gate_status": "NOT_RUN",
+        "release_gates_waived": false,
+        "release_status": "NOT_ELIGIBLE",
+        "demo_target_date": "2026-07-26",
+        "demo_actual_date": null,
+        "trend_from_2026_07_22": [
+          "Policy baseline 1.0.1 and the 129-type application are now bound as effective historical facts.",
+          "The 257-type audit baseline and ten-wave remediation plan are now bound.",
+          "FP-047 internal conformance passed while GAP-056 remains PARTIAL.",
+          "FP-035 Android activity-original upload policy now has an internal seventeen-test PASS with separate internal technical review approval and zero findings delta newer than r021."
+        ]
+      },
+      "allowed_claims": [
+        "The dashboard projection reports the current bound counts and separates internal progress from formal or release completion."
+      ],
+      "prohibited_claims": [
+        "Audit or r021 counts changed without a successor reassessment, or the demonstration, formal tests, gates or release completed."
+      ]
+    }
+  ],
+  "source_bindings": [
+    {
+      "binding_id": "SRC-MGT-PMP-PREDECESSOR",
+      "kind": "LEGACY_CANONICAL_PREDECESSOR",
+      "path": "docs/deliverables/01-management/project-management-plan.md",
+      "sha256": "a1c6579e27fd07284902bce5c23ddab14539557b5320d0dd257da47b89857cb0",
+      "allowed_claim": "Historical MGT-06 and MGT-07 wording and predecessor state.",
+      "prohibited_claim": "Current status authority after later evidence."
+    },
+    {
+      "binding_id": "SRC-MGT-CONTROL-PREDECESSOR",
+      "kind": "LEGACY_CANONICAL_PREDECESSOR",
+      "path": "docs/deliverables/01-management/project-control-registers.md",
+      "sha256": "174db8700dd42dee6a139724601d094185496cbd175b23caf5ce845631e5833d",
+      "allowed_claim": "Historical MGT-14 through MGT-17 wording and predecessor state.",
+      "prohibited_claim": "Current policy, decision, CR or dashboard status authority."
+    },
+    {
+      "binding_id": "SRC-WBS-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/wbs.json",
+      "sha256": "5d1045a098da6ba9885ed0cfed1a17d5b689514f17c18cfc3e72e51840b00487",
+      "allowed_claim": "Eight predecessor work-package definitions.",
+      "prohibited_claim": "A current completion percentage or current wave state."
+    },
+    {
+      "binding_id": "SRC-SCHEDULE-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/schedule.json",
+      "sha256": "87ac14b3b7781364518d580a59d30064b1733d42c753f1619adb33f275b2fe93",
+      "allowed_claim": "Predecessor milestone definitions and the demo target date.",
+      "prohibited_claim": "The demo or null-actual milestones completed."
+    },
+    {
+      "binding_id": "SRC-RAID-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/raid.json",
+      "sha256": "465d65f3c823c65938c8ee60bd91f9b07977906d2531e5ad4d2076c20f8552c7",
+      "allowed_claim": "Eleven predecessor RAID rows and their historical descriptions.",
+      "prohibited_claim": "RAID-011 remains the current unresolved policy status."
+    },
+    {
+      "binding_id": "SRC-DECISIONS-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/decisions.json",
+      "sha256": "3992669f257e0a78e0c84214ec47cd62f5304877e3bdffc2e3efb88fb3a0d713",
+      "allowed_claim": "Historical pointer to the 135-decision aligned register.",
+      "prohibited_claim": "The old pointer is the current composite decision authority."
+    },
+    {
+      "binding_id": "SRC-CHANGES-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/change-requests.json",
+      "sha256": "64f69a0aee2e4817c682f09fd22948da77115ec9c4227d5943e195f67c4783a5",
+      "allowed_claim": "Historical CR-0001 and CR-0002 request content.",
+      "prohibited_claim": "CR-0002 still awaits policy approval."
+    },
+    {
+      "binding_id": "SRC-DASHBOARD-PREDECESSOR",
+      "kind": "LEGACY_REGISTER_PREDECESSOR",
+      "path": "docs/deliverables/01-management/registers/dashboard.json",
+      "sha256": "46ed20166cc98bf3b0a3086d4ee6a8342b2c973bf0931256620fadaba59bc8bd",
+      "allowed_claim": "The 2026-07-22 predecessor observation.",
+      "prohibited_claim": "Its zero-approval and pending-FP-035 values are current."
+    },
+    {
+      "binding_id": "SRC-POLICY-BASELINE-1.0.1",
+      "kind": "APPROVED_POLICY_BASELINE_MANIFEST",
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "allowed_claim": "FP-035 exact approved rule and policy baseline 1.0.1 identity.",
+      "prohibited_claim": "Implementation, formal verification, deployment or release completion."
+    },
+    {
+      "binding_id": "SRC-ARTIFACT-APPLICATION",
+      "kind": "IMMUTABLE_COMMITTED_APPLICATION_RECEIPT",
+      "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+      "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+      "allowed_claim": "Committed 102/27/53/75 artifact state and 129 approved scope.",
+      "prohibited_claim": "Implementation, test, deployment, operation, acceptance or release completion."
+    },
+    {
+      "binding_id": "SRC-DECISION-SUCCESSOR",
+      "kind": "CURRENT_COMPACT_DECISION_SUCCESSOR",
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+      "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+      "allowed_claim": "Base 135 plus one approved replacement overlay with 135 effective decisions and 428 edges.",
+      "prohibited_claim": "Separate register reapproval, implementation conformance or release eligibility."
+    },
+    {
+      "binding_id": "SRC-ARTIFACT-AUDIT",
+      "kind": "IMMUTABLE_257_TYPE_AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+      "allowed_claim": "Audit-baseline counts 59/123/39/36 over 257 types.",
+      "prohibited_claim": "This supplement changes any audit classification."
+    },
+    {
+      "binding_id": "SRC-WAVE-PLAN",
+      "kind": "ARTIFACT_REMEDIATION_WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "allowed_claim": "Ten internal waves and the W1-MGT-CONTENT packet scope.",
+      "prohibited_claim": "Wave completion or artifact status promotion."
+    },
+    {
+      "binding_id": "SRC-GAP-R021",
+      "kind": "IMPLEMENTATION_GAP_DIAGNOSTIC",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+      "allowed_claim": "r021 assessment counts, FP-047 PARTIAL status and completion boundaries.",
+      "prohibited_claim": "Post-FP-035-change reassessment, formal verification or release eligibility."
+    },
+    {
+      "binding_id": "SRC-REMEDIATION-R021",
+      "kind": "IMPLEMENTATION_REMEDIATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+      "allowed_claim": "r021 remediation sequence and predecessor status context.",
+      "prohibited_claim": "Completed remediation or an approved delivery date."
+    },
+    {
+      "binding_id": "SRC-FP047-COMPLETION",
+      "kind": "INTERNAL_WORK_ITEM_COMPLETION_RECEIPT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+      "sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+      "allowed_claim": "FP-047 internal policy-conformance reassessment accepted with PASS result.",
+      "prohibited_claim": "Formal, actual, external, production or release completion."
+    },
+    {
+      "binding_id": "SRC-FP035-ANDROID-CALLER",
+      "kind": "CURRENT_INTERNAL_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43",
+      "allowed_claim": "Current Android caller binds walking lifecycle to activity-original upload cancellation and admission.",
+      "prohibited_claim": "Actual-device network transition or production behavior passed."
+    },
+    {
+      "binding_id": "SRC-FP035-ANDROID-POLICY",
+      "kind": "CURRENT_INTERNAL_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "sha256": "7befaf2a3f939c8bd7c382467d9b1bb2c5015f8324e103fcdfc84c0d17ef13e6",
+      "allowed_claim": "Current activity-original upload policy implements the bound internal decision branches.",
+      "prohibited_claim": "Formal, device, field, external or production verification passed."
+    },
+    {
+      "binding_id": "SRC-FP035-ANDROID-UNIT-SOURCE",
+      "kind": "INTERNAL_UNIT_TEST_SOURCE",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "sha256": "1eb282bad885e4aacf2d00ad880210cfadb0f87428825f473ecf9e19522e77b6",
+      "allowed_claim": "Seventeen internal unit cases define the tested policy, motion-evidence, lifecycle and concurrency boundary.",
+      "prohibited_claim": "Formal acceptance, actual device or production coverage."
+    },
+    {
+      "binding_id": "SRC-FP035-ANDROID-UNIT-RESULT",
+      "kind": "LOCAL_INTERNAL_UNIT_TEST_RESULT",
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.network.AndroidNetworkTransferPolicyTest.xml",
+      "sha256": "99536a7a7037559184cee253795aa9552bd21fca2bb82f4570a384bbc991b525",
+      "allowed_claim": "Seventeen local AndroidNetworkTransferPolicyTest cases passed with zero skipped, failures or errors at the recorded time.",
+      "prohibited_claim": "Formal test execution, actual-device validation, field validation, external review, deployment or release eligibility."
+    }
+  ],
+  "validation_invariants": {
+    "artifact_type_count": 6,
+    "source_binding_count": 20,
+    "artifact_inventory_total": 257,
+    "approved_scope_count": 129,
+    "not_approved_count": 128,
+    "artifact_audit_total": 257,
+    "implementation_gap_assessment_total": 68,
+    "remaining_gate_count": 5,
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "raid_total": 12,
+    "raid_open": 11,
+    "raid_resolved": 1,
+    "base_decision_count": 135,
+    "replacement_overlay_count": 1,
+    "effective_decision_count": 135,
+    "decision_feature_edge_count": 428,
+    "fp035_android_internal_unit_test_count": 17,
+    "fp035_android_internal_unit_failure_count": 0,
+    "fp035_formal_test_status": "NOT_RUN",
+    "fp035_actual_device_status": "NOT_RUN",
+    "fp047_gap_status": "PARTIAL",
+    "fp047_formal_test_status": "NOT_RUN",
+    "formal_test_execution_count": 0,
+    "demo_actual_date": null,
+    "fp035_internal_technical_review_decision": "APPROVED",
+    "fp035_internal_technical_review_blocking": 0,
+    "fp035_internal_technical_review_major": 0,
+    "fp035_internal_technical_review_minor": 0,
+    "fp035_user_approval_claimed": false,
+    "fp035_actual_device_sensor_status": "NOT_RUN",
+    "fp035_actual_device_network_status": "NOT_RUN",
+    "fp035_actual_socket_cancellation_status": "NOT_RUN"
+  },
+  "content_hash_contract": "SHA-256 over UTF-8 output of jq -S -c 'del(.record_content_sha256)' including its trailing LF.",
+  "record_content_sha256": "62e65cbda8a575284acda6ae69fe65459cf3fbcefa3a0db64e41d80cc22bafa4"
+}

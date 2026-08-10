@@ -1,0 +1,21 @@
+{
+  "schema_version": "walksafe.validation-receipt.v1",
+  "command_scope": "android-full-failure-clusters-r4",
+  "observed_at": "2026-07-27T15:05:04.824490+00:00",
+  "gradle_exit_code": 0,
+  "test_execution_started": true,
+  "junit_xml_files": 5,
+  "tests": 45,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "result": "PASS",
+  "log_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-full-regression-clusters-r4.log",
+  "log_sha256": "e8869170b0b9af4c25537d16cf0c6d164f7d813713ed192986ecf378ba0c9776",
+  "resource_policy": {
+    "parallel_heavy_lanes": 1,
+    "gradle_max_workers": 1,
+    "gradle_xmx": "1536m",
+    "offline": true
+  }
+}

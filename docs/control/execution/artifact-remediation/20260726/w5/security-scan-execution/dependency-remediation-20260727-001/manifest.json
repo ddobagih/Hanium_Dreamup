@@ -1,0 +1,133 @@
+{
+  "execution_lineage": "execution-lineage.json",
+  "modified_product_files": [
+    "backend/requirements.txt",
+    "backend/requirements.lock",
+    "tests/general-quality-cp312-linux-x86_64-cpu.lock"
+  ],
+  "receipt_files": [
+    {
+      "bytes": 774,
+      "path": "changes.json",
+      "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+    },
+    {
+      "bytes": 15366,
+      "path": "commands.json",
+      "sha256": "f8633e4684cbdfe0f1c641f5630fe101d5880f4aa2ce1b5c1714c38cd030e49c"
+    },
+    {
+      "bytes": 1241,
+      "path": "execution-lineage.json",
+      "sha256": "5d159ce8a4483cdce319a58dd49ebb53128f4f04fd591a19df5a63175d22a767"
+    },
+    {
+      "bytes": 21457,
+      "path": "execution-state.json",
+      "sha256": "c5ffbffd382e50a7902ff9d5b0c57aeb3410f5fa82502e47f3031914e8177e2b"
+    },
+    {
+      "bytes": 591,
+      "path": "logs/apply-attempt.log",
+      "sha256": "cda3ad2be3c8dc5d6c3d17b3f6690292a9fe812f7b870c8126b9afc02a7690fc"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/backend-lock-compile-1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/backend-lock-compile-2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 181,
+      "path": "logs/locked-env-inventory.log",
+      "sha256": "04b6430e0eccc0d57fd3cffefcfda732ddc2488ef453ca5e86a0f975686a19a6"
+    },
+    {
+      "bytes": 1500,
+      "path": "logs/piptools-install.log",
+      "sha256": "791ac4a92d921b3ac9d10548577f3acce0312944bdd5fe5f188028401de5b76f"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/python312-venv-create.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/quality-lock-compile-1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/quality-lock-compile-2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 440,
+      "path": "logs/receipt-recovery.log",
+      "sha256": "90fadda0184268a9c3689043ca930cae105fe447b4d7053a6240238479dcecbb"
+    },
+    {
+      "bytes": 142,
+      "path": "logs/smoke-import-version.log",
+      "sha256": "791e789f8a0ef445f4d3fc481acc66e545cc4c254438072d5e27ea99139ad1fa"
+    },
+    {
+      "bytes": 0,
+      "path": "logs/smoke-venv-create.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 850,
+      "path": "logs/smoke-wheel-install.log",
+      "sha256": "ef03cbbb62636e3cb9eb5e8399208dfa4b0f18cb12bea032776a6ff57d549bbd"
+    },
+    {
+      "bytes": 99,
+      "path": "logs/targeted-backend-tests.log",
+      "sha256": "6c3f6d266536b5db5c07c56d272c1609bb0005a16f0b944e92636750ad5b8d51"
+    },
+    {
+      "bytes": 858,
+      "path": "logs/targeted-overlay-install.log",
+      "sha256": "9382582b14e79be4db5aeef738349190d39e49b73af38ee341987c00a8f2b671"
+    },
+    {
+      "bytes": 3,
+      "path": "logs/targeted-test-heavy-process-check-corrected.log",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "bytes": 78,
+      "path": "logs/targeted-test-heavy-process-check.log",
+      "sha256": "50116801fdea799a6989accd674dc435bb7218cac88de042f67d774a7e7480b5"
+    },
+    {
+      "bytes": 62,
+      "path": "logs/targeted-test-resource-preflight.log",
+      "sha256": "ed249b804f96683f417efea4944e6ffee529319c8de4cf692850d0ce9f83f49f"
+    },
+    {
+      "bytes": 60,
+      "path": "logs/tool-version.log",
+      "sha256": "94bd172f5211fafe85cf1f6e84db455515430ff0decc6ebad17fb8891a813e26"
+    },
+    {
+      "bytes": 4942,
+      "path": "package-delta.json",
+      "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+    },
+    {
+      "bytes": 2303,
+      "path": "validation-summary.json",
+      "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "W5 backend dependency remediation",
+  "status": "PASS_WITH_RECOVERED_RECEIPT_EXDEV"
+}

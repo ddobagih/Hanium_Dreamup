@@ -1,0 +1,1646 @@
+{
+  "schema_version": "walksafe.artifact-remediation-wave-plan.v1",
+  "plan_id": "WS-ARTIFACT-REMEDIATION-WAVES-20260726",
+  "generated_at": "2026-07-26T17:41:17+09:00",
+  "status": "PLANNED_WITH_W0_IN_PROGRESS",
+  "authority_boundary": {
+    "baseline_kind": "CURRENT_FACTUAL_AUDIT",
+    "formal_approval": "NOT_GRANTED_BY_THIS_PLAN",
+    "formal_execution": "NOT_ASSERTED_BY_THIS_PLAN",
+    "statement": "내부 보완 순서와 외부·적용성 후속 packet을 정의할 뿐 승인이나 외부 실행 완료를 주장하지 않는다."
+  },
+  "source_bindings": [
+    {
+      "role": "VALIDATED_AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc"
+    },
+    {
+      "role": "EXECUTION_PLAN",
+      "path": "plans/features/2026-07-26_artifact_completion_execution_plan.md",
+      "sha256": "3b0c75d5338116dd9026b3a70f4c6121041c8b1fc666a3b31df0c661dc042cf8"
+    }
+  ],
+  "resource_policy": {
+    "allowed_classes": [
+      "LIGHT",
+      "MODERATE",
+      "HEAVY"
+    ],
+    "max_concurrent_heavy": 1,
+    "rule": "파일 충돌 없는 LIGHT/MODERATE만 병렬 실행하고 HEAVY build/test/model 작업은 항상 하나만 실행한다.",
+    "system_safety": "HEAVY 전후 메모리와 swap을 확인하며 압박 시 새 HEAVY 시작만 지연한다."
+  },
+  "execution_policy": {
+    "unit": "shared_root_cause_and_shared_target_area_wave",
+    "not_per_artifact": true,
+    "wave_order_is_dependency_order": true,
+    "fp047_is_wave_zero_and_not_repeated": true
+  },
+  "summary": {
+    "internal_wave_count": 10,
+    "internal_gap_count": 123,
+    "external_action_packet_count": 4,
+    "external_count": 39,
+    "applicability_packet_count": 4,
+    "n_a_candidate_count": 36
+  },
+  "internal_waves": [
+    {
+      "wave_id": "W0",
+      "order": 0,
+      "title": "FP047 사용자·관리자 로그인·권한 및 배타 잠금 종결",
+      "status": "IN_PROGRESS",
+      "resource_class": "HEAVY",
+      "root_cause": "현재 FP047의 인증 경계, nonce, session/recovery 경합, 배타 파일 잠금과 직접 추적 증거를 한 묶음으로 종결한다.",
+      "covered_artifact_count": 7,
+      "covered_artifact_ids": [
+        "DLV-DES-15",
+        "DLV-DES-19",
+        "DLV-DES-20",
+        "DLV-REL-18",
+        "DLV-SEC-19",
+        "DLV-TST-06",
+        "DLV-TST-08"
+      ],
+      "priority_counts": {
+        "P0": 5,
+        "P1": 2,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/adminapp",
+        "apps/android/app",
+        "backend/alembic/versions",
+        "docs/deliverables/00-control",
+        "docs/deliverables/04-design",
+        "docs/deliverables/06-testing",
+        "docs/deliverables/07-security",
+        "docs/deliverables/09-release"
+      ],
+      "dependencies": [],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W0-DES-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-DES-15",
+            "DLV-DES-19",
+            "DLV-DES-20"
+          ],
+          "target_areas": [
+            "apps/android/adminapp",
+            "docs/deliverables/00-control",
+            "docs/deliverables/04-design"
+          ],
+          "parallel_group": "W0-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W0-REL-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-REL-18"
+          ],
+          "target_areas": [
+            "docs/deliverables/09-release"
+          ],
+          "parallel_group": "W0-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W0-SEC-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-SEC-19"
+          ],
+          "target_areas": [
+            "backend/alembic/versions",
+            "docs/deliverables/07-security"
+          ],
+          "parallel_group": "W0-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W0-TST-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-TST-06",
+            "DLV-TST-08"
+          ],
+          "target_areas": [
+            "apps/android/adminapp",
+            "apps/android/app",
+            "docs/deliverables/00-control",
+            "docs/deliverables/06-testing"
+          ],
+          "parallel_group": "W0-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W0-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-DES-15",
+            "DLV-DES-19",
+            "DLV-DES-20",
+            "DLV-REL-18",
+            "DLV-SEC-19",
+            "DLV-TST-06",
+            "DLV-TST-08"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w0"
+          ],
+          "parallel_group": "W0-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w0/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w0/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w0/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w0/artifact-status-delta.json"
+      ],
+      "current_work_boundary": {
+        "feature_packet": "FP047",
+        "gap_id": "GAP-056",
+        "rule": "현재 구현·검증·증거 종결을 재사용하며 포함 ID를 후속 wave에 다시 배정하지 않는다.",
+        "direct_target_files_or_areas": [
+          "apps/android-gateway/src/exclusive-file-lock.ts",
+          "apps/android-gateway/test/exclusive-file-lock.test.ts",
+          "backend/app/field_test_security.py",
+          "backend/app/api/reports.py",
+          "backend/app/services/admin_security.py",
+          "backend/tests/test_admin_security.py",
+          "docs/control/execution/gap-resolution/FP047"
+        ]
+      }
+    },
+    {
+      "wave_id": "W1",
+      "order": 1,
+      "title": "관리·요구사항·의사결정 기준선 정합화",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "승인 상태, 결정 정본, WBS·일정·RTM의 서로 다른 시점과 상태 표현을 하나의 현재 사실 기준으로 맞춘다.",
+      "covered_artifact_count": 18,
+      "covered_artifact_ids": [
+        "DLV-DOC-01",
+        "DLV-DOC-05",
+        "DLV-DSC-03",
+        "DLV-DSC-07",
+        "DLV-DSC-09",
+        "DLV-DSC-14",
+        "DLV-MGT-06",
+        "DLV-MGT-07",
+        "DLV-MGT-14",
+        "DLV-MGT-15",
+        "DLV-MGT-16",
+        "DLV-MGT-17",
+        "DLV-REQ-03",
+        "DLV-REQ-06",
+        "DLV-REQ-16",
+        "DLV-REQ-17",
+        "DLV-REQ-18",
+        "DLV-REQ-19"
+      ],
+      "priority_counts": {
+        "P0": 11,
+        "P1": 5,
+        "P2": 2,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/app",
+        "docs/android/android_native_mvp_evidence_20260630.md",
+        "docs/control/baselines",
+        "docs/control/decision-interview",
+        "docs/deliverables/00-control",
+        "docs/deliverables/01-management",
+        "docs/deliverables/02-discovery",
+        "docs/deliverables/03-requirements",
+        "docs/execution/2026-05-19_integration_field_report.md",
+        "docs/submission/source_materials",
+        "plans/features",
+        "product/backlog.md",
+        "product/done-criteria.md",
+        "product/roadmap.md"
+      ],
+      "dependencies": [
+        "W0"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W1-DOC-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-DOC-01",
+            "DLV-DOC-05"
+          ],
+          "target_areas": [
+            "docs/control/baselines",
+            "docs/control/decision-interview",
+            "docs/deliverables/00-control"
+          ],
+          "parallel_group": "W1-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W1-DSC-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-DSC-03",
+            "DLV-DSC-07",
+            "DLV-DSC-09",
+            "DLV-DSC-14"
+          ],
+          "target_areas": [
+            "docs/android/android_native_mvp_evidence_20260630.md",
+            "docs/deliverables/00-control",
+            "docs/deliverables/02-discovery",
+            "docs/execution/2026-05-19_integration_field_report.md",
+            "docs/submission/source_materials",
+            "product/backlog.md"
+          ],
+          "parallel_group": "W1-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W1-MGT-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-MGT-06",
+            "DLV-MGT-07",
+            "DLV-MGT-14",
+            "DLV-MGT-15",
+            "DLV-MGT-16",
+            "DLV-MGT-17"
+          ],
+          "target_areas": [
+            "docs/control/baselines",
+            "docs/control/decision-interview",
+            "docs/deliverables/00-control",
+            "docs/deliverables/01-management",
+            "plans/features",
+            "product/roadmap.md"
+          ],
+          "parallel_group": "W1-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W1-REQ-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-REQ-03",
+            "DLV-REQ-06",
+            "DLV-REQ-16",
+            "DLV-REQ-17",
+            "DLV-REQ-18",
+            "DLV-REQ-19"
+          ],
+          "target_areas": [
+            "apps/android/app",
+            "docs/control/baselines",
+            "docs/control/decision-interview",
+            "docs/deliverables/00-control",
+            "docs/deliverables/03-requirements",
+            "product/done-criteria.md"
+          ],
+          "parallel_group": "W1-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W1-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-DOC-01",
+            "DLV-DOC-05",
+            "DLV-DSC-03",
+            "DLV-DSC-07",
+            "DLV-DSC-09",
+            "DLV-DSC-14",
+            "DLV-MGT-06",
+            "DLV-MGT-07",
+            "DLV-MGT-14",
+            "DLV-MGT-15",
+            "DLV-MGT-16",
+            "DLV-MGT-17",
+            "DLV-REQ-03",
+            "DLV-REQ-06",
+            "DLV-REQ-16",
+            "DLV-REQ-17",
+            "DLV-REQ-18",
+            "DLV-REQ-19"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w1"
+          ],
+          "parallel_group": "W1-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w1/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W2",
+      "order": 2,
+      "title": "설계 계약 및 아키텍처 추적 정합화",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "설계 산출물의 승인 주장과 실제 DRAFT 상태 충돌을 제거하고 요구사항-설계-구현 추적을 복원한다.",
+      "covered_artifact_count": 23,
+      "covered_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08",
+        "DLV-DES-09",
+        "DLV-DES-10",
+        "DLV-DES-11",
+        "DLV-DES-12",
+        "DLV-DES-13",
+        "DLV-DES-14",
+        "DLV-DES-16",
+        "DLV-DES-17",
+        "DLV-DES-18",
+        "DLV-DES-22",
+        "DLV-DES-23",
+        "DLV-DES-24",
+        "DLV-DES-25",
+        "DLV-DES-26",
+        "DLV-DES-27"
+      ],
+      "priority_counts": {
+        "P0": 7,
+        "P1": 16,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/adminapp",
+        "apps/android/settings.gradle.kts",
+        "docs/deliverables/00-control",
+        "docs/deliverables/04-design",
+        "docs/deliverables/05-implementation",
+        "docs/deliverables/06-testing"
+      ],
+      "dependencies": [
+        "W1"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W2-DES-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-DES-01",
+            "DLV-DES-02",
+            "DLV-DES-03",
+            "DLV-DES-04",
+            "DLV-DES-05",
+            "DLV-DES-06",
+            "DLV-DES-07",
+            "DLV-DES-08",
+            "DLV-DES-09",
+            "DLV-DES-10",
+            "DLV-DES-11",
+            "DLV-DES-12",
+            "DLV-DES-13",
+            "DLV-DES-14",
+            "DLV-DES-16",
+            "DLV-DES-17",
+            "DLV-DES-18",
+            "DLV-DES-22",
+            "DLV-DES-23",
+            "DLV-DES-24",
+            "DLV-DES-25",
+            "DLV-DES-26",
+            "DLV-DES-27"
+          ],
+          "target_areas": [
+            "apps/android/adminapp",
+            "apps/android/settings.gradle.kts",
+            "docs/deliverables/00-control",
+            "docs/deliverables/04-design",
+            "docs/deliverables/05-implementation",
+            "docs/deliverables/06-testing"
+          ],
+          "parallel_group": "W2-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W2-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-DES-01",
+            "DLV-DES-02",
+            "DLV-DES-03",
+            "DLV-DES-04",
+            "DLV-DES-05",
+            "DLV-DES-06",
+            "DLV-DES-07",
+            "DLV-DES-08",
+            "DLV-DES-09",
+            "DLV-DES-10",
+            "DLV-DES-11",
+            "DLV-DES-12",
+            "DLV-DES-13",
+            "DLV-DES-14",
+            "DLV-DES-16",
+            "DLV-DES-17",
+            "DLV-DES-18",
+            "DLV-DES-22",
+            "DLV-DES-23",
+            "DLV-DES-24",
+            "DLV-DES-25",
+            "DLV-DES-26",
+            "DLV-DES-27"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w2"
+          ],
+          "parallel_group": "W2-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W3",
+      "order": 3,
+      "title": "구현 명세·manifest·코드 추적 갱신",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "현재 코드와 구현 manifest 사이의 누락 및 낡은 source snapshot 결속을 공통 구현 기준선으로 갱신한다.",
+      "covered_artifact_count": 17,
+      "covered_artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-07",
+        "DLV-DEV-08",
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-14",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-18",
+        "DLV-DEV-19",
+        "DLV-DEV-20",
+        "DLV-DEV-21"
+      ],
+      "priority_counts": {
+        "P0": 10,
+        "P1": 7,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/adminapp",
+        "apps/android/settings.gradle.kts",
+        "docs/deliverables/00-control",
+        "docs/deliverables/05-implementation",
+        "docs/deliverables/06-testing"
+      ],
+      "dependencies": [
+        "W2"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W3-DEV-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-DEV-01",
+            "DLV-DEV-02",
+            "DLV-DEV-03",
+            "DLV-DEV-04",
+            "DLV-DEV-05",
+            "DLV-DEV-06",
+            "DLV-DEV-07",
+            "DLV-DEV-08",
+            "DLV-DEV-09",
+            "DLV-DEV-12",
+            "DLV-DEV-14",
+            "DLV-DEV-16",
+            "DLV-DEV-17",
+            "DLV-DEV-18",
+            "DLV-DEV-19",
+            "DLV-DEV-20",
+            "DLV-DEV-21"
+          ],
+          "target_areas": [
+            "apps/android/adminapp",
+            "apps/android/settings.gradle.kts",
+            "docs/deliverables/00-control",
+            "docs/deliverables/05-implementation",
+            "docs/deliverables/06-testing"
+          ],
+          "parallel_group": "W3-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W3-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-DEV-01",
+            "DLV-DEV-02",
+            "DLV-DEV-03",
+            "DLV-DEV-04",
+            "DLV-DEV-05",
+            "DLV-DEV-06",
+            "DLV-DEV-07",
+            "DLV-DEV-08",
+            "DLV-DEV-09",
+            "DLV-DEV-12",
+            "DLV-DEV-14",
+            "DLV-DEV-16",
+            "DLV-DEV-17",
+            "DLV-DEV-18",
+            "DLV-DEV-19",
+            "DLV-DEV-20",
+            "DLV-DEV-21"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w3"
+          ],
+          "parallel_group": "W3-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W4",
+      "order": 4,
+      "title": "시험 계획·결과·공식 실행 증거 통합",
+      "status": "PLANNED",
+      "resource_class": "HEAVY",
+      "root_cause": "존재하는 자동시험과 NOT_RUN 형식 산출물의 차이를 해소하고 재현 가능한 실행 로그·결과·추적을 생성한다.",
+      "covered_artifact_count": 13,
+      "covered_artifact_ids": [
+        "DLV-TST-01",
+        "DLV-TST-02",
+        "DLV-TST-03",
+        "DLV-TST-04",
+        "DLV-TST-05",
+        "DLV-TST-07",
+        "DLV-TST-09",
+        "DLV-TST-11",
+        "DLV-TST-14",
+        "DLV-TST-18",
+        "DLV-TST-19",
+        "DLV-TST-20",
+        "DLV-TST-21"
+      ],
+      "priority_counts": {
+        "P0": 13,
+        "P1": 0,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/app",
+        "docs/deliverables/00-control",
+        "docs/deliverables/04-design",
+        "docs/deliverables/05-implementation",
+        "docs/deliverables/06-testing"
+      ],
+      "dependencies": [
+        "W3"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W4-TST-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-TST-01",
+            "DLV-TST-02",
+            "DLV-TST-03",
+            "DLV-TST-04",
+            "DLV-TST-05",
+            "DLV-TST-07",
+            "DLV-TST-09",
+            "DLV-TST-11",
+            "DLV-TST-14",
+            "DLV-TST-18",
+            "DLV-TST-19",
+            "DLV-TST-20",
+            "DLV-TST-21"
+          ],
+          "target_areas": [
+            "apps/android/app",
+            "docs/deliverables/00-control",
+            "docs/deliverables/04-design",
+            "docs/deliverables/05-implementation",
+            "docs/deliverables/06-testing"
+          ],
+          "parallel_group": "W4-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W4-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-TST-01",
+            "DLV-TST-02",
+            "DLV-TST-03",
+            "DLV-TST-04",
+            "DLV-TST-05",
+            "DLV-TST-07",
+            "DLV-TST-09",
+            "DLV-TST-11",
+            "DLV-TST-14",
+            "DLV-TST-18",
+            "DLV-TST-19",
+            "DLV-TST-20",
+            "DLV-TST-21"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w4"
+          ],
+          "parallel_group": "W4-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W5",
+      "order": 5,
+      "title": "보안·개인정보 내부 통제 보완",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "보안 설계, 개인정보 고지, 접근통제, 위협·취약점 기록의 내부 작성과 독립 검토 준비를 통합한다.",
+      "covered_artifact_count": 9,
+      "covered_artifact_ids": [
+        "DLV-SEC-01",
+        "DLV-SEC-02",
+        "DLV-SEC-03",
+        "DLV-SEC-06",
+        "DLV-SEC-09",
+        "DLV-SEC-10",
+        "DLV-SEC-11",
+        "DLV-SEC-12",
+        "DLV-SEC-15"
+      ],
+      "priority_counts": {
+        "P0": 9,
+        "P1": 0,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": true,
+        "artifact_ids": [
+          "DLV-SEC-06"
+        ],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android-gateway/src",
+        "backend/app/config.py",
+        "docs/deliverables/00-control",
+        "docs/deliverables/07-security"
+      ],
+      "dependencies": [
+        "W0",
+        "W1"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W5-SEC-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-SEC-01",
+            "DLV-SEC-02",
+            "DLV-SEC-03",
+            "DLV-SEC-06",
+            "DLV-SEC-09",
+            "DLV-SEC-10",
+            "DLV-SEC-11",
+            "DLV-SEC-12",
+            "DLV-SEC-15"
+          ],
+          "target_areas": [
+            "apps/android-gateway/src",
+            "backend/app/config.py",
+            "docs/deliverables/00-control",
+            "docs/deliverables/07-security"
+          ],
+          "parallel_group": "W5-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W5-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-SEC-01",
+            "DLV-SEC-02",
+            "DLV-SEC-03",
+            "DLV-SEC-06",
+            "DLV-SEC-09",
+            "DLV-SEC-10",
+            "DLV-SEC-11",
+            "DLV-SEC-12",
+            "DLV-SEC-15"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w5"
+          ],
+          "parallel_group": "W5-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W6",
+      "order": 6,
+      "title": "AI/ML 데이터·권리·실험 기준선",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "데이터 출처·권리·분할·전처리·학습 설정과 실험 원장을 현재 runtime 모델 및 코드에 결속한다.",
+      "covered_artifact_count": 8,
+      "covered_artifact_ids": [
+        "DLV-AIML-04",
+        "DLV-AIML-05",
+        "DLV-AIML-08",
+        "DLV-AIML-09",
+        "DLV-AIML-11",
+        "DLV-AIML-12",
+        "DLV-AIML-13",
+        "DLV-AIML-21"
+      ],
+      "priority_counts": {
+        "P0": 4,
+        "P1": 4,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/app",
+        "configs/walksafe_unified_epoch270_field_20260711.json",
+        "docs/deliverables/08-ai-ml-data",
+        "model/train_yolo.py"
+      ],
+      "dependencies": [
+        "W1"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W6-AIML-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-AIML-04",
+            "DLV-AIML-05",
+            "DLV-AIML-08",
+            "DLV-AIML-09",
+            "DLV-AIML-11",
+            "DLV-AIML-12",
+            "DLV-AIML-13",
+            "DLV-AIML-21"
+          ],
+          "target_areas": [
+            "apps/android/app",
+            "configs/walksafe_unified_epoch270_field_20260711.json",
+            "docs/deliverables/08-ai-ml-data",
+            "model/train_yolo.py"
+          ],
+          "parallel_group": "W6-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W6-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-AIML-04",
+            "DLV-AIML-05",
+            "DLV-AIML-08",
+            "DLV-AIML-09",
+            "DLV-AIML-11",
+            "DLV-AIML-12",
+            "DLV-AIML-13",
+            "DLV-AIML-21"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w6"
+          ],
+          "parallel_group": "W6-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W7",
+      "order": 7,
+      "title": "AI/ML 모델 평가·변환·성능 증거",
+      "status": "PLANNED",
+      "resource_class": "HEAVY",
+      "root_cause": "모델 register, PT/TFLite 동등성, 임계값, 정확도·편향·기기 성능의 내부 재현 증거를 생성한다.",
+      "covered_artifact_count": 8,
+      "covered_artifact_ids": [
+        "DLV-AIML-06",
+        "DLV-AIML-07",
+        "DLV-AIML-10",
+        "DLV-AIML-14",
+        "DLV-AIML-15",
+        "DLV-AIML-16",
+        "DLV-AIML-17",
+        "DLV-AIML-23"
+      ],
+      "priority_counts": {
+        "P0": 6,
+        "P1": 2,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": false,
+        "artifact_ids": [],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "apps/android/app",
+        "docs/deliverables/08-ai-ml-data",
+        "model/artifacts"
+      ],
+      "dependencies": [
+        "W6"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W7-AIML-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-AIML-06",
+            "DLV-AIML-07",
+            "DLV-AIML-10",
+            "DLV-AIML-14",
+            "DLV-AIML-15",
+            "DLV-AIML-16",
+            "DLV-AIML-17",
+            "DLV-AIML-23"
+          ],
+          "target_areas": [
+            "apps/android/app",
+            "docs/deliverables/08-ai-ml-data",
+            "model/artifacts"
+          ],
+          "parallel_group": "W7-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W7-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-AIML-06",
+            "DLV-AIML-07",
+            "DLV-AIML-10",
+            "DLV-AIML-14",
+            "DLV-AIML-15",
+            "DLV-AIML-16",
+            "DLV-AIML-17",
+            "DLV-AIML-23"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w7"
+          ],
+          "parallel_group": "W7-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W8",
+      "order": 8,
+      "title": "릴리스 준비·배포·rollback 내부 패키지",
+      "status": "PLANNED",
+      "resource_class": "HEAVY",
+      "root_cause": "내부에서 작성 가능한 빌드, 배포, rollback, 설치, 교육 자료를 일관된 후보 패키지로 준비한다.",
+      "covered_artifact_count": 5,
+      "covered_artifact_ids": [
+        "DLV-REL-15",
+        "DLV-REL-16",
+        "DLV-REL-17",
+        "DLV-REL-19",
+        "DLV-REL-22"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 5,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "internal_external_mixed_boundary": {
+        "present": true,
+        "artifact_ids": [
+          "DLV-REL-15",
+          "DLV-REL-16",
+          "DLV-REL-19"
+        ],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "deploy/README.md",
+        "docs/deliverables/09-release"
+      ],
+      "dependencies": [
+        "W4",
+        "W5",
+        "W7"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W8-REL-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-REL-15",
+            "DLV-REL-16",
+            "DLV-REL-17",
+            "DLV-REL-19",
+            "DLV-REL-22"
+          ],
+          "target_areas": [
+            "deploy/README.md",
+            "docs/deliverables/09-release"
+          ],
+          "parallel_group": "W8-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W8-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-REL-15",
+            "DLV-REL-16",
+            "DLV-REL-17",
+            "DLV-REL-19",
+            "DLV-REL-22"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w8"
+          ],
+          "parallel_group": "W8-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json"
+      ]
+    },
+    {
+      "wave_id": "W9",
+      "order": 9,
+      "title": "운영·워크숍·종료 내부 준비 패키지",
+      "status": "PLANNED",
+      "resource_class": "MODERATE",
+      "root_cause": "운영 원장·변경·인수·종료 절차 중 내부 작성 가능한 부분을 완성하고 외부 실행 경계를 분리한다.",
+      "covered_artifact_count": 15,
+      "covered_artifact_ids": [
+        "DLV-CLS-07",
+        "DLV-CLS-08",
+        "DLV-CLS-09",
+        "DLV-CLS-10",
+        "DLV-CLS-14",
+        "DLV-CLS-15",
+        "DLV-CLS-16",
+        "DLV-OPS-17",
+        "DLV-OPS-19",
+        "DLV-OPS-20",
+        "DLV-OPS-21",
+        "DLV-OPS-24",
+        "DLV-WS-08",
+        "DLV-WS-10",
+        "DLV-WS-18"
+      ],
+      "priority_counts": {
+        "P0": 3,
+        "P1": 5,
+        "P2": 0,
+        "P3": 0,
+        "P4": 7
+      },
+      "internal_external_mixed_boundary": {
+        "present": true,
+        "artifact_ids": [
+          "DLV-CLS-08",
+          "DLV-CLS-10",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-OPS-17",
+          "DLV-OPS-19"
+        ],
+        "rule": "내부 작성과 후속 외부 실행·승인을 분리하고 외부 receipt 전에는 완료로 전환하지 않는다."
+      },
+      "target_files_or_areas": [
+        "deploy/README.md",
+        "docs/android/aihub189_depthprediction_offline_validation_20260701.md",
+        "docs/control/audits",
+        "docs/deliverables/10-operations",
+        "docs/deliverables/11-walksafe",
+        "docs/deliverables/12-closure",
+        "docs/evidence/aihub189_depthprediction_original_full_20260702.md",
+        "docs/operations/data_retention_policy.md",
+        "docs/walksafe-v2/navigation_integration_policy.md"
+      ],
+      "dependencies": [
+        "W8"
+      ],
+      "parallel_work_packets": [
+        {
+          "packet_id": "W9-CLS-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-CLS-07",
+            "DLV-CLS-08",
+            "DLV-CLS-09",
+            "DLV-CLS-10",
+            "DLV-CLS-14",
+            "DLV-CLS-15",
+            "DLV-CLS-16"
+          ],
+          "target_areas": [
+            "docs/control/audits",
+            "docs/deliverables/10-operations",
+            "docs/deliverables/12-closure",
+            "docs/operations/data_retention_policy.md"
+          ],
+          "parallel_group": "W9-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W9-OPS-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-OPS-17",
+            "DLV-OPS-19",
+            "DLV-OPS-20",
+            "DLV-OPS-21",
+            "DLV-OPS-24"
+          ],
+          "target_areas": [
+            "deploy/README.md",
+            "docs/control/audits",
+            "docs/deliverables/10-operations"
+          ],
+          "parallel_group": "W9-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W9-WS-CONTENT",
+          "mode": "WRITE",
+          "covered_artifact_ids": [
+            "DLV-WS-08",
+            "DLV-WS-10",
+            "DLV-WS-18"
+          ],
+          "target_areas": [
+            "docs/android/aihub189_depthprediction_offline_validation_20260701.md",
+            "docs/deliverables/11-walksafe",
+            "docs/evidence/aihub189_depthprediction_original_full_20260702.md",
+            "docs/walksafe-v2/navigation_integration_policy.md"
+          ],
+          "parallel_group": "W9-PREFIX-WRITES",
+          "constraint": "실제 target file이 겹치면 직렬화한다."
+        },
+        {
+          "packet_id": "W9-REVIEW",
+          "mode": "READ_ONLY_THEN_EVIDENCE_WRITE",
+          "covered_artifact_ids": [
+            "DLV-CLS-07",
+            "DLV-CLS-08",
+            "DLV-CLS-09",
+            "DLV-CLS-10",
+            "DLV-CLS-14",
+            "DLV-CLS-15",
+            "DLV-CLS-16",
+            "DLV-OPS-17",
+            "DLV-OPS-19",
+            "DLV-OPS-20",
+            "DLV-OPS-21",
+            "DLV-OPS-24",
+            "DLV-WS-08",
+            "DLV-WS-10",
+            "DLV-WS-18"
+          ],
+          "target_areas": [
+            "docs/control/execution/artifact-remediation/20260726/w9"
+          ],
+          "parallel_group": "W9-REVIEW-AFTER-WRITES",
+          "constraint": "내용 작성 완료 후 독립 검토하며 제품·정본은 수정하지 않는다."
+        }
+      ],
+      "acceptance_checks": [
+        "모든 covered artifact required_action을 evidence output에 양방향 추적한다.",
+        "정본·register·trace·source snapshot의 상태와 hash 결속이 일치한다.",
+        "결정론적 검사와 독립 검토가 PASS이고 미검증 사항은 NOT_RUN/EXTERNAL로 유지된다.",
+        "재감사에서 근거 없는 OK·승인·실행 완료 승격이 없다."
+      ],
+      "evidence_outputs": [
+        "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json"
+      ]
+    }
+  ],
+  "later_external_action_packets": [
+    {
+      "packet_id": "EXT-DATA-LEGAL",
+      "kind": "EXTERNAL_ACTION",
+      "status": "WAITING_EXTERNAL_INPUT",
+      "purpose": "데이터 권리·동의·법률·독립 보안 검토 원본 확보",
+      "artifact_count": 7,
+      "artifact_ids": [
+        "DLV-AIML-01",
+        "DLV-AIML-02",
+        "DLV-AIML-03",
+        "DLV-AIML-22",
+        "DLV-SEC-04",
+        "DLV-SEC-05",
+        "DLV-SEC-17"
+      ],
+      "priority_counts": {
+        "P0": 5,
+        "P1": 2,
+        "P2": 0,
+        "P3": 0,
+        "P4": 0
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "개발 작성자와 독립된 보안 검토자",
+        "개인정보·법률 검토자와 적용 법규 판단",
+        "데이터 제공자와 통제 저장소의 권리·동의 원본",
+        "운영 연락망, 관할 법률·기관 의무, 실제 훈련 참여자",
+        "원 데이터와 제공자 권리 증거",
+        "제공자 약관, 라이선스, 동의 또는 기관 승인 원본",
+        "지원 후보 Android 실기기와 통제된 전원·온도 시험환경"
+      ],
+      "acceptance_boundary": "권한 있는 외부 원본·서명·실행 receipt와 재감사 전에는 완료로 표시하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/ext-data-legal/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "EXT-FIELD-DEVICE",
+      "kind": "EXTERNAL_ACTION",
+      "status": "WAITING_EXTERNAL_INPUT",
+      "purpose": "실기기·현장·접근성·참여자 검증 실행",
+      "artifact_count": 10,
+      "artifact_ids": [
+        "DLV-WS-06",
+        "DLV-WS-07",
+        "DLV-WS-09",
+        "DLV-WS-12",
+        "DLV-WS-13",
+        "DLV-WS-14",
+        "DLV-WS-15",
+        "DLV-WS-17",
+        "DLV-WS-20",
+        "DLV-WS-21"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 0,
+        "P2": 10,
+        "P3": 0,
+        "P4": 0
+      },
+      "resource_class": "MODERATE",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "TalkBack 지원 Android 기기와 접근성 검토자",
+        "둘 이상의 실제 지원 Android 휴대전화",
+        "명명된 후보, 실제 휴대폰, 서버 환경과 관찰자",
+        "복수 Android OS 및 기기 조합",
+        "실제 Android 기기, 안전한 장소와 관찰자",
+        "실제 Android 기기와 사용자 관찰",
+        "실제 기기, 소음 corpus와 시험 장소",
+        "실제 기기와 접근성 사용자 또는 검토자",
+        "참여자, 동행자, 승인 경로와 현장 안전계획",
+        "현장시험 참여자, 안전 책임자와 서명 원본"
+      ],
+      "acceptance_boundary": "권한 있는 외부 원본·서명·실행 receipt와 재감사 전에는 완료로 표시하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/ext-field-device/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "EXT-RELEASE-OPS",
+      "kind": "EXTERNAL_ACTION",
+      "status": "WAITING_EXTERNAL_INPUT",
+      "purpose": "production·복구·배포·운영 권한과 실행 receipt 확보",
+      "artifact_count": 8,
+      "artifact_ids": [
+        "DLV-OPS-06",
+        "DLV-OPS-11",
+        "DLV-OPS-13",
+        "DLV-OPS-22",
+        "DLV-OPS-23",
+        "DLV-REL-13",
+        "DLV-REL-20",
+        "DLV-REL-21"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 0,
+        "P2": 0,
+        "P3": 8,
+        "P4": 0
+      },
+      "resource_class": "MODERATE",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "격리 복원 환경과 운영 백업",
+        "공유 또는 production 운영 환경",
+        "대체 인프라와 운영 훈련 참여자",
+        "삭제 권한과 실제 삭제 대상",
+        "실제 배포 환경과 승인 release 후보",
+        "운영 수령 조직과 서명자",
+        "유료 자원 또는 실제 용량 측정 환경",
+        "지정 검수자 또는 검수기관의 서명"
+      ],
+      "acceptance_boundary": "권한 있는 외부 원본·서명·실행 receipt와 재감사 전에는 완료로 표시하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/ext-release-ops/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "EXT-APPROVAL-HANDOVER",
+      "kind": "EXTERNAL_ACTION",
+      "status": "WAITING_EXTERNAL_INPUT",
+      "purpose": "지정 승인자·검수자·인수자의 서명과 외부 원본 확보",
+      "artifact_count": 14,
+      "artifact_ids": [
+        "DLV-CLS-02",
+        "DLV-CLS-04",
+        "DLV-CLS-11",
+        "DLV-DES-21",
+        "DLV-DSC-05",
+        "DLV-DSC-06",
+        "DLV-DSC-11",
+        "DLV-MGT-03",
+        "DLV-MGT-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13",
+        "DLV-REQ-15",
+        "DLV-TST-22",
+        "DLV-TST-23"
+      ],
+      "priority_counts": {
+        "P0": 2,
+        "P1": 7,
+        "P2": 2,
+        "P3": 0,
+        "P4": 3
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "TMAP/GCS 계약·처리위탁·국외이전 법률 검토",
+        "True",
+        "독립 원본수집 검토, cloud 실비, 실기기·현장·복구훈련, REL/SEC/WS 승인",
+        "지정 인수자 또는 인수기관의 서명",
+        "지정 인수자와 독립 QA의 외부 서명",
+        "최종 측정 기간, 실제 측정값 및 책임자 승인",
+        "회고 참여자와 종료 사건"
+      ],
+      "acceptance_boundary": "권한 있는 외부 원본·서명·실행 receipt와 재감사 전에는 완료로 표시하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/ext-approval-handover/decision-or-receipt.json"
+    }
+  ],
+  "later_applicability_packets": [
+    {
+      "packet_id": "NA-SEC-AIML",
+      "kind": "APPLICABILITY_DECISION",
+      "status": "DECISION_PENDING",
+      "purpose": "보안·AI 조건부 산출물 활성 조건 판정",
+      "artifact_count": 8,
+      "artifact_ids": [
+        "DLV-AIML-18",
+        "DLV-AIML-19",
+        "DLV-AIML-20",
+        "DLV-AIML-25",
+        "DLV-AIML-26",
+        "DLV-SEC-13",
+        "DLV-SEC-14",
+        "DLV-SEC-18"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 1,
+        "P2": 4,
+        "P3": 3,
+        "P4": 0
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "격리된 원격 staging 환경과 시험 계정",
+        "공개 신고 채널 운영자와 safe harbor 법률 검토",
+        "권한 있는 독립 침투시험자, 계약·범위 승인, 외부 보고서 원본",
+        "대표 기기·환경 표본과 독립 안전·편향 검토자"
+      ],
+      "acceptance_boundary": "활성 조건과 권한 있는 적용성 결정 전에는 N/A 또는 완료로 확정하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/na-sec-aiml/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "NA-RELEASE-OPS",
+      "kind": "APPLICABILITY_DECISION",
+      "status": "DECISION_PENDING",
+      "purpose": "릴리스·운영 사건과 환경 활성 여부 판정",
+      "artifact_count": 10,
+      "artifact_ids": [
+        "DLV-OPS-07",
+        "DLV-OPS-18",
+        "DLV-REL-03",
+        "DLV-REL-04",
+        "DLV-REL-05",
+        "DLV-REL-06",
+        "DLV-REL-07",
+        "DLV-REL-08",
+        "DLV-REL-09",
+        "DLV-REL-14"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 0,
+        "P2": 0,
+        "P3": 0,
+        "P4": 10
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "기준 이상 장애 종료 사건",
+        "단계적 배포 전략과 실제 트래픽",
+        "명명된 release artifact와 공급망 요구",
+        "명명된 release 후보",
+        "배포 또는 보관 대상 artifact와 승인 서명자",
+        "승인 release 계약과 빌드 후보",
+        "승인된 release version",
+        "승인된 source snapshot과 release 후보",
+        "운영 알림 채널과 책임자"
+      ],
+      "acceptance_boundary": "활성 조건과 권한 있는 적용성 결정 전에는 N/A 또는 완료로 확정하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/na-release-ops/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "NA-CLOSURE",
+      "kind": "APPLICABILITY_DECISION",
+      "status": "DECISION_PENDING",
+      "purpose": "종료 사건·승인·인수 조건 활성 여부 판정",
+      "artifact_count": 6,
+      "artifact_ids": [
+        "DLV-CLS-01",
+        "DLV-CLS-03",
+        "DLV-CLS-05",
+        "DLV-CLS-06",
+        "DLV-CLS-12",
+        "DLV-CLS-13"
+      ],
+      "priority_counts": {
+        "P0": 0,
+        "P1": 0,
+        "P2": 0,
+        "P3": 0,
+        "P4": 6
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "계약 또는 외부업체가 있으면 정산과 종료 확인 필요",
+        "승인 릴리스와 최종 인덱스",
+        "종료 결과와 후속 책임자 결정",
+        "종료 제안 및 승인 릴리스 기준선",
+        "최종 산출물 집합 동결",
+        "프로젝트 또는 주요 단계 종료 승인"
+      ],
+      "acceptance_boundary": "활성 조건과 권한 있는 적용성 결정 전에는 N/A 또는 완료로 확정하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/na-closure/decision-or-receipt.json"
+    },
+    {
+      "packet_id": "NA-MANAGEMENT-TECHNICAL",
+      "kind": "APPLICABILITY_DECISION",
+      "status": "DECISION_PENDING",
+      "purpose": "그 밖의 관리·설계·개발·시험 조건부 적용성 판정",
+      "artifact_count": 12,
+      "artifact_ids": [
+        "DLV-DEV-10",
+        "DLV-DEV-11",
+        "DLV-DEV-13",
+        "DLV-DEV-15",
+        "DLV-DSC-04",
+        "DLV-TST-10",
+        "DLV-TST-12",
+        "DLV-TST-13",
+        "DLV-TST-15",
+        "DLV-TST-16",
+        "DLV-TST-17",
+        "DLV-WS-16"
+      ],
+      "priority_counts": {
+        "P0": 4,
+        "P1": 6,
+        "P2": 0,
+        "P3": 1,
+        "P4": 1
+      },
+      "resource_class": "LIGHT",
+      "dependencies": [
+        "W9"
+      ],
+      "required_inputs": [
+        "True",
+        "Web/PWA 공식 지원 범위 재승인"
+      ],
+      "acceptance_boundary": "활성 조건과 권한 있는 적용성 결정 전에는 N/A 또는 완료로 확정하지 않는다.",
+      "evidence_output": "docs/control/execution/artifact-remediation/20260726/na-management-technical/decision-or-receipt.json"
+    }
+  ],
+  "validation": {
+    "status": "PASS",
+    "internal_gap_coverage": {
+      "status": "PASS",
+      "expected_count": 123,
+      "assigned_count": 123,
+      "unique_count": 123,
+      "missing_ids": [],
+      "extra_ids": [],
+      "duplicate_ids": []
+    },
+    "external_action_coverage": {
+      "status": "PASS",
+      "expected_count": 39,
+      "assigned_count": 39,
+      "unique_count": 39,
+      "missing_ids": [],
+      "extra_ids": [],
+      "duplicate_ids": []
+    },
+    "n_a_applicability_coverage": {
+      "status": "PASS",
+      "expected_count": 36,
+      "assigned_count": 36,
+      "unique_count": 36,
+      "missing_ids": [],
+      "extra_ids": [],
+      "duplicate_ids": []
+    },
+    "fp047_wave_zero_count": 7,
+    "fp047_duplicate_count": 0,
+    "heavy_concurrency_limit": 1
+  }
+}

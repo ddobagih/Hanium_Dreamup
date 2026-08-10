@@ -1,0 +1,364 @@
+{
+  "schema_version": "walksafe.data-model-source-inventory-evidence.v3",
+  "packet_id": "WS-DATA-MODEL-SOURCE-INVENTORY-EVIDENCE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "scope": "HANIUM_SUBMISSION_AND_DEMO",
+  "binding_materialized_at": "2026-07-27T19:08:16+09:00",
+  "capture_time_semantics": "captured_at is the exact packet/output binding materialization time. The original hash-capture time for inspected inputs was not recorded, so each input states that limitation.",
+  "output_bindings": [
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json",
+      "byte_length": 20365,
+      "sha256": "ca56b1d373ed09035c4b0968d6461045e50455a484515c82c4ac1dbcd617e766",
+      "captured_at": "2026-07-27T19:08:16+09:00",
+      "role": "AUTHORITATIVE_STRUCTURED_CURRENT_STATE_OUTPUT"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.md",
+      "byte_length": 9960,
+      "sha256": "05c44d43a5bc37b5245304560bf44fd4aa8f336f4f567aacd78160850d6ebf6c",
+      "captured_at": "2026-07-27T19:08:16+09:00",
+      "role": "HUMAN_READABLE_CURRENT_STATE_OUTPUT"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-missing-path-inventory.json",
+      "byte_length": 15880,
+      "sha256": "5c6a2a1554d106336996e9b0d50c7744f79aac65ea76ca93a27b2c6d68a0356c",
+      "captured_at": "2026-07-27T19:08:16+09:00",
+      "role": "DETERMINISTIC_MISSING_PATH_FILESYSTEM_INVENTORY"
+    }
+  ],
+  "inspected_source_binding_count": 28,
+  "inspected_source_bindings": [
+    {
+      "path": "data_sources/README.md",
+      "byte_length": 3046,
+      "sha256": "6daa5aa0d76e6565917128d490242a468195f171f70326513f244d42c0b1aabf",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "CURRENT_DATASET_DECLARATION"
+    },
+    {
+      "path": "data_sources/manifests/korean_dataset_candidates.md",
+      "byte_length": 6020,
+      "sha256": "29ee8575deee9c4b9c09fd46cafe6a1c06d99a77a214873e6464d9aca6e71cd3",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_v1_sources.md",
+      "byte_length": 1482,
+      "sha256": "fcaac487301c80171aec6b83dd0d4c2444edb2ca8162297041d06c58d117684b",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_policy_2026-05-19.md",
+      "byte_length": 1785,
+      "sha256": "c99edb678230629e3d133692f284d19768809c987ef667acbde3928476bfe270",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_summary_2026-05-19.json",
+      "byte_length": 1102,
+      "sha256": "1b995efe15563e6587a43ccf89b2b36a251d5d9ecad6415decd959c1dc51c744",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_curation_summary_2026-05-18.json",
+      "byte_length": 1799,
+      "sha256": "0e33db42651f91f77fade76fb2cc63b0110be44b6c95781f02a43c544979efc7",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+      "byte_length": 27823,
+      "sha256": "e2fa27a0fcdee5e9ddad5402d8b3b52a78034a2772b3c6a4018354ef9f723b46",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_candidate_index_2026-05-19.csv",
+      "byte_length": 47179,
+      "sha256": "6ac7cb425577d977afaaf67a0cc97ad97bb32479012620fdcb3ea289b6eaa690",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "data_sources/manifests/walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv",
+      "byte_length": 13312,
+      "sha256": "9e0ebfc596f3e75812b738786e7e611d57d8a81248e83c7dea4ea39b71de7cfa",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "SOURCE_OR_HISTORIC_CURATION_MANIFEST_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/README.md",
+      "byte_length": 1054,
+      "sha256": "6ae5890b33aae17417ccf32ecfe1670db0d0448a411943303ef4a34b6b84e27c",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/README.md",
+      "byte_length": 1538,
+      "sha256": "aa8886a383cc7595fdf4fdc76cefa381366c32cf95860db7731281de21e3c995",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/image_manifest.csv",
+      "byte_length": 11679,
+      "sha256": "94c46820ae33e9c5662e316301973d5ba7f1c63ef6cfe2fb246c1a1cda3903dc",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/relabel_queue.csv",
+      "byte_length": 33208,
+      "sha256": "f924aee969cda8ecfeb8ca7213bf45adbaac1c1314c5193ab1fed0fdcffd9c6a",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_v3_relabel_20260521/classes.txt",
+      "byte_length": 24,
+      "sha256": "2033cad2bc10f27f9a45b89e2ebff52eef440259c11dc53065d9cf4c281f17f0",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/README.md",
+      "byte_length": 2396,
+      "sha256": "c49ff3cec86fadadeca2add8036e20e1434f75e7adf619b38a962ddf7b781497",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_ai_suggestions_summary_2026-05-22.json",
+      "byte_length": 1968,
+      "sha256": "b72383d5b23e30d61d1a4e93751595717ba9a779f5c234a24055e25ee3ea5dde",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_tactile_damage_area_review_20260522/manifests/walksafe_tactile3_damage_area_review_decision_apply_summary_2026-05-22.json",
+      "byte_length": 1847,
+      "sha256": "670d333dc94aa17d0e31c53c54eb6802e63921375abd93980be189c9b49edd1b",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "ai_tasks/walksafe_two_model_runtime_20260522/README.md",
+      "byte_length": 2532,
+      "sha256": "2dda69f3e8946a706f5313c1511ff1e9f74c079b882feaa88e34f5c8cdcbaab7",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "AI_REVIEW_OR_RELABEL_PACKAGE_EVIDENCE"
+    },
+    {
+      "path": "model/README.md",
+      "byte_length": 7627,
+      "sha256": "f8c30578f42811987e3f6e51c1ef230760d7a41f301412be5154a1faa6d87ce6",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "MODEL_DECLARATION_OR_ARTIFACT_METADATA"
+    },
+    {
+      "path": "model/artifacts/README.md",
+      "byte_length": 1327,
+      "sha256": "c5fa9b10c22a7a77ecb24a44a1749af1e920dfdfae192be15bd1ea6b246de9fa",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "MODEL_DECLARATION_OR_ARTIFACT_METADATA"
+    },
+    {
+      "path": "model/registry/walksafe-model-registry.json",
+      "byte_length": 2293,
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "CANDIDATE_MODEL_REGISTRY"
+    },
+    {
+      "path": "model/deployments/local-deployment.json",
+      "byte_length": 1348,
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "DEVELOPMENT_DEPLOYMENT_STATE"
+    },
+    {
+      "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+      "byte_length": 5411845,
+      "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "CANDIDATE_MODEL_BINARY_BINDING"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "byte_length": 39378,
+      "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "EXISTING_AIML_DELIVERABLE"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+      "byte_length": 23552,
+      "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "EXISTING_AIML_DELIVERABLE"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+      "byte_length": 5834,
+      "sha256": "f0a18fa7758ebbeeb572225dbd67053909f5551c394970c7827515820f3f5f74",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "EXISTING_DATA_SOURCE_CONTROL_REGISTER"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "byte_length": 26684,
+      "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "EXISTING_DATASET_CONTROL_REGISTER"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "byte_length": 12663,
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+      "captured_at": "2026-07-27T19:05:33+09:00",
+      "capture_event": "PACKET_BINDING_MATERIALIZATION",
+      "original_hash_capture_time": "NOT_RECORDED",
+      "role": "EXISTING_MODEL_CONTROL_REGISTER"
+    }
+  ],
+  "inspected_source_set_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "sha256": "f87bb4d8c2b21a913c72ea6cdb1eb4226c29a9174f04ce85853459329e50e0e3"
+  },
+  "coverage": [
+    {
+      "artifact_type_code": "DLV-AIML-01",
+      "predicate": "현재 dataset·historic candidate·AI task·model의 수명주기 경계와 권리·privacy·manifest blocker를 current-state로 분리한다.",
+      "result": "CURRENT_STATE_AUTHORED_EVIDENCE_FACT_REQUEST_REDUCED"
+    },
+    {
+      "artifact_type_code": "DLV-AIML-02",
+      "predicate": "선언된 dataset 구성·class·model 연결과 현재 materialized manifest/data.yaml 누락을 명시하고 검증되지 않은 수량·split·hash를 주장하지 않는다.",
+      "result": "CURRENT_STATE_ATTESTED_MANIFEST_MISSING"
+    },
+    {
+      "artifact_type_code": "DLV-AIML-03",
+      "predicate": "현재 선언 source의 provider·확인 가능한 URL·포함 상태·license·학습·재배포·consent·privacy 상태를 source별로 기록한다.",
+      "result": "SOURCE_INVENTORY_AUTHORED_RIGHTS_NOT_VERIFIED"
+    }
+  ],
+  "missing_assertion_binding": {
+    "status": "BOUND_TO_DETERMINISTIC_MISSING_PATH_INVENTORY",
+    "inventory_path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-missing-path-inventory.json",
+    "checked_at": "2026-07-27T19:08:16+09:00",
+    "record_ids": [
+      "MISSING-PATH-001",
+      "MISSING-PATH-002",
+      "MISSING-PATH-003",
+      "MISSING-PATH-004",
+      "MISSING-PATH-005"
+    ],
+    "asserted_missing_paths": [
+      "reports/walksafe_best_eval_20260708/training_reference_index_20260708.md",
+      "data_sources/manifests/walksafe_aihub_source_usage_20260628.md",
+      "docs/model-data/walksafe_13class_dataset_source_contract_20260619.md",
+      "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv"
+    ],
+    "verification_rule": "Expected path lstat absent and first missing component absent from hashed direct-entry inventory of nearest existing parent.",
+    "sensitive_data_payload_read": false,
+    "recursive_directory_walk": false
+  },
+  "boundaries": {
+    "dataset_content_verified": false,
+    "dataset_split_verified": false,
+    "source_rights_verified": false,
+    "source_privacy_verified": false,
+    "direct_collection_verified": false,
+    "consent_records_verified": false,
+    "base_model_provenance_verified": false,
+    "training_run_performed": false,
+    "build_performed": false,
+    "test_performed": false,
+    "release_or_deployment_claimed": false
+  },
+  "remaining_evidence_fact_request_ids": [
+    "EFR-DATA-SOURCE-COMPLETENESS",
+    "EFR-RIGHTS-CONSENT-EVIDENCE",
+    "EFR-BASE-MODEL-PROVENANCE"
+  ],
+  "missing_path_inventory_binding": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-missing-path-inventory.json",
+    "byte_length": 15880,
+    "sha256": "5c6a2a1554d106336996e9b0d50c7744f79aac65ea76ca93a27b2c6d68a0356c",
+    "content_fingerprint_sha256": "1d3e37be9b53e276fca12e7768fd272532fe3cacdb1f32a82776c3a1e89eb22d",
+    "filesystem_state_sha256": "f828481a8950ace025b1fb8d54ae9e1f3f2594a7fd8095190426582cf1f968ea",
+    "checked_at": "2026-07-27T19:08:16+09:00",
+    "record_count": 5
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "scope": "ENTIRE_PACKET_EXCLUDING_TOP_LEVEL_CONTENT_FINGERPRINT",
+    "role": "NON_SELF_REFERENTIAL_EVIDENCE_PACKET_OUTPUT_FINGERPRINT",
+    "sha256": "b9606c7035beef07af1d8b21abbc43ee4676bddbf944832eb4e878819cc19b4a"
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "schema_version": "walksafe.aiml-evaluation-evidence-register.v1",
+  "metadata": {
+    "document_id": "WS-AIML-EVALUATION-EVIDENCE-REGISTER-20260721",
+    "title": "evaluation-evidence-register",
+    "document_version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": []
+  },
+  "supports_planned_artifact_type_ids": [
+    "AIML-05",
+    "AIML-08",
+    "AIML-09",
+    "AIML-10",
+    "AIML-11",
+    "AIML-13",
+    "AIML-18",
+    "AIML-19",
+    "AIML-20",
+    "AIML-21",
+    "AIML-22",
+    "AIML-23"
+  ],
+  "protocol_artifact_type_id": "AIML-17",
+  "planned_executions": [
+    {
+      "artifact_type_id": "AIML-05",
+      "execution_contract": {
+        "when": "학습·검증·시험 데이터셋 버전을 승인하기 전과 자료구성이 바뀔 때",
+        "executor": "데이터책임자",
+        "prerequisites": [
+          "불변 dataset manifest와 파일 지문",
+          "출처·권리·동의 상태",
+          "승인된 품질항목과 표본추출 방법"
+        ],
+        "evidence": [
+          "전체·출처·class별 수량과 결측·중복·손상 통계",
+          "검사 도구·설정·실행 log",
+          "제외 목록과 조치·재검사 결과"
+        ],
+        "judgment": "사전에 정한 품질항목을 모두 계산하고 중대한 결측·손상·권리 미확인이 0건이며 남은 한계가 승인돼야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-08",
+      "execution_contract": {
+        "when": "라벨 묶음을 학습 또는 독립 평가에 사용하기 전",
+        "executor": "라벨링 품질검사자",
+        "prerequisites": [
+          "AIML-07 지침 version",
+          "가명화된 표본 목록",
+          "검사자와 라벨 작성자의 역할 구분"
+        ],
+        "evidence": [
+          "class·난이도별 표본",
+          "일치·누락·경계 오류 집계",
+          "불일치 조정 기록과 수정 version"
+        ],
+        "judgment": "승인된 표본수와 오류기준을 충족하고 치명적 class 혼동·누락을 모두 조치한 경우만 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-09",
+      "execution_contract": {
+        "when": "학습 실행을 시작하기 전과 dataset version이 바뀔 때",
+        "executor": "데이터 엔지니어",
+        "prerequisites": [
+          "불변 sample·capture_group·source ID",
+          "분할 비율과 독립 시험 잠금 규칙"
+        ],
+        "evidence": [
+          "train·validation·test manifest",
+          "각 manifest SHA-256",
+          "group 겹침 0건 검사 결과"
+        ],
+        "judgment": "동일 보행·연속촬영·원본 파생물이 분할 사이에 겹치지 않고 독립 시험 묶음이 잠겨야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-10",
+      "execution_contract": {
+        "when": "분할 뒤, 학습 전, 그리고 평가 결과를 승인하기 전",
+        "executor": "ML 검증책임자",
+        "prerequisites": [
+          "AIML-09 분할 manifest",
+          "원본·파생·중복을 찾을 content/group key"
+        ],
+        "evidence": [
+          "정확·유사·group 중복 검사 원자료",
+          "누수 후보별 판정",
+          "재분할·재실행 기록"
+        ],
+        "judgment": "확정 누수 0건이고 모든 후보의 근거 있는 판정과 재검사가 끝나야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-11",
+      "execution_contract": {
+        "when": "정식 학습마다 실행 전에 고정하고 종료 직후 기록",
+        "executor": "ML 개발책임자",
+        "prerequisites": [
+          "승인 dataset·split hash",
+          "학습 코드 commit",
+          "환경·의존성 lock",
+          "설정·seed"
+        ],
+        "evidence": [
+          "실행 ID와 명령·설정",
+          "환경·GPU·도구 version",
+          "stdout·metric 원자료",
+          "결과 모델·checkpoint SHA-256"
+        ],
+        "judgment": "입력·코드·환경·seed와 결과 지문이 한 실행으로 결속되고 같은 절차의 재실행 가능성을 검토해야 완료"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-13",
+      "execution_contract": {
+        "when": "새 모델 후보를 승격하기 전",
+        "executor": "ML 검증책임자",
+        "prerequisites": [
+          "같은 독립 시험 split",
+          "현재 승인본 또는 명시한 단순 기준모델",
+          "AIML-17 평가 protocol"
+        ],
+        "evidence": [
+          "후보별 model hash",
+          "동일 입력의 전체 지표",
+          "차이와 통계적 불확실성",
+          "퇴행 목록"
+        ],
+        "judgment": "필수 안전지표 퇴행이 없고 승인된 개선조건을 충족해야 PASS; 일부 평균 개선으로 치명적 class 퇴행을 상쇄하지 않음"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-18",
+      "execution_contract": {
+        "when": "모델 후보·dataset·평가 protocol 중 하나가 바뀔 때마다",
+        "executor": "독립 평가책임자",
+        "prerequisites": [
+          "잠긴 독립 test split",
+          "평가 대상 model·runtime hash",
+          "AIML-17 protocol"
+        ],
+        "evidence": [
+          "전체·class·거리·환경별 원지표",
+          "confusion 자료",
+          "평가 명령·환경·원출력 SHA-256"
+        ],
+        "judgment": "사전 등록한 모든 필수 구간과 지표가 누락 없이 계산되고 기준을 충족해야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-19",
+      "execution_contract": {
+        "when": "AIML-18 평가 뒤와 중대한 현장 결함이 생길 때",
+        "executor": "ML 안전분석자",
+        "prerequisites": [
+          "예측·정답 연결 결과",
+          "class·거리·환경·위해도 분류규칙"
+        ],
+        "evidence": [
+          "오탐·미탐 사례 묶음",
+          "원인 taxonomy와 빈도",
+          "안전 영향·완화·회귀시험 연결"
+        ],
+        "judgment": "치명적 사례를 모두 분류·조치하거나 명시적으로 출시 차단하고 잔여위험을 승인해야 종결"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-20",
+      "execution_contract": {
+        "when": "출시 후보 평가와 대상 환경·사용자 범위 변경 시",
+        "executor": "독립 안전·편향 검토자",
+        "prerequisites": [
+          "대표 조도·날씨·기기·장착·지역 구간",
+          "위해 시나리오와 중단기준"
+        ],
+        "evidence": [
+          "구간별 강건성·편차 결과",
+          "최악 구간",
+          "공격·손상·범위 밖 입력 결과",
+          "제한·완화 기록"
+        ],
+        "judgment": "중대한 안전 격차가 기준 안이거나 지원범위 제한·차단으로 통제되고 독립 검토가 완료돼야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-21",
+      "execution_contract": {
+        "when": "학습 모델을 TFLite 등 배포 형식으로 변환할 때마다",
+        "executor": "ML·Android 통합책임자",
+        "prerequisites": [
+          "원본·변환 모델 hash",
+          "고정 동등성 입력 묶음",
+          "정확한 전처리·후처리 설정"
+        ],
+        "evidence": [
+          "샘플별 원출력과 배포출력",
+          "허용 오차·불일치 통계",
+          "변환 명령·도구 version",
+          "재변환 결과"
+        ],
+        "judgment": "사전 허용오차와 class·순서·shape 계약을 모두 충족하고 치명적 판정 불일치가 0건이어야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-22",
+      "execution_contract": {
+        "when": "지원 Android 기기 후보와 release model 조합마다 베타 전",
+        "executor": "Android 성능시험자",
+        "prerequisites": [
+          "APK·model·config hash",
+          "기기·OS·전원·온도·장착 조건",
+          "warmup·반복 protocol"
+        ],
+        "evidence": [
+          "지연 percentile·FPS·memory",
+          "배터리·온도·throttling 원자료",
+          "기기별 log와 결함"
+        ],
+        "judgment": "지원 기기별 사전 성능·발열·배터리 기준을 충족해야 PASS; Web/PWA는 별도 재승인 전 제외"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_id": "AIML-23",
+      "execution_contract": {
+        "when": "모델·거리계산·위험단계·지원범위 중 하나가 바뀔 때",
+        "executor": "ML·안전책임자",
+        "prerequisites": [
+          "AIML-18·19 결과",
+          "거리·class별 위해 비용",
+          "FP-020 행동단계 계약"
+        ],
+        "evidence": [
+          "후보 임계값 sweep",
+          "오탐·미탐 trade-off",
+          "선정 근거·버전",
+          "독립 재평가 결과"
+        ],
+        "judgment": "평균점수만이 아니라 거리·class별 안전비용을 충족하고 선정값이 앱 설정 hash에 결속돼야 PASS"
+      },
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "evidence_ids": [],
+      "pass_claimed": false,
+      "approval_status": "NOT_APPROVED"
+    }
+  ],
+  "formal_execution_count": 0,
+  "pass_count": 0,
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "fp035_open_issue": {
+    "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+    "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+    "scope": "일반 활동원본의 보행·정지·허용 네트워크 분기",
+    "owner_clarification_required": false,
+    "normalized_policy": {
+      "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+      "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+      "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+    },
+    "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+    "correction_candidate_binding": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "correction_candidate_approval_status": "NOT_APPROVED",
+    "correction_candidate_effective_status": "NOT_EFFECTIVE",
+    "policy_effect_claimed": false,
+    "related_test_status": "NOT_RUN",
+    "raw_collection_policy_reopened": false
+  }
+}

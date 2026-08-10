@@ -1,0 +1,68 @@
+{
+  "schema_version": "walksafe.feature-policy-baseline-review-answer-intake.v1",
+  "intake_id": "WS-FEATURE-POLICY-BASELINE-REVIEW-ANSWER-INTAKE-20260721-001",
+  "intake_version": "1.0.0",
+  "change_reason": "사용자가 2026-07-20 종합 정책서의 공통정책 9개와 기능 54개를 모두 이대로 확정해 검토 결과를 프로젝트 통제 입력으로 최초 반입한다.",
+  "answer_intake": {
+    "external_path": "/home/ddobagi/Downloads/walksafe-feature-policy-baseline-review-answers.json",
+    "external_path_usage": "PROVENANCE_ONLY",
+    "controlled_path": "docs/control/decision-interview/source-records/walksafe-feature-policy-baseline-review-20260720-r001-answers.json",
+    "sha256": "a6e6076dd19e31d437bd25d733baf8e803f9d8bd64b3085b39e3f06230f58d1c",
+    "byte_length": 5723,
+    "captured_at": "2026-07-21T00:05:05+09:00",
+    "controlled_revision": 1,
+    "prior_controlled_path": null,
+    "prior_controlled_sha256": null,
+    "source_class": "EXTERNAL",
+    "artifact_form": "EXTERNAL_RECORD",
+    "evidence_classification": "USER_CONFIRMED",
+    "adoption_trust": "D"
+  },
+  "answer_metadata": {
+    "schema_version": "walksafe.feature-policy-baseline-review-answers.v1",
+    "report_id": "WS-FEATURE-POLICY-DRAFT-20260720",
+    "document_content_sha256": "e49ffe0ee9e59de0cec173cac9425d61aa78e0ccd65980ba568045a3975e0b28",
+    "source_binding_sha256": "836e4107ab3dc6d4cab6e561ed56fabfca590a7fa671d64c486092b967e3d7d6",
+    "baseline_status": "NOT_APPROVED",
+    "reviewer": "김민호",
+    "exported_at": "2026-07-20T14:57:36.063Z",
+    "item_count": 63,
+    "common_policy_count": 9,
+    "feature_count": 54,
+    "confirmed": 63,
+    "revision_requested": 0,
+    "held": 0,
+    "non_empty_note_count": 0
+  },
+  "review_source_bindings": [
+    {
+      "id": "SRC-REVIEWED-FEATURE-POLICY-DRAFT-JSON",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    {
+      "id": "SRC-REVIEWED-FEATURE-POLICY-DRAFT-HTML",
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft-20260720.html",
+      "sha256": "61847089349a5227f0badc01add093c62011da022c1fbdbb6f9879e61ed44fa2"
+    }
+  ],
+  "record_controls": {
+    "external_signature_status": "NOT_SIGNED",
+    "confidentiality": "INTERNAL",
+    "personal_data": [
+      "reviewer_name"
+    ],
+    "retention_class": "PROJECT_LIFECYCLE_PLUS_3_YEARS",
+    "notes": "검토자 이름은 정책 결정 책임을 추적하기 위한 내부 통제정보다. 비밀번호·키·인증서·서비스 최종사용자 개인정보는 포함하지 않는다."
+  },
+  "approval_boundary": {
+    "review_status": "REVIEW_COMPLETE_ALL_CONFIRMED",
+    "baseline_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "approved_by": null,
+    "approved_at": null,
+    "baseline_approval_recorded": false,
+    "formal_deliverable_generation_status": "NOT_RUN",
+    "note": "63개 전부 확정은 별도 기준선 승인을 요청할 수 있다는 뜻이며, 이 검토 답변 자체는 기준선 승인·구현 완료·시험 완료·출시 허가가 아니다."
+  }
+}

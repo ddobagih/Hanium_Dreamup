@@ -1,0 +1,630 @@
+{
+  "schema_version": "walksafe.w6.aiml-data-schema-current-state.v1",
+  "document_id": "WALKSAFE-W6-AIML-DATA-SCHEMA-CURRENT-STATE-20260727",
+  "wave_id": "W6",
+  "prepared_on": "2026-07-27",
+  "exact_artifact_ids": [
+    "DLV-AIML-04",
+    "DLV-AIML-05",
+    "DLV-AIML-08",
+    "DLV-AIML-09",
+    "DLV-AIML-11",
+    "DLV-AIML-12",
+    "DLV-AIML-13",
+    "DLV-AIML-21"
+  ],
+  "authority_boundary": {
+    "artifact_kind": "INTERNAL_CURRENT_STATE_TRACE_AND_CANDIDATE_DISPOSITION",
+    "approval_status": "NOT_AN_APPROVAL",
+    "formal_pass_claim": false,
+    "deployment_claim": false,
+    "release_eligibility": "NOT_ELIGIBLE",
+    "statement": "Only DLV-AIML-04 is an OK candidate pending independent review. The other seven exact-scope artifacts remain INTERNAL_GAP. This file does not assert formal, device, deployment or release completion."
+  },
+  "current_source_subject": {
+    "source_commit": null,
+    "build_id": null,
+    "binding_kind": "PATH_SHA256_BYTE_LENGTH_WITHOUT_COMMIT_OR_BUILD_RECEIPT",
+    "changed_file_count": 7,
+    "evidence_files": [
+      {
+        "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+        "role": "BUILDER_IMPLEMENTATION",
+        "sha256": "5babd4df6d56db99c1222611b4659c3cfa82d717beb773b7d854b8a87d376f15",
+        "byte_length": 84116
+      },
+      {
+        "path": "tests/test_walksafe_formal_aiml.py",
+        "role": "TARGETED_TEST_CONTRACT",
+        "sha256": "b5fedb010da952c9dbc5a0b82d505b425cbd804305224355637219516f5f8551",
+        "byte_length": 23351
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "role": "AIML_DATA_MANAGEMENT_GENERATED",
+        "sha256": "34426ab6b8d4ec8410291f750a5049e8f16109e84e3d07eb78e9c60be0f0e559",
+        "byte_length": 39378
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/model-development.md",
+        "role": "AIML_MODEL_DEVELOPMENT_GENERATED",
+        "sha256": "19239979cdcba6e52a6dea084c7f1fe8c5dfc5aae80d050a9c4c742604e8b939",
+        "byte_length": 23552
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+        "role": "CURRENT_DATASET_REGISTER",
+        "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+        "byte_length": 26684
+      },
+      {
+        "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+        "role": "CURRENT_MODEL_REGISTER",
+        "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+        "byte_length": 12663
+      },
+      {
+        "path": "docs/deliverables/manifests/aiml-draft-20260721-r001.json",
+        "role": "AIML_GENERATION_MANIFEST",
+        "sha256": "5b912ac448732ee9860cfc723bcd3d677f8d119dbd30bc2ff5c58f3e5fd47770",
+        "byte_length": 38456
+      }
+    ]
+  },
+  "source_generation_evidence": {
+    "receipt_kind": "IN_SESSION_COMMAND_RESULT_BOUND_TO_HASHED_SOURCE_SET_NO_STANDALONE_LOG",
+    "builder_generation": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_walksafe_formal_aiml_20260721.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "generated_file_count": 11,
+      "materialized_artifact_count": 14,
+      "planned_artifact_count": 12,
+      "formal_execution_count": 0,
+      "release_gate_count": 5,
+      "release_gate_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "builder_determinism_check": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/build_walksafe_formal_aiml_20260721.py --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "verified_file_count": 11
+    },
+    "targeted_python_tests": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.venv/bin/python -m pytest -q tests/test_walksafe_formal_aiml.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "collected_test_count": 19,
+      "passed_test_count": 19,
+      "failed_test_count": 0
+    }
+  },
+  "artifact_dispositions": [
+    {
+      "artifact_id": "DLV-AIML-04",
+      "artifact_name": "Class schema and runtime ID contract",
+      "current_disposition": "OK_CANDIDATE_PENDING_INDEPENDENT_REVIEW",
+      "candidate_classification": "OK",
+      "internal_state": "INTERNAL_CONTENT_COMPLETE",
+      "independent_review_status": "NOT_RUN",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "The current dataset/model registers bind the exact three-model 13/3/80 class order, model-specific namespaces, canonical-name conversion and breaking-major migration rules.",
+      "remaining_gap": "Independent review has not run; this is an OK candidate, not an approved or formal closure."
+    },
+    {
+      "artifact_id": "DLV-AIML-05",
+      "artifact_name": "Actual dataset manifest and content custody",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "ACTUAL_DATASET_MANIFEST_ABSENT",
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "The generated register is a schema/current-state candidate and does not contain an actual immutable dataset manifest with content-level image/label hashes.",
+      "remaining_gap": "Produce and bind the actual dataset manifest and content hashes."
+    },
+    {
+      "artifact_id": "DLV-AIML-08",
+      "artifact_name": "Gold set and double-label quality evidence",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "GOLD_SET_AND_DOUBLE_LABEL_EVIDENCE_ABSENT",
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "No gold-set receipt, independent double-label result or adjudication evidence is bound.",
+      "remaining_gap": "Create an immutable gold set, double-label it and bind adjudication evidence."
+    },
+    {
+      "artifact_id": "DLV-AIML-09",
+      "artifact_name": "Immutable split and leakage control",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "IMMUTABLE_SPLIT_AND_CAPTURE_GROUP_CHECKER_ABSENT",
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "No immutable train/validation/test split manifest or capture-group leakage checker execution is bound.",
+      "remaining_gap": "Freeze split membership by capture group and execute a zero-leakage checker."
+    },
+    {
+      "artifact_id": "DLV-AIML-11",
+      "artifact_name": "Training provenance chain",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "TRAINING_PROVENANCE_CHAIN_DISCONNECTED",
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "The current unified candidate source is hash-bound, but dataset snapshot, split, config, environment, run and checkpoint are not connected as one reproducible chain; fallback source provenance remains unknown.",
+      "remaining_gap": "Bind one immutable end-to-end training lineage and resolve fallback provenance."
+    },
+    {
+      "artifact_id": "DLV-AIML-12",
+      "artifact_name": "Formal experiment execution",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "FORMAL_EXPERIMENT_COUNT_ZERO",
+      "formal_experiment_count": 0,
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "Candidate metrics are not formal evaluation evidence and the formal experiment count is zero.",
+      "remaining_gap": "Execute the approved protocol and bind run-level inputs, outputs and metrics."
+    },
+    {
+      "artifact_id": "DLV-AIML-13",
+      "artifact_name": "Same-protocol model comparison",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "SAME_PROTOCOL_COMPARISON_COUNT_ZERO",
+      "same_protocol_comparison_count": 0,
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "No two model candidates have been evaluated on the same immutable split and metric protocol.",
+      "remaining_gap": "Run and bind at least one same-protocol comparison without mixing candidate metrics."
+    },
+    {
+      "artifact_id": "DLV-AIML-21",
+      "artifact_name": "Prediction conversion equivalence",
+      "current_disposition": "INTERNAL_GAP",
+      "candidate_classification": "INTERNAL_GAP",
+      "internal_state": "PREDICTION_EQUIVALENCE_NOT_RUN",
+      "prediction_equivalence_status": "NOT_RUN",
+      "independent_review_status": "NOT_READY",
+      "formal_status": "NOT_RUN",
+      "closure_claimed": false,
+      "basis": "No source-versus-export prediction equivalence run is bound for the runtime artifacts.",
+      "remaining_gap": "Run equivalence on the immutable evaluation set after every affected model re-export."
+    }
+  ],
+  "runtime_class_contract": {
+    "exact_runtime_model_ids": [
+      "unified_walksafe",
+      "custom_tactile",
+      "coco_general"
+    ],
+    "exact_class_counts": [
+      13,
+      3,
+      80
+    ],
+    "numeric_id_rule": "A numeric class_id is meaningful only inside its runtime-model-specific class_id_namespace; numeric equality across models does not imply semantic equivalence.",
+    "canonical_name_conversion": {
+      "algorithm": "trim, lowercase ASCII, replace each non-alphanumeric run with underscore, trim edge underscores",
+      "cross_model_numeric_id_equivalence": false,
+      "purpose": "Canonical names support name-level comparison without collapsing model-specific numeric ID namespaces."
+    },
+    "schemas": [
+      {
+        "runtime_model_id": "unified_walksafe",
+        "runtime_role": "PRIMARY",
+        "class_count": 13,
+        "class_id_namespace": "walksafe.unified_walksafe.class_id",
+        "qualified_class_id_format": "walksafe.unified_walksafe.class_id:{zero_based_class_id}",
+        "class_order": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "bus",
+          "truck",
+          "traffic light",
+          "normal_tactile_block",
+          "damaged_tactile_block",
+          "crosswalk",
+          "curb_step",
+          "uneven_sidewalk",
+          "e_scooter_obstruction"
+        ],
+        "canonical_name_order": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "bus",
+          "truck",
+          "traffic_light",
+          "normal_tactile_block",
+          "damaged_tactile_block",
+          "crosswalk",
+          "curb_step",
+          "uneven_sidewalk",
+          "e_scooter_obstruction"
+        ],
+        "class_order_sha256": "5a01ce89ef0123c136fc17910c326fc64e70a3eaed77f3d4e80548518722d6d3",
+        "approval_status": "NOT_APPROVED"
+      },
+      {
+        "runtime_model_id": "custom_tactile",
+        "runtime_role": "LEGACY_TWO_MODEL_TACTILE_FALLBACK_COMPONENT",
+        "class_count": 3,
+        "class_id_namespace": "walksafe.custom_tactile.class_id",
+        "qualified_class_id_format": "walksafe.custom_tactile.class_id:{zero_based_class_id}",
+        "class_order": [
+          "normal_tactile_block",
+          "damaged_tactile_block",
+          "tactile_damage_area"
+        ],
+        "canonical_name_order": [
+          "normal_tactile_block",
+          "damaged_tactile_block",
+          "tactile_damage_area"
+        ],
+        "class_order_sha256": "85210b06510e5f0967d1c3ae325aa82e0731a11fe53e0b6a83f67e3d1ad84c00",
+        "approval_status": "NOT_APPROVED"
+      },
+      {
+        "runtime_model_id": "coco_general",
+        "runtime_role": "LEGACY_TWO_MODEL_GENERAL_FALLBACK_COMPONENT",
+        "class_count": 80,
+        "class_id_namespace": "coco.coco_general.class_id",
+        "qualified_class_id_format": "coco.coco_general.class_id:{zero_based_class_id}",
+        "class_order": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "airplane",
+          "bus",
+          "train",
+          "truck",
+          "boat",
+          "traffic light",
+          "fire hydrant",
+          "stop sign",
+          "parking meter",
+          "bench",
+          "bird",
+          "cat",
+          "dog",
+          "horse",
+          "sheep",
+          "cow",
+          "elephant",
+          "bear",
+          "zebra",
+          "giraffe",
+          "backpack",
+          "umbrella",
+          "handbag",
+          "tie",
+          "suitcase",
+          "frisbee",
+          "skis",
+          "snowboard",
+          "sports ball",
+          "kite",
+          "baseball bat",
+          "baseball glove",
+          "skateboard",
+          "surfboard",
+          "tennis racket",
+          "bottle",
+          "wine glass",
+          "cup",
+          "fork",
+          "knife",
+          "spoon",
+          "bowl",
+          "banana",
+          "apple",
+          "sandwich",
+          "orange",
+          "broccoli",
+          "carrot",
+          "hot dog",
+          "pizza",
+          "donut",
+          "cake",
+          "chair",
+          "couch",
+          "potted plant",
+          "bed",
+          "dining table",
+          "toilet",
+          "tv",
+          "laptop",
+          "mouse",
+          "remote",
+          "keyboard",
+          "cell phone",
+          "microwave",
+          "oven",
+          "toaster",
+          "sink",
+          "refrigerator",
+          "book",
+          "clock",
+          "vase",
+          "scissors",
+          "teddy bear",
+          "hair drier",
+          "toothbrush"
+        ],
+        "canonical_name_order": [
+          "person",
+          "bicycle",
+          "car",
+          "motorcycle",
+          "airplane",
+          "bus",
+          "train",
+          "truck",
+          "boat",
+          "traffic_light",
+          "fire_hydrant",
+          "stop_sign",
+          "parking_meter",
+          "bench",
+          "bird",
+          "cat",
+          "dog",
+          "horse",
+          "sheep",
+          "cow",
+          "elephant",
+          "bear",
+          "zebra",
+          "giraffe",
+          "backpack",
+          "umbrella",
+          "handbag",
+          "tie",
+          "suitcase",
+          "frisbee",
+          "skis",
+          "snowboard",
+          "sports_ball",
+          "kite",
+          "baseball_bat",
+          "baseball_glove",
+          "skateboard",
+          "surfboard",
+          "tennis_racket",
+          "bottle",
+          "wine_glass",
+          "cup",
+          "fork",
+          "knife",
+          "spoon",
+          "bowl",
+          "banana",
+          "apple",
+          "sandwich",
+          "orange",
+          "broccoli",
+          "carrot",
+          "hot_dog",
+          "pizza",
+          "donut",
+          "cake",
+          "chair",
+          "couch",
+          "potted_plant",
+          "bed",
+          "dining_table",
+          "toilet",
+          "tv",
+          "laptop",
+          "mouse",
+          "remote",
+          "keyboard",
+          "cell_phone",
+          "microwave",
+          "oven",
+          "toaster",
+          "sink",
+          "refrigerator",
+          "book",
+          "clock",
+          "vase",
+          "scissors",
+          "teddy_bear",
+          "hair_drier",
+          "toothbrush"
+        ],
+        "class_order_sha256": "a2bb9c8218affdef450cc85951e6a5abc5e4d956cd37b1be3d04840ae0120c8e",
+        "approval_status": "NOT_APPROVED"
+      }
+    ],
+    "breaking_change_policy": {
+      "class_addition": "BREAKING_MAJOR",
+      "class_deletion": "BREAKING_MAJOR",
+      "class_reorder": "BREAKING_MAJOR",
+      "migration_status": "NOT_RUN",
+      "prediction_conversion_equivalence_status": "NOT_RUN",
+      "required_actions": [
+        "Issue a new major class-schema version.",
+        "Update two_model_runtime.json and TwoModelClassMap.kt together.",
+        "Re-export every affected model.",
+        "Re-run DLV-AIML-21 source-versus-export prediction equivalence before eligibility review."
+      ]
+    }
+  },
+  "current_register_bindings": {
+    "dataset_register": {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "sha256": "c47ae48a0d52aa2fce119f6a8432cacf3aaf21f7ef063b76f19cfad0ad1983bd",
+      "byte_length": 26684,
+      "binding_scope": "exact three-model class schemas, namespaces, order and migration rules"
+    },
+    "model_register": {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88",
+      "byte_length": 12663,
+      "binding_scope": "exact three runtime models, roles, artifacts and conservative validation states"
+    },
+    "runtime_models": [
+      {
+        "runtime_model_id": "unified_walksafe",
+        "role": "PRIMARY",
+        "artifact_sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+        "source_provenance": "CANDIDATE_SOURCE_ARTIFACT_BOUND_NOT_APPROVED",
+        "evaluation_status": "NOT_RUN",
+        "prediction_equivalence_status": "NOT_RUN",
+        "device_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "release_status": "NOT_ELIGIBLE"
+      },
+      {
+        "runtime_model_id": "custom_tactile",
+        "role": "LEGACY_TWO_MODEL_TACTILE_FALLBACK_COMPONENT",
+        "artifact_sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "evaluation_status": "NOT_RUN",
+        "prediction_equivalence_status": "NOT_RUN",
+        "device_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "release_status": "NOT_ELIGIBLE"
+      },
+      {
+        "runtime_model_id": "coco_general",
+        "role": "LEGACY_TWO_MODEL_GENERAL_FALLBACK_COMPONENT",
+        "artifact_sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1",
+        "source_provenance": "UNKNOWN_PROVENANCE",
+        "evaluation_status": "NOT_RUN",
+        "prediction_equivalence_status": "NOT_RUN",
+        "device_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "release_status": "NOT_ELIGIBLE"
+      }
+    ]
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "formal_qa_approval_status": "NOT_APPROVED_PENDING",
+    "actual_device_status": "NOT_RUN",
+    "prediction_equivalence_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "release_eligible_claimed": false
+  },
+  "self_validation": {
+    "method": "deterministic in-memory construction followed by post-write JSON/Markdown parity and fingerprint validation",
+    "overall_status": "PASS",
+    "checks": {
+      "exact_artifact_scope": {
+        "status": "PASS",
+        "expected": [
+          "DLV-AIML-04",
+          "DLV-AIML-05",
+          "DLV-AIML-08",
+          "DLV-AIML-09",
+          "DLV-AIML-11",
+          "DLV-AIML-12",
+          "DLV-AIML-13",
+          "DLV-AIML-21"
+        ],
+        "actual": [
+          "DLV-AIML-04",
+          "DLV-AIML-05",
+          "DLV-AIML-08",
+          "DLV-AIML-09",
+          "DLV-AIML-11",
+          "DLV-AIML-12",
+          "DLV-AIML-13",
+          "DLV-AIML-21"
+        ],
+        "count": 8,
+        "unique_count": 8
+      },
+      "json_markdown_exact_id_parity": {
+        "status": "PASS",
+        "count": 8
+      },
+      "candidate_disposition_boundary": {
+        "status": "PASS",
+        "ok_candidate_count": 1,
+        "internal_gap_count": 7,
+        "final_closure_count": 0
+      },
+      "runtime_class_counts_and_order": {
+        "status": "PASS",
+        "counts": [
+          13,
+          3,
+          80
+        ],
+        "order_hash_count": 3
+      },
+      "model_specific_namespaces": {
+        "status": "PASS",
+        "unique_namespace_count": 3
+      },
+      "breaking_major_migration_boundary": {
+        "status": "PASS",
+        "migration_status": "NOT_RUN",
+        "prediction_equivalence_status": "NOT_RUN"
+      },
+      "current_register_hash_bindings": {
+        "status": "PASS",
+        "count": 2
+      },
+      "source_evidence_hash_bindings": {
+        "status": "PASS",
+        "count": 7
+      },
+      "source_commit_and_build_id_boundary": {
+        "status": "PASS",
+        "source_commit": null,
+        "build_id": null
+      },
+      "formal_device_release_boundary": {
+        "status": "PASS",
+        "formal_279": "NOT_RUN",
+        "actual_device": "NOT_RUN",
+        "release": "NOT_ELIGIBLE"
+      },
+      "content_and_projection_fingerprints": {
+        "status": "PASS",
+        "algorithm": "SHA-256"
+      }
+    },
+    "git_used": false,
+    "daylog_written": false,
+    "product_tests_run_by_current_state_authoring_task": false
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), trailing LF",
+    "content_fingerprint_rule": "Canonicalize the complete JSON after setting integrity.content_fingerprint.value to null.",
+    "semantic_projection_rule": "Canonicalize projection schema walksafe.w6.aiml-data-schema.semantic.v1 plus exact_artifact_ids, authority_boundary, current_source_subject, source_generation_evidence, artifact_dispositions, runtime_class_contract, current_register_bindings and verification_boundary.",
+    "input_set_fingerprint_rule": "Canonicalize current_source_subject.evidence_files in stored order.",
+    "content_fingerprint": {
+      "value": "5d26dba8ca105121ccc29ee4cb56e710615aec08aa8dcde13caec800bedf665a"
+    },
+    "semantic_projection_fingerprint": "151b9092646686e86b313db67fc298be35686363efad65b03b73f28a75d34926",
+    "input_set_fingerprint": "2d145f9693807c661d153a8870ba7811b6cb7430f8498f7250d9d4d1d8baf860"
+  }
+}

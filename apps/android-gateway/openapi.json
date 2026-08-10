@@ -1,0 +1,2227 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WalkSafe Android Gateway API",
+    "version": "0.6.0",
+    "description": "Single-process Android gateway contract, including server-confirmed integrated consent and durable account-deletion v2 fencing with capability recovery. Every response is Cache-Control: no-store."
+  },
+  "paths": {
+    "/api/field-session": {
+      "get": {
+        "operationId": "getFieldSession",
+        "description": "Without a query, returns the current session status and exact session_scope. With exactly devices=true, requires a general-scope current long-lived access cookie and lists only that actor's active devices.",
+        "parameters": [
+          {
+            "name": "devices",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "true"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current field session state or actor-bound device list",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/FieldSessionStatus"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FieldSessionDeviceList"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createFieldSession",
+        "description": "Body limit 4096 bytes; body-read timeout 10 seconds. Login purpose defaults to general for legacy request compatibility. Short login returns its exact session_scope; account_deletion_recovery is always short-lived and cannot include device_id. An enabled general device login or one-time refresh returns split access-cookie and refresh-token credentials. A consumed refresh-token reuse revokes only that family.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/FieldSessionLogin"
+                  },
+                  {
+                    "$ref": "#/components/schemas/FieldSessionRefresh"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short scoped session or general long-lived device session established, or a general device session atomically rotated",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "Set-Cookie": {
+                "description": "Short-lived walksafe_field_session access cookie; Path=/; HttpOnly; SameSite=Strict; Secure on HTTPS",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/FieldShortSession"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FieldLongSession"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFieldSession",
+        "description": "With device_id, requires a current long-lived access cookie and idempotently revokes that actor's device. Without a query, revokes the current family by access cookie or by the optional JSON refresh proof. Refresh proof values never belong in the URL or headers. A valid, mismatched, or already-revoked well-formed proof returns the same 204 to avoid a token oracle.",
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldSessionRefreshProof"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Idempotent revoke accepted; the cookie is expired when the current session is cleared",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              },
+              "Set-Cookie": {
+                "description": "Optional expired walksafe_field_session cookie",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/field-walk": {
+      "get": {
+        "operationId": "getFieldWalk",
+        "description": "Returns the account current live walk. Requires a general-scope v4 long-lived field cookie; holder identity is derived only from that server session.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account field walk state",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldWalkStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "commandFieldWalk",
+        "description": "Acquires, takes over, renews, or ends the account live walk with a 90 second server-time lease.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldWalkCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Field walk command applied or idempotently replayed",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldWalkCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "description": "Lease or request id conflict",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldWalkConflictResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayUnavailable"
+          }
+        }
+      }
+    },
+    "/api/navigation/walking": {
+      "post": {
+        "operationId": "createWalkingRoute",
+        "description": "Field session required. Body limit 16384 bytes; body-read timeout 10 seconds; upstream timeout 15 seconds.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "400": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      }
+    },
+    "/api/navigation/destinations/search": {
+      "get": {
+        "operationId": "searchDestinations",
+        "description": "Field session required; upstream timeout 15 seconds.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 5
+            }
+          },
+          {
+            "name": "origin_lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          {
+            "name": "origin_lng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      }
+    },
+    "/api/reports/v2": {
+      "post": {
+        "operationId": "createReportV2",
+        "description": "Field session required. Total multipart limit 9437184 bytes; body and upstream timeouts are each 15 seconds; one upload may be in flight.\n\nThe header purpose must match multipart metadata.auto_reported before any backend fetch.\n\nx-walksafe-report-purpose is an authenticated first-party Android declaration inside the gateway trust boundary, not cryptographic client attestation. The gateway fail-closes when it disagrees with multipart metadata.auto_reported. A tampered but otherwise authenticated client is NOT_COVERED.",
+        "security": [
+          {
+            "fieldSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "metadata",
+                  "image"
+                ],
+                "properties": {
+                  "metadata": {
+                    "type": "string",
+                    "contentMediaType": "application/json",
+                    "description": "UTF-8 JSON text; maximum 65536 bytes",
+                    "x-max-utf8-bytes": 65536
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": "image/jpeg",
+                    "description": "Exactly one JPEG image; 1 to 8388608 bytes",
+                    "x-min-bytes": 1,
+                    "x-max-bytes": 8388608
+                  }
+                },
+                "additionalProperties": false
+              },
+              "encoding": {
+                "metadata": {
+                  "contentType": "application/json"
+                },
+                "image": {
+                  "contentType": "image/jpeg"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "201": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "400": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "description": "Consent receipt, actor generation, or processing epoch is stale."
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/BackendJson"
+          },
+          "428": {
+            "description": "Required current transport or integrated-consent receipt headers are missing or unsupported."
+          },
+          "429": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "499": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "x-walksafe-consent-installation-id",
+            "in": "header",
+            "required": true,
+            "description": "Integrated-consent installation identifier.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-walksafe-consent-control-secret",
+            "in": "header",
+            "required": true,
+            "description": "Installation-bound consent control secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "x-walksafe-network-transport",
+            "in": "header",
+            "required": true,
+            "description": "Current transport; cellular independently requires mobile-network-transfer consent.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "wifi",
+                "cellular"
+              ]
+            }
+          },
+          {
+            "name": "x-walksafe-consent-policy-version",
+            "in": "header",
+            "required": true,
+            "description": "Current integrated-consent policy version.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-walksafe-consent-revision",
+            "in": "header",
+            "required": true,
+            "description": "Current consent revision.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "x-walksafe-consent-receipt-sha256",
+            "in": "header",
+            "required": true,
+            "description": "SHA-256 receipt for the current consent revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "x-walksafe-report-purpose",
+            "in": "header",
+            "required": true,
+            "description": "Authenticated first-party Android declaration. explicit requires raw-source consent; automatic also requires automatic-reporting consent.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "explicit",
+                "automatic"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/privacy/rights": {
+      "get": {
+        "operationId": "getIntegratedConsent",
+        "description": "Returns the current server-confirmed integrated-consent record. This control form requires exactly control, installation_id, and policy_version query parameters plus the installation control secret. A GET without control parameters serves the separate public privacy-rights HTML page.",
+        "security": [
+          {
+            "consentControlSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "control",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "integrated-consent"
+            }
+          },
+          {
+            "name": "installation_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+            }
+          },
+          {
+            "name": "policy_version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "FP-013-1.0.0"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/IntegratedConsentConfirmation"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putIntegratedConsent",
+        "description": "Records four independent consent selections only after a live field session and exact backend consent receipt confirm the mutation. The query contains exactly control=integrated-consent.",
+        "security": [
+          {
+            "fieldSession": [],
+            "consentControlSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "control",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "integrated-consent"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegratedConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/IntegratedConsentConfirmation"
+          },
+          "201": {
+            "$ref": "#/components/responses/IntegratedConsentConfirmation"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "401": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "403": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "408": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "413": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "415": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "422": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "502": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "503": {
+            "$ref": "#/components/responses/GatewayError"
+          }
+        }
+      }
+    },
+    "/privacy/account-deletions": {
+      "post": {
+        "operationId": "acceptAccountDeletionV2",
+        "description": "Durably fences the authenticated actor generation before forwarding the exact v2 request. The first request accepts a general or account_deletion_recovery field session and requires a 32-byte client capability; exact retries require only that capability. A 503 means the gateway fence and outbox remain durable but no canonical backend status has been returned.",
+        "security": [
+          {
+            "fieldSession": [],
+            "deletionAccessSecret": []
+          },
+          {
+            "deletionAccessSecret": []
+          }
+        ],
+        "x-walksafe-conditional-security": {
+          "new_request": ["fieldSession", "deletionAccessSecret"],
+          "exact_replay": ["deletionAccessSecret"]
+        },
+        "x-walksafe-field-session-scopes": [
+          "general",
+          "account_deletion_recovery"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDeletionRequestV2"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccountDeletionStatus"
+          },
+          "202": {
+            "$ref": "#/components/responses/AccountDeletionStatus"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/AccountDeletionConflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionPending"
+          }
+        }
+      }
+    },
+    "/privacy/account-deletions/{request_id}/status": {
+      "get": {
+        "operationId": "getAccountDeletionStatusV2",
+        "description": "Refreshes canonical backend deletion status using only the request-bound recovery capability.",
+        "security": [
+          {
+            "deletionAccessSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountDeletionRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccountDeletionStatus"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/AccountDeletionConflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionPending"
+          }
+        }
+      }
+    },
+    "/privacy/account-deletions/{request_id}/device-evidence": {
+      "post": {
+        "operationId": "submitDeviceDeletionEvidenceV2",
+        "description": "Durably queues exact, receipt-linked device deletion evidence and forwards it with status-revision CAS. The raw recovery capability is never forwarded or persisted by the gateway.",
+        "security": [
+          {
+            "deletionAccessSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountDeletionRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDeletionEvidenceV2"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AccountDeletionStatus"
+          },
+          "400": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "404": {
+            "$ref": "#/components/responses/GatewayError"
+          },
+          "409": {
+            "$ref": "#/components/responses/AccountDeletionConflict"
+          },
+          "503": {
+            "$ref": "#/components/responses/AccountDeletionPending"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "fieldSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "walksafe_field_session"
+      },
+      "deletionAccessSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-walksafe-deletion-access-secret",
+        "description": "Unpadded base64url encoding of exactly 32 random client-generated bytes. Retained only by the Android encrypted fallback marker."
+      },
+      "consentControlSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-walksafe-consent-control-secret",
+        "description": "Exactly 64 lowercase hexadecimal characters generated and retained by the Android encrypted preference store."
+      }
+    },
+    "parameters": {
+      "AccountDeletionRequestId": {
+        "name": "request_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]{16,128}$"
+        }
+      }
+    },
+    "headers": {
+      "NoStore": {
+        "required": true,
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      }
+    },
+    "schemas": {
+      "FieldSessionLogin": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "token"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "token": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 512
+          },
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Stable per-install identifier; starts a long-lived device family only when that mode is explicitly enabled and fully configured. Forbidden with account_deletion_recovery purpose."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "general",
+              "account_deletion_recovery"
+            ],
+            "default": "general",
+            "description": "Authorization scope for a short session. account_deletion_recovery is never device-bound or refreshable."
+          }
+        },
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "purpose",
+                "device_id"
+              ],
+              "properties": {
+                "purpose": {
+                  "const": "account_deletion_recovery"
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      },
+      "FieldShortSession": {
+        "type": "object",
+        "required": [
+          "session_scope"
+        ],
+        "properties": {
+          "session_scope": {
+            "$ref": "#/components/schemas/FieldSessionScope"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSessionScope": {
+        "type": "string",
+        "enum": [
+          "general",
+          "account_deletion_recovery"
+        ]
+      },
+      "FieldSessionRefreshProof": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "device_id",
+          "family_id",
+          "rotation",
+          "refresh_token"
+        ],
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "const": "refresh_token"
+          },
+          "actor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "device_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 24,
+            "maxLength": 128
+          },
+          "rotation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096
+          },
+          "refresh_token": {
+            "type": "string",
+            "minLength": 48,
+            "maxLength": 256,
+            "description": "Opaque secret sent only in a JSON request body and returned only in a successful JSON response"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSessionRefresh": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldSessionRefreshProof"
+          },
+          {
+            "required": [
+              "grant_type"
+            ]
+          }
+        ]
+      },
+      "FieldLongSession": {
+        "type": "object",
+        "required": [
+          "session_scope",
+          "actor_id",
+          "device_id",
+          "family_id",
+          "rotation",
+          "refresh_token",
+          "access_expires_at_epoch_ms",
+          "idle_expires_at_epoch_ms",
+          "absolute_expires_at_epoch_ms"
+        ],
+        "properties": {
+          "session_scope": {
+            "type": "string",
+            "const": "general"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "rotation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "access_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "idle_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "absolute_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSessionStatus": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FieldSessionBasicStatus"
+          },
+          {
+            "$ref": "#/components/schemas/FieldLongSessionStatus"
+          }
+        ]
+      },
+      "FieldSessionBasicStatus": {
+        "type": "object",
+        "required": [
+          "required",
+          "authenticated",
+          "actor_id",
+          "session_scope"
+        ],
+        "properties": {
+          "required": {
+            "type": "boolean"
+          },
+          "authenticated": {
+            "type": "boolean"
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session_scope": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FieldSessionScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldLongSessionStatus": {
+        "type": "object",
+        "required": [
+          "required",
+          "authenticated",
+          "actor_id",
+          "session_scope",
+          "session_mode",
+          "device_id",
+          "family_id",
+          "rotation",
+          "access_expires_at_epoch_ms",
+          "idle_expires_at_epoch_ms",
+          "absolute_expires_at_epoch_ms"
+        ],
+        "properties": {
+          "required": {
+            "type": "boolean",
+            "const": true
+          },
+          "authenticated": {
+            "type": "boolean",
+            "const": true
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "session_scope": {
+            "type": "string",
+            "const": "general"
+          },
+          "session_mode": {
+            "type": "string",
+            "const": "long_lived"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "rotation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096
+          },
+          "access_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "idle_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "absolute_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSessionDeviceList": {
+        "type": "object",
+        "required": [
+          "actor_id",
+          "devices"
+        ],
+        "properties": {
+          "actor_id": {
+            "type": "string"
+          },
+          "devices": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/FieldSessionDevice"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldSessionDevice": {
+        "type": "object",
+        "required": [
+          "device_id",
+          "family_id",
+          "current",
+          "rotation",
+          "created_at_epoch_ms",
+          "last_rotated_at_epoch_ms",
+          "idle_expires_at_epoch_ms",
+          "absolute_expires_at_epoch_ms"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "family_id": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "rotation": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096
+          },
+          "created_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "last_rotated_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "idle_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "absolute_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EpochMilliseconds": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 1
+      },
+      "GatewayError": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "FieldWalkStartCommand": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "const": "start"
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkTakeoverCommand": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id",
+          "expected_active_walk_id",
+          "expected_fencing_token",
+          "confirmation"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "const": "takeover"
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "expected_active_walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "expected_fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "voice_confirmed"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkLeaseCommand": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "action",
+          "walk_id",
+          "lease_id",
+          "fencing_token"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-command.v1"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "renew",
+              "end"
+            ]
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "lease_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkCommand": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FieldWalkStartCommand"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkTakeoverCommand"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkLeaseCommand"
+          }
+        ]
+      },
+      "FieldWalkLeaseResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "result",
+          "walk_id",
+          "lease_id",
+          "fencing_token",
+          "acquired_at_epoch_ms",
+          "lease_expires_at_epoch_ms",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ACQUIRED",
+              "ALREADY_ACTIVE",
+              "TAKEN_OVER",
+              "RENEWED"
+            ]
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "lease_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "acquired_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "lease_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkEndedResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "result",
+          "walk_id",
+          "lease_id",
+          "fencing_token",
+          "ended_at_epoch_ms",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "result": {
+            "type": "string",
+            "const": "ENDED"
+          },
+          "walk_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "lease_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "ended_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkCommandResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FieldWalkLeaseResponse"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkEndedResponse"
+          }
+        ]
+      },
+      "FieldWalkActiveResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "result",
+          "active_walk_id",
+          "active_device_id",
+          "fencing_token",
+          "lease_expires_at_epoch_ms",
+          "held_by_current_device",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "result": {
+            "type": "string",
+            "const": "ACTIVE"
+          },
+          "active_walk_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "active_device_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "fencing_token": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lease_expires_at_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          },
+          "held_by_current_device": {
+            "type": "boolean"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkNoneResponse": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "result",
+          "held_by_current_device",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "result": {
+            "type": "string",
+            "const": "NONE"
+          },
+          "held_by_current_device": {
+            "type": "boolean",
+            "const": false
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkStatusResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FieldWalkActiveResponse"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkNoneResponse"
+          }
+        ]
+      },
+      "FieldWalkConflict": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "code",
+          "active_walk_id",
+          "active_device_id",
+          "fencing_token",
+          "lease_expires_at_epoch_ms",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "walk_lease_conflict"
+          },
+          "active_walk_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active_device_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fencing_token": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "lease_expires_at_epoch_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkRequestIdConflict": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "code",
+          "server_time_epoch_ms"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.field-walk-response.v1"
+          },
+          "code": {
+            "type": "string",
+            "const": "request_id_conflict"
+          },
+          "server_time_epoch_ms": {
+            "$ref": "#/components/schemas/EpochMilliseconds"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FieldWalkConflictResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FieldWalkConflict"
+          },
+          {
+            "$ref": "#/components/schemas/FieldWalkRequestIdConflict"
+          }
+        ]
+      },
+      "IntegratedConsentItemVersions": {
+        "type": "object",
+        "required": [
+          "raw_source_collection",
+          "automatic_reporting",
+          "mobile_network_transfer",
+          "training_reuse"
+        ],
+        "properties": {
+          "raw_source_collection": {
+            "type": "string",
+            "const": "FP-013-RAW-1.0.0"
+          },
+          "automatic_reporting": {
+            "type": "string",
+            "const": "FP-013-AUTO-1.0.0"
+          },
+          "mobile_network_transfer": {
+            "type": "string",
+            "const": "FP-013-MOBILE-1.0.0"
+          },
+          "training_reuse": {
+            "type": "string",
+            "const": "FP-013-TRAINING-1.0.0"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IntegratedConsentSelections": {
+        "type": "object",
+        "required": [
+          "raw_source_collection",
+          "automatic_reporting",
+          "mobile_network_transfer",
+          "training_reuse"
+        ],
+        "properties": {
+          "raw_source_collection": {
+            "type": "boolean"
+          },
+          "automatic_reporting": {
+            "type": "boolean"
+          },
+          "mobile_network_transfer": {
+            "type": "boolean"
+          },
+          "training_reuse": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IntegratedConsentRequest": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "installation_id",
+          "request_id",
+          "policy_version",
+          "item_versions",
+          "client_revision",
+          "selections"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.integrated-consent-request.v1"
+          },
+          "installation_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "policy_version": {
+            "type": "string",
+            "const": "FP-013-1.0.0"
+          },
+          "item_versions": {
+            "$ref": "#/components/schemas/IntegratedConsentItemVersions"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "selections": {
+            "$ref": "#/components/schemas/IntegratedConsentSelections"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IntegratedConsentConfirmation": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "current",
+          "installation_id",
+          "request_id",
+          "policy_version",
+          "item_versions",
+          "client_revision",
+          "revision",
+          "selections",
+          "confirmed_at",
+          "receipt_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.integrated-consent-confirmation.v1"
+          },
+          "current": {
+            "type": "boolean",
+            "const": true
+          },
+          "installation_id": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "policy_version": {
+            "type": "string",
+            "const": "FP-013-1.0.0"
+          },
+          "item_versions": {
+            "$ref": "#/components/schemas/IntegratedConsentItemVersions"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "selections": {
+            "$ref": "#/components/schemas/IntegratedConsentSelections"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionRequestV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "client_revision",
+          "confirmation"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-deletion-request.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "confirmation": {
+            "type": "string",
+            "const": "DELETE_MY_ACCOUNT"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeviceDeletionEvidenceV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "tombstone_id",
+          "request_receipt_sha256",
+          "installation_id",
+          "evidence_id",
+          "client_revision",
+          "expected_status_revision",
+          "item",
+          "result",
+          "completed_at",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.device-deletion-evidence.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "tombstone_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "request_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "installation_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expected_status_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "item": {
+            "type": "string",
+            "const": "device_untransmitted_data"
+          },
+          "result": {
+            "type": "string",
+            "enum": ["DELETED", "NOT_FOUND", "FAILED"]
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionItemV2": {
+        "type": "object",
+        "required": [
+          "key",
+          "status",
+          "item_revision",
+          "due_at",
+          "updated_at",
+          "evidence_sha256",
+          "disposition_basis",
+          "retry_after",
+          "restriction_reason",
+          "legal_hold_review_at",
+          "legal_hold_contact",
+          "terminal_at"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "device_untransmitted_data",
+              "server_originals",
+              "server_quarantine",
+              "server_copies",
+              "report_records",
+              "training_datasets",
+              "training_labels",
+              "derived_artifacts",
+              "backups"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "IN_PROGRESS",
+              "EXTERNAL_PENDING",
+              "RETRY_WAIT",
+              "LEGAL_HOLD",
+              "FAILED",
+              "COMPLETED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "item_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "evidence_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "disposition_basis": {
+            "type": ["string", "null"]
+          },
+          "retry_after": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "restriction_reason": {
+            "type": ["string", "null"]
+          },
+          "legal_hold_review_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "legal_hold_contact": {
+            "type": ["string", "null"]
+          },
+          "terminal_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AccountDeletionStatusV2": {
+        "type": "object",
+        "required": [
+          "schema_version",
+          "request_id",
+          "client_revision",
+          "revision",
+          "accepted_at",
+          "updated_at",
+          "account_generation",
+          "tombstone_id",
+          "request_receipt_sha256",
+          "overall_status",
+          "items",
+          "completion_receipt_sha256"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "walksafe.account-deletion-status.v2"
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{16,128}$"
+          },
+          "client_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "account_generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "tombstone_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$"
+          },
+          "request_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "overall_status": {
+            "type": "string",
+            "enum": [
+              "PROCESSING",
+              "PARTIAL",
+              "RETRY_WAIT",
+              "RESTRICTED",
+              "FAILED",
+              "COMPLETED"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "minItems": 9,
+            "maxItems": 9,
+            "items": {
+              "$ref": "#/components/schemas/AccountDeletionItemV2"
+            },
+            "description": "Canonical order: device_untransmitted_data, server_originals, server_quarantine, server_copies, report_records, training_datasets, training_labels, derived_artifacts, backups."
+          },
+          "completion_receipt_sha256": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "GatewayError": {
+        "description": "Bounded gateway error",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GatewayError"
+            }
+          }
+        }
+      },
+      "GatewayUnavailable": {
+        "description": "Gateway security is not configured",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GatewayError"
+            }
+          }
+        }
+      },
+      "BackendJson": {
+        "description": "Validated backend contract response",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "IntegratedConsentConfirmation": {
+        "description": "Current backend-confirmed integrated-consent state",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/IntegratedConsentConfirmation"
+            }
+          }
+        }
+      },
+      "AccountDeletionStatus": {
+        "description": "Canonical backend account-deletion status",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AccountDeletionStatusV2"
+            }
+          }
+        }
+      },
+      "AccountDeletionConflict": {
+        "description": "A stale evidence revision returns the canonical deletion status; request/body/operation/binding and other permanent conflicts return a bounded gateway error and are durably quarantined from retry.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AccountDeletionStatusV2"
+                },
+                {
+                  "$ref": "#/components/schemas/GatewayError"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AccountDeletionPending": {
+        "description": "The durable gateway fence or outbox exists, but canonical backend processing is unavailable. Retry with the same request id, body, revision, and capability.",
+        "headers": {
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Retry-After": {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GatewayError"
+            }
+          }
+        }
+      }
+    }
+  }
+}

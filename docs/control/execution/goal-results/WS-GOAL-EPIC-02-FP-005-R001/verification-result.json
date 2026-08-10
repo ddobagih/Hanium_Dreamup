@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP005-OFFICIAL-ENVIRONMENT-VERIFICATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-24T20:49:41+09:00",
+  "checks": [
+    {
+      "name": "FP-005 focused Android official-environment tests",
+      "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.session.OfficialEnvironmentPolicyTest --tests kr.co.hanium.dreamup.walksafe.device.CameraFrameQualityPolicyTest --tests kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorTest --tests kr.co.hanium.dreamup.walksafe.depth.MessagePolicyTest --tests kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityTest --tests kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessTest --tests kr.co.hanium.dreamup.walksafe.session.PermissionSessionPolicyTest --tests kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityAccessibilityStaticTest --tests kr.co.hanium.dreamup.walksafe.RuntimeMetricMainActivityStaticTest --tests kr.co.hanium.dreamup.walksafe.MainActivityOfficialEnvironmentStaticTest --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/logs/focused-android-tests.log",
+      "output_sha256": "db25c4055c4bd1f0d130567bb3a592ae573aec206d5f3de77808a9a6a6a5cb68",
+      "executed_at": "2026-07-24T20:17:09+09:00"
+    },
+    {
+      "name": "full Android unit/build/lint verification",
+      "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/logs/full-android-verification.log",
+      "output_sha256": "39b21890eb6be52cb1e54c26e5b2037053892e445f0703fe6ba158be1e3632b8",
+      "executed_at": "2026-07-24T20:17:52+09:00"
+    },
+    {
+      "name": "v2.3 archived-to-live successor-chain and repository capture regressions",
+      "command": "python3 -m py_compile scripts/check_walksafe_goal_graph_v2_3.py && LOCKED_PY=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python; \"$LOCKED_PY\" -m pytest -q tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_archive_changed_artifact_errors_are_deferred_only tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_cross_package_completion_order_precedes_raw_sequence tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_staged_fp005_completion_resolves_archived_live_bytes tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_staged_fp005_completion_requires_event_and_receipt tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_staged_fp005_completion_rejects_broken_before_hash tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_work_item_completion_binds_start_receipt_and_event tests/test_walksafe_goal_graph_v2_3.py::WalkSafeGoalGraphV23Test::test_completed_historical_goal_survives_new_current_backlog_binding",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/logs/control-plane-successor-chain-verification.log",
+      "output_sha256": "1bc08e084ad1122dea3f8ae19ce44d99614c42879ed1a34d6539c78f82efa74e",
+      "executed_at": "2026-07-24T20:49:39+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "focused_tests": "PASS",
+    "full_unit_tests": "PASS",
+    "debug_build": "PASS",
+    "lint": "PASS",
+    "control_plane_successor_chain_tests": "PASS_7",
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "evidence_boundary": {
+    "repository_internal": true,
+    "formal_test_status": "NOT_RUN",
+    "environment_field_test_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "production_official_environment_profile": null,
+    "production_camera_quality_profile": null,
+    "approved_production_profile_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

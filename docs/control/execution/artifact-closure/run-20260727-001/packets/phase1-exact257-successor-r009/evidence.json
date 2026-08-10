@@ -1,0 +1,284 @@
+{
+  "exact2_status_equality": {
+    "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+    "exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "exact_set_equality": true,
+    "status": "PASS"
+  },
+  "inherited_completion_boolean_coverage": {
+    "current_scope_comparison": {
+      "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+      "exact_ids": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "false_count": 255,
+      "rowwise_mismatch_count": 0,
+      "true_count": 2,
+      "true_id_set_sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+    },
+    "global_unqualified_comparison": {
+      "all_row_mismatch_count": 0,
+      "false_count": 257,
+      "pairwise_mismatch_counts": {
+        "artifact_closure_global_vs_claim_boundary_global": 0,
+        "artifact_closure_global_vs_claim_boundary_legacy_alias": 0,
+        "claim_boundary_global_vs_claim_boundary_legacy_alias": 0
+      },
+      "true_count": 0,
+      "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inheritance_mode": "PHYSICAL_BINDING_AND_ASSERTION_SNAPSHOT",
+    "legacy_ambiguous": {
+      "false_count": 257,
+      "true_count": 0,
+      "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "path_count": 6,
+    "path_statistics": [
+      {
+        "boolean_count": 257,
+        "false_count": 255,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+        "row_count": 257,
+        "semantic_scope": "CURRENT_SCOPE",
+        "true_count": 2,
+        "true_id_set_sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b",
+        "true_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ]
+      },
+      {
+        "boolean_count": 257,
+        "false_count": 255,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+        "row_count": 257,
+        "semantic_scope": "CURRENT_SCOPE",
+        "true_count": 2,
+        "true_id_set_sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b",
+        "true_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ]
+      },
+      {
+        "boolean_count": 257,
+        "false_count": 257,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/artifact_closure/completion_claimed",
+        "row_count": 257,
+        "semantic_scope": "LEGACY_AMBIGUOUS",
+        "true_count": 0,
+        "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "true_ids": []
+      },
+      {
+        "boolean_count": 257,
+        "false_count": 257,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/artifact_closure/global_artifact_completion_claimed",
+        "row_count": 257,
+        "semantic_scope": "GLOBAL_UNQUALIFIED",
+        "true_count": 0,
+        "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "true_ids": []
+      },
+      {
+        "boolean_count": 257,
+        "false_count": 257,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "row_count": 257,
+        "semantic_scope": "GLOBAL_UNQUALIFIED",
+        "true_count": 0,
+        "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "true_ids": []
+      },
+      {
+        "boolean_count": 257,
+        "false_count": 257,
+        "missing_count": 0,
+        "non_boolean_count": 0,
+        "null_count": 0,
+        "path": "/records/*/claim_boundary/artifact_completion_claimed",
+        "row_count": 257,
+        "semantic_scope": "GLOBAL_UNQUALIFIED_LEGACY_ALIAS",
+        "true_count": 0,
+        "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "true_ids": []
+      }
+    ],
+    "source_evidence_binding_id": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+    "source_receipt_binding_id": "R009-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+    "status": "PASS"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "e557281064525986400c129defe69c240574e9ba84937cc8d1c3a82316f0480a",
+    "encoding": "UTF-8",
+    "ensure_ascii": true,
+    "excluded_field": null,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 8004,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r009/evidence.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 8004,
+    "content_sha256": "e557281064525986400c129defe69c240574e9ba84937cc8d1c3a82316f0480a",
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r009/evidence.json"
+  },
+  "packet_id": "PHASE1-EXACT257-SUCCESSOR-R009-EVIDENCE-001",
+  "prepared_on": "2026-07-28T12:19:03+09:00",
+  "preserved_invariants": {
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_closure_delta_count": 2,
+    "ledger_changed": false,
+    "ledger_replicated": false,
+    "open_artifact_count": 131,
+    "record_count": 257,
+    "zero_credits": {
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "formal279_pass_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "prior_minor_closures": {
+    "entries": [
+      {
+        "minor_id": "R007-MINOR-RECEIPT-COMPLETION-BOOLEAN-COVERAGE-001",
+        "status": "CLOSED"
+      }
+    ],
+    "source": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+    "status": "CLOSED"
+  },
+  "r009_minor_closure_register": {
+    "all_closed": true,
+    "entries": [
+      {
+        "finding": "R008 did not expose the complete release gate tuple in both expected/observed check data and receipt summary.",
+        "minor_id": "R008-MINOR-RELEASE-CHECK-EXPECTED-OBSERVED-SUMMARY-001",
+        "resolution": "R009 binds the immutable R007 subject and both R008 wrappers, verifies the four-field release gate tuple, and repeats it unchanged in the receipt summary.",
+        "status": "CLOSED"
+      }
+    ],
+    "entry_count": 1,
+    "register_id": "PHASE1-EXACT257-SUCCESSOR-R009-MINOR-CLOSURE-REGISTER-001",
+    "status": "CLOSED"
+  },
+  "release_gate_check": {
+    "check_id": "R009-RELEASE-GATE-COMPLETE-TUPLE-001",
+    "definitions": {
+      "named_candidate_count": "Count of named R007 records with release_eligible_claimed=true.",
+      "release_approval_count": "Count of named R007 records carrying release credit or an owner/attestation release approval."
+    },
+    "expected": {
+      "named_candidate_count": 0,
+      "release_approval_count": 0,
+      "release_eligible_count": 0,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "match": true,
+    "observation_basis": {
+      "artifact_closure_release_credit_true_count": 0,
+      "authorization_boundary_attestation_approval_count": 0,
+      "authorization_boundary_owner_approval_count": 0,
+      "authorization_boundary_release_eligible_count": 0,
+      "authorization_boundary_release_status": "NOT_ELIGIBLE",
+      "claim_boundary_owner_approval_claimed_true_count": 0,
+      "claim_boundary_release_eligible_claimed_false_count": 257,
+      "claim_boundary_release_eligible_claimed_true_count": 0,
+      "independent_review_release_credit_true_count": 0,
+      "named_candidate_ids": [],
+      "record_count": 257,
+      "release_approval_ids": []
+    },
+    "observed": {
+      "named_candidate_count": 0,
+      "release_approval_count": 0,
+      "release_eligible_count": 0,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "status": "PASS"
+  },
+  "schema_version": "1.0.0",
+  "subject_bindings": [
+    {
+      "binding_id": "R009-SUBJECT-R007-LEDGER-PHYSICAL-001",
+      "byte_length": 2592915,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+      "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+      "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+    },
+    {
+      "binding_id": "R009-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+      "byte_length": 23279,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json",
+      "sha256": "fbdfb6b30cd45dec562e80f687d93c2ebdf6582963a6cad72c0907bf8708b045",
+      "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_EVIDENCE"
+    },
+    {
+      "binding_id": "R009-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+      "byte_length": 37591,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r008.json",
+      "sha256": "22896f621f5029ce66eeb1bf41c93495b758eea54390b098f8f31b13a145093f",
+      "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_RECEIPT"
+    }
+  ],
+  "wrapper_semantics": "ADD_ONLY_CORRECTION_WRAPPER; R007_LEDGER_AND_R008_WRAPPERS_IMMUTABLE; NO_R009_LEDGER"
+}

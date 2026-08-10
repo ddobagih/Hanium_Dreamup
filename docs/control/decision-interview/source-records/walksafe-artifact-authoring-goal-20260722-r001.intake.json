@@ -1,0 +1,60 @@
+{
+  "schema_version": "walksafe.artifact-authoring-goal-intake.v1",
+  "metadata": {
+    "record_id": "WS-ARTIFACT-AUTHORING-GOAL-INTAKE-20260722-001",
+    "received_at": "2026-07-22T12:37:48+09:00",
+    "source_kind": "USER_PROVIDED_CODEX_GOAL_ATTACHMENT",
+    "source_external_path": "/home/ddobagi/.codex/attachments/31342067-bd59-4ada-b73c-f8d4aa28d7d3/pasted-text-1.txt",
+    "source_sha256": "2a4d2de081cb94152662d7e966509b14713417a37586fe19304c237b3e9f1687",
+    "source_byte_length": 6934,
+    "approval_status": "NOT_AN_ARTIFACT_BASELINE_APPROVAL",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "objective": "승인된 기능 정책과 기존 답변으로 DOC-01부터 CLS-16까지 257개 산출물을 보완하고, 실행하지 않은 증거를 구분한 뒤 새로운 일괄 승인 후보를 만든다.",
+  "authority_boundary": {
+    "authorizes_document_authoring": true,
+    "authorizes_existing_answer_integration": true,
+    "authorizes_fp035_normalization_candidate": true,
+    "authorizes_reasking_existing_decisions": false,
+    "authorizes_artifact_approval_or_baseline_transition": false,
+    "authorizes_test_result_creation_without_execution": false,
+    "authorizes_release": false,
+    "current_implementation_is_normative_policy_input": false
+  },
+  "fp035_normalization": {
+    "directive_id": "DIR-FP035-NETWORK-20260722-001",
+    "statement": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+    "affected_artifact_codes": [
+      "REQ-03",
+      "REQ-06",
+      "DES-04",
+      "DES-13",
+      "DES-20"
+    ],
+    "change_control_refs": [
+      "CR-0002",
+      "ISS-POLICY-FP035-NETWORK-001",
+      "RAID-011"
+    ],
+    "formal_effect_before_bundled_owner_approval": "OWNER_DIRECTIVE_CAPTURED_AS_DRAFT_CORRECTION; PREVIOUS_BASELINE_BYTES_UNCHANGED",
+    "formal_effect_after_bundled_owner_approval": "APPLY_AS_VERSIONED_POLICY_CORRECTION_AND_UNFREEZE_ONLY_THE_NORMALIZED_NETWORK_BRANCH"
+  },
+  "reconciliation_checkpoints": {
+    "artifact_type_count": 257,
+    "previous_baseline_or_active_candidate_count": 4,
+    "previous_planned_not_run_count": 75,
+    "previous_draft_or_conditional_count": 178,
+    "previous_draft_or_conditional_triage": {
+      "authorable_from_existing_approved_inputs": 120,
+      "execution_or_external_evidence_required": 53,
+      "fp035_normalization_affected": 5
+    },
+    "rule": "수량은 완료 주장이 아니라 전수 재검증용 체크포인트다. 결과가 다르면 누락·중복·분류 근거를 기록한다."
+  },
+  "non_waivable_boundaries": {
+    "remaining_gate_count": 5,
+    "remaining_gate_status": "NOT_RUN_UNWAIVED",
+    "release_status": "NOT_ELIGIBLE",
+    "human_owner_approval_required_for_new_candidate": true
+  }
+}

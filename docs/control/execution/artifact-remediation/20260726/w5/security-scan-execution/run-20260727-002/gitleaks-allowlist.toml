@@ -1,0 +1,11 @@
+title = "WalkSafe current-tree false-positive allowlist"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Reviewed generic-api-key false positives only"
+targetRules = ["generic-api-key"]
+paths = [
+  '''scripts/build_latest_model_report_20260710\.py$''',
+  '''backend/tests/test_admin_security\.py$''',
+]

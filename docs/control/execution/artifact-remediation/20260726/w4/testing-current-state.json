@@ -1,0 +1,1660 @@
+{
+  "schema_version": "walksafe.artifact-remediation.testing-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W4-TESTING-CURRENT-STATE-20260727-001",
+  "revision": "1.0.0",
+  "prepared_on": "2026-07-27",
+  "status": "DRAFT_CURRENT_STATE_SUCCESSOR_CANDIDATE_FOR_INDEPENDENT_REVIEW",
+  "document_family": {
+    "role": "W4_CONTENT_SUBPACKET_CURRENT_STATE_SOURCE",
+    "paths": {
+      "json": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+      "markdown": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.md",
+      "data_assignment_forward": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+      "trace_forward": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "independent_review_forward": "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+      "artifact_status_delta_forward": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+      "validation_summary_forward": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "implementation_receipt_forward": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "source_drift_json": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+      "source_drift_markdown": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+      "environment_readiness_json": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+      "environment_readiness_markdown": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+      "external_action_json": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+      "external_action_markdown": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+      "validation_run001_summary": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+      "validation_run002_summary": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+    },
+    "forward_reference_policy": "trace·data assignment·source drift·validation run001/002·environment/external pair는 actual file SHA/content fingerprint로 one-way 결속한다. 아직 존재하지 않거나 최종화되지 않은 independent review·central delta·validation summary·terminal receipt만 path-only forward reference다."
+  },
+  "scope": {
+    "wave_id": "W4",
+    "title": "시험 계획·결과·공식 실행 증거 통합",
+    "artifact_count": 13,
+    "artifact_unique_count": 13,
+    "baseline_classification": "INTERNAL_GAP",
+    "central_transition_applied": false,
+    "current_effective_projection_source": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+  },
+  "authority_boundary": {
+    "candidate_only": true,
+    "statement": "이 문서는 W4 content subpacket의 current-state·disposition 후보다. 독립 검토, 중앙 artifact-status delta, validation summary와 terminal receipt 전에는 상태 전이를 적용하지 않는다.",
+    "ok_candidate_meaning": "현재 artifact required_action의 내부 내용·추적 정합성 후보만 뜻하며 formal 승인, formal279 PASS, 실기기, 외부, production, gate 또는 release 완료를 뜻하지 않는다.",
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "canonical_testing_documents_mutated": false,
+    "approval_or_content_baseline_changed": false,
+    "formal_execution_claimed": false,
+    "device_or_external_execution_claimed": false,
+    "release_eligibility_claimed": false
+  },
+  "w1_w3_current_scope": {
+    "w1": {
+      "requirements": 68,
+      "requirement_version": "0.2.0",
+      "approved_predecessor_baseline_present": false,
+      "approval_status": "NOT_APPROVED",
+      "baseline_status": "NOT_BASELINED",
+      "test_plan_linked": 68,
+      "evidence_linked": 13,
+      "evidence_unlinked": 55,
+      "source_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json"
+      ]
+    },
+    "w2": {
+      "current_design_artifact_count": 23,
+      "meaning": "current design artifact internal conformance only",
+      "product_and_contract_domains": [
+        "architecture",
+        "interface/data",
+        "operations",
+        "UX/accessibility"
+      ],
+      "source_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json"
+      ]
+    },
+    "w3": {
+      "source_commit": null,
+      "dirty_worktree": true,
+      "module_file_count": 365,
+      "module_file_counts": {
+        "android_user": 208,
+        "android_admin": 25,
+        "gateway": 26,
+        "backend": 79,
+        "model_config": 27
+      },
+      "formal_fixture_link_count": 0,
+      "formal_fixture_unassigned_count": 279,
+      "source_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+      ]
+    }
+  },
+  "canonical_state_conflict": {
+    "status": "OPEN_PRESERVED",
+    "register_claims": {
+      "approved_baselined_codes_count": 3,
+      "active_opening_snapshot_approved_codes_count": 5,
+      "planned_not_run_codes_count": 5
+    },
+    "canonical_testing_bundle": {
+      "lifecycle_status": "DRAFT",
+      "approval_status": "NOT_APPROVED",
+      "verification_status": "NOT_RUN",
+      "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "current_effective_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.1"
+    },
+    "resolution_rule": "add-only W4 current-state와 중앙 projection으로 충돌을 드러내며 기존 register·canonical 승인 상태를 이 subpacket에서 바꾸지 않는다."
+  },
+  "formal_279_boundary": {
+    "canonical_case_count": 279,
+    "canonical_case_unique_count": 279,
+    "case_lifecycle_status": "DRAFT",
+    "case_approval_status": "NOT_APPROVED",
+    "execution_status_counts": {
+      "NOT_RUN": 279,
+      "PASS": 0,
+      "FAIL": 0,
+      "BLOCKED": 0
+    },
+    "result_count": 0,
+    "evidence_link_count": 0,
+    "defect_link_count": 0,
+    "test_data_link_count": 0,
+    "formal_execution_instance_count": 0,
+    "formal_environment_instance_count": 0,
+    "formal_environment_ready_count": 0,
+    "pass_claimed": false,
+    "blocked_semantics": "실행을 실제 시작한 뒤 외부 조건 때문에 막힌 case에만 BLOCKED를 사용한다. 진입조건이 없는 현재 case는 NOT_RUN을 유지한다.",
+    "source_paths": [
+      "docs/deliverables/06-testing/registers/test-cases.json",
+      "docs/deliverables/06-testing/registers/environments.json",
+      "docs/deliverables/06-testing/evidence/evidence-register.json",
+      "docs/deliverables/manifests/dev-test-draft-20260721-r001.json"
+    ]
+  },
+  "automated_w3_evidence_boundary": {
+    "separated_from_formal_279": true,
+    "adoption_status": "INTERNAL_CANDIDATE_EVIDENCE_ONLY",
+    "this_packet_executed_tests": false,
+    "results": [
+      {
+        "scope": "Android user",
+        "test_count": 728,
+        "status": "PASS_REUSED_EXACT_SOURCE"
+      },
+      {
+        "scope": "Android admin",
+        "test_count": 38,
+        "status": "PASS_REUSED_EXACT_SOURCE"
+      },
+      {
+        "scope": "Gateway",
+        "test_count": 62,
+        "status": "PASS_REUSED_EXACT_SOURCE"
+      },
+      {
+        "scope": "Backend DB-free",
+        "test_count": 33,
+        "status": "PASS_CURRENT_BACKEND_SUBJECT"
+      },
+      {
+        "scope": "PostGIS exact node sequential runs",
+        "test_count": 2,
+        "status": "PASS_CURRENT_BACKEND_SUBJECT"
+      }
+    ],
+    "allowed_claim": "동일 exact subject에 한정된 내부 candidate evidence가 존재한다.",
+    "prohibited_claim": "formal279 PASS, actual-device, user/admin participant, TalkBack, live TMAP/network, production, deploy, gate 또는 release PASS.",
+    "source_paths": [
+      "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+    ]
+  },
+  "release_and_external_boundary": {
+    "source_commit": null,
+    "remaining_gate_count": 5,
+    "waived_gate_count": 0,
+    "remaining_gates_unwaived": true,
+    "gates": [
+      {
+        "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+        "status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "status": "NOT_RUN",
+        "waived": false
+      }
+    ],
+    "release_status": "NOT_ELIGIBLE",
+    "actual_device_status": "NOT_RUN",
+    "live_provider_status": "NOT_RUN",
+    "field_user_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "external_action_rule": "내부 readiness 완료 뒤 candidate digest·device/service/account·case·expected evidence를 별도 external Wave E action으로 전달하고 실제 receipt 전에는 완료로 전환하지 않는다."
+  },
+  "candidate_disposition_summary": {
+    "candidate_only": true,
+    "central_transition_applied": false,
+    "pending_independent_qa_review": 1,
+    "ready_for_independent_review_as_ok_candidate": 1,
+    "ok_candidate_total": 2,
+    "internal_gap_retained": 11,
+    "total": 13,
+    "current_effective_post_w3_projection": {
+      "OK": 107,
+      "INTERNAL_GAP": 73,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "total": 257
+    },
+    "proposed_delta_if_reviewed_and_centrally_adopted": {
+      "OK": 2,
+      "INTERNAL_GAP": -2,
+      "EXTERNAL": 0,
+      "N_A_CANDIDATE": 0
+    },
+    "projected_post_w4_if_reviewed_and_centrally_adopted": {
+      "OK": 109,
+      "INTERNAL_GAP": 71,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "total": 257
+    }
+  },
+  "artifact_rows": [
+    {
+      "artifact_type_code": "DLV-TST-01",
+      "title": "마스터 테스트 전략",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "현행 제품·서비스·위험 범위로 전략을 갱신하고 필수 독립 QA 검토를 기록한다.",
+      "register_state": "APPROVED_BASELINED",
+      "canonical_state": "DRAFT_NOT_APPROVED_POLICY_1_0_0",
+      "current_evidence": {
+        "summary": "register 승인 주장과 canonical Draft 충돌은 유지된다. W1 요구, W2 설계, W3 제품·모듈 경계와 materialized source-drift/구조 validation을 결속해 전략 내용은 보완됐지만 dedicated independent QA review는 아직 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-plan.md",
+          "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json"
+        ]
+      },
+      "remediation_content": {
+        "product_boundary": [
+          "Android 사용자 앱",
+          "별도 Android 관리자 앱",
+          "Android Gateway",
+          "Backend와 격리 PostGIS",
+          "TFLite model과 config",
+          "TMAP 등 외부 provider",
+          "원본 수집·전송·보존·삭제와 권한·복구·telemetry"
+        ],
+        "verification_scope": [
+          "unit·contract·integration·regression 자동 suite",
+          "격리 DB와 mock/stub 의존성",
+          "실제 Android 기기·TalkBack·network·TMAP",
+          "현장·사용자·production·release gate"
+        ],
+        "planned_verification_commands": [
+          {
+            "command": "python3 scripts/build_walksafe_formal_dev_test_20260721.py --check",
+            "status": "PLANNED_NOT_RUN_BY_THIS_PACKET",
+            "claim": "formal Draft 결정성만 검사"
+          },
+          {
+            "command": "bash scripts/run_walksafe_test_layers_20260711.sh validate",
+            "status": "PLANNED_NOT_RUN_BY_THIS_PACKET",
+            "claim": "현재 control validation 후보"
+          },
+          {
+            "command": "bash scripts/run_walksafe_test_layers_20260711.sh integration",
+            "status": "PLANNED_NOT_RUN_BY_THIS_PACKET",
+            "claim": "격리 내부 integration 후보이며 formal·device PASS가 아님"
+          }
+        ],
+        "canonical_link_strategy": [
+          {
+            "role": "CURRENT_REQUIREMENT_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CURRENT_DESIGN_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CURRENT_INTERFACE_DATA_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CURRENT_OPERATIONS_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CURRENT_UX_ACCESSIBILITY_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CURRENT_ENGINEERING_SCOPE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+            "binding": "CURRENT_STATE_SUCCESSOR"
+          },
+          {
+            "role": "CANONICAL_FORMAL_CASES",
+            "path": "docs/deliverables/06-testing/registers/test-cases.json",
+            "binding": "DRAFT_CANONICAL_CONTROL"
+          },
+          {
+            "role": "W4_CURRENT_TRACE",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+            "binding": "PATH_ONLY_FORWARD_REFERENCE"
+          }
+        ],
+        "independent_review_boundary": "독립 W4 검토는 내부 artifact 정합성 후보만 판정하며 정식 QA·제품 승인이나 formal PASS를 부여하지 않는다.",
+        "materialized_structural_validation": {
+          "run001": "FAIL_PRESERVED",
+          "run002": "PASS_STRUCTURE_ONLY",
+          "formal_execution_status": "NOT_RUN",
+          "release_status": "NOT_ELIGIBLE"
+        },
+        "dedicated_review_requirement": "DEDICATED_INDEPENDENT_QA_REVIEW_NOT_YET_MATERIALIZED"
+      },
+      "blockers": [
+        "dedicated independent QA review 미실행",
+        "중앙 artifact-status delta 미적용",
+        "정식 QA·제품 승인 상태 불변"
+      ],
+      "candidate_disposition": {
+        "status": "PENDING_INDEPENDENT_QA_REVIEW",
+        "projected_classification_if_adopted": "OK",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "동결된 content·source-drift·validation·env/external 결속을 dedicated independent QA가 검토한 뒤에만 중앙 OK 후보로 채택한다.",
+      "follow_up_target": "W4_INDEPENDENT_REVIEW_THEN_PHASE4_APPROVAL_HANDOVER"
+    },
+    {
+      "artifact_type_code": "DLV-TST-02",
+      "title": "STP(Software Test Plan)",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "현행 release 후보와 환경에 대한 entry/exit·중단·재개 기준을 승인한다.",
+      "register_state": "APPROVED_BASELINED",
+      "canonical_state": "DRAFT_NOT_APPROVED_POLICY_1_0_0",
+      "current_evidence": {
+        "summary": "통제 시연 목표일 2026-07-26은 지났고 제한 사용자·정식 beta 일정은 미정이다. source_commit=null, formal 환경 0, 이름 붙인 release generation과 승인 receipt가 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-plan.md",
+          "docs/deliverables/06-testing/registers/environments.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+        ]
+      },
+      "remediation_content": {
+        "schedule_status": "PROVISIONAL_UNAPPROVED",
+        "phases": [
+          "W4 경량 trace·data·환경 preflight",
+          "동결 subject의 내부 formal-eligible subset",
+          "별도 external Wave E의 device·live provider",
+          "동일 release generation 회귀와 사람 판정"
+        ],
+        "entry_criteria": [
+          "W3 terminal receipt",
+          "non-null source commit 또는 권한자가 승인한 exact dirty-source snapshot",
+          "build/model/config/OpenAPI/DB hash",
+          "smoke 검증된 formal 환경 instance",
+          "승인 시험데이터·executor·reviewer"
+        ],
+        "suspension_criteria": [
+          "subject hash 또는 환경 drift",
+          "안전·개인정보·비밀값 finding",
+          "필수 predecessor 실패",
+          "append-only evidence 기록 실패"
+        ],
+        "resume_criteria": [
+          "새 run_id",
+          "재동결된 subject와 environment hash",
+          "실패 triage·defect 연결",
+          "cleanup 확인과 독립 reviewer 지정"
+        ],
+        "exit_criteria": [
+          "적용 case의 append-only result",
+          "실패·skip·blocked 편차와 defect/risk 연결",
+          "독립 review",
+          "미실행 external 항목의 NOT_RUN 유지"
+        ]
+      },
+      "blockers": [
+        "release generation 미고정",
+        "formal 환경 미준비",
+        "권한 있는 QA·제품 승인 없음"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "W8 release candidate와 formal 환경을 고정한 뒤 STP 일정·entry/exit·중단·재개를 권한자가 승인한다.",
+      "follow_up_target": "W8_RELEASE_GENERATION_AND_AUTHORIZED_APPROVAL"
+    },
+    {
+      "artifact_type_code": "DLV-TST-03",
+      "title": "테스트 환경·지원 기기 목록",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "환경 instance를 source/build/model/config와 결속하고 지원 기기 matrix를 승인한다.",
+      "register_state": "ACTIVE_OPENING_SNAPSHOT_APPROVED",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "logical 환경 6개는 정의됐지만 formal instance와 formal-ready instance는 모두 0이다. 지원 기기 matrix는 pending이고 field 환경은 WS-21·복구 gate로 차단됐다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-plan.md",
+          "docs/deliverables/06-testing/registers/environments.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+          "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json"
+        ]
+      },
+      "remediation_content": {
+        "logical_environment_count": 6,
+        "formal_instance_count": 0,
+        "formal_ready_instance_count": 0,
+        "logical_environments": [
+          "ENV-UNIT-ANDROID",
+          "ENV-UNIT-SERVER",
+          "ENV-INTEGRATION-POSTGIS",
+          "ENV-DEVICE-SUPPORTED",
+          "ENV-FIELD-CONTROLLED",
+          "ENV-LEGACY-WEB"
+        ],
+        "internal_readiness_action": "unit Android, unit server, isolated PostGIS instance를 exact source/build/model/config/runtime/lock과 smoke evidence에 결속한다.",
+        "external_readiness_action": "지원 user/admin 실기기 matrix, credential reference, device pseudonym, OS/API·ARCore/depth·network와 승인 evidence를 제공한다.",
+        "environment_pair_binding": {
+          "json_file_sha256": "dd72611c00e8c41348586e05fc0763cac15ae56199babd25840ea3d5b5fad34c",
+          "json_content_fingerprint": "0141d4676b3da85e53e9fdb0d9f820a9ff4b75672d72584c4db38f7972873c5a",
+          "external_action_file_sha256": "dbd4a159f39197ce0a7376cef12a08969d11d787c953467012489cf12f38a67b",
+          "external_action_content_fingerprint": "da54cea25a8a5d00e70572d0a1fc39e6f2b83114a4e1291c061ced3e869b4f15"
+        }
+      },
+      "blockers": [
+        "formal instance 0",
+        "source_commit null",
+        "지원 실기기 matrix 미승인",
+        "device/field test 미승인"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "로컬 formal 환경을 먼저 materialize하고 실기기·field 부분은 내부 readiness 뒤 external action으로 분리한다.",
+      "follow_up_target": "W4_INTERNAL_ENV_READINESS_THEN_EXTERNAL_WAVE_E"
+    },
+    {
+      "artifact_type_code": "DLV-TST-04",
+      "title": "테스트 데이터 계획",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "현행 시나리오의 합성·비식별·폐기·누수방지 data plan을 갱신한다.",
+      "register_state": "APPROVED_BASELINED",
+      "canonical_state": "DRAFT_NOT_APPROVED_POLICY_1_0_0",
+      "current_evidence": {
+        "summary": "materialized exact data-assignment overlay가 synthetic·fixed non-personal·pseudonymous controlled profile, isolation·reset·disposal·leakage boundary를 결속한다. formal execution과 independent review는 아직 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-plan.md",
+          "docs/deliverables/06-testing/registers/test-cases.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.md"
+        ]
+      },
+      "remediation_content": {
+        "default_data_classes": [
+          "SYNTHETIC",
+          "FIXED_NON_PERSONAL",
+          "PSEUDONYMOUS_CONTROLLED"
+        ],
+        "real_data_boundary": "실제 영상·음성·정확 위치·사람·기기 식별값은 Git에 넣지 않고 승인된 암호화 저장소의 control ID와 SHA-256만 참조한다.",
+        "pseudonymization_rule": "executor·reviewer·device·account는 승인된 가명 ID를 사용하고 재식별 key는 시험 저장소 밖 권한 경계에 둔다.",
+        "isolation_rule": "unit·integration·device·field·production data를 분리하고 production 개인정보를 fixture로 복제하지 않는다.",
+        "reset_and_disposal_rule": "run 전 seed와 run 후 cleanup·retention·폐기 evidence를 환경 instance와 결속한다.",
+        "leakage_prevention_rule": "model train/validation/test 분할, 로그·screenshot·raw evidence redaction, secret/query/body 비수집을 검증한다.",
+        "rights_rule": "실사용 원본은 목적·출처·동의·권리·보존·삭제·법무/개인정보 승인 전에는 선택하거나 실행하지 않는다.",
+        "assignment_overlay_path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+        "assignment_overlay_binding": "EXACT_ONE_WAY_BINDING",
+        "assignment_overlay_file_sha256": "e0e5b45267f9f98070b417b8e10bea43d43e7b27f20fe2378e5c63456d3bf965",
+        "assignment_overlay_content_fingerprint": "fa931c2f87e5e120008f6a29a8e6134147ca76b207fa5095762d5360766f225c",
+        "upstream_trace_file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+        "upstream_trace_content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86"
+      },
+      "blockers": [
+        "independent review 미실행",
+        "중앙 artifact-status delta 미적용",
+        "formal279·정식 승인 상태 불변"
+      ],
+      "candidate_disposition": {
+        "status": "READY_FOR_INDEPENDENT_REVIEW_AS_OK_CANDIDATE",
+        "projected_classification_if_adopted": "OK",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "exact data overlay와 upstream trace의 one-way binding 및 policy coverage를 독립 검토한 뒤에만 중앙 OK 후보로 채택한다.",
+      "follow_up_target": "W4_DATA_ASSIGNMENT_WITH_W5_PRIVACY_BOUNDARY"
+    },
+    {
+      "artifact_type_code": "DLV-TST-05",
+      "title": "테스트 케이스·절차",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "현행 요구·설계·모듈과 case를 재연결하고 독립 QA 검토를 기록한다.",
+      "register_state": "ACTIVE_OPENING_SNAPSHOT_APPROVED",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "materialized trace는 279개 case 각각에 같은 8개 artifact-type predecessor를 투영한 비판별적 transitive 구조 projection이다. direct edge는 false이고 fixture link는 0이므로 현행 요구·설계·모듈 재연결을 충족하지 않는다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-plan.md",
+          "docs/deliverables/06-testing/registers/test-cases.json",
+          "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+          "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json"
+        ]
+      },
+      "remediation_content": {
+        "canonical_case_count": 279,
+        "canonical_case_unique_count": 279,
+        "current_execution_status": "NOT_RUN",
+        "current_result_count": 0,
+        "current_evidence_link_count": 0,
+        "current_defect_link_count": 0,
+        "current_test_data_link_count": 0,
+        "current_fixture_link_count": 0,
+        "trace_successor_path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "trace_successor_binding": "EXACT_ONE_WAY_BINDING",
+        "required_trace_dimensions": [
+          "current requirement",
+          "current design",
+          "module/config",
+          "environment",
+          "test-data/fixture",
+          "automated suite candidate",
+          "formal evidence eligibility"
+        ],
+        "review_rule": "trace completeness와 case 내용만 독립 검토하며 NOT_RUN을 PASS로 바꾸지 않는다.",
+        "trace_successor_file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+        "trace_successor_content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86",
+        "projection_case_count": 279,
+        "transitive_predecessor_width_per_case": 8,
+        "transitive_projection_edge_count": 2232,
+        "projection_is_discriminative": false,
+        "projection_links_are_direct_trace_edges": false,
+        "required_closure": "case별 판별 가능한 current requirement/design/module/config direct edge와 explicit fixture assignment"
+      },
+      "blockers": [
+        "279×8 비판별 transitive projection",
+        "direct trace edge false",
+        "explicit fixture link 0/279",
+        "dedicated independent QA review 전 required_action 미충족"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "case별 판별 가능한 direct edge와 fixture assignment를 materialize하고 dedicated independent QA가 검토할 때까지 INTERNAL_GAP을 유지한다.",
+      "follow_up_target": "W4_DISCRIMINATIVE_DIRECT_TRACE_AND_FIXTURE_REMEDIATION"
+    },
+    {
+      "artifact_type_code": "DLV-TST-07",
+      "title": "통합 테스트",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "격리 환경에서 실제·대역 의존성을 구분한 통합시험 evidence를 생성한다.",
+      "register_state": "PLANNED_NOT_RUN",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "planned case trace는 164개다. W3 backend DB-free 33 PASS와 fresh PostGIS exact-node 2회 PASS는 내부 후보이며 formal execution instance와 Android→Gateway→Backend cross-process evidence는 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-evidence.md",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/deliverables/05-implementation/software-integration-report.md",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "adoptable_internal_candidate": "같은 exact subject임이 증명된 backend·PostGIS 내부 결과",
+        "required_execution": "격리 환경에서 mock/stub와 real dependency를 행별로 표시하고 Gateway→Backend→PostGIS, migration, cleanup, repeatability를 append-only run에 기록한다.",
+        "prohibited_relabel": "기존 내부 PASS를 formal279·device·live provider PASS로 재라벨하지 않는다."
+      },
+      "blockers": [
+        "formal environment instance 없음",
+        "formal execution instance 0",
+        "cross-process Android 흐름 미실행",
+        "actual/mock dependency 분류 미결속"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "동결 subject의 isolated internal integration을 실행하고 release-generation·device/live subset은 후속 경계로 둔다.",
+      "follow_up_target": "W4_INTERNAL_EXECUTION_THEN_W8_RELEASE_GENERATION"
+    },
+    {
+      "artifact_type_code": "DLV-TST-09",
+      "title": "E2E 테스트",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "지원 실기기와 실제 서비스 구성에서 전체 시나리오 E2E evidence를 생성한다.",
+      "register_state": "PLANNED_NOT_RUN",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "planned case trace는 180개다. 저장된 실기기 근거는 model smoke 2건뿐이며 제품 E2E·서비스·DB·권한·복구를 증명하지 않는다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-evidence.md",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/deliverables/05-implementation/software-integration-report.md",
+          "docs/deliverables/06-testing/registers/environments.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json"
+        ]
+      },
+      "remediation_content": {
+        "internal_preparation": "loopback/stub/PostGIS candidate, APK/model/config hash, case·계정·cleanup plan을 준비한다.",
+        "external_execution": "실제 user/admin Android, Gateway, Backend, PostGIS, live TMAP/network, 권한·복구 흐름을 같은 generation에서 실행한다."
+      },
+      "blockers": [
+        "지원 실기기 matrix 미승인",
+        "TMAP credential/live provider 없음",
+        "formal service/account/environment 없음",
+        "전체 cross-process E2E 미실행"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "내부 readiness를 완료한 뒤 별도 external Wave E에 candidate digest와 device/service action을 전달한다.",
+      "follow_up_target": "EXTERNAL_WAVE_E_DEVICE_LIVE_SERVICE_AFTER_INTERNAL_READINESS"
+    },
+    {
+      "artifact_type_code": "DLV-TST-11",
+      "title": "회귀 테스트",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "current release generation으로 회귀 suite를 실행하고 실패 triage를 기록한다.",
+      "register_state": "PLANNED_NOT_RUN",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "현재 formal planned regression case는 0개다. W3 Android user 728, admin 38, Gateway 62와 backend 33 내부 결과는 suite별 후보일 뿐 current release formal regression이 아니다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/registers/test-cases.json",
+          "docs/deliverables/06-testing/test-evidence.md",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "required_selection": "current change impact에서 formal regression case와 affected module·risk를 선택한다.",
+        "required_execution": "동일 release generation에서 suite를 실행하고 failure·skip·blocked·flaky를 append-only triage와 defect/risk에 연결한다.",
+        "reuse_rule": "exact source/build/config/environment identity가 같을 때만 기존 내부 result를 candidate evidence로 재사용한다."
+      },
+      "blockers": [
+        "formal regression case assignment 0",
+        "release generation 미고정",
+        "formal execution·failure triage 없음"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "W4에서 regression selection과 내부 실행을 만들고 W8 candidate에서 동일 generation으로 재결속한다.",
+      "follow_up_target": "W4_REGRESSION_SELECTION_THEN_W8_RELEASE_GENERATION"
+    },
+    {
+      "artifact_type_code": "DLV-TST-14",
+      "title": "접근성 테스트",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "두 Android 앱의 접근성 suite와 실기기 보조기기 시험 evidence를 생성한다.",
+      "register_state": "PLANNED_NOT_RUN",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "planned case는 15개이며 모두 NOT_RUN이다. W2 접근성 설계는 current-state지만 TalkBack tree·focus·announcement·확대/reflow·대비·TTS·진동 실기기 evidence가 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-evidence.md",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json"
+        ]
+      },
+      "remediation_content": {
+        "internal_precheck": "두 앱의 semantic/static·emulator 사전검사와 screen/state inventory를 동결 subject에 결속한다.",
+        "device_execution": "실제 지원 Android에서 TalkBack 탐색·focus·announcement, 큰 글꼴/reflow, 대비, 음성·진동 대체를 실행한다.",
+        "human_verdict": "접근성·QA 판정자가 raw evidence와 expected result를 검토한다."
+      },
+      "blockers": [
+        "실제 지원 user/admin 기기 없음",
+        "TalkBack·보조기기 evidence 0",
+        "접근성·QA 사람 판정 없음"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "static/emulator precheck 뒤 external Wave E에서 실제 기기 접근성 evidence와 사람 verdict를 수집한다.",
+      "follow_up_target": "W4_STATIC_PRECHECK_THEN_EXTERNAL_WAVE_E_DEVICE_ACCESSIBILITY"
+    },
+    {
+      "artifact_type_code": "DLV-TST-18",
+      "title": "결함 관리대장",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "원장 opening metadata를 완료하고 시험 실패를 append-only defect instance로 연결한다.",
+      "register_state": "ACTIVE_OPENING_SNAPSHOT_APPROVED",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "defect schema와 append-only 경로는 있으나 formal execution 0으로 defect instance가 0이다. defect 0은 결함이 없다는 품질 결과가 아니다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-quality-report.md",
+          "docs/deliverables/06-testing/registers/defects.json",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "opening_rule": "opening snapshot에 exact subject, environment, case/evidence source, owner/reviewer, 기준시점과 0건 의미를 결속한다.",
+        "append_only_rule": "실제 FAIL/BLOCKED와 product defect가 생기면 새 defect instance를 만들고 fix commit·retest evidence 없이는 CLOSED로 전환하지 않는다."
+      },
+      "blockers": [
+        "formal execution 0",
+        "append-only defect instance 0",
+        "opening 승인 주장과 canonical Draft 충돌"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "formal 실행과 함께 opening metadata를 동결하고 실제 실패만 append-only defect instance로 연결한다.",
+      "follow_up_target": "W4_FORMAL_EXECUTION_AND_PHASE5_DEFECT_AGGREGATION"
+    },
+    {
+      "artifact_type_code": "DLV-TST-19",
+      "title": "테스트 커버리지·품질지표",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "formal evidence에서 coverage와 품질지표를 재집계한다.",
+      "register_state": "ACTIVE_OPENING_SNAPSHOT_APPROVED",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "pre-execution snapshot은 planned 279, executed 0, formal coverage 0.0%이며 quality_metrics_status=NOT_MEASURED다. 코드·branch·환경·기기 coverage는 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-quality-report.md",
+          "docs/deliverables/06-testing/registers/metrics.json",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "aggregation_source": "append-only formal execution instance만 formal numerator에 사용한다.",
+        "required_dimensions": [
+          "requirement/scenario",
+          "code/branch",
+          "environment/device",
+          "pass/fail/blocked/skip/flaky",
+          "defect leakage/reopen",
+          "formula/as-of/source generation"
+        ],
+        "separation_rule": "W3 automated counts는 별도 내부 suite metric이며 formal279 분자·분모에 합산하지 않는다."
+      },
+      "blockers": [
+        "formal evidence 0",
+        "code·branch coverage 미측정",
+        "environment·device coverage 미측정",
+        "quality metric 미측정"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "formal campaign evidence가 생긴 뒤 새 metrics revision을 결정론적으로 집계한다.",
+      "follow_up_target": "W4_FORMAL_EXECUTION_PHASE5_METRICS_W8_RELEASE_GENERATION"
+    },
+    {
+      "artifact_type_code": "DLV-TST-20",
+      "title": "STR(Software Test Report)",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "적용 시험 완료 후 동일 기준선의 결과·결함·잔여위험을 집계해 승인한다.",
+      "register_state": "PLANNED_NOT_RUN",
+      "canonical_state": "DRAFT_CONTROL_TEMPLATE_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "현재 STR은 계획 279, 실행 0, PASS 0, FAIL 0을 적은 Draft 통제 틀이다. build/model/config·편차·결함·잔여위험·승인 evidence가 없다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-quality-report.md",
+          "docs/deliverables/06-testing/software-test-report.md",
+          "docs/deliverables/06-testing/evidence/evidence-register.json",
+          "docs/deliverables/06-testing/registers/metrics.json",
+          "docs/deliverables/06-testing/registers/defects.json",
+          "docs/deliverables/06-testing/registers/residual-risks.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "required_subject": "동일 source/build/model/config/OpenAPI/DB/environment release generation",
+        "required_inputs": [
+          "applicable formal results",
+          "defect snapshot",
+          "coverage/quality metrics",
+          "residual-risk snapshot",
+          "deviation/skip/blocker",
+          "independent review"
+        ],
+        "approval_boundary": "QA·제품·보안·개인정보·안전 권한자의 실제 verdict 전에는 승인·GO를 기록하지 않는다."
+      },
+      "blockers": [
+        "formal279 실행 0",
+        "동일 release generation 없음",
+        "결함·지표·위험 동시점 snapshot 없음",
+        "권한 있는 승인 없음"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "W8/Phase5의 동일 generation evidence가 준비된 뒤 STR을 새 revision으로 집계하고 권한자 승인을 받는다.",
+      "follow_up_target": "PHASE5_W8_THEN_AUTHORIZED_QA_PRODUCT_APPROVAL"
+    },
+    {
+      "artifact_type_code": "DLV-TST-21",
+      "title": "미해결 결함·잔여 위험",
+      "baseline_classification": "INTERNAL_GAP",
+      "baseline_priority": "P0",
+      "required_action": "각 위험의 평가·완화·수용·만료·출시 영향을 완전하게 기록한다.",
+      "register_state": "ACTIVE_OPENING_SNAPSHOT_APPROVED",
+      "canonical_state": "DRAFT_NOT_APPROVED_NOT_RUN",
+      "current_evidence": {
+        "summary": "open risk 9개는 title·closure·blocks를 가지지만 likelihood·severity·acceptor·expiry와 승인된 release impact가 완전하지 않다. waiver는 0이다.",
+        "paths": [
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/06-testing/test-quality-report.md",
+          "docs/deliverables/06-testing/registers/residual-risks.json",
+          "docs/deliverables/06-testing/registers/defects.json",
+          "docs/deliverables/06-testing/registers/metrics.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+          "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json"
+        ]
+      },
+      "remediation_content": {
+        "required_row_fields": [
+          "likelihood",
+          "severity",
+          "affected user/scenario",
+          "mitigation/workaround/disclosure",
+          "owner",
+          "authorized acceptor",
+          "acceptance status",
+          "expiry/review date",
+          "follow-up target",
+          "release impact",
+          "snapshot version"
+        ],
+        "internal_boundary": "open gate·defect·external blocker의 current snapshot과 평가·완화 proposal은 내부에서 갱신할 수 있다.",
+        "authority_boundary": "risk acceptance, waiver, gate closure와 release decision은 권한자 receipt 없이는 완료 처리하지 않는다."
+      },
+      "blockers": [
+        "likelihood·severity 불완전",
+        "authorized acceptor·expiry 없음",
+        "gate 5개 미면제",
+        "release impact 승인 없음"
+      ],
+      "candidate_disposition": {
+        "status": "INTERNAL_GAP_RETAINED",
+        "projected_classification_if_adopted": "INTERNAL_GAP",
+        "central_transition_applied": false,
+        "artifact_register_mutated": false,
+        "audit_baseline_mutated": false,
+        "approval_or_content_baseline_changed": false,
+        "formal_test_status_changed": false,
+        "release_status_changed": false
+      },
+      "next_action": "W5/W8의 보안·개인정보·release 입력을 반영하고 권한자가 위험 수용·만료·출시 영향을 판정한다.",
+      "follow_up_target": "W5_W8_INPUTS_THEN_AUTHORIZED_RISK_ACCEPTANCE"
+    }
+  ],
+  "source_bindings": [
+    {
+      "role": "AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "EXECUTION_PLAN",
+      "path": "plans/features/2026-07-26_artifact_completion_execution_plan.md",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "ARTIFACT_REGISTER",
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_TEST_PLAN",
+      "path": "docs/deliverables/06-testing/test-plan.md",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_TEST_CASES",
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_ENVIRONMENTS",
+      "path": "docs/deliverables/06-testing/registers/environments.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_EVIDENCE_REGISTER",
+      "path": "docs/deliverables/06-testing/evidence/evidence-register.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_DEFECT_REGISTER",
+      "path": "docs/deliverables/06-testing/registers/defects.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_METRICS_REGISTER",
+      "path": "docs/deliverables/06-testing/registers/metrics.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "CANONICAL_RESIDUAL_RISKS",
+      "path": "docs/deliverables/06-testing/registers/residual-risks.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W1_REQUIREMENT_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W2_ARCHITECTURE_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W2_INTERFACE_DATA_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W2_OPERATIONS_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W2_UX_ACCESSIBILITY_CURRENT_STATE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W3_ENGINEERING_TRACE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W3_TERMINAL_RECEIPT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+      "binding": "PATH_ONLY_CURRENT_INPUT"
+    },
+    {
+      "role": "W4_TEST_TRACE_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+      "byte_count": 123312,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "DRAFT_CURRENT_TRACE_NOT_FORMAL_EXECUTION"
+    },
+    {
+      "role": "W4_TEST_DATA_ASSIGNMENT_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+      "file_sha256": "e0e5b45267f9f98070b417b8e10bea43d43e7b27f20fe2378e5c63456d3bf965",
+      "byte_count": 104635,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "fa931c2f87e5e120008f6a29a8e6134147ca76b207fa5095762d5360766f225c",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "DRAFT_CONTROLLED_PROFILE_ASSIGNMENT_NOT_FORMAL_EXECUTION"
+    },
+    {
+      "role": "W4_TEST_DATA_ASSIGNMENT_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.md",
+      "file_sha256": "716bc60a11fe1c285c8c06de7bb550ab103ccc664dc0d5517d53b5e6a7836909",
+      "byte_count": 9079,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "fa931c2f87e5e120008f6a29a8e6134147ca76b207fa5095762d5360766f225c",
+      "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+      "status": "PAIRED_RENDERING"
+    },
+    {
+      "role": "W4_SOURCE_DRIFT_SUCCESSOR_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+      "file_sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4",
+      "byte_count": 11631,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "f74b4a4e7f46d5ee868b1accd9dfcd6879f5b84d9e2f14bcfc812cd97df19039",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "CURRENT_FRESHNESS_SUCCESSOR_PASS"
+    },
+    {
+      "role": "W4_SOURCE_DRIFT_SUCCESSOR_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+      "file_sha256": "7e6690bad75d3643c57c860aefc6bb928c962b28e3eaf0491c9cac2d968be0bf",
+      "byte_count": 3730,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "f74b4a4e7f46d5ee868b1accd9dfcd6879f5b84d9e2f14bcfc812cd97df19039",
+      "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+      "status": "PAIRED_RENDERING"
+    },
+    {
+      "role": "W4_ENVIRONMENT_READINESS_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+      "file_sha256": "dd72611c00e8c41348586e05fc0763cac15ae56199babd25840ea3d5b5fad34c",
+      "byte_count": 15545,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "0141d4676b3da85e53e9fdb0d9f820a9ff4b75672d72584c4db38f7972873c5a",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "INTERNAL_GAP"
+    },
+    {
+      "role": "W4_ENVIRONMENT_READINESS_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+      "file_sha256": "bb91307350aeeba27098971957b2b2b3d5729328027fca33406879441ecc2b2d",
+      "byte_count": 8002,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "0141d4676b3da85e53e9fdb0d9f820a9ff4b75672d72584c4db38f7972873c5a",
+      "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+      "status": "PAIRED_RENDERING"
+    },
+    {
+      "role": "W4_EXTERNAL_ACTION_PACKET_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+      "file_sha256": "dbd4a159f39197ce0a7376cef12a08969d11d787c953467012489cf12f38a67b",
+      "byte_count": 19453,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "da54cea25a8a5d00e70572d0a1fc39e6f2b83114a4e1291c061ced3e869b4f15",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS"
+    },
+    {
+      "role": "W4_EXTERNAL_ACTION_PACKET_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+      "file_sha256": "5b6bf2dae0843c1ecca5d7a51022b1210d2cf1b9f1f961d1ba51b5b4428b41f2",
+      "byte_count": 11049,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "da54cea25a8a5d00e70572d0a1fc39e6f2b83114a4e1291c061ced3e869b4f15",
+      "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+      "status": "PAIRED_RENDERING"
+    },
+    {
+      "role": "W4_VALIDATION_RUN001_EXECUTION_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+      "file_sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+      "byte_count": 1174,
+      "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "FAIL_PRESERVED"
+    },
+    {
+      "role": "W4_VALIDATION_RUN001_COMMAND_RESULTS",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/command-results.tsv",
+      "file_sha256": "d4796448bbb28cdb9549eff330fe4dc18759a292d9a17fa1f239225014160fed",
+      "byte_count": 427,
+      "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "FAIL_PRESERVED"
+    },
+    {
+      "role": "W4_VALIDATION_RUN001_FORMAL_DEV_TEST_CHECK_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/formal-dev-test-check.log",
+      "file_sha256": "3a07f8dbb188c135a49fbd82310a58048977009c731b60e18fa9eb095e58f58f",
+      "byte_count": 102,
+      "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_1_FAIL_PRESERVED"
+    },
+    {
+      "role": "W4_VALIDATION_RUN001_TRACE_INTEGRATION_CHECK_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/trace-integration-check.log",
+      "file_sha256": "e931f9e15336bda57a16ae3ad2f5fefa036343addb12c605ee579c82166495f8",
+      "byte_count": 75,
+      "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_1_FAIL_PRESERVED"
+    },
+    {
+      "role": "W4_VALIDATION_RUN001_FORMAL_TRACE_UNIT_TESTS_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/formal-trace-unit-tests.log",
+      "file_sha256": "a55b933607a31d0d950797de7860586adb6b22748cb15dec03b2b5c297ce06c5",
+      "byte_count": 82,
+      "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_1_FAIL_PRESERVED"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_EXECUTION_SUMMARY",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+      "file_sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+      "byte_count": 3229,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "PASS_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_COMMAND_RESULTS",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/command-results.tsv",
+      "file_sha256": "8cb3e84394c2637c916623c9baab0abb6dc728966ad8bc3ce804187f0f29a29e",
+      "byte_count": 717,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "PASS_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_FORMAL_DEV_TEST_GENERATE_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-dev-test-generate.log",
+      "file_sha256": "edfc07941eb1c41f6cc0eb6832ca39f2caf001481009ea00365170d089b495e1",
+      "byte_count": 40,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_0_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_TRACE_INTEGRATION_GENERATE_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/trace-integration-generate.log",
+      "file_sha256": "08121f18665215f99174a491fba44c58b6ea99078a94d6cf9b884038451d3f3a",
+      "byte_count": 123,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_0_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_FORMAL_DEV_TEST_CHECK_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-dev-test-check.log",
+      "file_sha256": "0e48eafd5a5326e5f315ceae759f06e25329a4abb61f94338168b5da9eb79128",
+      "byte_count": 39,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_0_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_TRACE_INTEGRATION_CHECK_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/trace-integration-check.log",
+      "file_sha256": "827758533d02f233cd083b384ec7b0d26ca3b901caa85e07b18246e70a32677c",
+      "byte_count": 122,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_0_STRUCTURE_ONLY"
+    },
+    {
+      "role": "W4_VALIDATION_RUN002_FORMAL_TRACE_UNIT_TESTS_LOG",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-trace-unit-tests.log",
+      "file_sha256": "2bffe95880569701b0b3ba0606d784c6b5529b450c6c33e070f307fa931d1e30",
+      "byte_count": 130,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": null,
+      "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+      "status": "EXIT_0_STRUCTURE_ONLY"
+    }
+  ],
+  "validation_invariants": {
+    "exact_artifact_count": 13,
+    "exact_artifact_unique_count": 13,
+    "every_row_baseline_internal_gap": true,
+    "candidate_status_count": 2,
+    "retained_status_count": 11,
+    "candidate_and_retained_total": 13,
+    "formal_not_run_count": 279,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "remaining_gate_count": 5,
+    "waived_gate_count": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "source_commit": null,
+    "central_transition_applied": false,
+    "json_markdown_same_fact_source": true,
+    "pending_independent_qa_review_count": 1,
+    "ready_for_independent_review_as_ok_candidate_count": 1,
+    "materialized_exact_one_way_binding_count": 21,
+    "validation_run001_result": "FAIL_PRESERVED",
+    "validation_run002_result": "PASS_STRUCTURE_ONLY"
+  },
+  "integrity": {
+    "artifact_count": 13,
+    "artifact_unique_count": 13,
+    "artifact_id_set_sha256": "6e046cddbdb3b8e288cbac0ef2c21c6016885006322c86703a4e2b1ef4aab3d2",
+    "disposition_count": 13,
+    "disposition_set_sha256": "a10f2eb10a0d4233557662ed228ba9f61375992dd5001f4595e64964fc01bb33",
+    "source_binding_count": 39,
+    "source_path_set_sha256": "a6b180bb9663f05375fa3def41e6d57b0959783da40a8291b8504debcab6cfa4",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "ef6689cf38adcceddc1aec8e28bb52f13fa1812d73ccee09c20d6e2ee82c3845"
+    },
+    "source_binding_exact_hash_count": 21,
+    "source_binding_path_only_count": 18
+  },
+  "materialized_one_way_bindings": {
+    "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+    "predecessor_mutation_claimed": false,
+    "trace_current_state": {
+      "role": "W4_TEST_TRACE_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "file_sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+      "byte_count": 123312,
+      "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+      "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+      "content_fingerprint": "a1c1aa13fc63e63bd6ed9470f0080aaca6ec94dda7db6aadb6c46bad84188f86",
+      "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+      "status": "DRAFT_CURRENT_TRACE_NOT_FORMAL_EXECUTION"
+    },
+    "data_assignment_pair": {
+      "json": {
+        "role": "W4_TEST_DATA_ASSIGNMENT_CURRENT_STATE_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.json",
+        "file_sha256": "e0e5b45267f9f98070b417b8e10bea43d43e7b27f20fe2378e5c63456d3bf965",
+        "byte_count": 104635,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "fa931c2f87e5e120008f6a29a8e6134147ca76b207fa5095762d5360766f225c",
+        "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+        "status": "DRAFT_CONTROLLED_PROFILE_ASSIGNMENT_NOT_FORMAL_EXECUTION"
+      },
+      "markdown": {
+        "role": "W4_TEST_DATA_ASSIGNMENT_CURRENT_STATE_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-data-assignment-current-state.md",
+        "file_sha256": "716bc60a11fe1c285c8c06de7bb550ab103ccc664dc0d5517d53b5e6a7836909",
+        "byte_count": 9079,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "fa931c2f87e5e120008f6a29a8e6134147ca76b207fa5095762d5360766f225c",
+        "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+        "status": "PAIRED_RENDERING"
+      }
+    },
+    "source_drift_successor_pair": {
+      "json": {
+        "role": "W4_SOURCE_DRIFT_SUCCESSOR_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+        "file_sha256": "ea77f75876f61d6b47f1e3dbaabc6640a7b45ec6c855e6cc4bda1a796fadd9e4",
+        "byte_count": 11631,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "f74b4a4e7f46d5ee868b1accd9dfcd6879f5b84d9e2f14bcfc812cd97df19039",
+        "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+        "status": "CURRENT_FRESHNESS_SUCCESSOR_PASS"
+      },
+      "markdown": {
+        "role": "W4_SOURCE_DRIFT_SUCCESSOR_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+        "file_sha256": "7e6690bad75d3643c57c860aefc6bb928c962b28e3eaf0491c9cac2d968be0bf",
+        "byte_count": 3730,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "f74b4a4e7f46d5ee868b1accd9dfcd6879f5b84d9e2f14bcfc812cd97df19039",
+        "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+        "status": "PAIRED_RENDERING"
+      }
+    },
+    "environment_readiness_pair": {
+      "json": {
+        "role": "W4_ENVIRONMENT_READINESS_CURRENT_STATE_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.json",
+        "file_sha256": "dd72611c00e8c41348586e05fc0763cac15ae56199babd25840ea3d5b5fad34c",
+        "byte_count": 15545,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "0141d4676b3da85e53e9fdb0d9f820a9ff4b75672d72584c4db38f7972873c5a",
+        "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+        "status": "INTERNAL_GAP"
+      },
+      "markdown": {
+        "role": "W4_ENVIRONMENT_READINESS_CURRENT_STATE_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/environment-readiness-current-state.md",
+        "file_sha256": "bb91307350aeeba27098971957b2b2b3d5729328027fca33406879441ecc2b2d",
+        "byte_count": 8002,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "0141d4676b3da85e53e9fdb0d9f820a9ff4b75672d72584c4db38f7972873c5a",
+        "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+        "status": "PAIRED_RENDERING"
+      }
+    },
+    "external_action_pair": {
+      "json": {
+        "role": "W4_EXTERNAL_ACTION_PACKET_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.json",
+        "file_sha256": "dbd4a159f39197ce0a7376cef12a08969d11d787c953467012489cf12f38a67b",
+        "byte_count": 19453,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "da54cea25a8a5d00e70572d0a1fc39e6f2b83114a4e1291c061ced3e869b4f15",
+        "content_fingerprint_role": "CANONICAL_JSON_CONTENT_FINGERPRINT",
+        "status": "EXTERNAL_ACTION_PENDING_AFTER_INTERNAL_READINESS"
+      },
+      "markdown": {
+        "role": "W4_EXTERNAL_ACTION_PACKET_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/external-action-packet.md",
+        "file_sha256": "5b6bf2dae0843c1ecca5d7a51022b1210d2cf1b9f1f961d1ba51b5b4428b41f2",
+        "byte_count": 11049,
+        "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+        "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+        "content_fingerprint": "da54cea25a8a5d00e70572d0a1fc39e6f2b83114a4e1291c061ced3e869b4f15",
+        "content_fingerprint_role": "PAIRED_JSON_CONTENT_FINGERPRINT",
+        "status": "PAIRED_RENDERING"
+      }
+    },
+    "validation_lineage": {
+      "run001": {
+        "run_id": "W4-VALIDATION-20260726-001",
+        "result": "FAIL_PRESERVED",
+        "scope": "EXISTING_FORMAL_DRAFT_AND_TRACE_STRUCTURE_ONLY",
+        "files": [
+          {
+            "role": "W4_VALIDATION_RUN001_EXECUTION_SUMMARY",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+            "file_sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+            "byte_count": 1174,
+            "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "FAIL_PRESERVED"
+          },
+          {
+            "role": "W4_VALIDATION_RUN001_COMMAND_RESULTS",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/command-results.tsv",
+            "file_sha256": "d4796448bbb28cdb9549eff330fe4dc18759a292d9a17fa1f239225014160fed",
+            "byte_count": 427,
+            "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "FAIL_PRESERVED"
+          },
+          {
+            "role": "W4_VALIDATION_RUN001_FORMAL_DEV_TEST_CHECK_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/formal-dev-test-check.log",
+            "file_sha256": "3a07f8dbb188c135a49fbd82310a58048977009c731b60e18fa9eb095e58f58f",
+            "byte_count": 102,
+            "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_1_FAIL_PRESERVED"
+          },
+          {
+            "role": "W4_VALIDATION_RUN001_TRACE_INTEGRATION_CHECK_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/trace-integration-check.log",
+            "file_sha256": "e931f9e15336bda57a16ae3ad2f5fefa036343addb12c605ee579c82166495f8",
+            "byte_count": 75,
+            "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_1_FAIL_PRESERVED"
+          },
+          {
+            "role": "W4_VALIDATION_RUN001_FORMAL_TRACE_UNIT_TESTS_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/formal-trace-unit-tests.log",
+            "file_sha256": "a55b933607a31d0d950797de7860586adb6b22748cb15dec03b2b5c297ce06c5",
+            "byte_count": 82,
+            "binding_mode": "IMMUTABLE_FAILED_PREDECESSOR_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_1_FAIL_PRESERVED"
+          }
+        ],
+        "formal_execution": {
+          "total": 279,
+          "status": "NOT_RUN",
+          "pass_claimed": false
+        },
+        "release_eligibility": "NOT_ELIGIBLE"
+      },
+      "run002": {
+        "run_id": "W4-VALIDATION-20260726-002",
+        "supersedes_failed_run": "W4-VALIDATION-20260726-001",
+        "result": "PASS",
+        "scope": "FORMAL_DRAFT_AND_TRACE_DETERMINISTIC_REGENERATION_STRUCTURE_ONLY",
+        "files": [
+          {
+            "role": "W4_VALIDATION_RUN002_EXECUTION_SUMMARY",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+            "file_sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+            "byte_count": 3229,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "PASS_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_COMMAND_RESULTS",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/command-results.tsv",
+            "file_sha256": "8cb3e84394c2637c916623c9baab0abb6dc728966ad8bc3ce804187f0f29a29e",
+            "byte_count": 717,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "PASS_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_FORMAL_DEV_TEST_GENERATE_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-dev-test-generate.log",
+            "file_sha256": "edfc07941eb1c41f6cc0eb6832ca39f2caf001481009ea00365170d089b495e1",
+            "byte_count": 40,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_0_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_TRACE_INTEGRATION_GENERATE_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/trace-integration-generate.log",
+            "file_sha256": "08121f18665215f99174a491fba44c58b6ea99078a94d6cf9b884038451d3f3a",
+            "byte_count": 123,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_0_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_FORMAL_DEV_TEST_CHECK_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-dev-test-check.log",
+            "file_sha256": "0e48eafd5a5326e5f315ceae759f06e25329a4abb61f94338168b5da9eb79128",
+            "byte_count": 39,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_0_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_TRACE_INTEGRATION_CHECK_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/trace-integration-check.log",
+            "file_sha256": "827758533d02f233cd083b384ec7b0d26ca3b901caa85e07b18246e70a32677c",
+            "byte_count": 122,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_0_STRUCTURE_ONLY"
+          },
+          {
+            "role": "W4_VALIDATION_RUN002_FORMAL_TRACE_UNIT_TESTS_LOG",
+            "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/formal-trace-unit-tests.log",
+            "file_sha256": "2bffe95880569701b0b3ba0606d784c6b5529b450c6c33e070f307fa931d1e30",
+            "byte_count": 130,
+            "binding_mode": "EXACT_ONE_WAY_FILE_BINDING",
+            "binding_direction": "THIS_DOCUMENT_TO_IMMUTABLE_PREDECESSOR",
+            "content_fingerprint": null,
+            "content_fingerprint_role": "NOT_DEFINED_FILE_SHA256_ONLY",
+            "status": "EXIT_0_STRUCTURE_ONLY"
+          }
+        ],
+        "formal_execution": {
+          "total": 279,
+          "status": "NOT_RUN",
+          "pass_claimed": false
+        },
+        "release_eligibility": "NOT_ELIGIBLE"
+      }
+    },
+    "claim_boundary": "run002 PASS는 Draft·trace 결정론적 재생성/구조 검증뿐이다. run001 실패를 삭제하지 않으며 formal279·device·gate·release 상태를 바꾸지 않는다."
+  }
+}

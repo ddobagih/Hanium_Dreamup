@@ -1,0 +1,147 @@
+{
+  "schema_version": "walksafe.recovery-drill-protocol.v1",
+  "metadata": {
+    "protocol_id": "WS-SINGLE-ADMIN-RECOVERY-DRILL-PROTOCOL-20260722-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-22",
+    "status": "DRAFT_PROCEDURE_NOT_EXECUTED",
+    "title": "단일 관리자 휴대전화 분실 복구훈련 절차"
+  },
+  "authority_boundary": {
+    "procedure_only": true,
+    "execution_authorized_by_this_document": false,
+    "execution_completed": false,
+    "gate_closed": false,
+    "gate_waived": false,
+    "formal_test_pass_claimed": false,
+    "release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "phase_b_record": {
+      "name": "phase_b_record",
+      "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.json",
+      "content_sha256": "de806b1f9ecd5d7ce5b86f781a6caf70a61b1a142682ff94fbac302d98929e87",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    },
+    "requirement_id": "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001",
+    "planned_test_id": "TC-GATE-SINGLE-ADMIN-RECOVERY-DRILL-01",
+    "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+  },
+  "execution": {
+    "status": "NOT_RUN",
+    "started_at": null,
+    "completed_at": null,
+    "environment_id": null,
+    "release_candidate_id": null,
+    "result": null,
+    "defect_ids": [],
+    "evidence_files": [],
+    "evidence_manifest_sha256": null,
+    "approved_by": null,
+    "approved_at": null
+  },
+  "roles": {
+    "executor": "최종관리자 1명",
+    "recorder": "최종관리자 또는 지정 시험기록 담당자",
+    "optional_observer": "독립 관찰자는 둘 수 있으나 정책상 두 명의 독립 확인자를 합격조건으로 요구하지 않는다."
+  },
+  "preconditions": [
+    "실사용 개인정보가 없는 격리된 비운영 환경과 고정된 Android 관리자 앱·백엔드·DB 형상을 준비한다.",
+    "관리자 휴대전화 밖에 보관한 고엔트로피 일회용 복구코드와 회전할 새 TOTP 비밀을 서로 노출하지 않는 방식으로 준비한다.",
+    "기존 관리자 기기 A와 등록할 대체 기기 B, 기존 세션 두 개 이상, 정상 상태에서 최근 재확인이 필요한 고위험 시험 동작을 준비한다.",
+    "로그·화면녹화·스크린샷에서 비밀번호, TOTP, 복구코드, 원문 세션·복구 증명값, TOTP 비밀이 저장되지 않도록 수집 설정을 확인한다.",
+    "중단 기준, 롤백 담당자, 시험 DB 백업과 복원 가능성을 확인한다."
+  ],
+  "steps": [
+    {
+      "order": 1,
+      "action": "고정 형상과 정상 초기상태를 기록한다.",
+      "expected": "보안 상태 NORMAL, 기존 기기 A 세션 목록, 고위험 작업은 최근 비밀번호·TOTP 재확인 뒤에만 허용된다.",
+      "evidence": "비밀을 제외한 앱·서버·DB migration·설정 지문, 시각, 세션 ID·기기 ID의 부분 마스킹 목록"
+    },
+    {
+      "order": 2,
+      "action": "기기 A를 사용할 수 없다고 선언하고 기기 B에서 외부 복구코드로 복구 시작을 요청한다.",
+      "expected": "보안 상태가 RECOVERY_IN_PROGRESS로 바뀌고 기존 모든 세션이 폐기되며, 복구코드는 아직 사용 완료 처리되지 않는다.",
+      "evidence": "상태 버전, 기존 세션 폐기 시각, 비밀을 제외한 감사 사건"
+    },
+    {
+      "order": 3,
+      "action": "기기 A의 기존 세션과 다른 기존 세션으로 상태조회 및 고위험 작업을 시도한다.",
+      "expected": "기존 세션은 모두 거부되고 권한 변경·자료 삭제·출시 승인은 실패 닫힘으로 동결된다.",
+      "evidence": "HTTP 상태·오류 코드와 오프라인 gate 실패 결과; 원문 증명값 제외"
+    },
+    {
+      "order": 4,
+      "action": "첫 복구 시작 응답을 유실했다고 가정하고 같은 미사용 코드·같은 기기 B로 다시 시작한다.",
+      "expected": "복구 만료시각은 늘어나지 않고 새 복구 증명값만 발급되며 이전 복구 증명값은 사용할 수 없다.",
+      "evidence": "마스킹된 transaction ID, 변하지 않은 만료시각, 이전 증명값 거부 결과"
+    },
+    {
+      "order": 5,
+      "action": "다른 기기 또는 다른 코드로 진행 중 복구를 가로채려 시도한다.",
+      "expected": "요청은 거부되고 RECOVERY_IN_PROGRESS와 고위험 동결이 유지된다.",
+      "evidence": "오류 코드, 상태 버전, 비밀 없는 감사 사건"
+    },
+    {
+      "order": 6,
+      "action": "기기 B에서 새 비밀번호, 새 외부 TOTP 비밀의 현재 코드, 최신 복구 증명값으로 복구를 완료한다.",
+      "expected": "복구코드가 이 성공 시점에만 사용 처리되고 기존 세션은 계속 폐기된 채 새 기기 B 세션만 만들어지며 상태가 NORMAL로 돌아온다.",
+      "evidence": "완료 시각, 사용 처리 시각, 새 세션 ID의 부분 마스킹, 상태 버전"
+    },
+    {
+      "order": 7,
+      "action": "이전 비밀번호·이전 TOTP·사용한 복구코드·이전 복구 증명값·기기 A 세션을 각각 재사용한다.",
+      "expected": "모두 거부되고 성공한 TOTP 시각구간을 다시 사용해도 거부된다.",
+      "evidence": "입력 원문을 저장하지 않은 거부 결과와 감사 사건"
+    },
+    {
+      "order": 8,
+      "action": "새 자격정보로 로그인하고 최근 비밀번호·TOTP 재확인 전후의 고위험 작업을 비교한다.",
+      "expected": "재확인 전에는 차단되고 재확인 뒤 정해진 짧은 시간 안에서만 허용된다.",
+      "evidence": "마스킹된 세션 ID, 재확인 만료시각, 전후 결과"
+    },
+    {
+      "order": 9,
+      "action": "복구자료의 휴대전화 외부 암호화 보관과 실제 열람·복원 가능성을 확인하고 시험환경을 정리한다.",
+      "expected": "복구자료는 기기 B 안에만 남지 않고, 원문 비밀은 증거 묶음에 포함되지 않으며 시험용 세션과 자료가 정해진 절차로 폐기된다.",
+      "evidence": "보관 매체 식별자·암호화/접근통제 확인·삭제 영수증; 비밀 원문 제외"
+    }
+  ],
+  "pass_criteria": [
+    "모든 단계의 기대 결과가 같은 고정 형상에서 충족되고 P0/P1 결함이 없다.",
+    "복구 시작부터 완료까지 기존 세션과 고위험 작업이 우회 없이 차단된다.",
+    "복구코드는 성공 완료 전에는 소비되지 않고 성공 뒤에는 재사용되지 않는다.",
+    "응답 유실 재개는 같은 코드·같은 기기에만 허용되며 만료를 연장하지 않고 이전 증명값을 무효화한다.",
+    "원문 비밀이나 실제 개인정보가 시험 증거·로그·저장소에 남지 않는다.",
+    "원자료·환경·실행자·시각·결함·결론을 SHA-256 manifest로 결속하고 지정 승인 절차를 마친다."
+  ],
+  "abort_and_fail_conditions": [
+    "복구 중 기존 세션이나 고위험 작업이 한 번이라도 허용된다.",
+    "다른 기기·다른 코드가 진행 중 transaction을 이어받는다.",
+    "성공 전에 복구코드가 소비되거나 성공 뒤 다시 사용된다.",
+    "원문 비밀번호·TOTP·복구코드·세션/복구 증명값·TOTP 비밀이 로그나 증거에 기록된다.",
+    "증거가 불완전하거나 고정 형상과 실행환경을 재현할 수 없다."
+  ],
+  "evidence_manifest_required_fields": [
+    "protocol_id_and_version",
+    "immutable_candidate_component_hashes",
+    "environment_and_device_ids",
+    "executor_and_observer_if_any",
+    "started_and_completed_at",
+    "step_results_without_secrets",
+    "audit_and_http_result_file_hashes",
+    "defect_ids_and_dispositions",
+    "overall_result",
+    "approver_and_approved_at"
+  ],
+  "release_boundary": {
+    "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+    "gate_status": "NOT_RUN",
+    "waived": false,
+    "formal_test_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "protocol_content_sha256": "ebb009d9ce7471dd23d3632590fbb1ab1739d8d2e08e0cb7352fdd2f227e973a"
+}

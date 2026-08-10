@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "overlay_id": "WS-EPIC-02-FP012-MULTI-DEVICE-SESSION-LEDGER-ACTIVE-LEDGER-OVERLAY-20260726-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-26",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-02 FP-012 multi-device session-ledger successor overlay"
+  },
+  "authority_boundary": {
+    "predecessor_overlay_preserved": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_product_policy": false,
+    "formal_test_completion_claimed": false,
+    "actual_voice_confirmation_completion_claimed": false,
+    "actual_unstable_network_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "operational_lease_policy_approval_completion_claimed": false,
+    "production_deployment_completion_claimed": false,
+    "epic_in_progress_claimed": true,
+    "epic_complete_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": {
+    "predecessor_overlay": {
+      "path": "docs/control/execution/walksafe-epic-02-fp016-camera-centered-buttonless-screen-active-ledger-overlay-20260726-r001.json",
+      "bytes": 3366,
+      "sha256": "df50b7273fe16b009caa1ea64446450001e225fb8a3bd9489451d2a3107dfc61"
+    },
+    "implementation_record": {
+      "name": "fp012_implementation",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/implementation-record.json",
+      "sha256": "ce4448adcdc66deb8a48cb63378c8cfd5088e9a0decf833e396a0023d829da2a"
+    },
+    "verification_result": {
+      "name": "fp012_verification",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/verification-result.json",
+      "sha256": "1299b5b72ac856c7b9dd9f6af20ee7f41bccd16c0982b087a447e2462e577940"
+    },
+    "implementation_gap": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260726-020",
+      "file_sha256": "6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7"
+    },
+    "implementation_backlog": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-020",
+      "file_sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f"
+    }
+  },
+  "goal_state": {
+    "goal_id": "WS-GOAL-EPIC-02-FP-012-R001",
+    "internal_result": "PARTIAL_IMPLEMENTATION_VERIFIED",
+    "gap_id": "GAP-021",
+    "gap_status": "PARTIAL",
+    "next_source_policy_id": "FP-047",
+    "next_gap_id": "GAP-056"
+  },
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-012-01",
+      "TC-FP-012-02",
+      "TC-FP-012-03",
+      "TC-FP-012-04",
+      "TC-FP-012-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_voice_confirmation_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_unstable_network_status": "NOT_RUN",
+    "operational_lease_policy_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

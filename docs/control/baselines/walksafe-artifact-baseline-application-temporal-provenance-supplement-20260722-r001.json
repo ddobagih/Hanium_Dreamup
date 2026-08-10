@@ -1,0 +1,81 @@
+{
+  "schema_version": "walksafe.artifact-baseline-application-temporal-provenance-supplement.v1",
+  "metadata": {
+    "supplement_id": "WS-ARTIFACT-BASELINE-TEMPORAL-PROVENANCE-SUPPLEMENT-20260722-001",
+    "supplement_version": "1.0.0",
+    "issued_at": "2026-07-22T14:38:23+09:00",
+    "lifecycle_status": "IMMUTABLE",
+    "correction_scope": "TIME_PROVENANCE_ONLY"
+  },
+  "subject_binding": {
+    "receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+    "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+    "file_sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+    "content_sha256": "85a34a21c50a3b0d6ecc15f21bcfa3051c5b408b3f248dcd2a4e22bd90e52090"
+  },
+  "related_evidence_bindings": {
+    "posttransition_verification": {
+      "path": "docs/control/baselines/walksafe-artifact-posttransition-verification-20260722-r001.json",
+      "file_sha256": "9012644a5ebffa835222ae4be6c0948936fd61b810af253f567bfc4b642dcab5",
+      "content_sha256": "b16ceaaf5cc9741505a7b8c8c2298909c9ee77a710cbdcc61249f222a8a9f6cb"
+    },
+    "materializer": {
+      "path": "scripts/materialize_walksafe_artifact_baseline_approval_20260722.py",
+      "file_sha256": "cf06e2c8c5e6635f90dfa73f10b73cf4a47d841fb79e96c2c97e2b4ef9b45607"
+    }
+  },
+  "finding": {
+    "finding_id": "TEMPORAL-PROVENANCE-EFFECTIVE-AT-001",
+    "severity": "NON_BLOCKING_RECORD_ACCURACY",
+    "original_value": "2026-07-22T14:22:21+09:00",
+    "original_basis_label": "TRANSACTION_COMMIT_TIME",
+    "finding": "The timestamp was captured while building the transaction plan before publication began, not when the final COMMITTED receipt was published.",
+    "cause": "build_transaction_plan captured one second-resolution value and propagated it into outputs; commit_transaction_plan then published the receipt last without capturing a separate commit event time.",
+    "actual_transaction_commit_time": "NOT_CRYPTOGRAPHICALLY_CAPTURED",
+    "corrected_interpretation": "TRANSACTION_PLAN_TIMESTAMP_PROPAGATED_TO_APPROVED_OUTPUTS",
+    "invalid_interpretation": "EXACT_TRANSACTION_COMMIT_TIME"
+  },
+  "supporting_filesystem_observations": {
+    "authority": "NON_AUTHORITATIVE_LOCAL_FILESYSTEM_SUPPORTING_EVIDENCE",
+    "artifact_register": {
+      "birth_time": "2026-07-22T14:22:22.713877739+09:00",
+      "modified_time": "2026-07-22T14:22:22.715477675+09:00"
+    },
+    "artifact_change_log": {
+      "birth_time": "2026-07-22T14:22:22.704993063+09:00",
+      "modified_time": "2026-07-22T14:22:22.706386683+09:00"
+    },
+    "posttransition_verification": {
+      "birth_time": "2026-07-22T14:22:22.724877895+09:00",
+      "modified_time": "2026-07-22T14:22:22.726103224+09:00"
+    },
+    "committed_receipt": {
+      "birth_time": "2026-07-22T14:22:24.191898704+09:00",
+      "modified_time": "2026-07-22T14:22:24.193267696+09:00",
+      "change_time": "2026-07-22T14:22:24.200898832+09:00"
+    }
+  },
+  "effective_boundary": {
+    "rule": "The 129 artifact approvals are effective only when the exact bound receipt exists with transaction_status COMMITTED and all bound bytes validate.",
+    "temporal_claim": "Effectiveness must not be represented as occurring earlier than successful publication of the valid COMMITTED receipt.",
+    "exact_effective_time": "NOT_CAPTURED",
+    "receipt_publication_time_evidence": "LOCAL_FILESYSTEM_TIMESTAMPS_ONLY_NOT_AUTHORITATIVE"
+  },
+  "impact": {
+    "owner_approval_valid": true,
+    "transaction_commit_marker_valid": true,
+    "approved_artifact_states_valid": true,
+    "candidate_or_approval_hash_changed": false,
+    "existing_immutable_receipt_modified": false,
+    "reapproval_required": false,
+    "release_status": "NOT_ELIGIBLE",
+    "remaining_gates_are_waived": false
+  },
+  "handling": {
+    "supplements_receipt_time_provenance_only": true,
+    "does_not_supersede_receipt": true,
+    "does_not_rewrite_existing_immutable_records": true,
+    "future_materializers_should_capture_commit_publication_time_after_the_final_receipt_write": true
+  },
+  "content_sha256": "218b920087fd2d0831025ea96eef61ace35ecdde36c565bd6f17e97993ed9452"
+}

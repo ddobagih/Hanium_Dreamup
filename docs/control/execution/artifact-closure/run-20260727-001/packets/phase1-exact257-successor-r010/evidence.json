@@ -1,0 +1,277 @@
+{
+  "completion_boolean_coverage_inheritance": {
+    "current_scope": {
+      "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+      "exact_ids": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "false_count": 255,
+      "rowwise_mismatch_count": 0,
+      "true_count": 2,
+      "true_id_set_sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+    },
+    "global_unqualified": {
+      "all_row_mismatch_count": 0,
+      "false_count": 257,
+      "pairwise_mismatch_counts": [
+        0,
+        0,
+        0
+      ],
+      "true_count": 0,
+      "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "legacy_ambiguous": {
+      "false_count": 257,
+      "true_count": 0,
+      "true_id_set_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "path_count": 6,
+    "paths": [
+      "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+      "/records/*/claim_boundary/current_scope_n_a_closure_claimed",
+      "/records/*/artifact_closure/completion_claimed",
+      "/records/*/artifact_closure/global_artifact_completion_claimed",
+      "/records/*/claim_boundary/global_artifact_completion_claimed",
+      "/records/*/claim_boundary/artifact_completion_claimed"
+    ],
+    "source_binding_ids": [
+      "R010-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+      "R010-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+      "R010-PREDECESSOR-R009-EVIDENCE-PHYSICAL-001",
+      "R010-PREDECESSOR-R009-RECEIPT-PHYSICAL-001"
+    ],
+    "status": "PASS",
+    "totality": {
+      "boolean_count_each": 257,
+      "missing_count_each": 0,
+      "non_boolean_count_each": 0,
+      "null_count_each": 0,
+      "row_count_each": 257
+    }
+  },
+  "historical_finding": {
+    "affected_bindings": [
+      "R010-PREDECESSOR-R009-EVIDENCE-PHYSICAL-001",
+      "R010-PREDECESSOR-R009-RECEIPT-PHYSICAL-001"
+    ],
+    "finding": "R009 declared final_lf=true while its nonself projection byte count and digest were calculated before appending LF.",
+    "finding_id": "R009-MINOR-NONSELF-FINAL-LF-CONTRACT-001",
+    "historical_declaration": {
+      "evidence_integrity_final_lf": true,
+      "receipt_integrity_final_lf": true
+    },
+    "historical_observation": {
+      "evidence_nonself_sha256_lf_excluded": "e557281064525986400c129defe69c240574e9ba84937cc8d1c3a82316f0480a",
+      "projection_byte_count_included_final_lf": false,
+      "projection_sha256_included_final_lf": false,
+      "receipt_nonself_sha256_lf_excluded": "9beb42d1f73ef818f982d51936cc120148aac60ea86d5cca36eeebf66a282556"
+    },
+    "historical_treatment": "R009 physical bindings remain immutable historical inputs; R009 nonself digests are not reinterpreted as LF-inclusive.",
+    "resolution": "R010 defines and executes an LF-inclusive nonself projection contract and independently records actual reserialization count and SHA.",
+    "status": "CLOSED"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 8152,
+    "content_sha256": "377b32d3186fa125a563bc78b6357cc026d6d37a5f5ebd6c4f2f787ff98f2672",
+    "encoding": "UTF-8",
+    "final_lf": true,
+    "projection_contract": {
+      "canonical_json": {
+        "encoding": "UTF-8",
+        "ensure_ascii": true,
+        "recursive_key_order": "LEXICOGRAPHIC_ASCENDING",
+        "separators": {
+          "item": ",",
+          "key_value": ":"
+        },
+        "whitespace_outside_strings": "NONE_EXCEPT_EXACTLY_ONE_FINAL_LF"
+      },
+      "projection_field_rules": {
+        "all_other_fields": "PRESERVE_VALUES",
+        "null_paths": [
+          "/integrity/content_sha256",
+          "/nonself_digest_check/content_sha256"
+        ],
+        "null_value": "JSON_NULL",
+        "omission_paths": [],
+        "omission_rule": "NO_FIELDS_OMITTED"
+      },
+      "terminal_byte_rule": {
+        "byte_hex": "0a",
+        "exact_count": 1,
+        "final_lf": true,
+        "included_in_canonical_byte_count": true,
+        "included_in_sha256_input": true,
+        "operation": "APPEND_EXACTLY_ONE_LF_AFTER_COMPACT_CANONICAL_JSON"
+      }
+    },
+    "projection_path": "/",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 8152,
+    "content_sha256": "377b32d3186fa125a563bc78b6357cc026d6d37a5f5ebd6c4f2f787ff98f2672",
+    "final_lf": true,
+    "projection_contract": {
+      "canonical_json": {
+        "encoding": "UTF-8",
+        "ensure_ascii": true,
+        "recursive_key_order": "LEXICOGRAPHIC_ASCENDING",
+        "separators": {
+          "item": ",",
+          "key_value": ":"
+        },
+        "whitespace_outside_strings": "NONE_EXCEPT_EXACTLY_ONE_FINAL_LF"
+      },
+      "projection_field_rules": {
+        "all_other_fields": "PRESERVE_VALUES",
+        "null_paths": [
+          "/integrity/content_sha256",
+          "/nonself_digest_check/content_sha256"
+        ],
+        "null_value": "JSON_NULL",
+        "omission_paths": [],
+        "omission_rule": "NO_FIELDS_OMITTED"
+      },
+      "terminal_byte_rule": {
+        "byte_hex": "0a",
+        "exact_count": 1,
+        "final_lf": true,
+        "included_in_canonical_byte_count": true,
+        "included_in_sha256_input": true,
+        "operation": "APPEND_EXACTLY_ONE_LF_AFTER_COMPACT_CANONICAL_JSON"
+      }
+    },
+    "projection_path": "/",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json"
+  },
+  "packet_id": "PHASE1-EXACT257-SUCCESSOR-R010-EVIDENCE-001",
+  "physical_output_contract": {
+    "encoding": "UTF-8",
+    "exactly_one_final_lf": true,
+    "final_lf_byte_hex": "0a",
+    "status": "PASS"
+  },
+  "prepared_on": "2026-07-28T12:26:49+09:00",
+  "preserved_invariants": {
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "current_queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 62,
+      "INTERNAL_RUN_REQUIRED": 24,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 21,
+      "SCOPE_DECISION_PENDING": 0,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "current_scope_closure_delta_count": 2,
+    "open_artifact_count": 131,
+    "record_count": 257,
+    "zero_credits": {
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "formal279_pass_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "r010_minor_closure_register": {
+    "all_closed": true,
+    "entries": [
+      {
+        "minor_id": "R009-MINOR-NONSELF-FINAL-LF-CONTRACT-001",
+        "resolution_artifacts": [
+          "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r010/evidence.json",
+          "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r010.json"
+        ],
+        "status": "CLOSED"
+      }
+    ],
+    "entry_count": 1,
+    "register_id": "PHASE1-EXACT257-SUCCESSOR-R010-MINOR-CLOSURE-REGISTER-001",
+    "status": "CLOSED"
+  },
+  "release_gate_inheritance": {
+    "expected": {
+      "named_candidate_count": 0,
+      "release_approval_count": 0,
+      "release_eligible_count": 0,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "observed": {
+      "named_candidate_count": 0,
+      "release_approval_count": 0,
+      "release_eligible_count": 0,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "source_binding_ids": [
+      "R010-PREDECESSOR-R009-EVIDENCE-PHYSICAL-001",
+      "R010-PREDECESSOR-R009-RECEIPT-PHYSICAL-001"
+    ],
+    "status": "PASS"
+  },
+  "schema_version": "1.0.0",
+  "subject_chain": {
+    "bindings": [
+      {
+        "binding_id": "R010-SUBJECT-R007-LEDGER-PHYSICAL-001",
+        "byte_length": 2592915,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r007.json",
+        "sha256": "4cf29456590aaa6df99a4306e50e9d39bf152b69208b3b78c1d1f6087a0a33e9",
+        "subject_role": "R007_LEDGER_IMMUTABLE_SUBJECT"
+      },
+      {
+        "binding_id": "R010-PREDECESSOR-R008-EVIDENCE-PHYSICAL-001",
+        "byte_length": 23279,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r008/evidence.json",
+        "sha256": "fbdfb6b30cd45dec562e80f687d93c2ebdf6582963a6cad72c0907bf8708b045",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_EVIDENCE"
+      },
+      {
+        "binding_id": "R010-PREDECESSOR-R008-RECEIPT-PHYSICAL-001",
+        "byte_length": 37591,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r008.json",
+        "sha256": "22896f621f5029ce66eeb1bf41c93495b758eea54390b098f8f31b13a145093f",
+        "subject_role": "R008_COMPLETION_BOOLEAN_COVERAGE_RECEIPT"
+      },
+      {
+        "binding_id": "R010-PREDECESSOR-R009-EVIDENCE-PHYSICAL-001",
+        "byte_length": 10248,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r009/evidence.json",
+        "sha256": "5c38512d3506fb09dcfa486682b261152d3fcb93ad086a950da4824f8dd1688a",
+        "subject_role": "R009_RELEASE_GATE_CORRECTION_EVIDENCE_WITH_HISTORICAL_NONSELF_LF_MISMATCH"
+      },
+      {
+        "binding_id": "R010-PREDECESSOR-R009-RECEIPT-PHYSICAL-001",
+        "byte_length": 12901,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r009.json",
+        "sha256": "6e6b2d708957854c5f1bce705a94360028cbaeb2989db24fb4dfe0e9e79e65fc",
+        "subject_role": "R009_RELEASE_GATE_CORRECTION_RECEIPT_WITH_HISTORICAL_NONSELF_LF_MISMATCH"
+      }
+    ],
+    "chain_order": [
+      "R010_WRAPPER",
+      "R009_RELEASE_CHECK",
+      "R008_BOOLEAN_COVERAGE",
+      "R007_LEDGER_SUBJECT"
+    ],
+    "ledger_changed": false,
+    "ledger_replicated": false
+  },
+  "wrapper_semantics": "ADD_ONLY_CORRECTION_WRAPPER; EXISTING_ARTIFACTS_IMMUTABLE; NO_R010_LEDGER"
+}

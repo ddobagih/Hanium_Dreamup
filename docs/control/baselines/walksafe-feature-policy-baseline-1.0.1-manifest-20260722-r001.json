@@ -1,0 +1,199 @@
+{
+  "schema_version": "walksafe.feature-policy-baseline-manifest.v2",
+  "metadata": {
+    "manifest_id": "WS-FEATURE-POLICY-BASELINE-MANIFEST-20260722-001",
+    "manifest_version": "1.0.0",
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "established_at": "2026-07-22T14:03:17+09:00",
+    "established_at_basis": "EXACT_OWNER_APPROVAL_PROCESSING_RECORD",
+    "baseline_status": "BASELINED",
+    "effective_status": "EFFECTIVE_BY_BUNDLED_OWNER_APPROVAL",
+    "control_materialization_status": "PENDING_ATOMIC_DOC01_DOC05_COMMIT"
+  },
+  "supersedes": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "baseline_version": "1.0.0",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+    "manifest_file_sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+  },
+  "approval_binding": {
+    "approval_record_id": "WS-ARTIFACT-BASELINE-APPROVAL-20260722-001",
+    "approval_record_path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+    "approval_record_content_sha256": "f0d83889eb784a7407ed11ab4de8ea360a6f44bbcd113ada984812a550d6a437",
+    "statement_text_sha256": "23dc7a77091f5ee0e66848c84ffec11837ad58f3701a85706665a84a49a95667"
+  },
+  "composition": {
+    "base_policy_1_0_0_remains_immutable": true,
+    "overlay_candidate_path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+    "overlay_candidate_file_sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+    "overlay_candidate_content_sha256": "1918e10fd03d74fc3a7c292b077f1da51027bcdc7b9945f6c22c0acafc877a9d",
+    "approved_feature_id": "FP-035",
+    "approved_normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+    "decision_branches": [
+      {
+        "condition": "보행 중",
+        "result": "일반 활동원본을 어떤 망으로도 전송하지 않는다."
+      },
+      {
+        "condition": "보행 정지 후, 이동통신망 전송을 명시적으로 선택했고 현재 망이 허용됨",
+        "result": "배터리·저장공간 등 다른 전송 조건도 충족하면 이동통신망 전송을 허용한다."
+      },
+      {
+        "condition": "보행 정지 후, 이동통신망 전송을 선택하지 않음",
+        "result": "Wi-Fi에서만 전송한다."
+      },
+      {
+        "condition": "허용된 망이 없음",
+        "result": "암호화 대기열에 보관하고 기존 보존·용량·삭제 정책을 적용한다."
+      }
+    ],
+    "directly_affected_artifact_codes": [
+      "REQ-03",
+      "REQ-06",
+      "DES-04",
+      "DES-13",
+      "DES-20"
+    ]
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "kind_label": "실측",
+      "completion_condition": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다.",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-044",
+        "FP-045"
+      ],
+      "must_close_before": "지원 기기별 실제 사용자시험 범위 확정과 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "지원 기기별 대기열 용량 기준 확정",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "kind_label": "개발 설계 검토",
+      "completion_condition": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다.",
+      "affected_feature_ids": [
+        "FP-031",
+        "FP-032",
+        "FP-035",
+        "FP-040",
+        "FP-044",
+        "FP-052",
+        "FP-053"
+      ],
+      "must_close_before": "관련 기능의 통합시험 완료와 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "서버 용량상태 연동 통합시험 완료",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "kind_label": "독립 검토",
+      "completion_condition": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다.",
+      "affected_feature_ids": [
+        "FP-013",
+        "FP-015",
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-022",
+        "FP-023",
+        "FP-025",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-036",
+        "FP-038",
+        "FP-041",
+        "FP-046",
+        "FP-048",
+        "FP-049",
+        "FP-050",
+        "FP-053",
+        "FP-054"
+      ],
+      "must_close_before": "TST-22 출시 준비도 판단과 실제 서비스 배포 전",
+      "blocks_until_complete": [
+        "무가림 원본수집 출시 적합 판정",
+        "REL-02 릴리스 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "title": "실제 클라우드 저장비 측정",
+      "kind_label": "실측",
+      "completion_condition": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다.",
+      "affected_feature_ids": [
+        "FP-041",
+        "FP-053"
+      ],
+      "must_close_before": "운영비 기준 확정과 TST-22 출시 준비도 판단 전",
+      "blocks_until_complete": [
+        "월 저장비 상한 충족 판정",
+        "TST-22 출시 준비도 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "kind_label": "복구훈련",
+      "completion_condition": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다.",
+      "affected_feature_ids": [
+        "FP-003",
+        "FP-008",
+        "FP-047",
+        "FP-048",
+        "FP-050",
+        "FP-051",
+        "FP-052",
+        "FP-053"
+      ],
+      "must_close_before": "실제 사용자시험 또는 배포 전",
+      "blocks_until_complete": [
+        "실제 사용자시험 시작",
+        "REL-02 릴리스 승인"
+      ],
+      "does_not_block_after_policy_baseline_approval": [
+        "0~6 정식 산출물 작성",
+        "통제된 개발·시험 준비"
+      ]
+    }
+  ],
+  "release_status": "NOT_ELIGIBLE",
+  "change_control": {
+    "direct_edit_allowed": false,
+    "new_owner_approval_required_for_normative_change": true
+  },
+  "content_sha256": "8fdeab58e8c901a29f4380de373cdfd2b67350cd43dafa765246b4f6c9f77244"
+}

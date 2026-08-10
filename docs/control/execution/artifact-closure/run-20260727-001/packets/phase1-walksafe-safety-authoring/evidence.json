@@ -1,0 +1,291 @@
+{
+  "artifact_dispositions": [
+    {
+      "anchor": "ws-08",
+      "approval_status": "PENDING",
+      "artifact_type_code": "DLV-WS-08",
+      "claim": "Class-specific failure, FP/FN risk, severity, exposure, detectability, fail-closed behavior, and field-evidence limitations are explicitly authored.",
+      "class_level_field_result_claimed": false,
+      "device_or_field_pass_claimed": false,
+      "disposition": "CONTENT_STRENGTHENED_NO_EXECUTION_PROMOTION",
+      "primary_output_subject_id": "OUT-WS-SAFETY-POLICY",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL"
+    },
+    {
+      "anchor": "ws-10",
+      "approval_status": "PENDING",
+      "artifact_type_code": "DLV-WS-10",
+      "candidate_model_binding_status": "UNKNOWN_NOT_BOUND",
+      "claim": "Candidate model binding, input, output, tolerance, failure decision, procedure, and evidence destination are explicit; unavailable model hash and tolerance remain open.",
+      "disposition": "RUN_REQUIRED_NO_RESULT_PROMOTION",
+      "parity_run_status": "NOT_RUN",
+      "primary_output_subject_id": "OUT-WS-ACCEPTANCE-MATRIX",
+      "result_status": "UNKNOWN",
+      "status": "RUN_CONTRACT_AUTHORED_ACTUAL_RUN_NOT_RUN"
+    },
+    {
+      "anchor": "ws-18",
+      "approval_status": "PENDING",
+      "artifact_type_code": "DLV-WS-18",
+      "claim": "Timeout, normalized errors, bounded retry, cache invalidation, quota unknowns, offline handling, and safe fail-closed fallback are explicitly authored.",
+      "device_or_field_pass_claimed": false,
+      "disposition": "CONTENT_STRENGTHENED_NO_EXECUTION_PROMOTION",
+      "primary_output_subject_id": "OUT-WS-SAFETY-POLICY",
+      "provider_contract_status": "UNKNOWN_NOT_CONFIRMED",
+      "quota_status": "UNKNOWN_NOT_ESTABLISHED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "supporting_output_subject_id": "OUT-NAVIGATION-INTEGRATION-POLICY"
+    }
+  ],
+  "capture_time": "2026-07-27T21:33:16+09:00",
+  "completion_boundary": {
+    "actual_parity_run_complete": false,
+    "actual_test_complete": false,
+    "approval_complete": false,
+    "authoring_recorded": true,
+    "content_review_complete": false,
+    "device_validation_complete": false,
+    "field_validation_complete": false,
+    "implementation_conformance_complete": false,
+    "map_api_contract_confirmed": false,
+    "map_quota_confirmed": false,
+    "release_eligible": false
+  },
+  "history_control": {
+    "future_execution_requires_new_exact_subject_receipt": true,
+    "packet_is_approval_receipt": false,
+    "packet_is_test_receipt": false
+  },
+  "immutable_input_manifest": {
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "hash_algorithm": "SHA-256",
+    "immutability": "CONTENT_ADDRESSED_CAPTURE",
+    "manifest_id": "WS-PHASE1-SAFETY-INPUTS-20260727-001",
+    "manifest_sha256": "301d689a32fa55678c22944cb16f51dd3dbc0659e1ed34e545570d3a93944487",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subjects": [
+      {
+        "byte_length": 11429,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/android/aihub189_depthprediction_offline_validation_20260701.md",
+        "sha256": "db0f1895bd4e6eeeaee7c396696f91ca7f0165491d7765d883b85f2fa9c10ce1",
+        "subject_id": "IN-AIHUB189-OFFLINE-VALIDATION",
+        "subject_role": "INSPECTED_VALIDATION_SOURCE"
+      },
+      {
+        "byte_length": 8054,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+        "subject_id": "IN-POLICY-BASELINE-MANIFEST",
+        "subject_role": "CURRENT_EFFECTIVE_POLICY_SOURCE"
+      },
+      {
+        "byte_length": 12949,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "sha256": "ccc0c7ecad9cf0f4c803a3dfc961c7e5c6fd1c1c007020401deb3db08d769de7",
+        "subject_id": "IN-CURRENT-IMPLEMENTATION-BASELINE",
+        "subject_role": "CURRENT_CLAIM_BOUNDARY_SOURCE"
+      },
+      {
+        "byte_length": 1111436,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-artifact-action-queue.json",
+        "sha256": "75a718d23b81e234c7542426301b36a3cf1e9b406fb2348ceee928e18bdb043b",
+        "subject_id": "IN-PHASE1-ACTION-QUEUE",
+        "subject_role": "CURRENT_ACTION_QUEUE_SOURCE"
+      },
+      {
+        "byte_length": 2165,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/evidence/aihub189_depthprediction_original_full_20260702.md",
+        "sha256": "42683cbad14e6fc5093ce2fb52777c2ae37219481189135d9313a09768e9d3d3",
+        "subject_id": "IN-AIHUB189-ORIGINAL-SOURCE",
+        "subject_role": "INSPECTED_DATA_SOURCE_RECORD"
+      }
+    ]
+  },
+  "immutable_output_manifest": {
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "hash_algorithm": "SHA-256",
+    "immutability": "CONTENT_ADDRESSED_CAPTURE",
+    "manifest_id": "WS-PHASE1-SAFETY-OUTPUTS-20260727-001",
+    "manifest_sha256": "9abe0a6ed6b007b4edbdcacd1d8dc54f962aeff52a5a2ded73d0d1093140984e",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subjects": [
+      {
+        "byte_length": 53428,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+        "sha256": "5b0efdced1b9a17ecdf73311c78b83c55643521a671289c7fd18c1aa0a9e54cc",
+        "subject_id": "OUT-WS-ACCEPTANCE-MATRIX",
+        "subject_role": "CANONICAL_AUTHORED_OUTPUT"
+      },
+      {
+        "byte_length": 70768,
+        "capture_time": "2026-07-27T21:41:47+09:00",
+        "exact_path": "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+        "sha256": "ef2f9a25ed267df2e5b9dad7cf664b7c2f625351ad03a6d5e3304a0b9a9cb7c6",
+        "subject_id": "OUT-WS-SAFETY-POLICY",
+        "subject_role": "CANONICAL_AUTHORED_OUTPUT"
+      },
+      {
+        "byte_length": 20675,
+        "capture_time": "2026-07-27T21:33:16+09:00",
+        "exact_path": "docs/walksafe-v2/navigation_integration_policy.md",
+        "sha256": "af9a05935a3f54a7f06e6dfcba4a39a6d57ef94879cf1c3afa0288ca050a63a8",
+        "subject_id": "OUT-NAVIGATION-INTEGRATION-POLICY",
+        "subject_role": "SUPPORTING_CANONICAL_AUTHORED_OUTPUT"
+      }
+    ]
+  },
+  "inspected_source_facts": {
+    "aihub189_offline_reference_run": {
+      "arcore_pass": false,
+      "candidate_model_binding_status": "UNKNOWN_NOT_BOUND",
+      "candidate_model_id": null,
+      "candidate_model_sha256": null,
+      "class_or_label_level_results_present": false,
+      "confidence_direction_status": "DISABLED_UNKNOWN_DIRECTION",
+      "detector_performance_evidence": false,
+      "disp16_scale_status": "16.0_UNVERIFIED",
+      "execution_status_in_source": "RECORDED_OFFLINE_RUN",
+      "frames_evaluated": 2461,
+      "frames_total": 2461,
+      "frames_with_all_files": 2461,
+      "generated_probe_bbox_used": true,
+      "generated_probe_detections": 2461,
+      "input_contract": "1920x1080 left/right RGB, 16-bit grayscale disp16, 8-bit grayscale confidence, recorded ZED fx=1394.83 and baseline=120.009mm",
+      "model_parity_status": "NOT_RUN",
+      "numeric_tolerance_status": "UNKNOWN_NOT_DEFINED_IN_BOUND_SOURCES",
+      "output_contract": "distance_m, step_count, risk_bucket, CSV and JSON summary",
+      "risk_bucket_counts": {
+        "ignore": 926,
+        "stop": 883,
+        "warning": 652
+      },
+      "skipped_low_quality": 0,
+      "skipped_missing_assets": 0,
+      "skipped_missing_frame": 0,
+      "source_archive_set_sha256_as_recorded": "f02358a0e1e784671d8de01aea94048b457a948bedf6b45596c01b24f03dea03",
+      "zed_reference_is_ground_truth": false
+    }
+  },
+  "packet_id": "WS-PHASE1-WALKSAFE-SAFETY-AUTHORING-20260727-001",
+  "packet_status": "AUTHORING_RECORDED_REVIEW_APPROVAL_AND_EXECUTION_OPEN",
+  "policy_state": {
+    "baseline_status": "BASELINED",
+    "current_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "current_baseline_version": "1.0.1",
+    "effective_status": "EFFECTIVE_BY_BUNDLED_OWNER_APPROVAL",
+    "implementation_conformance_status": "NOT_ASSESSED",
+    "stale_current_policy_occurrences": 0
+  },
+  "prepared_on": "2026-07-27",
+  "queue_preservation": {
+    "execution_started": false,
+    "final_completion_claimed": false,
+    "owner_approval_claimed": false,
+    "phase1_queue_is_execution_approval": false,
+    "rows": [
+      {
+        "artifact_type_code": "DLV-WS-08",
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "current_state": "OK_BASELINE",
+        "queue_state_mutated": false,
+        "source_snapshot_status": "OK"
+      },
+      {
+        "artifact_type_code": "DLV-WS-10",
+        "completion_mode": "ACTUAL_RUN_AND_RESULT",
+        "current_state": "INTERNAL_RUN_REQUIRED",
+        "queue_state_mutated": false,
+        "source_snapshot_status": "INTERNAL_GAP"
+      },
+      {
+        "artifact_type_code": "DLV-WS-18",
+        "completion_mode": "CONTENT_ACCEPTANCE_ONLY",
+        "current_state": "OK_BASELINE",
+        "queue_state_mutated": false,
+        "source_snapshot_status": "OK"
+      }
+    ]
+  },
+  "remaining_gates": [
+    {
+      "gate_id": "GATE-WS08-CLASS-LEVEL-FIELD-VALIDATION",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-WS10-CANDIDATE-MODEL-BINDING",
+      "status": "OPEN_UNKNOWN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-WS10-MODEL-PARITY-RUN",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-WS18-MAP-CONTRACT-AND-QUOTA",
+      "status": "OPEN_UNKNOWN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-WS18-DEVICE-FIELD-FALLBACK",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "gate_id": "GATE-PHASE1-SAFETY-CONTENT-REVIEW-AND-APPROVAL",
+      "status": "OPEN",
+      "waived": false
+    }
+  ],
+  "schema_version": "walksafe.phase1-safety-authoring-evidence.v1",
+  "scope": {
+    "actual_test_or_device_event_claimed": false,
+    "artifact_type_codes": [
+      "DLV-WS-08",
+      "DLV-WS-10",
+      "DLV-WS-18"
+    ],
+    "execution_mode": "STATIC_AUTHORING_ONLY",
+    "queue_state_transition_claimed": false
+  },
+  "static_consistency": {
+    "candidate_model_hash_fabricated": false,
+    "current_policy_file_count": 3,
+    "execution_state_promotion": "NONE",
+    "markdown_fence_parity": "PASS_3_OF_3",
+    "offline_reference_promoted_to_model_parity": false,
+    "policy_stale_disallowed_occurrences": 0,
+    "required_anchor_count": 3
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "excluded_json_path": "$.packet_content_fingerprint",
+    "non_self_referential": true,
+    "sha256": "5095f7c0420eefbbe1b8c7c99b9d0eb27b1d1dc122e65a99580fd17a74f26417"
+  }
+}

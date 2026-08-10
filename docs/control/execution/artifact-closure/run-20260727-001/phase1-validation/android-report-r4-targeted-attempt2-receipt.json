@@ -1,0 +1,25 @@
+{
+  "run_id": "android-report-r4-targeted-attempt2",
+  "started_at": "2026-07-27T14:51:32.775908615Z",
+  "completed_at": "2026-07-27T14:51:53.193916960Z",
+  "exit_code": 1,
+  "resource_policy": "single heavy lane; max-workers=1; JVM Xmx=1536MiB; nice=10; ionice=best-effort/7; offline; no-daemon; clean-test-output; rerun-tasks",
+  "preflight_mem_available_mib": 22991,
+  "log": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/android-report-r4-targeted-attempt2-test-compile-fail.log",
+    "sha256": "63cec6e888ce4d41495c54459d82afd851c91a5476a327155eeb818fd79d31bb"
+  },
+  "junit": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "test_execution_started": false,
+  "claim_boundary": {
+    "formal279": false,
+    "device": false,
+    "release": false
+  },
+  "failure_stage": "compileDebugUnitTestKotlin"
+}

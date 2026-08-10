@@ -1,0 +1,301 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP015-WITHDRAWAL-ACCOUNT-DELETION-IMPLEMENTATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-015-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-25T23:47:50+09:00",
+  "implementation_content_set_sha256": "b23fe77ae83b63092b3d27fee8762c6f52066b368c4714263dfd97e4df164054",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "before_sha256": "25e749d03fcff6cf5c00ae73b00d239c4b4d9c8f392f5d1e2fca2fbabad38133",
+      "after_sha256": "7646f8cf176d900e2e9765effe3a838e4915073076c2d771911679738ee3f652",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+      "before_sha256": "42b39a5c30cc82d7d1e5b2a641f9044c19e6c6f693c71ef20631fab34371ad7f",
+      "after_sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+      "before_sha256": null,
+      "after_sha256": "878c7b1830ca4b2a8d37e092ec9e1bef055811946471a4003f18fe9897585aa7",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+      "before_sha256": null,
+      "after_sha256": "f0e951bf102afd590b213988d3fbeb5d3f3ad06b22f994d2b2d075e0a2402d89",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "before_sha256": "085c8818cbad50eee57326395b37e5b70d7e593b55858a9aab02d6771eb2259d",
+      "after_sha256": "01c47e47c8729d095e0deeb2abea5a896807bf443b2400b8860dfe95faf47d4b",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+      "before_sha256": "272d1122e67f106934f49aa2ce0555cb85e498da790342f7f96e8a42ded2d995",
+      "after_sha256": "f0bc17b243f52f9a100f926fdda51973df572c34b9368b2ac4e750ef1fd8b6ef",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+      "before_sha256": "fdd7890d7867b2e7a7045dcf22612a20a4c9a82d7b2dac0bc42f4b811ebf516a",
+      "after_sha256": "3bf6116f5598839edc5e2348b3e54d891360ad03c9c6013fa73a9089a4d37d5d",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+      "before_sha256": "79557faedcfdc0e393180c9dfd0061df12538e5177ed2c8e76f66b54881c3003",
+      "after_sha256": "ffd3e85c6888dcf1f13ea55f5f2899067c9687dedaffe33558e4509d352d858a",
+      "before_source": "GATE_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "5fecb60b9fea9414c9a31bfc2b9117698f0b75d1c81a7c50393c37fe70f288e8",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "44b49ab6add861b948c63178ef46537b89df6f51795cbc1714aff5b68b275155",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentWithdrawalTest.kt",
+      "before_sha256": null,
+      "after_sha256": "a2c0d75efd12f0fa04991a40ebfab5bff095247d25a956b708f73768cfe3c0b3",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+      "before_sha256": null,
+      "after_sha256": "ea0ee6d7077fdc72c273d8a3be018c4bcf3d3c60d9973ae9699f8128bd0bbedd",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+      "before_sha256": null,
+      "after_sha256": "de171ee17b89b6675c0c5959fa490facecf147510ed1785c9f1c14d21b1e92fd",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyAccountDeletionTest.kt",
+      "before_sha256": null,
+      "after_sha256": "e19d0dd8136e6f083f692727a0699ab4d958931eca698da1c32aa63923499d09",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportPurposeHeaderStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "a90dfe8fad0d5c2f989633ef10a037864bb19295702ec937b921431dae63e355",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+      "before_sha256": "c9c5d3ed1326f4da58685ae4bf1d810206b9c265044702ac2750345c610e63b2",
+      "after_sha256": "96ec030a7178497dd42fddfc1a473c87b33b584ffa278b5025f0b714cb517e77",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "before_sha256": "0c820c70ec05f5ec39bc4b15d98f0f567955609a0d2622147faaf2868ddebb97",
+      "after_sha256": "ddeed74408ef64d0fa79d3d12d882a4d15cfb544ad9cffaec5c4c9c7296450a8",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "before_sha256": "b0bf63b336448447ea1f0225573d8173b5c964535c21c650db395d946839b246",
+      "after_sha256": "59fbffefcb55ee48ce64d7532354e8012b5c59ecaeecb91fe5c05a09026450d0",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "a5f886f847e6ec4f483f096db30cac74e7a89de4956411ff279b02be27fb3fed",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+      "before_sha256": null,
+      "after_sha256": "03062251a4269ee596f4633c66c93c849b980a302683cc6f91a8918547487f41",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+      "before_sha256": null,
+      "after_sha256": "3bb534c89d088c23b3755c5573801ff6bf0f3a1cf57876be655e9158abedf62b",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+      "before_sha256": null,
+      "after_sha256": "ab0ac3ec00c53a8ea36d986985f206ac20835a2c1cfeaa408bc134fc51ab1dd5",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+      "before_sha256": null,
+      "after_sha256": "ee77631da711a87b6fa194b1834da396257fa78de5e54a073b8892c43ff1ebb3",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "before_sha256": "99cfd48ca29a8036d4b9b0e3cdb0290298114f1ae00fbe3e0172d2cb29ce15b6",
+      "after_sha256": "feea182c229e7bc6eec74afc571e4690b597937eaf20852f4bcdafe9bf5f4d3b",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "before_sha256": "0ffb67634f94722d4546155da5c6478c46374e1cac55c9a33c6cad8f2350ef54",
+      "after_sha256": "f3db37cb2e7dcf99dc15a3050def7d18b591615bbe774cc25ef00c3769be10f3",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/privacy-rights.ts",
+      "before_sha256": null,
+      "after_sha256": "170dba92d350204aa1d605050e944d0a386574851b3b850597ed48894cd126db",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "before_sha256": "7670b831fb364bf57fcc6f0207952e6913a97f0c89316a4064f55dbcdf9c90e8",
+      "after_sha256": "38106ed30e5c0a89dd45cb94699d8762321bfb27e3c0f5b257b55e562b3e57de",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/privacy-rights.test.ts",
+      "before_sha256": null,
+      "after_sha256": "5475a015d881630991623e7b7ad88edce6da269622308ac25ca78d2be9421790",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "before_sha256": "001654580bd92a7736691180ff19d1523437809378b944b0b91ef4bff4938d55",
+      "after_sha256": "0094eff1d4b2ac67d79d0a9193f9fe5da2b71ea8c61d70522a4a8cbe8ff60856",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/README.md",
+      "before_sha256": "1156a12576f3534bc5b74b5e77f47ed3799e0e6add8fcad95ae8b375250c9c07",
+      "after_sha256": "f500d9c2349c0b27019a7583f2ec700c9c35b1baf50966ef77f17eded48844e3",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/openapi.json",
+      "before_sha256": "6f00db2fe0a9088e8121a821ef6c46c1382b58bd7a211fc7ace2ce81ab040ee7",
+      "after_sha256": "f09ddb9f9c50d183dfec23377bafed7e5137b5946aa758575d0a5f09b177d265",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+      "before_sha256": null,
+      "after_sha256": "fc2345475f0025d3064492b8715341fedf1a36b2fd52d2fb3d00c85e1707cbde",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+      "before_sha256": null,
+      "after_sha256": "fff15f19d427f4cb4956f81b1a12b39aa8964412a457d1a8c612839a77721b36",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "before_sha256": "4adddf561799e3601762b5a5d4b33c145bcd14133356e464236c5825ccf49f7f",
+      "after_sha256": "95c4beea24837526a420efbae281fe7082bae88033b2bdc8722373b2304fa9b1",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "purpose withdrawal and account deletion use distinct explicit state machines",
+    "withdrawal immediately closes new purpose collection, reporting, transfer and training reuse",
+    "account deletion immediately closes every new personal-data processing entry point",
+    "phone, server, derived-data, report and backup deletion items remain independently tracked",
+    "phone, server, derived-data and backup deadlines are 24 hours, 7 days, 30 days and 35 days",
+    "failed, retry-waiting and legal-hold items cannot be promoted to complete",
+    "idempotent requests and monotonic revisions reject delayed, duplicate and reversed responses",
+    "logout ends only login while app removal never claims server deletion",
+    "local unsent data is removed by purpose without claiming remote or backup completion",
+    "app and public privacy-rights requests converge on one server processing record",
+    "re-registration creates a new account and new consent without restoring prior choices",
+    "Android progress, failure, remaining-item and contact states expose accessibility semantics"
+  ],
+  "remaining_implementation_boundaries": [
+    "final legal, privacy and legal-hold determinations were not performed",
+    "actual users, guardians, TalkBack users and Android devices were not tested",
+    "actual external stores, derived datasets, reports and backups were not deleted",
+    "external rights intake, alternative identity proof and deletion SLA were not certified",
+    "production credentials, networks and deployment were not used",
+    "TC-FP-015-01 through TC-FP-015-05, the 279 formal tests and release gates were not run"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-015-01",
+      "TC-FP-015-02",
+      "TC-FP-015-03",
+      "TC-FP-015-04",
+      "TC-FP-015-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "legal_privacy_review_status": "NOT_RUN",
+    "legal_hold_determination_status": "NOT_RUN",
+    "approved_final_privacy_copy_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_guardian_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "actual_external_storage_deletion_status": "NOT_RUN",
+    "actual_backup_deletion_status": "NOT_RUN",
+    "external_rights_intake_provisioning_status": "NOT_RUN",
+    "deletion_sla_certification_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

@@ -1,0 +1,1769 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#172131" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="WalkSafe 프로젝트 정책과 사양을 확정하기 위한 오프라인 의사결정 질문지">
+  <link rel="icon" href="data:,">
+  <title>WalkSafe 프로젝트 결정 질문지</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-muted: #eef3f8;
+      --text: #172133;
+      --muted: #566478;
+      --line: #cbd5e1;
+      --line-strong: #91a0b4;
+      --primary: #0757a6;
+      --primary-dark: #003b78;
+      --primary-soft: #e6f1ff;
+      --success: #08784a;
+      --success-soft: #e5f7ef;
+      --warning: #8a4b00;
+      --warning-soft: #fff3d6;
+      --danger: #b42318;
+      --danger-soft: #ffebe9;
+      --focus: #e06b00;
+      --shadow: 0 10px 30px rgb(25 46 74 / 10%);
+      --radius: 0.75rem;
+      --sidebar-width: 18.5rem;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 20rem;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    select,
+    textarea { font: inherit; }
+
+    button,
+    select,
+    input[type="checkbox"],
+    input[type="radio"],
+    summary,
+    .option {
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgb(7 87 166 / 18%);
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    summary:focus-visible,
+    a:focus-visible {
+      outline: 0.2rem solid var(--focus);
+      outline-offset: 0.15rem;
+    }
+
+    .skip-link {
+      position: fixed;
+      left: 1rem;
+      top: -6rem;
+      z-index: 100;
+      padding: 0.75rem 1rem;
+      border-radius: 0.4rem;
+      color: #fff;
+      background: #000;
+    }
+
+    .skip-link:focus { top: 1rem; }
+
+    .app-header {
+      padding: 1.25rem clamp(1rem, 4vw, 3.5rem);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .header-row,
+    .toolbar-row,
+    .progress-row,
+    .card-heading,
+    .card-footer,
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .header-row {
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    h1,
+    h2,
+    h3 {
+      text-wrap: balance;
+    }
+
+    h1,
+    h2,
+    h3,
+    p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 0.35rem;
+      font-size: clamp(1.55rem, 3vw, 2.15rem);
+      line-height: 1.2;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+
+    .purpose {
+      max-width: 68rem;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .header-actions,
+    .toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    .button {
+      min-height: 2.75rem;
+      padding: 0.55rem 0.9rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 0.5rem;
+      color: var(--text);
+      background: var(--surface);
+      font-weight: 650;
+    }
+
+    .button:hover { border-color: var(--primary); }
+
+    .button-primary {
+      border-color: var(--primary);
+      color: #fff;
+      background: var(--primary);
+    }
+
+    .button-primary:hover { background: var(--primary-dark); }
+
+    .button-danger {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .button-small {
+      min-height: 2.75rem;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.9rem;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 0.85rem clamp(1rem, 4vw, 3.5rem);
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      box-shadow: 0 4px 18px rgb(25 46 74 / 8%);
+      backdrop-filter: blur(0.5rem);
+    }
+
+    .toolbar-row {
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .search-wrap {
+      flex: 1 1 18rem;
+      max-width: 38rem;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-weight: 700;
+    }
+
+    .search-input,
+    .filter-select,
+    .mobile-category-select,
+    .text-answer,
+    .number-answer {
+      width: 100%;
+      min-height: 2.75rem;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid var(--line-strong);
+      border-radius: 0.45rem;
+      color: var(--text);
+      background: var(--surface);
+    }
+
+    .filter-wrap { min-width: 12rem; }
+
+    .progress-panel {
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .progress-row {
+      justify-content: space-between;
+      flex-wrap: wrap;
+      font-size: 0.93rem;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 0.75rem;
+      margin-top: 0.45rem;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-muted);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+
+    .progress-value {
+      width: 0;
+      height: 100%;
+      background: var(--primary);
+      transition: width 180ms ease;
+    }
+
+    .completion-banner {
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.8rem;
+      border-left: 0.3rem solid var(--warning);
+      border-radius: 0.35rem;
+      color: var(--warning);
+      background: var(--warning-soft);
+      font-weight: 700;
+    }
+
+    .completion-banner.complete {
+      border-color: var(--success);
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .storage-warning {
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.8rem;
+      border-left: 0.3rem solid var(--danger);
+      border-radius: 0.35rem;
+      color: var(--danger);
+      background: var(--danger-soft);
+      font-weight: 700;
+    }
+
+    .storage-notice {
+      margin: 0.8rem 0 0;
+      padding: 0.7rem 0.8rem;
+      border-left: 0.3rem solid var(--primary);
+      border-radius: 0.35rem;
+      color: var(--muted);
+      background: var(--surface-muted);
+      font-size: 0.9rem;
+    }
+
+    .mobile-category { display: none; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(14rem, var(--sidebar-width)) minmax(0, 1fr);
+      gap: 1.25rem;
+      width: min(100%, 100rem);
+      margin: 0 auto;
+      padding: 1.25rem clamp(1rem, 3vw, 2rem) 4rem;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 11.6rem;
+      align-self: start;
+      max-height: calc(100vh - 13rem);
+      overflow: auto;
+      padding: 0.85rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar-title {
+      margin-bottom: 0.6rem;
+      font-size: 1rem;
+    }
+
+    .category-list {
+      display: grid;
+      gap: 0.4rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .category-button {
+      width: 100%;
+      padding: 0.65rem 0.7rem;
+      border: 1px solid transparent;
+      border-radius: 0.45rem;
+      color: var(--text);
+      background: transparent;
+      text-align: left;
+    }
+
+    .category-button:hover { background: var(--surface-muted); }
+
+    .category-button[aria-current="true"] {
+      border-color: var(--primary);
+      color: var(--primary-dark);
+      background: var(--primary-soft);
+      font-weight: 750;
+    }
+
+    .category-button small {
+      display: block;
+      margin-top: 0.1rem;
+      color: var(--muted);
+    }
+
+    .content { min-width: 0; }
+
+    .result-summary {
+      margin-bottom: 0.75rem;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .question-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+    }
+
+    .question-card {
+      min-width: 0;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 70rem;
+      scroll-margin-top: 12rem;
+      padding: clamp(1rem, 2.5vw, 1.4rem);
+      border: 1px solid var(--line);
+      border-left: 0.35rem solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .question-card.answered { border-left-color: var(--success); }
+    .question-card.has-error { border-left-color: var(--danger); }
+    .question-card.has-warning:not(.has-error) { border-left-color: var(--warning); }
+    .question-card.review-marked { box-shadow: 0 0 0 0.18rem var(--warning), var(--shadow); }
+
+    .card-heading {
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .question-title {
+      margin-bottom: 0.2rem;
+      font-size: 1.18rem;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .question-id {
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.35rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.6rem;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--surface-muted);
+      font-size: 0.78rem;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .badge-required,
+    .badge-error {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .badge-recommended {
+      border-color: var(--primary);
+      color: var(--primary-dark);
+      background: var(--primary-soft);
+    }
+
+    .badge-success {
+      border-color: var(--success);
+      color: var(--success);
+      background: var(--success-soft);
+    }
+
+    .question-prompt {
+      margin-bottom: 0.85rem;
+      font-size: 1.03rem;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .context-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.65rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .info-box {
+      min-width: 0;
+      padding: 0.7rem 0.8rem;
+      border-left: 0.25rem solid var(--primary);
+      border-radius: 0.35rem;
+      background: var(--surface-muted);
+      overflow-wrap: anywhere;
+    }
+
+    .info-box strong { display: block; margin-bottom: 0.2rem; }
+    .info-box p:last-child { margin-bottom: 0; }
+
+    fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    .option-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.55rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .option {
+      display: grid;
+      min-width: 0;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.65rem;
+      padding: 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 0.55rem;
+      background: var(--surface);
+    }
+
+    .option-title,
+    .option-description,
+    .option-tradeoff { overflow-wrap: anywhere; }
+
+    .option:hover { border-color: var(--primary); }
+
+    .option.recommended {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .option input {
+      width: 1.2rem;
+      height: 1.2rem;
+      margin-top: 0.2rem;
+      accent-color: var(--primary);
+    }
+
+    .option-title { font-weight: 750; }
+    .option-description { display: block; margin-top: 0.12rem; color: var(--muted); }
+    .option-tradeoff { display: block; margin-top: 0.25rem; font-size: 0.9rem; }
+
+    .text-answer { min-height: 7rem; resize: vertical; }
+    .decision-note {
+      min-height: 5.5rem;
+      margin-top: 0.35rem;
+      resize: vertical;
+    }
+    .note-panel {
+      margin: 0.9rem 0;
+      padding: 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 0.55rem;
+      background: var(--surface-muted);
+    }
+    .note-panel label { display: block; font-weight: 750; }
+    .note-panel p { margin: 0.2rem 0 0.4rem; color: var(--muted); font-size: 0.9rem; }
+    .number-row { display: flex; align-items: center; gap: 0.55rem; max-width: 28rem; }
+    .number-unit { color: var(--muted); font-weight: 700; }
+    .answer-help { margin: 0.35rem 0 0.85rem; color: var(--muted); font-size: 0.9rem; }
+
+    .recommendation {
+      margin: 0.9rem 0;
+      padding: 0.8rem;
+      border: 1px solid #8bbbe8;
+      border-radius: 0.55rem;
+      background: var(--primary-soft);
+    }
+
+    .recommendation h3 { margin-bottom: 0.35rem; font-size: 1rem; }
+    .recommendation p:last-child { margin-bottom: 0; }
+
+    details {
+      margin-top: 0.7rem;
+      border: 1px solid var(--line);
+      border-radius: 0.45rem;
+      background: var(--surface);
+    }
+
+    summary {
+      padding: 0.65rem 0.75rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .details-body { padding: 0 0.85rem 0.85rem; }
+    .details-body h3 { margin: 0.75rem 0 0.25rem; font-size: 0.95rem; }
+    .details-body ul { margin: 0.2rem 0 0.7rem; padding-left: 1.3rem; }
+
+    .evidence-list {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.45rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .evidence-item {
+      min-width: 0;
+      padding: 0.55rem;
+      border: 1px solid var(--line);
+      border-radius: 0.4rem;
+      background: var(--surface-muted);
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-path {
+      display: block;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+
+    .issue-list {
+      display: grid;
+      gap: 0.45rem;
+      margin: 0.8rem 0 0;
+    }
+
+    .issue {
+      padding: 0.65rem 0.75rem;
+      border-left: 0.3rem solid var(--warning);
+      border-radius: 0.35rem;
+      color: var(--warning);
+      background: var(--warning-soft);
+      font-weight: 650;
+    }
+
+    .issue.error {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .card-footer {
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      padding-top: 0.8rem;
+      border-top: 1px solid var(--line);
+    }
+
+    .review-toggle {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+      gap: 0.4rem;
+      font-weight: 650;
+    }
+    .review-toggle input { width: 1.15rem; height: 1.15rem; accent-color: var(--warning); }
+
+    .empty-state {
+      padding: 2rem;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      text-align: center;
+      background: var(--surface);
+    }
+
+    .noscript {
+      margin: 1rem;
+      padding: 1rem;
+      border: 2px solid var(--danger);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    body.high-contrast {
+      --bg: #000;
+      --surface: #000;
+      --surface-muted: #141414;
+      --text: #fff;
+      --muted: #f2f2f2;
+      --line: #fff;
+      --line-strong: #fff;
+      --primary: #55b7ff;
+      --primary-dark: #fff;
+      --primary-soft: #002f50;
+      --success: #5cffaa;
+      --success-soft: #00351f;
+      --warning: #ffd85a;
+      --warning-soft: #382b00;
+      --danger: #ff8d85;
+      --danger-soft: #400b08;
+      --focus: #ffea00;
+      --shadow: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not(.forced-light) {
+        --bg: #101722;
+        --surface: #172131;
+        --surface-muted: #202d40;
+        --text: #edf3fb;
+        --muted: #b8c4d4;
+        --line: #40516a;
+        --line-strong: #73849a;
+        --primary: #67b4ff;
+        --primary-dark: #d8ecff;
+        --primary-soft: #173a5d;
+        --success: #66dca4;
+        --success-soft: #123a2a;
+        --warning: #ffc96a;
+        --warning-soft: #443016;
+        --danger: #ff9b94;
+        --danger-soft: #4d201d;
+      }
+    }
+
+    @media (max-width: 54rem) {
+      .header-row { display: block; }
+      .header-actions { justify-content: flex-start; margin-top: 0.85rem; }
+      .layout { display: block; }
+      .sidebar { display: none; }
+      .mobile-category { display: block; margin-top: 0.75rem; }
+      .context-grid { grid-template-columns: minmax(0, 1fr); }
+      .question-card { scroll-margin-top: 15rem; }
+    }
+
+    @media (max-width: 36rem) {
+      .toolbar { position: static; }
+      .toolbar-actions,
+      .header-actions { width: 100%; }
+      .toolbar-actions .button,
+      .header-actions .button { flex: 1 1 8rem; }
+      .filter-wrap { flex: 1 1 100%; }
+      .badges { justify-content: flex-start; }
+      .card-heading { display: block; }
+      .card-heading .badges { margin-top: 0.5rem; }
+      .number-row { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .button,
+      .question-card,
+      .option,
+      .recommendation,
+      .issue { forced-color-adjust: auto; }
+      .progress-value { background: Highlight; }
+    }
+
+    @media print {
+      :root {
+        --bg: #fff;
+        --surface: #fff;
+        --surface-muted: #f4f4f4;
+        --text: #000;
+        --muted: #333;
+        --line: #777;
+        --line-strong: #333;
+        --primary: #000;
+        --primary-dark: #000;
+        --primary-soft: #eee;
+        --success: #000;
+        --success-soft: #eee;
+        --warning: #000;
+        --warning-soft: #eee;
+        --danger: #000;
+        --danger-soft: #eee;
+        --shadow: none;
+      }
+
+      body { font-size: 10pt; }
+      .toolbar,
+      .sidebar,
+      .header-actions,
+      .card-footer,
+      .skip-link,
+      .result-summary,
+      .empty-state { display: none !important; }
+      .layout { display: block; width: 100%; padding: 0; }
+      .app-header { padding: 0 0 0.8rem; border: 0; }
+      .question-list { display: block; }
+      .question-card {
+        display: block !important;
+        content-visibility: visible;
+        break-inside: avoid;
+        margin: 0 0 0.8rem;
+        padding: 0.8rem;
+        box-shadow: none;
+      }
+      details { break-inside: avoid; }
+      details > .details-body { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">질문 목록으로 건너뛰기</a>
+
+  <header class="app-header">
+    <div class="header-row">
+      <div>
+        <h1 id="page-title">WalkSafe 프로젝트 결정 질문지</h1>
+        <p class="purpose" id="page-purpose">질문 데이터를 불러오는 중입니다.</p>
+      </div>
+      <div class="header-actions" aria-label="질문지 작업">
+        <button class="button" id="contrast-button" type="button" aria-pressed="false">고대비 켜기</button>
+        <button class="button" id="print-button" type="button">인쇄 보기</button>
+        <button class="button button-primary" id="export-button" type="button">답변 JSON 내보내기</button>
+        <button class="button" id="import-button" type="button">답변 JSON 불러오기</button>
+        <input class="sr-only" id="import-file" name="answer_file" type="file" accept="application/json,.json" aria-label="답변 JSON 파일 선택">
+        <button class="button button-danger" id="reset-button" type="button">답변 초기화</button>
+      </div>
+    </div>
+    <p class="storage-notice">
+      답변과 결정 메모는 이 브라우저 프로필에 자동 저장됩니다. 공용 기기에서는 작성하지 마세요.
+      내보낸 JSON도 암호화되지 않은 평문이므로 안전한 위치에 보관하고, 작업을 넘긴 뒤에는 답변을 초기화하세요.
+    </p>
+  </header>
+
+  <section class="toolbar" aria-label="검색, 필터와 진행률">
+    <div class="toolbar-row">
+      <div class="search-wrap">
+        <label class="field-label" for="search-input">질문 검색</label>
+        <input class="search-input" id="search-input" name="question_search" type="search" placeholder="예: 모델 교체, Q-AIML-001…" autocomplete="off">
+      </div>
+      <div class="filter-wrap">
+        <label class="field-label" for="status-filter">상태 필터</label>
+        <select class="filter-select" id="status-filter" name="question_status">
+          <option value="all">전체 질문</option>
+          <option value="unanswered">미응답만</option>
+          <option value="required">필수만</option>
+          <option value="conflict">충돌·경고만</option>
+          <option value="review">검토 표시만</option>
+        </select>
+      </div>
+      <div class="toolbar-actions">
+        <button class="button" id="focus-first-unanswered" type="button">첫 미응답으로 이동</button>
+      </div>
+    </div>
+
+    <div class="mobile-category">
+      <label class="field-label" for="mobile-category-select">범주</label>
+      <select class="mobile-category-select" id="mobile-category-select" name="question_category"></select>
+    </div>
+
+    <div class="progress-panel">
+      <div class="progress-row">
+        <strong id="overall-progress-text">전체 진행률 계산 중</strong>
+        <span id="required-progress-text"></span>
+        <span id="conflict-summary"></span>
+      </div>
+      <div class="progress-track" role="progressbar" id="progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="overall-progress-text">
+        <div class="progress-value" id="progress-value"></div>
+      </div>
+      <div class="completion-banner" id="completion-banner">완료 조건을 확인하는 중입니다.</div>
+      <div class="storage-warning" id="storage-warning" role="alert" hidden></div>
+    </div>
+  </section>
+
+  <div class="layout">
+    <aside class="sidebar" aria-label="질문 범주">
+      <h2 class="sidebar-title">범주별 진행률</h2>
+      <ul class="category-list" id="category-list"></ul>
+    </aside>
+
+    <main class="content" id="main-content" tabindex="-1">
+      <p class="result-summary" id="result-summary"></p>
+      <div class="question-list" id="question-list"></div>
+      <div class="empty-state" id="empty-state" hidden>
+        <h2>표시할 질문이 없습니다</h2>
+        <p>검색어 또는 필터를 변경해 주세요.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="sr-only" id="live-region" role="status" aria-live="polite" aria-atomic="true"></div>
+  <noscript><p class="noscript">이 질문지는 답변 저장과 충돌 검사를 위해 JavaScript가 필요합니다.</p></noscript>
+
+  <script id="questionnaire-data" type="application/json">__WALKSAFE_QUESTIONNAIRE_DATA__</script>
+  <script>
+    "use strict";
+    (() => {
+      const dataElement = document.getElementById("questionnaire-data");
+      const liveRegion = document.getElementById("live-region");
+
+      function announce(message) {
+        liveRegion.textContent = "";
+        window.setTimeout(() => { liveRegion.textContent = message; }, 20);
+      }
+
+      function fail(message) {
+        document.getElementById("page-purpose").textContent = message;
+        document.getElementById("completion-banner").textContent = "질문지를 시작할 수 없습니다.";
+        announce(message);
+      }
+
+      let boot;
+      try {
+        boot = JSON.parse(dataElement.textContent);
+      } catch (error) {
+        fail(`질문 데이터가 올바른 JSON이 아닙니다: ${error.message}`);
+        return;
+      }
+      if (!boot || typeof boot !== "object" || !boot.questionnaire || !boot.question_set_hash) {
+        fail("질문 데이터에 필수 메타데이터가 없습니다.");
+        return;
+      }
+
+      const questionnaire = boot.questionnaire;
+      const metadata = questionnaire.metadata;
+      const categories = [...questionnaire.categories].sort((left, right) => left.order - right.order);
+      const questions = questionnaire.questions;
+      const questionSetHash = boot.question_set_hash;
+      const questionById = new Map(questions.map((question) => [question.id, question]));
+      const categoryById = new Map(categories.map((category) => [category.id, category]));
+      const storageKey = `walksafe.project-questionnaire:${metadata.question_set_id}:${questionSetHash}`;
+      const exportSchemaVersion = "walksafe.questionnaire-answers.v2";
+      const cards = new Map();
+      const savedDetailsState = new Map();
+      let lastConflictFingerprint = null;
+      const decisionLevelLabels = {
+        PRODUCT: "제품", POLICY: "정책", SPECIFICATION: "사양",
+        IMPLEMENTATION: "구현", OPERATIONS: "운영", ASSURANCE: "검증"
+      };
+      const evidenceLabels = {
+        USER_CONFIRMED: "사용자 확인", CONFIRMED_BY_CODE: "코드로 확인",
+        CURRENT_CANDIDATE: "현재 후보", CONFLICTING: "충돌 자료",
+        STALE: "과거 기준", UNKNOWN: "미확인"
+      };
+      const state = {
+        answers: {}, notes: {}, review: {}, category: "all", status: "all", query: "",
+        highContrast: false
+      };
+      const elements = {
+        title: document.getElementById("page-title"),
+        purpose: document.getElementById("page-purpose"),
+        search: document.getElementById("search-input"),
+        status: document.getElementById("status-filter"),
+        mobileCategory: document.getElementById("mobile-category-select"),
+        categoryList: document.getElementById("category-list"),
+        questionList: document.getElementById("question-list"),
+        empty: document.getElementById("empty-state"),
+        resultSummary: document.getElementById("result-summary"),
+        overallProgress: document.getElementById("overall-progress-text"),
+        requiredProgress: document.getElementById("required-progress-text"),
+        conflictSummary: document.getElementById("conflict-summary"),
+        progressTrack: document.getElementById("progress-track"),
+        progressValue: document.getElementById("progress-value"),
+        completion: document.getElementById("completion-banner"),
+        storageWarning: document.getElementById("storage-warning"),
+        contrast: document.getElementById("contrast-button"),
+        importFile: document.getElementById("import-file")
+      };
+
+      function createElement(tagName, options = {}) {
+        const element = document.createElement(tagName);
+        if (options.className) element.className = options.className;
+        if (options.text !== undefined) element.textContent = options.text;
+        if (options.id) element.id = options.id;
+        if (options.attributes) {
+          for (const [name, value] of Object.entries(options.attributes)) {
+            element.setAttribute(name, String(value));
+          }
+        }
+        return element;
+      }
+
+      function appendList(parent, items) {
+        const list = createElement("ul");
+        for (const item of items) list.append(createElement("li", { text: item }));
+        parent.append(list);
+      }
+
+      function hasOwn(object, key) {
+        return Object.prototype.hasOwnProperty.call(object, key);
+      }
+
+      function showStorageWarning(message) {
+        elements.storageWarning.textContent = message;
+        elements.storageWarning.hidden = false;
+        announce(message);
+      }
+
+      function clearStorageWarning() {
+        elements.storageWarning.textContent = "";
+        elements.storageWarning.hidden = true;
+      }
+
+      function valueIsAnswered(question, value) {
+        if (question.answer_type === "single_choice") {
+          return typeof value === "string" && question.options.some((option) => option.id === value);
+        }
+        if (question.answer_type === "multi_choice") {
+          return Array.isArray(value) && value.length > 0 && value.every(
+            (answer) => typeof answer === "string" && question.options.some((option) => option.id === answer)
+          ) && new Set(value).size === value.length;
+        }
+        if (question.answer_type === "text") return typeof value === "string" && value.trim().length > 0;
+        if (question.answer_type === "number") {
+          return typeof value === "number" && Number.isFinite(value)
+            && value >= question.validation.min && value <= question.validation.max;
+        }
+        return false;
+      }
+
+      function isAnswered(question) {
+        return hasOwn(state.answers, question.id) && valueIsAnswered(question, state.answers[question.id]);
+      }
+
+      function answerError(question) {
+        if (!hasOwn(state.answers, question.id)) return "";
+        if (question.answer_type === "number" && !valueIsAnswered(question, state.answers[question.id])) {
+          return `${question.validation.min}~${question.validation.max} ${question.validation.unit} 범위의 숫자를 입력해 주세요.`;
+        }
+        return "";
+      }
+
+      function conditionMatches(question, condition) {
+        const answered = hasOwn(state.answers, question.id)
+          && valueIsAnswered(question, state.answers[question.id]);
+        const value = state.answers[question.id];
+        if (condition.operator === "answered") return answered;
+        if (condition.operator === "unanswered") return !answered;
+        if (!answered) return false;
+        if (condition.operator === "equals") return value === condition.value;
+        if (condition.operator === "not_equals") return value !== condition.value;
+        const includes = Array.isArray(value)
+          ? value.includes(condition.value)
+          : typeof value === "string" && value.includes(String(condition.value));
+        if (condition.operator === "includes") return includes;
+        if (condition.operator === "excludes") return !includes;
+        return false;
+      }
+
+      function evaluateConflicts() {
+        const conflicts = [];
+        for (const owner of questions) {
+          for (const dependencyId of owner.dependencies) {
+            const dependency = questionById.get(dependencyId);
+            if (dependency && isAnswered(owner) && !isAnswered(dependency)) {
+              conflicts.push({
+                rule_id: `DEPENDENCY-${owner.id}-${dependency.id}`,
+                question_id: owner.id,
+                trigger_question_id: dependency.id,
+                severity: "error",
+                kind: "unresolved_dependency",
+                message: `선행 질문 ${dependency.id}의 답변이 필요합니다.`
+              });
+            }
+          }
+          for (const rule of owner.conflict_rules) {
+            if (rule.if && !conditionMatches(owner, rule.if)) continue;
+            const trigger = questionById.get(rule.when.question_id);
+            if (!trigger || !conditionMatches(trigger, rule.when)) continue;
+            conflicts.push({
+              rule_id: rule.id,
+              question_id: owner.id,
+              trigger_question_id: trigger.id,
+              severity: rule.severity,
+              message: rule.message
+            });
+          }
+        }
+        for (const question of questions) {
+          if (!isAnswered(question) || question.answer_type === "text") continue;
+          const answer = state.answers[question.id];
+          const reasons = [];
+          if (question.answer_type === "single_choice"
+              && !question.recommended_option_ids.includes(answer)) {
+            reasons.push("추천안과 다른 선택");
+          }
+          if (question.answer_type === "multi_choice") {
+            const selected = [...answer].sort();
+            const recommended = [...question.recommended_option_ids].sort();
+            if (selected.length !== recommended.length
+                || selected.some((value, index) => value !== recommended[index])) {
+              reasons.push("추천 조합과 다른 선택");
+            }
+          }
+          if ((typeof answer === "string" && answer === "custom")
+              || (Array.isArray(answer) && answer.includes("custom"))) {
+            reasons.push("사용자 정의 선택");
+          }
+          if (question.answer_type === "number") reasons.push("수치 결정");
+          if (conflicts.some((conflict) => conflict.question_id === question.id
+              && conflict.severity === "warning")) {
+            reasons.push("활성 경고에 대한 수용 근거");
+          }
+          const note = state.notes[question.id];
+          if (reasons.length > 0 && (typeof note !== "string" || note.trim() === "")) {
+            conflicts.push({
+              rule_id: `NOTE-${question.id}`,
+              question_id: question.id,
+              trigger_question_id: question.id,
+              severity: "error",
+              kind: "required_decision_note",
+              message: `결정 메모가 필요합니다: ${[...new Set(reasons)].join(", ")}. 구체 값·예외·근거·책임자를 적어 주세요.`
+            });
+          }
+        }
+        return conflicts;
+      }
+
+      function validateImportedAnswer(question, value) {
+        return valueIsAnswered(question, value);
+      }
+
+      function loadState() {
+        let saved;
+        try {
+          saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+        } catch (error) {
+          showStorageWarning("저장된 답변을 읽을 수 없어 새 질문지로 시작합니다. JSON 백업을 확인해 주세요.");
+          return;
+        }
+        if (!saved || saved.question_set_id !== metadata.question_set_id
+            || saved.question_set_hash !== questionSetHash) return;
+        if (saved.answers && typeof saved.answers === "object" && !Array.isArray(saved.answers)) {
+          for (const [questionId, answer] of Object.entries(saved.answers)) {
+            const question = questionById.get(questionId);
+            if (question && validateImportedAnswer(question, answer)) state.answers[questionId] = answer;
+          }
+        }
+        if (saved.notes && typeof saved.notes === "object" && !Array.isArray(saved.notes)) {
+          for (const [questionId, note] of Object.entries(saved.notes)) {
+            if (questionById.has(questionId) && typeof note === "string" && note.trim()) {
+              state.notes[questionId] = note;
+            }
+          }
+        }
+        if (saved.review && typeof saved.review === "object" && !Array.isArray(saved.review)) {
+          for (const [questionId, marked] of Object.entries(saved.review)) {
+            if (questionById.has(questionId) && marked === true) state.review[questionId] = true;
+          }
+        }
+        state.highContrast = saved.high_contrast === true;
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            questionnaire_schema_version: metadata.schema_version,
+            question_set_id: metadata.question_set_id,
+            question_set_hash: questionSetHash,
+            answers: state.answers,
+            notes: state.notes,
+            review: state.review,
+            high_contrast: state.highContrast
+          }));
+          clearStorageWarning();
+        } catch (error) {
+          showStorageWarning("브라우저 저장소에 저장하지 못했습니다. 현재 답변을 JSON으로 내보내 백업해 주세요.");
+        }
+      }
+
+      function setAnswer(questionId, value) {
+        if (value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) {
+          delete state.answers[questionId];
+        } else {
+          state.answers[questionId] = value;
+        }
+        saveState();
+        refresh();
+      }
+
+      function optionInputId(questionId, optionId) {
+        return `answer-${questionId}-${optionId}`;
+      }
+
+      function renderChoiceControl(question, fieldset) {
+        const options = createElement("div", { className: "option-list" });
+        for (const option of question.options) {
+          const recommended = question.recommended_option_ids.includes(option.id);
+          const label = createElement("label", {
+            className: `option${recommended ? " recommended" : ""}`,
+            attributes: { for: optionInputId(question.id, option.id) }
+          });
+          const input = createElement("input", {
+            id: optionInputId(question.id, option.id),
+            attributes: {
+              type: question.answer_type === "single_choice" ? "radio" : "checkbox",
+              name: `answer-${question.id}`,
+              value: option.id
+            }
+          });
+          if (question.answer_type === "single_choice") {
+            input.checked = state.answers[question.id] === option.id;
+            input.addEventListener("change", () => { if (input.checked) setAnswer(question.id, option.id); });
+          } else {
+            input.checked = Array.isArray(state.answers[question.id])
+              && state.answers[question.id].includes(option.id);
+            input.addEventListener("change", () => {
+              const checked = [...options.querySelectorAll("input:checked")].map((item) => item.value);
+              setAnswer(question.id, checked);
+            });
+          }
+          const copy = createElement("span");
+          const title = createElement("span", { className: "option-title", text: option.label });
+          if (recommended) {
+            title.append(" ", createElement("span", { className: "badge badge-recommended", text: "추천" }));
+          }
+          copy.append(
+            title,
+            createElement("span", { className: "option-description", text: option.description }),
+            createElement("span", { className: "option-tradeoff", text: `고려사항: ${option.tradeoffs}` })
+          );
+          label.append(input, copy);
+          options.append(label);
+        }
+        fieldset.append(options);
+      }
+
+      function renderFreeformControl(question, fieldset) {
+        if (question.answer_type === "text") {
+          const input = createElement("textarea", {
+            className: "text-answer",
+            id: `answer-${question.id}`,
+            attributes: {
+              rows: "5", name: `answer-${question.id}`, autocomplete: "off",
+              "aria-label": `${question.title} 답변`
+            }
+          });
+          input.value = typeof state.answers[question.id] === "string" ? state.answers[question.id] : "";
+          input.addEventListener("input", () => setAnswer(question.id, input.value));
+          fieldset.append(input);
+          return;
+        }
+        const row = createElement("div", { className: "number-row" });
+        const input = createElement("input", {
+          className: "number-answer",
+          id: `answer-${question.id}`,
+          attributes: {
+            type: "number", min: question.validation.min, max: question.validation.max,
+            step: "any", name: `answer-${question.id}`, autocomplete: "off", inputmode: "decimal",
+            "aria-label": `${question.title} 숫자 답변`
+          }
+        });
+        if (typeof state.answers[question.id] === "number") input.value = String(state.answers[question.id]);
+        input.addEventListener("input", () => {
+          setAnswer(question.id, input.value === "" ? undefined : input.valueAsNumber);
+        });
+        row.append(input, createElement("span", { className: "number-unit", text: question.validation.unit }));
+        fieldset.append(row, createElement("p", {
+          className: "answer-help",
+          text: `허용 범위: ${question.validation.min}~${question.validation.max} ${question.validation.unit}`
+        }));
+      }
+
+      function renderRecommendation(question) {
+        const panel = createElement("aside", {
+          className: "recommendation", attributes: { "aria-label": "추천안" }
+        });
+        panel.append(createElement("h3", { text: "추천안 — 자동 선택되지 않습니다" }));
+        if (question.recommended_option_ids.length > 0) {
+          const labels = question.recommended_option_ids.map((id) => {
+            const option = question.options.find((candidate) => candidate.id === id);
+            return option ? option.label : id;
+          });
+          panel.append(createElement("p", { text: `추천 선택: ${labels.join(", ")}` }));
+        }
+        panel.append(createElement("p", { text: question.recommendation_reason }));
+        return panel;
+      }
+
+      function renderDecisionNote(question) {
+        const panel = createElement("div", { className: "note-panel" });
+        const label = createElement("label", {
+          text: "결정 메모 (구체 값·예외·근거·책임자)",
+          attributes: { for: `note-${question.id}` }
+        });
+        const help = createElement("p", {
+          text: "추천안과 다른 선택, 사용자 정의 선택, 수치 결정 또는 경고 수용 시 반드시 작성합니다."
+        });
+        const note = createElement("textarea", {
+          className: "text-answer decision-note",
+          id: `note-${question.id}`,
+          attributes: {
+            rows: "4", name: `note-${question.id}`, autocomplete: "off",
+            placeholder: "예: 적용 범위, 예외 상황, 선택 근거, 최종 책임자와 재검토 조건…"
+          }
+        });
+        note.value = typeof state.notes[question.id] === "string" ? state.notes[question.id] : "";
+        note.addEventListener("input", () => {
+          if (note.value.trim()) state.notes[question.id] = note.value;
+          else delete state.notes[question.id];
+          saveState();
+          refresh();
+        });
+        panel.append(label, help, note);
+        return panel;
+      }
+
+      function renderDetails(question) {
+        const details = createElement("details");
+        details.append(createElement("summary", { text: "영향·근거·후속 작성 지침 보기" }));
+        const body = createElement("div", { className: "details-body" });
+        body.append(createElement("h3", { text: "이 결정의 영향" }));
+        appendList(body, question.impacts);
+        body.append(createElement("h3", { text: "영향받는 산출물 유형" }));
+        appendList(body, question.affected_deliverable_types);
+        if (question.dependencies.length > 0) {
+          body.append(createElement("h3", { text: "먼저 함께 확인할 질문" }));
+          appendList(body, question.dependencies.map((id) => {
+            const dependency = questionById.get(id);
+            return dependency ? `${id} — ${dependency.title}` : id;
+          }));
+        }
+        body.append(createElement("h3", { text: "기존 근거의 현재 분류" }));
+        if (question.evidence.length === 0) {
+          body.append(createElement("p", { text: "등록된 근거가 없습니다. 사용자 답변이 새 기준이 됩니다." }));
+        } else {
+          const list = createElement("ul", { className: "evidence-list" });
+          for (const evidence of question.evidence) {
+            const item = createElement("li", { className: "evidence-item" });
+            item.append(
+              createElement("span", { className: "badge", text: evidenceLabels[evidence.classification] || evidence.classification }),
+              createElement("span", { className: "evidence-path", text: evidence.path }),
+              createElement("span", { text: evidence.note })
+            );
+            list.append(item);
+          }
+          body.append(list);
+        }
+        body.append(
+          createElement("h3", { text: "답변 후 문서 작성 지침" }),
+          createElement("p", { text: question.followup_guidance })
+        );
+        details.append(body);
+        return details;
+      }
+
+      function renderQuestion(question) {
+        const category = categoryById.get(question.category_id);
+        const card = createElement("article", {
+          className: "question-card", id: `question-${question.id}`,
+          attributes: { tabindex: "-1", "data-question-id": question.id }
+        });
+        const heading = createElement("div", { className: "card-heading" });
+        const headingCopy = createElement("div");
+        headingCopy.append(
+          createElement("h2", { className: "question-title", id: `title-${question.id}`, text: question.title }),
+          createElement("span", { className: "question-id", text: question.id })
+        );
+        const badges = createElement("div", { className: "badges" });
+        badges.append(
+          createElement("span", { className: "badge", text: category.title }),
+          createElement("span", { className: "badge", text: decisionLevelLabels[question.decision_level] || question.decision_level })
+        );
+        if (question.required) badges.append(createElement("span", {
+          className: "badge badge-required", text: "필수"
+        }));
+        heading.append(headingCopy, badges);
+        const prompt = createElement("p", {
+          className: "question-prompt", id: `prompt-${question.id}`, text: question.prompt
+        });
+        const context = createElement("div", { className: "context-grid" });
+        const why = createElement("div", { className: "info-box" });
+        why.append(createElement("strong", { text: "왜 필요한가" }), createElement("p", { text: question.why_it_matters }));
+        const current = createElement("div", { className: "info-box" });
+        current.append(createElement("strong", { text: "현재 확인된 상황" }), createElement("p", { text: question.current_context }));
+        context.append(why, current);
+        const fieldset = createElement("fieldset", {
+          attributes: { "aria-describedby": `prompt-${question.id} validation-${question.id}` }
+        });
+        fieldset.append(createElement("legend", { className: "sr-only", text: `${question.title} 답변` }));
+        if (question.answer_type === "single_choice" || question.answer_type === "multi_choice") {
+          renderChoiceControl(question, fieldset);
+        } else {
+          renderFreeformControl(question, fieldset);
+        }
+        const validation = createElement("p", {
+          className: "answer-help", id: `validation-${question.id}`, attributes: { role: "status" }
+        });
+        fieldset.append(validation);
+        const issueList = createElement("div", {
+          className: "issue-list", attributes: { "aria-label": "답변 충돌과 경고" }
+        });
+        const footer = createElement("div", { className: "card-footer" });
+        const status = createElement("span", { className: "badge", text: "미응답" });
+        const actions = createElement("div", { className: "action-row" });
+        const reviewLabel = createElement("label", { className: "review-toggle" });
+        const review = createElement("input", {
+          attributes: {
+            type: "checkbox", name: `review-${question.id}`,
+            "aria-label": `${question.title} 검토 필요 표시`
+          }
+        });
+        review.checked = state.review[question.id] === true;
+        review.addEventListener("change", () => {
+          if (review.checked) state.review[question.id] = true;
+          else delete state.review[question.id];
+          saveState();
+          refresh();
+          announce(review.checked ? `${question.id}을 검토 필요로 표시했습니다.` : `${question.id} 검토 표시를 해제했습니다.`);
+        });
+        reviewLabel.append(review, document.createTextNode("검토 필요"));
+        const clear = createElement("button", {
+          className: "button button-small", text: "이 답변 지우기", attributes: { type: "button" }
+        });
+        clear.addEventListener("click", () => {
+          delete state.answers[question.id];
+          delete state.notes[question.id];
+          for (const input of fieldset.querySelectorAll("input, textarea")) {
+            if (input.type === "radio" || input.type === "checkbox") input.checked = false;
+            else input.value = "";
+          }
+          const note = document.getElementById(`note-${question.id}`);
+          if (note) note.value = "";
+          saveState();
+          refresh();
+          announce(`${question.id} 답변과 결정 메모를 지웠습니다.`);
+        });
+        actions.append(reviewLabel, clear);
+        footer.append(status, actions);
+        card.append(
+          heading, prompt, context, fieldset, renderRecommendation(question), renderDecisionNote(question),
+          renderDetails(question), issueList, footer
+        );
+        cards.set(question.id, {
+          card, status, validation, issueList, review, issueFingerprint: null
+        });
+        return card;
+      }
+
+      function updateCategoryNavigation() {
+        for (const button of elements.categoryList.querySelectorAll("button")) {
+          const categoryId = button.dataset.categoryId;
+          button.setAttribute("aria-current", categoryId === state.category ? "true" : "false");
+          const scoped = categoryId === "all" ? questions
+            : questions.filter((question) => question.category_id === categoryId);
+          button.querySelector("small").textContent = `${scoped.filter(isAnswered).length}/${scoped.length} 응답`;
+        }
+        elements.mobileCategory.value = state.category;
+      }
+
+      function renderCategoryNavigation() {
+        const categoryItems = [{ id: "all", title: "전체 범주" }, ...categories];
+        for (const category of categoryItems) {
+          const item = createElement("li");
+          const button = createElement("button", {
+            className: "category-button", text: category.title,
+            attributes: { type: "button", "data-category-id": category.id, "aria-current": "false" }
+          });
+          button.append(createElement("small"));
+          button.addEventListener("click", () => {
+            state.category = category.id;
+            refresh();
+          });
+          item.append(button);
+          elements.categoryList.append(item);
+          const option = createElement("option", { text: category.title });
+          option.value = category.id;
+          elements.mobileCategory.append(option);
+        }
+      }
+
+      function searchableText(question) {
+        return [
+          question.id, question.title, question.prompt, question.why_it_matters,
+          question.current_context, question.recommendation_reason,
+          ...question.options.flatMap((option) => [option.label, option.description, option.tradeoffs]),
+          ...question.impacts, ...question.affected_deliverable_types
+        ].join(" ").toLocaleLowerCase("ko");
+      }
+
+      function applyFilters(conflicts) {
+        const conflictQuestions = new Set(conflicts.map((conflict) => conflict.question_id));
+        const query = state.query.trim().toLocaleLowerCase("ko");
+        let visible = 0;
+        for (const question of questions) {
+          const categoryMatch = state.category === "all" || question.category_id === state.category;
+          const queryMatch = !query || searchableText(question).includes(query);
+          let statusMatch = true;
+          if (state.status === "unanswered") statusMatch = !isAnswered(question);
+          if (state.status === "required") statusMatch = question.required;
+          if (state.status === "conflict") statusMatch = conflictQuestions.has(question.id);
+          if (state.status === "review") statusMatch = state.review[question.id] === true;
+          const show = categoryMatch && queryMatch && statusMatch;
+          cards.get(question.id).card.hidden = !show;
+          if (show) visible += 1;
+        }
+        elements.empty.hidden = visible !== 0;
+        elements.resultSummary.textContent = `현재 ${visible}개 / 전체 ${questions.length}개 질문 표시`;
+      }
+
+      function updateCards(conflicts) {
+        const byOwner = new Map();
+        for (const conflict of conflicts) {
+          if (!byOwner.has(conflict.question_id)) byOwner.set(conflict.question_id, []);
+          byOwner.get(conflict.question_id).push(conflict);
+        }
+        for (const question of questions) {
+          const refs = cards.get(question.id);
+          const answered = isAnswered(question);
+          const issues = byOwner.get(question.id) || [];
+          const hasError = issues.some((issue) => issue.severity === "error");
+          const hasWarning = issues.some((issue) => issue.severity === "warning");
+          refs.card.classList.toggle("answered", answered);
+          refs.card.classList.toggle("has-error", hasError);
+          refs.card.classList.toggle("has-warning", hasWarning);
+          refs.card.classList.toggle("review-marked", state.review[question.id] === true);
+          refs.status.className = `badge ${hasError ? "badge-error" : (answered ? "badge-success" : (question.required ? "badge-error" : ""))}`;
+          refs.status.textContent = hasError && answered
+            ? "응답 보완 필요"
+            : (answered ? "응답 완료" : (question.required ? "필수 미응답" : "미응답"));
+          const invalid = answerError(question);
+          refs.validation.textContent = invalid;
+          const numberInput = refs.card.querySelector("input[type='number']");
+          if (numberInput) numberInput.setAttribute("aria-invalid", invalid ? "true" : "false");
+          const issueFingerprint = JSON.stringify(issues.map((issue) => [
+            issue.rule_id, issue.severity, issue.message, issue.trigger_question_id
+          ]));
+          if (refs.issueFingerprint !== issueFingerprint) {
+            refs.issueList.replaceChildren();
+            for (const issue of issues) {
+              refs.issueList.append(createElement("div", {
+                className: `issue ${issue.severity}`,
+                text: `${issue.severity === "error" ? "충돌" : "경고"}: ${issue.message}`
+              }));
+            }
+            refs.issueFingerprint = issueFingerprint;
+          }
+        }
+      }
+
+      function announceConflictDelta(conflicts) {
+        const fingerprint = JSON.stringify(conflicts.map((conflict) => [
+          conflict.rule_id, conflict.question_id, conflict.severity, conflict.message
+        ]));
+        if (lastConflictFingerprint !== null && fingerprint !== lastConflictFingerprint) {
+          const errors = conflicts.filter((conflict) => conflict.severity === "error").length;
+          const warnings = conflicts.filter((conflict) => conflict.severity === "warning").length;
+          announce(`답변 검토 상태가 바뀌었습니다. 오류 충돌 ${errors}건, 경고 ${warnings}건입니다.`);
+        }
+        lastConflictFingerprint = fingerprint;
+      }
+
+      function updateProgress(conflicts) {
+        const answeredCount = questions.filter(isAnswered).length;
+        const required = questions.filter((question) => question.required);
+        const requiredAnswered = required.filter(isAnswered).length;
+        const unresolved = required.filter((question) => !isAnswered(question));
+        const errors = conflicts.filter((conflict) => conflict.severity === "error");
+        const warnings = conflicts.filter((conflict) => conflict.severity === "warning");
+        const percent = questions.length === 0 ? 100 : Math.round((answeredCount / questions.length) * 100);
+        elements.overallProgress.textContent = `전체 ${answeredCount}/${questions.length} 응답 (${percent}%)`;
+        elements.requiredProgress.textContent = `필수 ${requiredAnswered}/${required.length}`;
+        elements.conflictSummary.textContent = `충돌 ${errors.length}건 · 경고 ${warnings.length}건`;
+        elements.progressValue.style.width = `${percent}%`;
+        elements.progressTrack.setAttribute("aria-valuenow", String(percent));
+        const complete = unresolved.length === 0 && errors.length === 0;
+        elements.completion.classList.toggle("complete", complete);
+        if (complete) {
+          elements.completion.textContent = warnings.length > 0
+            ? `완료 조건 충족: 필수 질문 100%, 오류 충돌 0건입니다. 경고 ${warnings.length}건은 별도로 검토하세요.`
+            : "완료 조건 충족: 필수 질문 100%, 오류 충돌 0건입니다.";
+        } else {
+          elements.completion.textContent = `완료 전: 필수 미응답 ${unresolved.length}개, 오류 충돌 ${errors.length}건이 남았습니다.`;
+        }
+      }
+
+      function refresh() {
+        const conflicts = evaluateConflicts();
+        updateCards(conflicts);
+        updateProgress(conflicts);
+        updateCategoryNavigation();
+        applyFilters(conflicts);
+        announceConflictDelta(conflicts);
+      }
+
+      function renderQuestionsAgain() {
+        cards.clear();
+        elements.questionList.replaceChildren();
+        for (const question of questions) elements.questionList.append(renderQuestion(question));
+        refresh();
+      }
+
+      function unresolvedRequired() {
+        return questions.filter((question) => question.required && !isAnswered(question)).map((question) => question.id);
+      }
+
+      function exportAnswers() {
+        const answers = {};
+        for (const question of questions) {
+          if (isAnswered(question)) answers[question.id] = state.answers[question.id];
+        }
+        const payload = {
+          questionnaire_schema_version: metadata.schema_version,
+          answers_schema_version: exportSchemaVersion,
+          question_set_id: metadata.question_set_id,
+          question_set_hash: questionSetHash,
+          exported_at: new Date().toISOString(),
+          answers,
+          notes: Object.fromEntries(
+            Object.entries(state.notes).filter(([, note]) => typeof note === "string" && note.trim())
+          ),
+          review_required: Object.keys(state.review).filter((id) => state.review[id] === true).sort(),
+          unresolved_required: unresolvedRequired(),
+          conflicts: evaluateConflicts()
+        };
+        const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = createElement("a");
+        link.href = url;
+        link.download = `${metadata.question_set_id}-answers.json`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        announce("현재 답변을 JSON 파일로 내보냈습니다.");
+      }
+
+      function requireObject(value, message) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(message);
+        return value;
+      }
+
+      async function importAnswers(file) {
+        if (file.size > 2 * 1024 * 1024) throw new Error("답변 파일은 2MB 이하여야 합니다.");
+        let payload;
+        try { payload = JSON.parse(await file.text()); }
+        catch (error) { throw new Error("올바른 JSON 답변 파일이 아닙니다."); }
+        requireObject(payload, "답변 파일의 최상위 값은 객체여야 합니다.");
+        if (payload.question_set_id !== metadata.question_set_id) {
+          throw new Error(`다른 질문 세트입니다. 현재 ${metadata.question_set_id}, 파일 ${String(payload.question_set_id)}.`);
+        }
+        if (payload.question_set_hash !== questionSetHash) {
+          throw new Error("같은 ID이지만 질문 내용이 다른 파일입니다. 현재 질문 세트에 덮어쓰지 않았습니다.");
+        }
+        if (payload.questionnaire_schema_version !== metadata.schema_version) {
+          throw new Error("질문지 스키마 버전이 달라 불러오기를 거부했습니다.");
+        }
+        if (payload.answers_schema_version !== exportSchemaVersion) {
+          throw new Error("답변 파일 스키마 버전이 달라 불러오기를 거부했습니다.");
+        }
+        const imported = requireObject(payload.answers, "answers는 질문 ID별 답변 객체여야 합니다.");
+        const nextAnswers = {};
+        for (const [questionId, answer] of Object.entries(imported)) {
+          const question = questionById.get(questionId);
+          if (!question) throw new Error(`현재 질문 세트에 없는 질문 ID입니다: ${questionId}`);
+          if (!validateImportedAnswer(question, answer)) {
+            throw new Error(`${questionId} 답변의 형식 또는 선택지 ID가 올바르지 않습니다.`);
+          }
+          nextAnswers[questionId] = answer;
+        }
+        const importedNotes = requireObject(payload.notes, "notes는 질문 ID별 결정 메모 객체여야 합니다.");
+        const nextNotes = {};
+        for (const [questionId, note] of Object.entries(importedNotes)) {
+          if (!questionById.has(questionId)) throw new Error(`결정 메모에 알 수 없는 질문 ID가 있습니다: ${questionId}`);
+          if (typeof note !== "string" || note.trim() === "") {
+            throw new Error(`${questionId} 결정 메모는 비어 있지 않은 문자열이어야 합니다.`);
+          }
+          nextNotes[questionId] = note;
+        }
+        const nextReview = {};
+        if (payload.review_required !== undefined) {
+          if (!Array.isArray(payload.review_required)) throw new Error("review_required는 질문 ID 배열이어야 합니다.");
+          for (const questionId of payload.review_required) {
+            if (typeof questionId !== "string" || !questionById.has(questionId)) {
+              throw new Error(`검토 표시에 알 수 없는 질문 ID가 있습니다: ${String(questionId)}`);
+            }
+            nextReview[questionId] = true;
+          }
+        }
+        const currentItemCount = Object.keys(state.answers).length
+          + Object.keys(state.notes).length + Object.keys(state.review).length;
+        if (currentItemCount > 0) {
+          const confirmed = window.confirm(
+            `현재 브라우저의 답변·메모·검토 표시 ${currentItemCount}개를 `
+            + `불러온 답변 ${Object.keys(nextAnswers).length}개와 메모 ${Object.keys(nextNotes).length}개로 바꿉니다. `
+            + "기존 작업을 먼저 내보냈는지 확인한 뒤 계속할까요?"
+          );
+          if (!confirmed) {
+            announce("답변 불러오기를 취소했습니다. 기존 작업은 변경되지 않았습니다.");
+            return;
+          }
+        }
+        state.answers = nextAnswers;
+        state.notes = nextNotes;
+        state.review = nextReview;
+        saveState();
+        renderQuestionsAgain();
+        announce(`${Object.keys(nextAnswers).length}개 답변을 불러왔습니다.`);
+      }
+
+      function resetAnswers() {
+        if (!window.confirm("현재 질문 세트의 모든 답변과 검토 표시를 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) return;
+        state.answers = {};
+        state.notes = {};
+        state.review = {};
+        try {
+          localStorage.removeItem(storageKey);
+          clearStorageWarning();
+        } catch (error) {
+          showStorageWarning("브라우저 저장소의 답변을 삭제하지 못했습니다. 브라우저 사이트 데이터를 직접 확인해 주세요.");
+        }
+        renderQuestionsAgain();
+        announce("모든 답변과 검토 표시를 초기화했습니다.");
+      }
+
+      function applyContrast() {
+        document.body.classList.toggle("high-contrast", state.highContrast);
+        elements.contrast.setAttribute("aria-pressed", state.highContrast ? "true" : "false");
+        elements.contrast.textContent = state.highContrast ? "고대비 끄기" : "고대비 켜기";
+      }
+
+      function focusFirstUnanswered() {
+        const question = questions.find((item) => item.required && !isAnswered(item))
+          || questions.find((item) => !isAnswered(item));
+        if (!question) { announce("모든 질문에 응답했습니다."); return; }
+        state.category = "all";
+        state.status = "all";
+        state.query = "";
+        elements.search.value = "";
+        elements.status.value = "all";
+        refresh();
+        const card = cards.get(question.id).card;
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
+        const input = card.querySelector("input, textarea");
+        (input || card).focus({ preventScroll: true });
+        announce(`${question.id} 첫 미응답 질문으로 이동했습니다.`);
+      }
+
+      elements.title.textContent = metadata.title;
+      document.title = metadata.title;
+      elements.purpose.textContent = `${metadata.purpose} · 질문 세트 ${metadata.question_set_id} · ${questionSetHash.slice(0, 12)}`;
+      loadState();
+      applyContrast();
+      renderCategoryNavigation();
+      renderQuestionsAgain();
+
+      elements.search.addEventListener("input", () => { state.query = elements.search.value; refresh(); });
+      elements.status.addEventListener("change", () => { state.status = elements.status.value; refresh(); });
+      elements.mobileCategory.addEventListener("change", () => {
+        state.category = elements.mobileCategory.value;
+        refresh();
+      });
+      document.getElementById("focus-first-unanswered").addEventListener("click", focusFirstUnanswered);
+      document.getElementById("export-button").addEventListener("click", exportAnswers);
+      document.getElementById("import-button").addEventListener("click", () => elements.importFile.click());
+      elements.importFile.addEventListener("change", async () => {
+        const file = elements.importFile.files && elements.importFile.files[0];
+        if (!file) return;
+        try { await importAnswers(file); }
+        catch (error) {
+          window.alert(`답변을 불러오지 못했습니다.\n${error.message}`);
+          announce(`답변 불러오기 실패: ${error.message}`);
+        } finally { elements.importFile.value = ""; }
+      });
+      document.getElementById("reset-button").addEventListener("click", resetAnswers);
+      elements.contrast.addEventListener("click", () => {
+        state.highContrast = !state.highContrast;
+        applyContrast();
+        saveState();
+        announce(state.highContrast ? "고대비 보기를 켰습니다." : "고대비 보기를 껐습니다.");
+      });
+      document.getElementById("print-button").addEventListener("click", () => window.print());
+
+      document.addEventListener("keydown", (event) => {
+        const target = event.target;
+        const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+          || target instanceof HTMLSelectElement;
+        if (event.key === "/" && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          elements.search.focus();
+        }
+        if (event.key === "Escape" && document.activeElement === elements.search && elements.search.value) {
+          elements.search.value = "";
+          state.query = "";
+          refresh();
+          announce("검색어를 지웠습니다.");
+        }
+      });
+      window.addEventListener("beforeprint", () => {
+        savedDetailsState.clear();
+        for (const details of document.querySelectorAll("details")) {
+          savedDetailsState.set(details, details.open);
+          details.open = true;
+        }
+      });
+      window.addEventListener("afterprint", () => {
+        for (const [details, wasOpen] of savedDetailsState.entries()) details.open = wasOpen;
+        savedDetailsState.clear();
+      });
+    })();
+  </script>
+</body>
+</html>

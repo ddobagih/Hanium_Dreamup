@@ -1,0 +1,53 @@
+{
+  "schema_version": "walksafe.artifact-baseline-approval-intake.v1",
+  "intake_id": "WS-ARTIFACT-BASELINE-APPROVAL-INTAKE-20260722-001",
+  "intake_version": "1.0.0",
+  "recorded_at": "2026-07-22T14:03:17+09:00",
+  "recorded_at_basis": "LOCAL_PROCESSING_TIME_AFTER_USER_MESSAGE_NOT_PLATFORM_EVENT_TIME",
+  "approval_event_date": "2026-07-22",
+  "source_event_id": null,
+  "source_event_timestamp": null,
+  "source_event_metadata_status": "NOT_EXPOSED_BY_CONVERSATION_INTERFACE",
+  "source_kind": "USER_CHAT_MESSAGE_EXACT_TRANSCRIPTION",
+  "capture_fidelity": "EXACT_DISPLAYED_TEXT_PLUS_ONE_SERIALIZATION_NEWLINE",
+  "source_record_path": "docs/control/decision-interview/source-records/walksafe-artifact-baseline-approval-20260722-r001.txt",
+  "source_record_sha256": "13da372f93583fd5f1cd657f22e060aeb58f36070b37696bcbd6f13a83d35d1f",
+  "source_record_byte_length": 1742,
+  "statement_text_sha256": "23dc7a77091f5ee0e66848c84ffec11837ad58f3701a85706665a84a49a95667",
+  "candidate": {
+    "candidate_id": "WS-ARTIFACT-BASELINE-CANDIDATE-20260722-001",
+    "candidate_version": "1.0.0",
+    "path": "docs/control/baseline-candidates/walksafe-artifact-baseline-candidate-20260722-r001.json",
+    "file_sha256": "9616bfd3f3bdaf355f0f92082d38fc00c65cfefac766613714e4d449e92b21f0",
+    "declared_prepared_at": "2026-07-22T18:00:00+09:00",
+    "declared_prepared_at_basis": "DETERMINISTIC_DOCUMENT_TIMESTAMP_NOT_EVENT_EVIDENCE"
+  },
+  "conversation_order_evidence": {
+    "candidate_existed_and_review_html_was_presented_before_approval": true,
+    "exact_owner_statement_received_after_presentation": true,
+    "cryptographic_timestamp_available": false,
+    "basis": "CONVERSATION_SEQUENCE_ONLY"
+  },
+  "temporal_anomaly": {
+    "temporal_anomaly_id": "FUTURE_FIXED_PREPARED_AT-20260722",
+    "field_name_is_misleading": true,
+    "semantics_disclosed_after_generation": true,
+    "actual_generation_time_status": "NOT_CAPTURED",
+    "impact": "NO_CHANGE_TO_APPROVAL_TARGET_OR_BOUND_BYTES",
+    "disposition": "NON_BLOCKING_PROVENANCE_EXCEPTION",
+    "identified_before_application": true
+  },
+  "approver": {
+    "name": "김민호",
+    "role": "PROJECT_MANAGER_AND_FINAL_POLICY_OWNER",
+    "identity_basis": "CURRENT_CONVERSATION_ACTOR_MATCHED_TO_CONTROLLED_PROJECT_OWNER",
+    "identity_verification_status": "CONVERSATION_CONTINUITY_NOT_CRYPTOGRAPHICALLY_VERIFIED",
+    "cryptographic_signature_status": "NOT_SIGNED"
+  },
+  "normalization_policy": {
+    "unicode": "NONE",
+    "whitespace": "NONE",
+    "terminal_newline": "EXCLUDED_ONLY_FROM_TEXT_COMPARISON",
+    "meaning_changes_allowed": false
+  }
+}

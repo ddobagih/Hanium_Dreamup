@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-SUCCESSOR-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "kind": "SUCCESSOR_TRACE",
+  "status": "PASS",
+  "observed_at": "2026-07-24T13:48:00+09:00",
+  "canonical_update_event_type": "CANONICAL_BINDINGS_UPDATED",
+  "resulting_canonical_bindings": {
+    "IMPLEMENTATION_BACKLOG": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r010.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-010",
+      "file_sha256": "61954297c2679a331ee3e546e0be0682b9d80f5e4439216849a64dfee57625da"
+    },
+    "IMPLEMENTATION_GAP": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260724-r010.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260724-010",
+      "file_sha256": "917c846a1db5fda6825976b59ee67e37b527e00053fe0a48066491a3a4c4928e"
+    }
+  },
+  "changed_subject_ids_by_role": {
+    "IMPLEMENTATION_BACKLOG": [
+      "NPC-PERMISSION-SESSION-LIFECYCLE"
+    ],
+    "IMPLEMENTATION_GAP": [
+      "GAP-006",
+      "NPC-PERMISSION-SESSION-LIFECYCLE"
+    ]
+  },
+  "next_policy_gap_pair": {
+    "source_policy_id": "FP-004",
+    "gap_id": "GAP-013"
+  }
+}

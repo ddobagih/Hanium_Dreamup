@@ -1,0 +1,753 @@
+{
+  "schema_version": "walksafe.formal-sec-ws-draft-manifest.v1",
+  "metadata": {
+    "manifest_id": "WS-FORMAL-SEC-WS-DRAFT-20260721-001",
+    "title": "WalkSafe SEC·WS 정식 산출물 Draft manifest",
+    "version": "0.1.0",
+    "controlled_revision": 1,
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "SEC-01",
+      "SEC-02",
+      "SEC-03",
+      "SEC-04",
+      "SEC-05",
+      "SEC-06",
+      "SEC-07",
+      "SEC-08",
+      "SEC-09",
+      "SEC-15",
+      "SEC-16",
+      "SEC-17",
+      "SEC-18",
+      "SEC-19",
+      "WS-01",
+      "WS-02",
+      "WS-03",
+      "WS-04",
+      "WS-05",
+      "WS-08",
+      "WS-18",
+      "WS-19",
+      "WS-22",
+      "WS-11"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "scope_artifact_type_ids": [
+    "SEC-01",
+    "SEC-02",
+    "SEC-03",
+    "SEC-04",
+    "SEC-05",
+    "SEC-06",
+    "SEC-07",
+    "SEC-08",
+    "SEC-09",
+    "SEC-10",
+    "SEC-11",
+    "SEC-12",
+    "SEC-13",
+    "SEC-14",
+    "SEC-15",
+    "SEC-16",
+    "SEC-17",
+    "SEC-18",
+    "SEC-19",
+    "WS-01",
+    "WS-02",
+    "WS-03",
+    "WS-04",
+    "WS-05",
+    "WS-06",
+    "WS-07",
+    "WS-08",
+    "WS-09",
+    "WS-10",
+    "WS-11",
+    "WS-12",
+    "WS-13",
+    "WS-14",
+    "WS-15",
+    "WS-16",
+    "WS-17",
+    "WS-18",
+    "WS-19",
+    "WS-20",
+    "WS-21",
+    "WS-22"
+  ],
+  "materialized_artifact_type_ids": [
+    "SEC-01",
+    "SEC-02",
+    "SEC-03",
+    "SEC-04",
+    "SEC-05",
+    "SEC-06",
+    "SEC-07",
+    "SEC-08",
+    "SEC-09",
+    "SEC-15",
+    "SEC-16",
+    "SEC-17",
+    "SEC-18",
+    "SEC-19",
+    "WS-01",
+    "WS-02",
+    "WS-03",
+    "WS-04",
+    "WS-05",
+    "WS-08",
+    "WS-18",
+    "WS-19",
+    "WS-22",
+    "WS-11"
+  ],
+  "planned_artifact_type_ids": [
+    "SEC-10",
+    "SEC-11",
+    "SEC-12",
+    "SEC-13",
+    "SEC-14",
+    "WS-06",
+    "WS-07",
+    "WS-09",
+    "WS-10",
+    "WS-12",
+    "WS-13",
+    "WS-14",
+    "WS-15",
+    "WS-16",
+    "WS-17",
+    "WS-20",
+    "WS-21"
+  ],
+  "source_bindings": {
+    "approved_policy_document": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac"
+    },
+    "policy_approval_record": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
+      "sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5"
+    },
+    "policy_baseline_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-manifest-20260721-r001.json",
+      "sha256": "7285111aafd3907a5e8e338c79ca42f9af2c0d7db9de0460512b66a6cfac90be"
+    },
+    "aligned_decision_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f"
+    },
+    "artifact_catalog": {
+      "path": "docs/control/artifact-types.json",
+      "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+    },
+    "fp035_change_request_register": {
+      "path": "docs/deliverables/01-management/registers/change-requests.json",
+      "sha256": "64f69a0aee2e4817c682f09fd22948da77115ec9c4227d5943e195f67c4783a5"
+    },
+    "fp035_correction_candidate": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+    },
+    "w9_runtime_model_config": {
+      "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+      "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+    },
+    "w9_model_register": {
+      "path": "docs/deliverables/08-ai-ml-data/registers/model-register.json",
+      "sha256": "3161e34f86ccef324a1864ad1c7310b2e31d7bcf5ed09e55945b5840635e8f88"
+    },
+    "w9_navigation_policy": {
+      "path": "docs/walksafe-v2/navigation_integration_policy.md",
+      "sha256": "2871973337d4e8c25301f2a62b26841f71f13c0a5d5efe62287e0942a191afd5"
+    },
+    "generator": {
+      "path": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+      "sha256": "1b22bad59dda622e53ac910ace405c59e1d31aea47136894b3c187eed8faca5d"
+    }
+  },
+  "source_binding_sha256": "4e42154e1b3430a50c0f72e71b54a497e5aabe4c2417b74d9e2ab36eaacdd9ce",
+  "w9_contracts": {
+    "WS-08": {
+      "lifecycle_status": "DRAFT",
+      "runtime_model_id": "unified_walksafe",
+      "class_order": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "traffic light",
+        "normal_tactile_block",
+        "damaged_tactile_block",
+        "crosswalk",
+        "curb_step",
+        "uneven_sidewalk",
+        "e_scooter_obstruction"
+      ],
+      "class_count": 13,
+      "class_analysis": [
+        {
+          "class_id": "person",
+          "context": "전방 보행자 접근·정지·경로 점유",
+          "false_positive": "불필요한 정지와 반복 음성으로 주의 분산",
+          "false_negative": "접근 보행자를 놓쳐 충돌 가능",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "도심 보도에서 빈번할 수 있으나 측정 NOT_RUN",
+          "detectability": "거리·상대 움직임·연속 track으로 검출 가능성 확인 필요",
+          "model_control": "후보 threshold 0.20은 미승인; 거리·track 안정화 필요",
+          "policy_control": "접근 또는 경로 차단 근거가 있을 때만 제한 경고",
+          "ui_control": "사람 존재가 아니라 정지·주변 확인 중심의 짧은 안내",
+          "fail_closed": "거리·움직임 근거가 stale이면 방향 지시 없이 안전정지",
+          "required_evidence": "거리·혼잡·가림별 FP/FN과 실기기 TTS 중재",
+          "residual_field_limitation_notice": "군중·가림·역광에서 안전 보장 불가를 고지"
+        },
+        {
+          "class_id": "bicycle",
+          "context": "주행·정차 자전거의 접근 또는 통로 점유",
+          "false_positive": "정차 자전거를 즉시 충돌 위험으로 과잉 경고",
+          "false_negative": "빠른 접근 자전거를 놓쳐 충돌 가능",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "자전거 혼용 보도 노출 측정 NOT_RUN",
+          "detectability": "상대 속도·방향·depth 연속성 검증 필요",
+          "model_control": "후보 threshold 0.20은 미승인; motion gate 필요",
+          "policy_control": "접근 또는 경로 차단이 확인되지 않으면 위험 확정 금지",
+          "ui_control": "좌우 회피 대신 멈춤·주변 확인 안내",
+          "fail_closed": "속도·거리 불신 시 경고 정밀도를 낮추고 안전정지",
+          "required_evidence": "정차·접근·교차 자전거별 fixed-set와 실기기 시험",
+          "residual_field_limitation_notice": "고속·가림·야간은 현장 승인 전 비지원"
+        },
+        {
+          "class_id": "car",
+          "context": "보도 진입·주차·접근 차량",
+          "false_positive": "도로 옆 차량을 즉시 보행 충돌로 오인",
+          "false_negative": "보도 진입 차량을 놓쳐 중대 충돌 가능",
+          "harm": "QUALITATIVE_CRITICAL_NOT_SCORED",
+          "exposure": "교차로·주차장 출입구 노출 측정 NOT_RUN",
+          "detectability": "보행 공간 교차·상대 움직임·거리 근거 필요",
+          "model_control": "후보 threshold 0.20은 미승인; ROI·motion 결합 필요",
+          "policy_control": "차량 class만으로 횡단·회피 지시 금지",
+          "ui_control": "즉시 멈춤과 주변 확인만 안내",
+          "fail_closed": "차량 위치·움직임 불신 시 전체 안전정지",
+          "required_evidence": "진입·정차·원거리 차량별 FP/FN과 near-miss 통제시험",
+          "residual_field_limitation_notice": "차량 접근과 신호 안전을 보장하지 않음을 고지"
+        },
+        {
+          "class_id": "motorcycle",
+          "context": "보도·골목에서 접근하거나 정차한 이륜차",
+          "false_positive": "정차 이륜차를 이동 위험으로 과잉 경고",
+          "false_negative": "작고 빠른 이륜차를 놓쳐 충돌 가능",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "골목·혼용 공간 노출 측정 NOT_RUN",
+          "detectability": "작은 bbox·속도·가림 조건 검증 필요",
+          "model_control": "후보 threshold 0.20은 미승인; temporal 확인 필요",
+          "policy_control": "접근 근거 없는 방향 지시 금지",
+          "ui_control": "멈춤·주변 확인 중심 안내",
+          "fail_closed": "연속 관측 실패 시 안전정지",
+          "required_evidence": "거리·속도·가림별 fixed-set와 실기기 시험",
+          "residual_field_limitation_notice": "고속 접근 탐지를 보장하지 않음을 고지"
+        },
+        {
+          "class_id": "bus",
+          "context": "정류장·도로 가장자리·보도 인접 대형차",
+          "false_positive": "안전하게 분리된 버스를 경로 차단으로 오인",
+          "false_negative": "보행 공간 침범 버스를 놓침",
+          "harm": "QUALITATIVE_CRITICAL_NOT_SCORED",
+          "exposure": "정류장 인접 노출 측정 NOT_RUN",
+          "detectability": "큰 bbox의 부분 가림과 거리 포화 검증 필요",
+          "model_control": "후보 threshold 0.20은 미승인; ROI·depth sanity 필요",
+          "policy_control": "class만으로 도로 진입이나 우회 지시 금지",
+          "ui_control": "정지와 주변 확인 안내",
+          "fail_closed": "거리 포화·부분 검출이면 정밀 방향 안내 중지",
+          "required_evidence": "정류장·원거리·부분 bbox별 FP/FN 시험",
+          "residual_field_limitation_notice": "대형차 주변 사각지대 안전을 보장하지 않음"
+        },
+        {
+          "class_id": "truck",
+          "context": "공사·하역·도로 인접 대형 화물차",
+          "false_positive": "분리된 화물차를 즉시 보행 위험으로 오인",
+          "false_negative": "보행 공간 침범·접근 화물차를 놓침",
+          "harm": "QUALITATIVE_CRITICAL_NOT_SCORED",
+          "exposure": "공사·하역 구간 노출 측정 NOT_RUN",
+          "detectability": "부분 bbox·큰 물체 거리·움직임 검증 필요",
+          "model_control": "후보 threshold 0.20은 미승인; ROI·motion 결합 필요",
+          "policy_control": "공사구간은 현장 승인 전 비지원",
+          "ui_control": "정지·지원 요청 안내",
+          "fail_closed": "공사·하역 맥락 또는 거리 불신 시 전체 안전정지",
+          "required_evidence": "공사·하역 통제환경 FP/FN과 중단 시험",
+          "residual_field_limitation_notice": "공사구간과 대형차 사각지대는 비지원 고지"
+        },
+        {
+          "class_id": "traffic light",
+          "context": "교차로 주변 신호등 객체의 존재",
+          "false_positive": "신호등이 아닌 물체를 신호 안전 근거로 오인",
+          "false_negative": "신호등 존재를 놓침",
+          "harm": "QUALITATIVE_CRITICAL_IF_MISUSED_NOT_SCORED",
+          "exposure": "교차로 노출 측정 NOT_RUN",
+          "detectability": "객체 존재만 검출하며 신호 상태·보행 허용 판독 근거 없음",
+          "model_control": "후보 threshold 0.30은 미승인; 신호 상태 결정에 사용 금지",
+          "policy_control": "횡단보도 참고 정보만 제공하고 횡단 허용 판단 금지",
+          "ui_control": "건너도 된다는 안내를 생성하지 않음",
+          "fail_closed": "신호 관련 질문에는 기존 보조수단 확인 안내",
+          "required_evidence": "객체 FP/FN과 신호판단 비사용 회귀시험",
+          "residual_field_limitation_notice": "교통신호·차량 접근 안전을 보장하지 않음"
+        },
+        {
+          "class_id": "normal_tactile_block",
+          "context": "저장 TMAP 경로와 정렬된 가까운 점자블록",
+          "false_positive": "비점자 패턴을 경로 보조로 잘못 안내",
+          "false_negative": "유효한 근거리 점자블록 보조를 놓침",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "포장 패턴·마모 환경 노출 측정 NOT_RUN",
+          "detectability": "TMAP 방향·camera ROI·연속성 정렬 검증 필요",
+          "model_control": "후보 threshold 0.30은 미승인; route alignment gate 필요",
+          "policy_control": "목적지 route graph가 아닌 근거리 보조만 허용",
+          "ui_control": "정렬이 확인된 경우에만 제한적 follow 안내",
+          "fail_closed": "반대·끊김·정렬 불명확이면 따라가라 안내 금지",
+          "required_evidence": "패턴·방향·마모별 FP/FN과 route 정렬 시험",
+          "residual_field_limitation_notice": "점자블록이 목적지까지 이어짐을 보장하지 않음"
+        },
+        {
+          "class_id": "damaged_tactile_block",
+          "context": "손상 점자블록 위험·자동신고 후보",
+          "false_positive": "정상 블록을 손상으로 신고해 운영 오염",
+          "false_negative": "손상 위험과 신고 후보를 놓침",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "손상 유형·조명별 노출 측정 NOT_RUN",
+          "detectability": "정상/손상 혼동과 중복 후보 검증 필요",
+          "model_control": "후보 threshold 0.30은 미승인; class·중복 안정화 필요",
+          "policy_control": "report-only이며 자동 결과를 길안내 확정에 사용 금지",
+          "ui_control": "자동신고 후보별 기본 알림 없음; 안전 영향 시 제한 경고",
+          "fail_closed": "근거 불충분 후보는 기관 제출 없이 관리자 검수",
+          "required_evidence": "손상 유형별 FP/FN·중복률·report trace",
+          "residual_field_limitation_notice": "신고 생성이 보행 안전이나 기관 처리를 보장하지 않음"
+        },
+        {
+          "class_id": "crosswalk",
+          "context": "횡단보도 표면·경계의 참고 관측",
+          "false_positive": "유사 도색을 횡단보도로 오인",
+          "false_negative": "횡단보도 존재를 놓침",
+          "harm": "QUALITATIVE_CRITICAL_IF_MISUSED_NOT_SCORED",
+          "exposure": "도색 마모·가림별 노출 측정 NOT_RUN",
+          "detectability": "객체 존재만 확인하며 차량·신호 상태는 알 수 없음",
+          "model_control": "후보 threshold 0.30은 미승인; 횡단 안전판단 입력 금지",
+          "policy_control": "참고 정보만 제공하고 횡단 지시 금지",
+          "ui_control": "건너기 시작 안내를 생성하지 않음",
+          "fail_closed": "신호·차량 근거 없으면 정지·기존 보조수단 확인",
+          "required_evidence": "도색·가림별 FP/FN과 금지 안내 회귀시험",
+          "residual_field_limitation_notice": "횡단 가능 여부와 교통 안전을 보장하지 않음"
+        },
+        {
+          "class_id": "curb_step",
+          "context": "보행 진행면의 턱·단차",
+          "false_positive": "그림자·경계를 단차로 오인해 불필요 정지",
+          "false_negative": "단차를 놓쳐 걸림·낙상 가능",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "높이·조명·거리별 노출 측정 NOT_RUN",
+          "detectability": "depth·바닥면·연속 frame 검증 필요",
+          "model_control": "후보 threshold 0.20은 미승인; depth sanity 필요",
+          "policy_control": "이동 방향 대신 정지·주변 확인만 허용",
+          "ui_control": "턱 가능성과 안전정지를 짧게 안내",
+          "fail_closed": "depth 또는 바닥면 불신 시 전체 안전정지",
+          "required_evidence": "높이·조명·장착별 FP/FN과 실기기 depth 시험",
+          "residual_field_limitation_notice": "작은 턱·투명 경계 탐지를 보장하지 않음"
+        },
+        {
+          "class_id": "uneven_sidewalk",
+          "context": "균열·들뜸·불균일한 보도면",
+          "false_positive": "무늬·그림자를 불균일 보도로 오인",
+          "false_negative": "낙상 가능한 보도 손상을 놓침",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "재질·조명·젖은 노면 노출 측정 NOT_RUN",
+          "detectability": "낮은 recall blocker와 표면 다양성 검증 필요",
+          "model_control": "후보 threshold 0.15은 미승인; field gate 미충족",
+          "policy_control": "검증 전 안전 보장·정밀 회피 지시 금지",
+          "ui_control": "불확실하면 정지·주변 확인 안내",
+          "fail_closed": "표면 판단 불신 시 방향 안내 중지",
+          "required_evidence": "표면 재질·조명별 FP/FN과 field gate 재평가",
+          "residual_field_limitation_notice": "현행 후보 recall 부족과 미세 손상 한계를 고지"
+        },
+        {
+          "class_id": "e_scooter_obstruction",
+          "context": "보행로를 막는 전동킥보드",
+          "false_positive": "통로 밖 킥보드를 경로 차단으로 오인",
+          "false_negative": "통로를 막는 킥보드를 놓쳐 충돌 가능",
+          "harm": "QUALITATIVE_HIGH_NOT_SCORED",
+          "exposure": "배치·가림·조명별 노출 측정 NOT_RUN",
+          "detectability": "보행 ROI 점유·거리·가림 검증 필요",
+          "model_control": "후보 threshold 0.35은 미승인; obstruction gate 필요",
+          "policy_control": "안전한 이동 공간 검증 전 좌우 회피 지시 금지",
+          "ui_control": "정지·주변 확인 안내",
+          "fail_closed": "통과 공간 안전 미확인 시 진행 지시 금지",
+          "required_evidence": "배치·가림·거리별 FP/FN과 통제경로 시험",
+          "residual_field_limitation_notice": "넘어진 형태·부분 가림 탐지를 보장하지 않음"
+        }
+      ],
+      "quantitative_evaluation_status": "NOT_RUN",
+      "android_device_safety_validation_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "WS-10": {
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "gap_status": "INTERNAL_GAP",
+      "source_model": {
+        "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669"
+      },
+      "tflite_model": {
+        "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+      },
+      "runtime_config_artifact_sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19",
+      "fixed_same_input_pt_tflite_comparison": {
+        "status": "NOT_RUN",
+        "dataset_snapshot_sha256": null,
+        "preprocessing_contract_sha256": null,
+        "sample_results": null,
+        "result": null
+      },
+      "tolerance": {
+        "status": "NOT_ESTABLISHED",
+        "value": null,
+        "approval_ref": null
+      },
+      "completion_eligible": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    "WS-18": {
+      "lifecycle_status": "DRAFT",
+      "endpoints": [
+        {
+          "hop": "ANDROID_TO_GATEWAY_SEARCH",
+          "method": "GET",
+          "endpoint": "/api/navigation/destinations/search",
+          "status": "DEPLOYMENT_NOT_RUN"
+        },
+        {
+          "hop": "ANDROID_TO_GATEWAY_ROUTE",
+          "method": "POST",
+          "endpoint": "/api/navigation/walking",
+          "status": "DEPLOYMENT_NOT_RUN"
+        },
+        {
+          "hop": "BACKEND_TO_TMAP_SEARCH",
+          "method": "GET",
+          "endpoint": "TMAP_POI_SEARCH_URL",
+          "status": "LIVE_TMAP_NOT_RUN"
+        },
+        {
+          "hop": "BACKEND_TO_TMAP_ROUTE",
+          "method": "POST",
+          "endpoint": "https://apis.openapi.sk.com/tmap/routes/pedestrian",
+          "status": "LIVE_TMAP_NOT_RUN"
+        }
+      ],
+      "provider_timeout_seconds": 4.0,
+      "error_taxonomy": [
+        {
+          "error_class": "CONFIGURATION_UNAVAILABLE",
+          "behavior": "검색·경로 시작 차단, secret 원문 없는 기능 불가 안내",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "AUTH_OR_CONTRACT_REJECTED",
+          "behavior": "의존성 차단·escalation, provider 자동 전환 금지",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "QUOTA_OR_RATE_LIMITED",
+          "behavior": "quota 상태 기록, 현재 방향안내 중지, 사용자 재요청만 허용",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "PROVIDER_TIMEOUT",
+          "behavior": "4초에 요청 취소, 오래된 회전안내 재사용 금지",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "PROVIDER_UNAVAILABLE",
+          "behavior": "빈 경로로 변환하지 않고 offline/fallback 안내",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "INVALID_OR_OVERSIZED_RESPONSE",
+          "behavior": "응답 폐기, 마지막 성공 경로를 새 경로로 표시 금지",
+          "automatic_retry_budget": 0
+        },
+        {
+          "error_class": "NO_ROUTE_OR_NO_RESULT",
+          "behavior": "없음 안내, 임의 목적지·경로 생성 금지",
+          "automatic_retry_budget": 0
+        }
+      ],
+      "automatic_retry_budget": 0,
+      "cache_reuse_for_new_search_or_route": "PROHIBITED",
+      "stale_route_guidance": "PROHIBITED",
+      "quota_contracts": [
+        {
+          "item": "contract_quota_burst_daily",
+          "value": "NOT_ESTABLISHED",
+          "owner": "OPERATIONS_OWNER_ROLE",
+          "due": "BEFORE_LIVE_TMAP_OR_NAMED_RELEASE"
+        },
+        {
+          "item": "quota_cost_overage_policy",
+          "value": "NOT_ESTABLISHED",
+          "owner": "PROJECT_OWNER_ROLE",
+          "due": "BEFORE_LIVE_TMAP_OR_NAMED_RELEASE"
+        },
+        {
+          "item": "provider_status_support_contract",
+          "value": "NOT_ESTABLISHED",
+          "owner": "OPERATIONS_OWNER_ROLE",
+          "due": "BEFORE_LIVE_TMAP_OR_NAMED_RELEASE"
+        },
+        {
+          "item": "quota_measurement_block_test",
+          "value": "NOT_RUN",
+          "owner": "QA_OWNER_ROLE",
+          "due": "BEFORE_LIVE_TMAP_OR_NAMED_RELEASE"
+        }
+      ],
+      "planned_tests": [
+        {
+          "test": "route_and_search_endpoint_contract",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "four_second_timeout_and_cancellation",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "error_taxonomy_mapping",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "retry_zero_and_cache_stale_rejection",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "offline_fallback_and_accessible_notice",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "monitoring_redaction_and_escalation",
+          "status": "NOT_RUN"
+        },
+        {
+          "test": "provider_exit_and_alternate_validation",
+          "status": "NOT_RUN"
+        }
+      ],
+      "live_tmap_status": "NOT_RUN",
+      "quota_validation_status": "NOT_RUN",
+      "deployment_status": "NOT_RUN",
+      "provider_exit_status": "NOT_RUN",
+      "alternate_provider_validation_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE"
+    }
+  },
+  "coverage": {
+    "SEC": {
+      "expected": 19,
+      "materialized_draft": 14,
+      "planned_not_run": 5
+    },
+    "WS": {
+      "expected": 22,
+      "materialized_draft": 10,
+      "planned_not_run": 12
+    },
+    "bundle_count": 6,
+    "missing_artifact_type_ids": [],
+    "duplicate_artifact_type_ids": []
+  },
+  "generated_files": [
+    {
+      "path": "docs/deliverables/07-security/registers/security-exceptions.json",
+      "sha256": "5291c9082205da29fc138206dec3f846f9a6403d64620df2d454dafd3ba280f8",
+      "byte_length": 1172,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/07-security/registers/security-risks.json",
+      "sha256": "2a428d6aaee5eee214f36e6842ecc929df73379cd3398b7af3f4d24bc6a321cc",
+      "byte_length": 6226,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/07-security/registers/security-verification-evidence.json",
+      "sha256": "8fcc0962b79a74a8c8dedcd97ca0b3d3a3165df242052efda9bd5e61a39a491f",
+      "byte_length": 4431,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/07-security/registers/vulnerabilities.json",
+      "sha256": "abbea174ba2ce8f8513888a41b8376e64f3119919bd0ef504a3baecfb8167b69",
+      "byte_length": 1302,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "sha256": "4badcccfd1b4a991faed9e9bd0199b9fbe8c4c823d091afe208da91d013ca286",
+      "byte_length": 54184,
+      "artifact_type_ids": [
+        "SEC-01",
+        "SEC-02",
+        "SEC-03",
+        "SEC-04",
+        "SEC-05",
+        "SEC-06",
+        "SEC-07",
+        "SEC-08",
+        "SEC-09"
+      ]
+    },
+    {
+      "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+      "sha256": "b15666d307b8409ad87e58bf8b8022bf23b33ed83e9361f3154844101160afee",
+      "byte_length": 25180,
+      "artifact_type_ids": [
+        "SEC-15",
+        "SEC-16",
+        "SEC-17",
+        "SEC-18",
+        "SEC-19"
+      ]
+    },
+    {
+      "path": "docs/deliverables/07-security/security-verification-evidence.md",
+      "sha256": "0b7cc90532f8a279416b0647e5fb154618d377689faf3a38052555ceef205a02",
+      "byte_length": 21114,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/11-walksafe/field-test-safety-records.md",
+      "sha256": "52a4af81f402ab7e29bf0202ec52384035c5c8c82cd6da1b16790f2fb3abdfd0",
+      "byte_length": 7010,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/11-walksafe/registers/acceptance-evidence.json",
+      "sha256": "f46816aebdb17e257fefc09348343d548709fcd3cb5b3a1bcb640ec111117f0a",
+      "byte_length": 10934,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/11-walksafe/registers/field-test-external-record-index.json",
+      "sha256": "c6722c09d08ae3a41639ace8262216cf1308706a680042756a61fd02fc3b6925",
+      "byte_length": 1198,
+      "artifact_type_ids": []
+    },
+    {
+      "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+      "sha256": "c310a7a71480ebb8b402eeac5c00b6fda735f7724dba1c73c6b052775ed36b71",
+      "byte_length": 50254,
+      "artifact_type_ids": [
+        "WS-11"
+      ]
+    },
+    {
+      "path": "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+      "sha256": "dfa1a5d817bf41b2ff81a14f76a559d04076e7e393f0eed4336eb2aa8b686ce5",
+      "byte_length": 68326,
+      "artifact_type_ids": [
+        "WS-01",
+        "WS-02",
+        "WS-03",
+        "WS-04",
+        "WS-05",
+        "WS-08",
+        "WS-18",
+        "WS-19",
+        "WS-22"
+      ]
+    }
+  ],
+  "evidence_execution_summary": {
+    "planned_not_run_artifact_count": 17,
+    "executed_evidence_artifact_count": 0,
+    "passed_evidence_artifact_count": 0,
+    "external_original_record_count": 0,
+    "waived_evidence_artifact_count": 0
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "open_change_requests": [
+    {
+      "change_request_id": "CR-0002",
+      "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "owner_clarification_required": false,
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+      "related_test_status": "NOT_RUN",
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "correction_candidate_approval_status": "NOT_APPROVED",
+      "correction_candidate_effective_status": "NOT_EFFECTIVE",
+      "policy_effect_claimed": false,
+      "approval_boundary": "사용자 정규화 지시는 포착했으나 새 산출물 묶음 승인 전이므로 관련 구현 확정과 정식 시험은 대기한다."
+    }
+  ],
+  "scope_boundary": {
+    "current_products": [
+      "Android 사용자 앱",
+      "별도 비공개 Android 관리자 앱"
+    ],
+    "web_pwa_status": "LEGACY_NOT_ACTIVE; WS-16 requires separate reapproval",
+    "raw_original_collection_policy": "APPROVED_POLICY; release independent review NOT_RUN",
+    "sensitive_raw_data_in_git": false
+  },
+  "authorization_boundary": {
+    "policy_baseline_status": "BASELINED",
+    "formal_deliverable_lifecycle_status": "DRAFT_OR_PLANNED_AS_DECLARED",
+    "formal_deliverables_approved": false,
+    "security_verification_completion_claimed": false,
+    "field_or_device_test_completion_claimed": false,
+    "external_consent_or_pentest_claimed": false,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "manifest_content_sha256": "e21addcdcb3df027daf19f982cf49d70adc2f8b9bd757d9ce42cd0b43780352f"
+}

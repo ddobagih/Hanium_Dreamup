@@ -1,0 +1,77 @@
+{
+  "argv": [
+    "env",
+    "-u",
+    "DATABASE_URL",
+    "WALKSAFE_TEST_DATABASE_URL=<REDACTED_EPHEMERAL_LOOPBACK>",
+    "PYTHONPATH=<REPO>",
+    "uv",
+    "run",
+    "--no-project",
+    "<EXACT_UV_ADMIN_RUNTIME>",
+    "python",
+    "scripts/check_walksafe_test_database_20260713.py"
+  ],
+  "command_id": "test-database-preflight",
+  "cwd": ".",
+  "end": "2026-07-26T16:38:55.424564657Z",
+  "environment_constraints": {
+    "DATABASE_URL": "UNSET",
+    "WALKSAFE_TEST_DATABASE_URL": "REDACTED_EPHEMERAL_LOOPBACK",
+    "database_name": "walksafe_dev21_test_002"
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "7094d60781167179c1a95024bd6b13a80023bd61b5cef1bcb75cf894378ca5f3"
+    }
+  },
+  "log_path": "logs/test-database-preflight.log",
+  "log_sha256": "2cb1072241b5f51478f233de87c0c9913b90266a1781473de73d8bda41fe8089",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 60288,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "runtime_packages": [
+    "alembic==1.16.5",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.13.0",
+    "certifi==2026.4.22",
+    "fastapi==0.128.8",
+    "geoalchemy2==0.17.1",
+    "greenlet==3.5.0",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.14",
+    "iniconfig==2.3.0",
+    "mako==1.3.12",
+    "markupsafe==3.0.3",
+    "packaging==26.2",
+    "pluggy==1.6.0",
+    "psycopg[binary]==3.2.13",
+    "psycopg-binary==3.2.13",
+    "pydantic==2.13.4",
+    "pydantic-core==2.46.4",
+    "pygments==2.20.0",
+    "pyotp==2.10.0",
+    "pytest==8.4.2",
+    "python-dotenv==1.2.1",
+    "python-multipart==0.0.20",
+    "sqlalchemy==2.0.49",
+    "starlette==0.52.1",
+    "typing-extensions==4.15.0",
+    "typing-inspection==0.4.2"
+  ],
+  "schema_version": "walksafe.w3-dev21-command-receipt.v2",
+  "start": "2026-07-26T16:38:55.208792974Z",
+  "status": "PASS",
+  "time_log_path": "logs/test-database-preflight.time",
+  "time_log_sha256": "8e601c93f0ad33ac11a211c8118262585dff8ec5309176c6fcb460bfceb2c1de",
+  "tool": {
+    "runtime": "UV_ADMIN_RUNTIME"
+  }
+}

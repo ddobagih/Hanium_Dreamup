@@ -1,0 +1,1311 @@
+{
+  "schema_version": "walksafe.phase1-owner-attestation-decision-ready.v1",
+  "packet_id": "WS-PHASE1-OWNER-ATTESTATION-DECISION-READY-20260727-001",
+  "run_id": "run-20260727-001",
+  "prepared_on": "2026-07-27",
+  "prepared_on_precision": "DAY_ONLY",
+  "materialized_at": "2026-07-27T22:58:18+09:00",
+  "packet_status": "DECISION_READY_AWAITING_HUMAN_INPUTS",
+  "effective_policy": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "policy_1_0_0_role": "HISTORICAL_COMPOSITION_ONLY",
+    "implementation_conformance": "NOT_ASSESSED",
+    "tests": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "selection": {
+    "source_queue_id": "WS-ARTIFACT-CLOSURE-PHASE1-ACTION-QUEUE-20260727-001",
+    "owner_question_group": "CONTENT_OWNER_APPROVAL_14",
+    "attestation_question_group": "ATTESTATION_QA_OWNER_4",
+    "owner_ids": [
+      "DLV-DES-21",
+      "DLV-DSC-05",
+      "DLV-DSC-06",
+      "DLV-DSC-07",
+      "DLV-DSC-11",
+      "DLV-MGT-03",
+      "DLV-MGT-08",
+      "DLV-REQ-12",
+      "DLV-REQ-13",
+      "DLV-REQ-15",
+      "DLV-SEC-04",
+      "DLV-SEC-05",
+      "DLV-SEC-06",
+      "DLV-SEC-17"
+    ],
+    "attestation_ids": [
+      "DLV-OPS-17",
+      "DLV-OPS-19",
+      "DLV-OPS-23",
+      "DLV-TST-22"
+    ],
+    "union_ids": [
+      "DLV-DES-21",
+      "DLV-DSC-05",
+      "DLV-DSC-06",
+      "DLV-DSC-07",
+      "DLV-DSC-11",
+      "DLV-MGT-03",
+      "DLV-MGT-08",
+      "DLV-REQ-12",
+      "DLV-REQ-13",
+      "DLV-REQ-15",
+      "DLV-SEC-04",
+      "DLV-SEC-05",
+      "DLV-SEC-06",
+      "DLV-SEC-17",
+      "DLV-OPS-17",
+      "DLV-OPS-19",
+      "DLV-OPS-23",
+      "DLV-TST-22"
+    ],
+    "owner_count": 14,
+    "attestation_count": 4,
+    "union_count": 18,
+    "sets_disjoint": true
+  },
+  "source_bindings": [
+    {
+      "binding_id": "SRC-PHASE1-QUEUE",
+      "role": "CURRENT_SELECTION_SOURCE_NO_MUTATION",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-artifact-action-queue.json",
+      "byte_length": 1111436,
+      "file_sha256": "75a718d23b81e234c7542426301b36a3cf1e9b406fb2348ceee928e18bdb043b",
+      "logical_id": "WS-ARTIFACT-CLOSURE-PHASE1-ACTION-QUEUE-20260727-001",
+      "content_fingerprint": "cad7814c2dda898bc7a87d15754df8d48fef0c9521335254223e67072eb46d92",
+      "historical_only": false
+    },
+    {
+      "binding_id": "SRC-PHASE1-CORE-SUCCESSOR",
+      "role": "CURRENT_AUTHORABLE_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-internal-authorable-core/evidence.json",
+      "byte_length": 17664,
+      "file_sha256": "d0dfaa251b284f84582149581f661c66c4cfc67509df43564e041476c7570e62",
+      "logical_id": "WS-PHASE1-INTERNAL-AUTHORABLE-CORE-20260727-001",
+      "content_fingerprint": "5b88584dd4fc277070281c7f71555e05302fd2f8d8c75ce840ee2a6c91698817",
+      "historical_only": false
+    },
+    {
+      "binding_id": "SRC-PHASE1-SECURITY-SUCCESSOR",
+      "role": "CURRENT_AUTHORABLE_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-security-authorable/evidence.json",
+      "byte_length": 16598,
+      "file_sha256": "a79ed29970b27bc208a0c96bb42de68da7fb95728ce239174ed9a214b410d638",
+      "logical_id": "WS-PHASE1-SECURITY-AUTHORABLE-20260727-001",
+      "content_fingerprint": "f6546b2c4e925d280fb7968dd69f443b3d301e3ac511314afe0136b679518e87",
+      "historical_only": false
+    },
+    {
+      "binding_id": "SRC-R007",
+      "role": "CURRENT_INDEPENDENT_CONTENT_REVIEW_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/content-acceptance-review-receipt-r007.json",
+      "byte_length": 28685,
+      "file_sha256": "b016e6d3cccd9a57eb9bdab69e7e5dd058b6471baa86fcef8f6f2eaf5963834f",
+      "logical_id": "WS-CONTENT-ACCEPTANCE-REVIEW-20260727-007",
+      "content_fingerprint": "15e6ed49b205076c24f474ec6955dfed113a3f1bae9e00421439bb85efa80e0e",
+      "historical_only": false
+    },
+    {
+      "binding_id": "SRC-R006-HISTORICAL",
+      "role": "HISTORICAL_CONTENT_REVIEW_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/content-acceptance-review-receipt.json",
+      "byte_length": 28305,
+      "file_sha256": "bca93cff7c58e3f5cd26646a38c66e2c5518561bd68c58d3fbde13be90dacb3f",
+      "logical_id": "WS-CONTENT-ACCEPTANCE-REVIEW-20260727-006",
+      "content_fingerprint": "141402d98b984d74fdde2fe84209d8ad6cce93b830a4df62b81088f9fbbee47c",
+      "historical_only": true
+    },
+    {
+      "binding_id": "SRC-PHASE1-CURRENT-STATE-ATTESTATION",
+      "role": "CURRENT_STATE_ATTESTATION_SOURCE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+      "byte_length": 38400,
+      "file_sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+      "logical_id": "WS-PHASE1-CURRENT-STATE-ATTESTATION-20260727-001",
+      "content_fingerprint": "ce3e4d7e435ac3bf4ada767d950070f84c835e39caa528b2d4b2c24425318d5b",
+      "historical_only": false
+    },
+    {
+      "binding_id": "SRC-R002-INDEPENDENT-REVIEW",
+      "role": "HISTORICAL_REVIEW_CONTEXT_ONLY",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-queue-ai-independent-review-r002.md",
+      "byte_length": 11353,
+      "file_sha256": "efb0d8ef9a5e517ef4004bc905ebbe83cdd25458122203de6b1acd33dda421fa",
+      "logical_id": "R002_INDEPENDENT_CONTENT_REVIEW",
+      "content_fingerprint": null,
+      "historical_only": true
+    }
+  ],
+  "queue_binding_interpretation": {
+    "queue_role": "EXACT_ID_AND_CURRENT_STATE_SELECTION_SOURCE_ONLY",
+    "embedded_r006_dependencies_role": "HISTORICAL_AFTER_R007_CURRENT_BYTE_REVIEW",
+    "queue_mutated_by_this_packet": false,
+    "queue_state_promoted_by_this_packet": false,
+    "controlled_receipt_required_for_later_queue_update": true
+  },
+  "content_review_acceptance": {
+    "receipt_id": "WS-CONTENT-ACCEPTANCE-REVIEW-20260727-007",
+    "result": "PASS14_PARTIAL0_FAIL0",
+    "pass_count": 14,
+    "partial_count": 0,
+    "fail_count": 0,
+    "blocking_finding_count": 0,
+    "nonblocking_finding_count": 14,
+    "nonblocking_finding_severity_counts": {
+      "INFO": 5,
+      "LOW": 4,
+      "MEDIUM": 1,
+      "HIGH": 4
+    },
+    "scope_owner_approval_count": 0,
+    "scope_owner_approval_status": "PENDING"
+  },
+  "owner_decision_items": [
+    {
+      "artifact_type_code": "DLV-DES-21",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "des-21",
+        "byte_length": 83400,
+        "path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "sha256": "e99b96971d411c7ce07c26679adc4eb229ab78d5a3f62ee50af7cc366b3970ac",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-DES21-001",
+        "severity": "INFO",
+        "summary": "current policy 1.0.1과 approved/effective/committed FP-035에 결속된 현재 설계 바이트가 데이터 흐름과 실행·법률 경계를 분리한다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_CURRENT_BYTES_KEEP_LEGAL_IMPLEMENTATION_AND_PRODUCTION_GATES_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-05",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "dsc-05",
+        "byte_length": 43076,
+        "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-DSC05-001",
+        "severity": "INFO",
+        "summary": "current policy 1.0.1 proto-persona이며 DSC-04는 Planned/NOT_RUN이다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_DSC04_USER_RESEARCH_PLANNED_NOT_RUN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-06",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "dsc-06",
+        "byte_length": 43076,
+        "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-DSC06-001",
+        "severity": "INFO",
+        "summary": "여정 계약과 실제 사용자 조사 미실행 경계가 분리됐다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_DSC04_USER_RESEARCH_PLANNED_NOT_RUN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-07",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "dsc-07",
+        "byte_length": 43076,
+        "path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-DSC07-001",
+        "severity": "LOW",
+        "summary": "dated desktop 비교만 COMPLETED_WITH_LIMITATIONS이고 app·field·performance·user 축은 NOT_RUN이다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_APP_FIELD_PERFORMANCE_USER_TERMS_LEGAL_AND_REFETCH_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-11",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "dsc-11",
+        "byte_length": 23179,
+        "path": "docs/deliverables/02-discovery/product-definition.md",
+        "sha256": "f0c835ae6ea3f952e4650b978412e06f150384fcbb01268db710767542589e60",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-DSC11-001",
+        "severity": "INFO",
+        "summary": "KPI 계약이 구체적이고 미측정값을 0으로 꾸미지 않았다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_MEASUREMENT_AND_TARGET_BASELINING_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-MGT-03",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "mgt-03",
+        "byte_length": 22749,
+        "path": "docs/deliverables/01-management/project-charter.md",
+        "sha256": "aa71b094be01928fbf830bec5ffda70635a9afdae4876a3afee181eee3522979",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-MGT03-001",
+        "severity": "INFO",
+        "summary": "SMART 목표와 KPI 관리 계약이 명시됐다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_EXECUTION_KPIS_NOT_RUN_OR_NOT_MEASURED",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-MGT-08",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "mgt-08",
+        "byte_length": 35549,
+        "path": "docs/deliverables/01-management/project-management-plan.md",
+        "sha256": "5f292543a0749d9734bf64c9a7b2d362091da6dfd7364b513f65a02d47acd1fa",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-MGT08-001",
+        "severity": "LOW",
+        "summary": "자원 계획과 측정·승인 경계가 분리되고 기기 사실은 미검증이다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_DEVICE_FACT_COST_MEASUREMENT_AND_EXTERNAL_RESOURCES_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-12",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "req-12",
+        "byte_length": 689364,
+        "path": "docs/deliverables/03-requirements/system-requirements.md",
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-REQ12-001",
+        "severity": "LOW",
+        "summary": "REQ-12는 current policy 1.0.1 측정계약이며 FP-035 구현 적합성·시험·gate 완료를 주장하지 않는다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_DEVICE_MEASUREMENT_LOAD_TEST_AND_CAPACITY_GATES_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-13",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "req-13",
+        "byte_length": 689364,
+        "path": "docs/deliverables/03-requirements/system-requirements.md",
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-REQ13-001",
+        "severity": "LOW",
+        "summary": "가용성·복구 목표와 실제 운영 미실행 경계가 분리됐다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_BACKUP_RESTORE_DRILL_SLO_AND_PRODUCTION_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-15",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "req-15",
+        "byte_length": 689364,
+        "path": "docs/deliverables/03-requirements/system-requirements.md",
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-REQ15-001",
+        "severity": "HIGH",
+        "summary": "의무 inventory는 작성됐지만 법률·계약·라이선스 검토는 미확보다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_KEEP_LEGAL_CONTRACT_LICENSE_AND_STORE_REVIEW_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-SEC-04",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "sec-04",
+        "byte_length": 69161,
+        "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-SEC04-001",
+        "severity": "HIGH",
+        "summary": "current policy 1.0.1 기준의 현재 검토 내용은 충족하지만 운영 보안시험의 독립성과 release blocker는 열려 있다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_CURRENT_BYTES_KEEP_OPERATIONAL_SECURITY_TEST_INDEPENDENCE_AND_RELEASE_BLOCKERS_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-SEC-05",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "sec-05",
+        "byte_length": 69161,
+        "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-SEC05-001",
+        "severity": "HIGH",
+        "summary": "현재 영향평가 내용은 충족하지만 잔여위험 수용, 법률 의견과 배포 판단은 열려 있다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_CURRENT_BYTES_KEEP_RESIDUAL_RISK_LEGAL_AND_RELEASE_GATES_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-SEC-06",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "sec-06",
+        "byte_length": 69161,
+        "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-SEC06-001",
+        "severity": "HIGH",
+        "summary": "현재 동의·고지 계약은 충족하지만 법률 적합성, UI·E2E와 provider 검증은 열려 있다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_CURRENT_BYTES_KEEP_LEGAL_NOTICE_UI_E2E_PROVIDER_AND_RELEASE_GATES_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    },
+    {
+      "artifact_type_code": "DLV-SEC-17",
+      "queue_current_state": "OWNER_APPROVAL_PENDING",
+      "question_group": "CONTENT_OWNER_APPROVAL_14",
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "exact_review_subject": {
+        "anchor": "sec-17",
+        "byte_length": 33912,
+        "path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "sha256": "e12637797b00007cff56ba727bbd3c66fa176c177ed60f0299ba8d1e41e306fe",
+        "subject_scope": "FULL_CANONICAL_FILE_BYTES_WITH_SECTION_ANCHOR"
+      },
+      "content_review_decision": "PASS_CONTENT_REVIEW_ONLY",
+      "nonblocking_finding": {
+        "blocks_content_review_pass": false,
+        "finding_id": "CAR7-SEC17-001",
+        "severity": "MEDIUM",
+        "summary": "현재 사고대응 계약은 충족하지만 연락 채널, 훈련, 법률 통지 판단과 production 실행은 열려 있다."
+      },
+      "finding_disposition": "CONTENT_ACCEPTED_CURRENT_BYTES_KEEP_CONTACT_DRILL_LEGAL_NOTIFICATION_AND_PRODUCTION_OPEN",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "approval_signature": null,
+      "decision_status": "PENDING"
+    }
+  ],
+  "attestation_decision_items": [
+    {
+      "artifact_type_code": "DLV-OPS-17",
+      "queue_current_state": "ATTESTATION_REVIEW_PENDING",
+      "question_group": "ATTESTATION_QA_OWNER_4",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-17-20260727-001",
+      "exact_attestation_subject": {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "json_selector": "$.attestations[0]"
+      },
+      "observed_state": {
+        "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+        "reconciliation_result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW",
+        "execution_status": "NOT_RUN",
+        "review_status": "PENDING_INDEPENDENT_REVIEW",
+        "approval_status": "NOT_APPROVED",
+        "release_decision": "NO_GO",
+        "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred."
+      },
+      "required_independent_qa_input": {
+        "required_authority": "INDEPENDENT_QA_REVIEWER",
+        "permitted_decisions": [
+          "ACCEPT_CURRENT_STATE_ATTESTATION",
+          "REJECT_CURRENT_STATE_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "reviewer_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      },
+      "required_scope_owner_input": {
+        "required_authority": "SERVICE_OWNER",
+        "source_approver_role": "서비스소유자",
+        "permitted_decisions": [
+          "APPROVE_ATTESTATION",
+          "REJECT_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "approver_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      }
+    },
+    {
+      "artifact_type_code": "DLV-OPS-19",
+      "queue_current_state": "ATTESTATION_REVIEW_PENDING",
+      "question_group": "ATTESTATION_QA_OWNER_4",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-19-20260727-001",
+      "exact_attestation_subject": {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "json_selector": "$.attestations[1]"
+      },
+      "observed_state": {
+        "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+        "reconciliation_result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW",
+        "execution_status": "NOT_RUN",
+        "review_status": "PENDING_INDEPENDENT_REVIEW",
+        "approval_status": "NOT_APPROVED",
+        "release_decision": "NO_GO",
+        "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred."
+      },
+      "required_independent_qa_input": {
+        "required_authority": "INDEPENDENT_QA_REVIEWER",
+        "permitted_decisions": [
+          "ACCEPT_CURRENT_STATE_ATTESTATION",
+          "REJECT_CURRENT_STATE_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "reviewer_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      },
+      "required_scope_owner_input": {
+        "required_authority": "SERVICE_OWNER",
+        "source_approver_role": "서비스소유자",
+        "permitted_decisions": [
+          "APPROVE_ATTESTATION",
+          "REJECT_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "approver_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      }
+    },
+    {
+      "artifact_type_code": "DLV-OPS-23",
+      "queue_current_state": "ATTESTATION_REVIEW_PENDING",
+      "question_group": "ATTESTATION_QA_OWNER_4",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-23-20260727-001",
+      "exact_attestation_subject": {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "json_selector": "$.attestations[2]"
+      },
+      "observed_state": {
+        "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+        "reconciliation_result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW",
+        "execution_status": "NOT_RUN",
+        "review_status": "PENDING_INDEPENDENT_REVIEW",
+        "approval_status": "NOT_APPROVED",
+        "release_decision": "NO_GO",
+        "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred."
+      },
+      "required_independent_qa_input": {
+        "required_authority": "INDEPENDENT_QA_REVIEWER",
+        "permitted_decisions": [
+          "ACCEPT_CURRENT_STATE_ATTESTATION",
+          "REJECT_CURRENT_STATE_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "reviewer_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      },
+      "required_scope_owner_input": {
+        "required_authority": "SERVICE_OWNER",
+        "source_approver_role": "서비스소유자",
+        "permitted_decisions": [
+          "APPROVE_ATTESTATION",
+          "REJECT_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "approver_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      }
+    },
+    {
+      "artifact_type_code": "DLV-TST-22",
+      "queue_current_state": "ATTESTATION_REVIEW_PENDING",
+      "question_group": "ATTESTATION_QA_OWNER_4",
+      "attestation_id": "ATT-PHASE1-DLV-TST-22-20260727-001",
+      "exact_attestation_subject": {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "json_selector": "$.attestations[3]"
+      },
+      "observed_state": {
+        "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+        "reconciliation_result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW",
+        "execution_status": "NOT_RUN",
+        "review_status": "PENDING_INDEPENDENT_REVIEW",
+        "approval_status": "NOT_APPROVED",
+        "release_decision": "NO_GO",
+        "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred."
+      },
+      "required_independent_qa_input": {
+        "required_authority": "INDEPENDENT_QA_REVIEWER",
+        "permitted_decisions": [
+          "ACCEPT_CURRENT_STATE_ATTESTATION",
+          "REJECT_CURRENT_STATE_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "reviewer_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      },
+      "required_scope_owner_input": {
+        "required_authority": "PRODUCT_OWNER",
+        "source_approver_role": "제품책임자",
+        "permitted_decisions": [
+          "APPROVE_ATTESTATION",
+          "REJECT_ATTESTATION",
+          "RETURN_FOR_CORRECTION"
+        ],
+        "actual_decision": null,
+        "approver_identity": null,
+        "decided_on": null,
+        "signature": null,
+        "status": "PENDING"
+      }
+    }
+  ],
+  "requested_human_inputs": {
+    "content_owner_decision": {
+      "request_id": "REQ-OWNER-CONTENT-14-001",
+      "exact_artifact_type_codes": [
+        "DLV-DES-21",
+        "DLV-DSC-05",
+        "DLV-DSC-06",
+        "DLV-DSC-07",
+        "DLV-DSC-11",
+        "DLV-MGT-03",
+        "DLV-MGT-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13",
+        "DLV-REQ-15",
+        "DLV-SEC-04",
+        "DLV-SEC-05",
+        "DLV-SEC-06",
+        "DLV-SEC-17"
+      ],
+      "exact_artifact_count": 14,
+      "required_authority": "PROJECT_SCOPE_OWNER",
+      "permitted_decisions": [
+        "APPROVE_CONTENT",
+        "REJECT_CONTENT",
+        "RETURN_FOR_CHANGE"
+      ],
+      "decision_must_bind_manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "signature": null,
+      "status": "PENDING"
+    },
+    "attestation_independent_qa_decision": {
+      "request_id": "REQ-ATTESTATION-QA-4-001",
+      "exact_artifact_type_codes": [
+        "DLV-OPS-17",
+        "DLV-OPS-19",
+        "DLV-OPS-23",
+        "DLV-TST-22"
+      ],
+      "exact_artifact_count": 4,
+      "required_authority": "INDEPENDENT_QA_REVIEWER",
+      "permitted_decisions": [
+        "ACCEPT_CURRENT_STATE_ATTESTATIONS",
+        "REJECT_CURRENT_STATE_ATTESTATIONS",
+        "RETURN_FOR_CORRECTION"
+      ],
+      "decision_must_bind_manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "actual_decision": null,
+      "reviewer_identity": null,
+      "decided_on": null,
+      "signature": null,
+      "status": "PENDING"
+    },
+    "attestation_scope_owner_decision": {
+      "request_id": "REQ-ATTESTATION-SCOPE-OWNER-4-001",
+      "exact_artifact_type_codes": [
+        "DLV-OPS-17",
+        "DLV-OPS-19",
+        "DLV-OPS-23",
+        "DLV-TST-22"
+      ],
+      "exact_artifact_count": 4,
+      "authority_by_artifact": {
+        "DLV-OPS-17": "SERVICE_OWNER",
+        "DLV-OPS-19": "SERVICE_OWNER",
+        "DLV-OPS-23": "SERVICE_OWNER",
+        "DLV-TST-22": "PRODUCT_OWNER"
+      },
+      "permitted_decisions": [
+        "APPROVE_ATTESTATIONS",
+        "REJECT_ATTESTATIONS",
+        "RETURN_FOR_CORRECTION"
+      ],
+      "decision_must_bind_manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "actual_decision": null,
+      "approver_identity": null,
+      "decided_on": null,
+      "signature": null,
+      "status": "PENDING"
+    }
+  },
+  "no_event_and_release_boundary": {
+    "actual_execution_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "device_execution_status": "NOT_RUN",
+    "production_execution_status": "NOT_RUN",
+    "attestation_execution_status": "NOT_RUN",
+    "attestation_release_decision": "NO_GO",
+    "release_status": "NOT_ELIGIBLE",
+    "no_event_disclaimer_preserved": true,
+    "legal_opinion_status": "NOT_OBTAINED"
+  },
+  "state_control": {
+    "actual_content_owner_approval_count": 0,
+    "actual_independent_qa_acceptance_count": 0,
+    "actual_attestation_scope_owner_approval_count": 0,
+    "actual_approval_signature_count": 0,
+    "canonical_content_modified": false,
+    "source_queue_modified": false,
+    "state_promotion_performed": false,
+    "final_approval_receipt_issued": false,
+    "release_approval_issued": false
+  },
+  "hash_invalidation_rules": {
+    "any_bound_subject_byte_change_invalidates_packet": true,
+    "any_manifest_item_change_invalidates_prior_decision_input": true,
+    "approval_must_bind_decision_item_manifest_sha256": true,
+    "approval_must_bind_packet_content_fingerprint": true,
+    "changed_bytes_require_new_review_and_new_decision_packet": true,
+    "R006_role": "HISTORICAL_ONLY",
+    "R007_role": "CURRENT_INDEPENDENT_CONTENT_REVIEW"
+  },
+  "decision_item_manifest": {
+    "manifest_id": "WS-PHASE1-OWNER-ATTESTATION-DECISION-ITEM-MANIFEST-20260727-001",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "hash_algorithm": "SHA-256",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_ARTIFACT_TYPE_CODE",
+    "item_count": 18,
+    "owner_item_count": 14,
+    "attestation_item_count": 4,
+    "items": [
+      {
+        "artifact_type_code": "DLV-DES-21",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "anchor": "des-21",
+        "byte_length": 83400,
+        "sha256": "e99b96971d411c7ce07c26679adc4eb229ab78d5a3f62ee50af7cc366b3970ac",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-DSC-05",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "anchor": "dsc-05",
+        "byte_length": 43076,
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-DSC-06",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "anchor": "dsc-06",
+        "byte_length": 43076,
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-DSC-07",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "anchor": "dsc-07",
+        "byte_length": 43076,
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-DSC-11",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/02-discovery/product-definition.md",
+        "anchor": "dsc-11",
+        "byte_length": 23179,
+        "sha256": "f0c835ae6ea3f952e4650b978412e06f150384fcbb01268db710767542589e60",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-MGT-03",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/01-management/project-charter.md",
+        "anchor": "mgt-03",
+        "byte_length": 22749,
+        "sha256": "aa71b094be01928fbf830bec5ffda70635a9afdae4876a3afee181eee3522979",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-MGT-08",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/01-management/project-management-plan.md",
+        "anchor": "mgt-08",
+        "byte_length": 35549,
+        "sha256": "5f292543a0749d9734bf64c9a7b2d362091da6dfd7364b513f65a02d47acd1fa",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-OPS-17",
+        "decision_class": "CURRENT_STATE_ATTESTATION_QA_AND_SCOPE_OWNER",
+        "attestation_id": "ATT-PHASE1-DLV-OPS-17-20260727-001",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "independent_qa_actual_decision": null,
+        "scope_owner_actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-OPS-19",
+        "decision_class": "CURRENT_STATE_ATTESTATION_QA_AND_SCOPE_OWNER",
+        "attestation_id": "ATT-PHASE1-DLV-OPS-19-20260727-001",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "independent_qa_actual_decision": null,
+        "scope_owner_actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-OPS-23",
+        "decision_class": "CURRENT_STATE_ATTESTATION_QA_AND_SCOPE_OWNER",
+        "attestation_id": "ATT-PHASE1-DLV-OPS-23-20260727-001",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "independent_qa_actual_decision": null,
+        "scope_owner_actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-REQ-12",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "anchor": "req-12",
+        "byte_length": 689364,
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-REQ-13",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "anchor": "req-13",
+        "byte_length": 689364,
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-REQ-15",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "anchor": "req-15",
+        "byte_length": 689364,
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-SEC-04",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "anchor": "sec-04",
+        "byte_length": 69161,
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-SEC-05",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "anchor": "sec-05",
+        "byte_length": 69161,
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-SEC-06",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "anchor": "sec-06",
+        "byte_length": 69161,
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-SEC-17",
+        "decision_class": "CONTENT_OWNER_APPROVAL",
+        "exact_path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "anchor": "sec-17",
+        "byte_length": 33912,
+        "sha256": "e12637797b00007cff56ba727bbd3c66fa176c177ed60f0299ba8d1e41e306fe",
+        "actual_decision": null
+      },
+      {
+        "artifact_type_code": "DLV-TST-22",
+        "decision_class": "CURRENT_STATE_ATTESTATION_QA_AND_SCOPE_OWNER",
+        "attestation_id": "ATT-PHASE1-DLV-TST-22-20260727-001",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+        "byte_length": 38400,
+        "sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+        "independent_qa_actual_decision": null,
+        "scope_owner_actual_decision": null
+      }
+    ],
+    "manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd"
+  },
+  "physical_binding_manifest": {
+    "manifest_id": "WS-PHASE1-OWNER-ATTESTATION-PHYSICAL-BINDING-MANIFEST-20260727-001",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "hash_algorithm": "SHA-256",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subject_count": 13,
+    "subjects": [
+      {
+        "subject_id": "DECISION-DOC-01",
+        "exact_path": "docs/deliverables/01-management/project-charter.md",
+        "byte_length": 22749,
+        "sha256": "aa71b094be01928fbf830bec5ffda70635a9afdae4876a3afee181eee3522979",
+        "artifact_type_codes": [
+          "DLV-MGT-03"
+        ],
+        "anchors": [
+          "mgt-03"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-02",
+        "exact_path": "docs/deliverables/01-management/project-management-plan.md",
+        "byte_length": 35549,
+        "sha256": "5f292543a0749d9734bf64c9a7b2d362091da6dfd7364b513f65a02d47acd1fa",
+        "artifact_type_codes": [
+          "DLV-MGT-08"
+        ],
+        "anchors": [
+          "mgt-08"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-03",
+        "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "byte_length": 43076,
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "artifact_type_codes": [
+          "DLV-DSC-05",
+          "DLV-DSC-06",
+          "DLV-DSC-07"
+        ],
+        "anchors": [
+          "dsc-05",
+          "dsc-06",
+          "dsc-07"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-04",
+        "exact_path": "docs/deliverables/02-discovery/product-definition.md",
+        "byte_length": 23179,
+        "sha256": "f0c835ae6ea3f952e4650b978412e06f150384fcbb01268db710767542589e60",
+        "artifact_type_codes": [
+          "DLV-DSC-11"
+        ],
+        "anchors": [
+          "dsc-11"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-05",
+        "exact_path": "docs/deliverables/02-discovery/registers/discovery-evidence.json",
+        "byte_length": 5131,
+        "sha256": "a594cb582cb77c430a906c813b2935b8eb2dd20591bc89079d4ced3be09bc779",
+        "artifact_type_codes": [
+          "DLV-DSC-05",
+          "DLV-DSC-06"
+        ],
+        "anchors": [
+          "dsc-05",
+          "dsc-06"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-06",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "byte_length": 689364,
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "artifact_type_codes": [
+          "DLV-REQ-12",
+          "DLV-REQ-13",
+          "DLV-REQ-15"
+        ],
+        "anchors": [
+          "req-12",
+          "req-13",
+          "req-15"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-07",
+        "exact_path": "docs/deliverables/04-design/design-traceability-register.json",
+        "byte_length": 463652,
+        "sha256": "18775a3f4d5d1faf0ae692b27888613c3d43f0b276d5a71dfbb08aad47c6b4ae",
+        "artifact_type_codes": [
+          "DLV-DES-21"
+        ],
+        "anchors": [
+          "des-21"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-08",
+        "exact_path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "byte_length": 83400,
+        "sha256": "e99b96971d411c7ce07c26679adc4eb229ab78d5a3f62ee50af7cc366b3970ac",
+        "artifact_type_codes": [
+          "DLV-DES-21"
+        ],
+        "anchors": [
+          "des-21"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-09",
+        "exact_path": "docs/deliverables/06-testing/test-quality-report.md",
+        "byte_length": 3279,
+        "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+        "artifact_type_codes": [
+          "DLV-TST-22"
+        ],
+        "anchors": [
+          "tst-22"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-10",
+        "exact_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "byte_length": 69161,
+        "sha256": "48ca9fdc3e992ce7a9fc8cb089beb704e24a8a45791dac84693a9a6434a3ab7f",
+        "artifact_type_codes": [
+          "DLV-SEC-04",
+          "DLV-SEC-05",
+          "DLV-SEC-06"
+        ],
+        "anchors": [
+          "sec-04",
+          "sec-05",
+          "sec-06"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-11",
+        "exact_path": "docs/deliverables/07-security/security-response-and-monitoring.md",
+        "byte_length": 33912,
+        "sha256": "e12637797b00007cff56ba727bbd3c66fa176c177ed60f0299ba8d1e41e306fe",
+        "artifact_type_codes": [
+          "DLV-SEC-17"
+        ],
+        "anchors": [
+          "sec-17"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-12",
+        "exact_path": "docs/deliverables/10-operations/operations-control-registers.md",
+        "byte_length": 57361,
+        "sha256": "e5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2",
+        "artifact_type_codes": [
+          "DLV-OPS-17",
+          "DLV-OPS-19",
+          "DLV-OPS-23"
+        ],
+        "anchors": [
+          "ops-17",
+          "ops-19",
+          "ops-23"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      },
+      {
+        "subject_id": "DECISION-DOC-13",
+        "exact_path": "docs/deliverables/10-operations/registers/operations-registers.json",
+        "byte_length": 32049,
+        "sha256": "8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a",
+        "artifact_type_codes": [
+          "DLV-OPS-17",
+          "DLV-OPS-19",
+          "DLV-OPS-23"
+        ],
+        "anchors": [
+          "ops-17",
+          "ops-19",
+          "ops-23"
+        ],
+        "subject_role": "CONTROLLED_DECISION_INPUT"
+      }
+    ],
+    "manifest_sha256": "cb7294c18aaab61df1c18dd26881db2015436d85a5ebda7f3c18780e68e6e495"
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "input_projection": "entire evidence JSON excluding top-level packet_content_fingerprint",
+    "excluded_json_paths": [
+      "$.packet_content_fingerprint"
+    ],
+    "non_self_referential": true,
+    "canonical_byte_length": 40467,
+    "sha256": "59678e30dda89a6462e41a44e8db44009a13ce5cf1a93f7846c699a818db6eab"
+  },
+  "attestation_binding_control": {
+    "current_packet_id": "WS-PHASE1-CURRENT-STATE-ATTESTATION-20260727-001",
+    "current_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-current-state-attestation/evidence.json",
+    "current_file_sha256": "86c91f1b46f435323ec00d4a9263f747fc4d90461ead5bdd2c2bff033cee51d4",
+    "current_content_fingerprint": "ce3e4d7e435ac3bf4ada767d950070f84c835e39caa528b2d4b2c24425318d5b",
+    "historical_predecessor_packet_id": "WS-PHASE0-CURRENT-STATE-ATTESTATIONS-20260727-001",
+    "historical_predecessor_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase0-current-state-attestations/evidence.json",
+    "phase0_role": "HISTORICAL_PREDECESSOR_ONLY",
+    "current_role": "CURRENT_STATE_ATTESTATION_SOURCE",
+    "binding_reason": "R001_BLOCKING_TRANSITIVE_STALE_SOURCE_RESOLVED_BY_PHASE1_CURRENT_PHYSICAL_RECAPTURE"
+  }
+}

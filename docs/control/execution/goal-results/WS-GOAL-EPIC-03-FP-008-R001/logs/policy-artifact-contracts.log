@@ -1,0 +1,6 @@
+WALKSAFE_FP008_COMMAND PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp008_policy_contract_20260809.py tests/test_walksafe_fp008_admin_review_delivery_trace_20260803.py tests/test_walksafe_fp008_gap_backlog_r024_20260803.py tests/test_walksafe_fp008_artifact_trace_successor_20260803.py tests/test_walksafe_phase1_exact257_successor_r013_20260803.py tests/test_walksafe_fp008_strict_review_gate_20260803.py
+WALKSAFE_FP008_STARTED_AT 2026-08-09T16:38:12+09:00
+..............................                                           [100%]
+30 passed in 73.86s (0:01:13)
+WALKSAFE_FP008_EXIT_CODE 0
+WALKSAFE_FP008_ENDED_AT 2026-08-09T16:39:26+09:00

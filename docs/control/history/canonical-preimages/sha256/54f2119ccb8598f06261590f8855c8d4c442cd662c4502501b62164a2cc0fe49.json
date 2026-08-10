@@ -1,0 +1,1509 @@
+{
+  "schema_version": "walksafe.dev-module-register.v1",
+  "metadata": {
+    "title": "WalkSafe 프로그램·모듈 목록",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "DEV-18"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "platform_boundary": {
+    "formal_products": [
+      "Android 사용자 앱",
+      "Android 관리자 앱"
+    ],
+    "services": [
+      "백엔드",
+      "PostgreSQL/PostGIS",
+      "대용량 원본 저장소",
+      "TMAP"
+    ],
+    "legacy_reference": [
+      "Web/PWA"
+    ]
+  },
+  "known_source_policy_issues": [
+    {
+      "issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "status": "OPEN_OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "owner_clarification_required": false,
+      "affected_module_ids": [
+        "MOD-ANDROID-USER",
+        "MOD-BACKEND"
+      ],
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "correction_candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "approval_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "mobile_network_branch_implementation_and_test_readiness": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "approval_boundary": "사용자 정규화 지시는 포착했으나 새 산출물 묶음 승인 전이므로 관련 구현 확정과 정식 시험 실행은 시작하지 않는다."
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "MOD-ANDROID-USER",
+      "name": "Android 사용자 앱",
+      "paths": [
+        "apps/android"
+      ],
+      "policy_role": "사용자용 정식 제품 후보: 탐지·길안내·음성·진동·신고",
+      "current_fact": "Android 소스와 단위·기기 시험 코드가 존재한다.",
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "languages": [
+        "Kotlin",
+        "Gradle Kotlin DSL",
+        "XML",
+        "TFLite asset"
+      ],
+      "responsibility": "사용자의 보행 세션, 단말 추론, 길안내, 음성·진동, 신고 후보를 처리한다.",
+      "inputs": [
+        "카메라·센서·위치",
+        "사용자 명령",
+        "서버·TMAP 응답",
+        "승인된 모델·설정"
+      ],
+      "outputs": [
+        "위험 안내",
+        "길안내",
+        "암호화된 신고·원본 대기자료"
+      ],
+      "owner_role": "Android 개발책임자",
+      "policy_refs": [
+        "FP-007",
+        "FP-019",
+        "FP-020",
+        "FP-022",
+        "FP-031",
+        "FP-035"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19",
+        "DES-22"
+      ],
+      "build_artifacts": [
+        "Android 사용자 앱 APK/AAB — 아직 정식 build hash 없음"
+      ],
+      "deployment_artifacts": [
+        "사용자 앱 설치본 — 아직 미승인"
+      ],
+      "deprecation_status": "ACTIVE_PRODUCT_CANDIDATE",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-007-001",
+        "RQ-FP-019-001",
+        "RQ-FP-020-001",
+        "RQ-FP-022-001",
+        "RQ-FP-031-001",
+        "RQ-FP-035-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-007-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-007-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-007-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-019-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-019-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-019-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-020-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-020-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-020-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-022-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-022-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-022-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-031-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-031-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-031-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-035-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-035-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-035-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-04",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-14",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "anchor": "des-14",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-14",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "anchor": "des-15",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-19",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-22",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19",
+        "DES-22"
+      ],
+      "tracked_file_count": 151,
+      "sample_paths": [
+        "apps/android/.gitignore",
+        "apps/android/README.md",
+        "apps/android/app/README.md",
+        "apps/android/app/build.gradle.kts",
+        "apps/android/app/gradle.lockfile",
+        "apps/android/app/proguard-rules.pro",
+        "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteDeviceSmokeTest.kt",
+        "apps/android/app/src/debug/AndroidManifest.xml",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/CameraFallbackTestOverride.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugFrameCaptureUploaderFactory.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/DebugMetadataLogUploaderFactory.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpFrameCaptureUploader.kt",
+        "apps/android/app/src/debug/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploader.kt",
+        "apps/android/app/src/main/AndroidManifest.xml",
+        "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+        "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+        "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AndroidRiskSelectionPolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/ArCoreAvailabilityPolicy.kt"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "direct_policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": "DIRECT_MOBILE_NETWORK_BRANCH_IMPLEMENTATION_DEPENDENCY",
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "bundled_approval_dependency_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "implementation_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "mobile_data_branch_status": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "formal_branch_implementation_and_test_frozen": true,
+      "normalized_mobile_data_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-ANDROID-ADMIN",
+      "name": "Android 관리자 앱",
+      "paths": [
+        "apps/android/admin"
+      ],
+      "policy_role": "관리자용 정식 제품",
+      "current_fact": "정책상 별도 정식 제품이나 현재 저장소에서 독립 앱 경계를 확인하지 못했다.",
+      "alignment_status": "IMPLEMENTATION_GAP_REVIEW_REQUIRED",
+      "languages": [
+        "Kotlin — 계획"
+      ],
+      "responsibility": "검수·승인·기관 전달·권한·감사 기록을 관리자에게 제공한다.",
+      "inputs": [
+        "신고·검수 대기자료",
+        "관리자 인증·권한"
+      ],
+      "outputs": [
+        "검수 결정",
+        "기관 전달 상태",
+        "감사 기록"
+      ],
+      "owner_role": "Android 관리자 앱 개발책임자",
+      "policy_refs": [
+        "FP-008",
+        "FP-047",
+        "FP-048",
+        "FP-050",
+        "FP-051"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19"
+      ],
+      "build_artifacts": [
+        "별도 관리자 APK/AAB — 구현 경계 없음"
+      ],
+      "deployment_artifacts": [
+        "관리자 앱 설치본 — 없음"
+      ],
+      "deprecation_status": "REQUIRED_BUT_NOT_IMPLEMENTED",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-008-001",
+        "RQ-FP-047-001",
+        "RQ-FP-048-001",
+        "RQ-FP-050-001",
+        "RQ-FP-051-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-008-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-008-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-008-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-047-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-047-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-047-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-048-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-048-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-048-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-050-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-050-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-050-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-051-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-051-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-051-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-04",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-14",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "anchor": "des-14",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-14",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "anchor": "des-15",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-19",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-14",
+        "DES-15",
+        "DES-19"
+      ],
+      "tracked_file_count": 0,
+      "sample_paths": [],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "IMPLEMENTATION_MISSING"
+    },
+    {
+      "module_id": "MOD-BACKEND",
+      "name": "백엔드·PostGIS",
+      "paths": [
+        "backend",
+        "contracts"
+      ],
+      "policy_role": "계정·TMAP 중계·신고·원본과 원본 저장 메타데이터·관리 API",
+      "current_fact": "FastAPI, migration, 계약 및 시험 후보가 존재한다.",
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "languages": [
+        "Python",
+        "SQL",
+        "OpenAPI JSON"
+      ],
+      "responsibility": "계정, 지도 중계, 신고, 원본·메타데이터 저장, 삭제, 관리 API를 처리한다.",
+      "inputs": [
+        "인증 요청",
+        "TMAP 요청",
+        "신고·원본",
+        "삭제·검수 요청"
+      ],
+      "outputs": [
+        "API 응답",
+        "DB·원본 저장 상태",
+        "감사 기록"
+      ],
+      "owner_role": "백엔드 개발책임자",
+      "policy_refs": [
+        "FP-011",
+        "FP-022",
+        "FP-031",
+        "FP-034",
+        "FP-035",
+        "FP-048"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-19",
+        "DES-22"
+      ],
+      "build_artifacts": [
+        "서버 image/build — 아직 정식 hash 없음"
+      ],
+      "deployment_artifacts": [
+        "backend systemd/Docker 후보"
+      ],
+      "deprecation_status": "ACTIVE_SERVICE_CANDIDATE",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-011-001",
+        "RQ-FP-022-001",
+        "RQ-FP-031-001",
+        "RQ-FP-034-001",
+        "RQ-FP-035-001",
+        "RQ-FP-048-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-011-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-011-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-011-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-022-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-022-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-022-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-031-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-031-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-031-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-034-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-034-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-034-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-035-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-035-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-035-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-048-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-048-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-048-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-05",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-09",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "anchor": "des-09",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-09",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-10",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "anchor": "des-10",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-10",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-11",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "anchor": "des-11",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-11",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-12",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "anchor": "des-12",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-12",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-13",
+          "path": "docs/deliverables/04-design/interface-and-data-design.md",
+          "anchor": "des-13",
+          "target": "docs/deliverables/04-design/interface-and-data-design.md#des-13",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-19",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-19",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-19",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-22",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-05",
+        "DES-09",
+        "DES-10",
+        "DES-11",
+        "DES-12",
+        "DES-13",
+        "DES-19",
+        "DES-22"
+      ],
+      "tracked_file_count": 77,
+      "sample_paths": [
+        "backend/.env.example",
+        "backend/README.md",
+        "backend/__init__.py",
+        "backend/alembic.ini",
+        "backend/alembic/README.md",
+        "backend/alembic/env.py",
+        "backend/alembic/versions/202605120001_create_reports.py",
+        "backend/alembic/versions/202607110001_report_query_indexes.py",
+        "backend/alembic/versions/202607110002_report_data_constraints.py",
+        "backend/alembic/versions/202607110003_backend_safety_controls.py",
+        "backend/alembic/versions/202607110004_append_only_audit_tables.py",
+        "backend/alembic/versions/202607130001_guard_audit_truncate.py",
+        "backend/alembic/versions/202607130002_unique_export_audit_digest.py",
+        "backend/alembic/versions/202607130003_report_read_audits.py",
+        "backend/alembic/versions/202607130004_shared_actor_rate_limits.py",
+        "backend/alembic/versions/202607160001_report_duplicate_check_audit.py",
+        "backend/app/README.md",
+        "backend/app/__init__.py",
+        "backend/app/api/README.md",
+        "backend/app/api/__init__.py"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "change_tracking_refs": [
+        "ISS-POLICY-FP035-NETWORK-001"
+      ],
+      "policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001"
+      ],
+      "fp035_dependency_relation": "RELATED_DOWNSTREAM_UPLOAD_CONTRACT_DEPENDENCY",
+      "correction_candidate_binding": {
+        "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+        "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742"
+      },
+      "bundled_approval_dependency_refs": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "required_activation_event": "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT",
+      "implementation_blockers": [
+        "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+        "EXACT_NEW_BUNDLED_OWNER_APPROVAL_STATEMENT"
+      ],
+      "mobile_data_branch_status": "BLOCKED_PENDING_BUNDLED_APPROVAL",
+      "mobile_network_branch_implementation_status": "FROZEN_PENDING_EXACT_BUNDLED_APPROVAL",
+      "mobile_network_branch_formal_test_status": "NOT_RUN_BLOCKED_PENDING_EXACT_BUNDLED_APPROVAL",
+      "formal_branch_implementation_and_test_frozen": true,
+      "normalized_mobile_data_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-MODEL",
+      "name": "객체 탐지 모델·학습 도구",
+      "paths": [
+        "model",
+        "apps/android/app/src/main/assets/models"
+      ],
+      "policy_role": "휴대전화 추론과 서버 학습·평가 후보",
+      "current_fact": "TFLite 자산과 Python 학습·검증 도구가 존재한다.",
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "languages": [
+        "Python",
+        "TFLite",
+        "PyTorch artifact"
+      ],
+      "responsibility": "객체 탐지 모델의 학습·평가·변환 후보와 단말 배포 자산을 관리한다.",
+      "inputs": [
+        "승인 데이터셋",
+        "학습 설정",
+        "모델 후보"
+      ],
+      "outputs": [
+        "평가 결과",
+        "TFLite 모델",
+        "모델 hash"
+      ],
+      "owner_role": "AI·ML 개발책임자",
+      "policy_refs": [
+        "FP-019",
+        "FP-020",
+        "FP-021",
+        "FP-034"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-07",
+        "DES-24"
+      ],
+      "build_artifacts": [
+        "TFLite·학습모델 후보 — release 결속 전"
+      ],
+      "deployment_artifacts": [
+        "Android model asset 후보"
+      ],
+      "deprecation_status": "ACTIVE_MODEL_CANDIDATE",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-019-001",
+        "RQ-FP-020-001",
+        "RQ-FP-021-001",
+        "RQ-FP-034-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-019-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-019-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-019-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-020-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-020-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-020-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-021-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-021-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-021-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-034-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-034-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-034-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-07",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-24",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-24",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-24",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-07",
+        "DES-24"
+      ],
+      "tracked_file_count": 16,
+      "sample_paths": [
+        "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+        "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+        "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+        "model/README.md",
+        "model/artifacts/README.md",
+        "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+        "model/deployments/README.md",
+        "model/deployments/local-deployment.json",
+        "model/registry/README.md",
+        "model/registry/walksafe-model-registry.json",
+        "model/requirements.txt",
+        "model/sample_yolo_failures.py",
+        "model/test_two_model_runtime.py",
+        "model/train_yolo.py",
+        "model/two_model_runtime.py",
+        "model/validate_yolo_dataset.py"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-VOICE",
+      "name": "음성 처리 후보",
+      "paths": [
+        "voice",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation"
+      ],
+      "policy_role": "호출어·STT·의도·TTS의 단말 우선 처리",
+      "current_fact": "Android 및 Python 음성 관련 코드가 함께 존재한다.",
+      "alignment_status": "BOUNDARY_REVIEW_REQUIRED",
+      "languages": [
+        "Kotlin",
+        "Python"
+      ],
+      "responsibility": "호출어·음성인식·의도·음성안내 후보를 처리하며 단말 우선 책임 경계를 검토한다.",
+      "inputs": [
+        "마이크 입력",
+        "명령 문구",
+        "안내 문장"
+      ],
+      "outputs": [
+        "의도",
+        "음성 안내",
+        "오류·성능 기록"
+      ],
+      "owner_role": "음성 기능 개발책임자",
+      "policy_refs": [
+        "FP-025",
+        "FP-026",
+        "FP-027",
+        "FP-028",
+        "FP-029"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-15",
+        "DES-22"
+      ],
+      "build_artifacts": [
+        "Android 음성 기능·Python 음성 서비스 후보"
+      ],
+      "deployment_artifacts": [
+        "voice systemd 후보"
+      ],
+      "deprecation_status": "BOUNDARY_REVIEW_REQUIRED",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-025-001",
+        "RQ-FP-026-001",
+        "RQ-FP-027-001",
+        "RQ-FP-028-001",
+        "RQ-FP-029-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-025-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-025-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-025-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-026-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-026-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-026-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-027-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-027-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-027-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-028-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-028-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-028-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-029-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-029-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-029-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-04",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-04",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-04",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-15",
+          "path": "docs/deliverables/04-design/user-experience-and-accessibility-design.md",
+          "anchor": "des-15",
+          "target": "docs/deliverables/04-design/user-experience-and-accessibility-design.md#des-15",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-22",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-22",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-22",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-03",
+        "DES-04",
+        "DES-15",
+        "DES-22"
+      ],
+      "tracked_file_count": 28,
+      "sample_paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileFrameCoordinator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidance.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimator.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt",
+        "voice/README.md",
+        "voice/__init__.py",
+        "voice/inference_process.py",
+        "voice/intents.py",
+        "voice/model_integrity.py",
+        "voice/phrases.py",
+        "voice/quality-requirements.lock"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-WEB-LEGACY",
+      "name": "Web/PWA 과거 구현",
+      "paths": [
+        "apps/web"
+      ],
+      "policy_role": "과거 참고자료이며 정식 사용자·관리자 제품이 아님",
+      "current_fact": "Next.js/PWA 구현과 시험 후보가 존재한다.",
+      "alignment_status": "LEGACY_REFERENCE_ONLY",
+      "languages": [
+        "TypeScript",
+        "React",
+        "Next.js"
+      ],
+      "responsibility": "과거 동작을 비교할 때만 참고하며 Android 정식 제품의 완료·합격 근거로 쓰지 않는다.",
+      "inputs": [
+        "과거 Web/PWA 입력"
+      ],
+      "outputs": [
+        "과거 버전 비교 결과"
+      ],
+      "owner_role": "기술책임자",
+      "policy_refs": [
+        "FP-009"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-07"
+      ],
+      "build_artifacts": [
+        "Web/PWA 과거 빌드 — 정식 제품 아님"
+      ],
+      "deployment_artifacts": [
+        "Web 환경·nginx·systemd 파일 — 과거 참고"
+      ],
+      "deprecation_status": "LEGACY_REFERENCE_ONLY",
+      "replacement_module_id": "MOD-ANDROID-USER",
+      "requirement_refs": [
+        "RQ-FP-009-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-009-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-009-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-009-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-02",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-02",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-02",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-03",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-03",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-03",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-05",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-06",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-06",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-06",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-07",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-02",
+        "DES-03",
+        "DES-05",
+        "DES-06",
+        "DES-07"
+      ],
+      "tracked_file_count": 144,
+      "sample_paths": [
+        "apps/web/.env.example",
+        "apps/web/README.md",
+        "apps/web/app/README.md",
+        "apps/web/app/_walksafe/README.md",
+        "apps/web/app/_walksafe/absolute-heading.ts",
+        "apps/web/app/_walksafe/admin-heatmap.ts",
+        "apps/web/app/_walksafe/assist-session-lifecycle.ts",
+        "apps/web/app/_walksafe/camera-policy.ts",
+        "apps/web/app/_walksafe/components/AssistPanel.tsx",
+        "apps/web/app/_walksafe/components/AssistiveAnnouncement.tsx",
+        "apps/web/app/_walksafe/components/CameraSurface.tsx",
+        "apps/web/app/_walksafe/components/GatewaySessionGate.tsx",
+        "apps/web/app/_walksafe/components/README.md",
+        "apps/web/app/_walksafe/components/TestCapturePanel.tsx",
+        "apps/web/app/_walksafe/config.ts",
+        "apps/web/app/_walksafe/depth-estimator.ts",
+        "apps/web/app/_walksafe/detection-availability.ts",
+        "apps/web/app/_walksafe/detection-presence-policy.ts",
+        "apps/web/app/_walksafe/feedback.ts",
+        "apps/web/app/_walksafe/gps-freshness.ts"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-DEPLOY",
+      "name": "배포 설정 후보",
+      "paths": [
+        "deploy",
+        ".github/workflows",
+        "docker-compose.yml"
+      ],
+      "policy_role": "서버·품질 자동화의 구현 후보",
+      "current_fact": "systemd, nginx, Docker Compose, GitHub Actions 후보가 존재한다.",
+      "alignment_status": "REVALIDATION_REQUIRED",
+      "languages": [
+        "YAML",
+        "systemd unit",
+        "nginx configuration",
+        "Docker Compose"
+      ],
+      "responsibility": "서버 실행·이관·자동검사를 재현하는 배포·CI 후보를 관리한다.",
+      "inputs": [
+        "source·lock·환경 설정",
+        "배포 대상"
+      ],
+      "outputs": [
+        "build·검사 결과",
+        "서버 프로세스"
+      ],
+      "owner_role": "배포·운영 개발책임자",
+      "policy_refs": [
+        "FP-002",
+        "FP-044",
+        "FP-053"
+      ],
+      "design_refs": [
+        "DES-01",
+        "DES-05",
+        "DES-23",
+        "DES-25",
+        "DES-27"
+      ],
+      "build_artifacts": [
+        "CI 결과·container 후보 — 정식 빌드 생성 이력(provenance) 없음"
+      ],
+      "deployment_artifacts": [
+        "systemd/nginx/Docker Compose 후보"
+      ],
+      "deprecation_status": "REVALIDATION_REQUIRED",
+      "replacement_module_id": null,
+      "requirement_refs": [
+        "RQ-FP-002-001",
+        "RQ-FP-044-001",
+        "RQ-FP-053-001"
+      ],
+      "requirement_links": [
+        {
+          "requirement_id": "RQ-FP-002-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-002-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-002-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-044-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-044-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-044-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "requirement_id": "RQ-FP-053-001",
+          "path": "docs/deliverables/03-requirements/system-requirements.md",
+          "anchor": "RQ-FP-053-001",
+          "target": "docs/deliverables/03-requirements/system-requirements.md#RQ-FP-053-001",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-05",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-05",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-05",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-23",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-23",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-23",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-25",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-25",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-25",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-27",
+          "path": "docs/deliverables/04-design/security-and-operations-design.md",
+          "anchor": "des-27",
+          "target": "docs/deliverables/04-design/security-and-operations-design.md#des-27",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-05",
+        "DES-23",
+        "DES-25",
+        "DES-27"
+      ],
+      "tracked_file_count": 16,
+      "sample_paths": [
+        ".github/workflows/android-device-acceptance.yml",
+        ".github/workflows/quality.yml",
+        "deploy/config/walksafe-backend.env.example",
+        "deploy/config/walksafe-report-retention.env.example",
+        "deploy/config/walksafe-voice.env.example",
+        "deploy/config/walksafe-web.env.example",
+        "deploy/nginx/walksafe-web.conf.example",
+        "deploy/systemd/walksafe-backend-migrate.service",
+        "deploy/systemd/walksafe-backend.service",
+        "deploy/systemd/walksafe-log-retention.service",
+        "deploy/systemd/walksafe-log-retention.timer",
+        "deploy/systemd/walksafe-report-retention.service",
+        "deploy/systemd/walksafe-report-retention.timer",
+        "deploy/systemd/walksafe-voice.service",
+        "deploy/systemd/walksafe-web.service",
+        "docker-compose.yml"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    },
+    {
+      "module_id": "MOD-ENGINEERING-TOOLING",
+      "name": "빌드·검증·제출 도구",
+      "paths": [
+        "scripts",
+        "tests",
+        "configs"
+      ],
+      "policy_role": "제품 코드와 분리해 관리하는 빌드·검증·제출 지원 도구",
+      "current_fact": "스크립트·시험·고정 설정이 존재하나 제품·과거 참고·제출 도구의 세부 분류가 더 필요하다.",
+      "alignment_status": "SCOPE_CLASSIFICATION_REQUIRED",
+      "languages": [
+        "Python",
+        "Shell",
+        "JSON",
+        "YAML"
+      ],
+      "responsibility": "빌드·검사·백업·제출·고정 시험자료 도구를 실행하고 재현 입력을 제공한다.",
+      "inputs": [
+        "코드·의존성 버전 고정 파일(lock)·고정 시험자료(fixture)·정책 기준"
+      ],
+      "outputs": [
+        "검사 결과",
+        "build·제출 후보",
+        "운영 자료"
+      ],
+      "owner_role": "개발·QA 책임자",
+      "policy_refs": [],
+      "design_refs": [
+        "DES-01",
+        "DES-07"
+      ],
+      "build_artifacts": [
+        "도구 실행 결과 — 제품 artifact와 분리"
+      ],
+      "deployment_artifacts": [],
+      "deprecation_status": "SCOPE_CLASSIFICATION_REQUIRED",
+      "replacement_module_id": null,
+      "requirement_refs": [],
+      "requirement_links": [],
+      "requirement_trace_status": "DRAFT_REQUIREMENT_LINKS_DECLARED",
+      "design_links": [
+        {
+          "design_id": "DES-01",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-01",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-01",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        },
+        {
+          "design_id": "DES-07",
+          "path": "docs/deliverables/04-design/software-architecture.md",
+          "anchor": "des-07",
+          "target": "docs/deliverables/04-design/software-architecture.md#des-07",
+          "trace_status": "DRAFT_NOT_APPROVED"
+        }
+      ],
+      "design_candidate_refs": [
+        "DES-01",
+        "DES-07"
+      ],
+      "tracked_file_count": 176,
+      "sample_paths": [
+        "configs/README.md",
+        "configs/submission_exact8_requirements.lock",
+        "configs/submission_installer_requirements.lock",
+        "configs/submission_toolchain_lock_20260713.json",
+        "configs/walksafe_node_toolchain_lock_20260715.json",
+        "configs/walksafe_product_quality_policy_20260713.json",
+        "configs/walksafe_two_model_runtime_20260522.yaml",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json",
+        "configs/walksafe_unified_epoch270_field_20260711.json",
+        "scripts/README.md",
+        "scripts/aihub_label_first_download_20260602.sh",
+        "scripts/audit_project_classification_20260708.py",
+        "scripts/audit_submission_visual_privacy_20260711.py",
+        "scripts/audit_walksafe_test_report_contamination_20260711.py",
+        "scripts/backup_walksafe_data_20260711.sh",
+        "scripts/build_design_documents_20260710.py",
+        "scripts/build_latest_model_report_20260710.py",
+        "scripts/build_midterm_design_ppt_20260712.py",
+        "scripts/build_midterm_design_ppt_practical_deliverables_20260712.py",
+        "scripts/build_midterm_design_ppt_template_faithful_20260712.py"
+      ],
+      "design_trace_status": "DRAFT_DESIGN_LINKS_DECLARED",
+      "link_validation_status": "SEE_EXTERNAL_INTEGRATION_REPORT",
+      "integration_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "source_issue_ids": [],
+      "change_tracking_refs": [],
+      "policy_correction_candidate_refs": [],
+      "direct_policy_correction_candidate_refs": [],
+      "related_policy_correction_candidate_refs": [],
+      "fp035_dependency_relation": null,
+      "correction_candidate_binding": null,
+      "bundled_approval_dependency_refs": [],
+      "required_activation_event": null,
+      "implementation_blockers": [],
+      "mobile_data_branch_status": "NOT_APPLICABLE",
+      "mobile_network_branch_implementation_status": null,
+      "mobile_network_branch_formal_test_status": null,
+      "formal_branch_implementation_and_test_frozen": false,
+      "normalized_mobile_data_policy": null,
+      "inventory_status": "DRAFT_REVIEW_REQUIRED"
+    }
+  ],
+  "assignment_metrics": {
+    "source_file_count": 592,
+    "unassigned_file_count": 0,
+    "multiply_assigned_file_count": 16,
+    "unassigned_sample_paths": [],
+    "multiply_assigned_sample_paths": [
+      "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+      "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+      "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileFrameCoordinator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidance.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactory.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicy.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt"
+    ]
+  },
+  "approval_boundary": {
+    "module_inventory_complete_for_current_tracked_tree": false,
+    "module_inventory_completion_reason": "모듈별 세부 소유·인터페이스·배포 단위와 중복 경계를 사람이 검토해야 한다.",
+    "policy_alignment_complete": false,
+    "implementation_completion_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "trace_integration_boundary": {
+    "declared_links_include_downstream_hashes": false,
+    "post_generation_report_path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+    "structural_link_validation_is_not_approval": true
+  }
+}

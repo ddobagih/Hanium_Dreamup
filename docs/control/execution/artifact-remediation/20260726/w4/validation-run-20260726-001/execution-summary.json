@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "W4-VALIDATION-20260726-001",
+  "scope": "EXISTING_FORMAL_DRAFT_AND_TRACE_STRUCTURE_ONLY",
+  "commands": [
+    {
+      "command_id": "formal-dev-test-check",
+      "exit_code": 1,
+      "started_at": "2026-07-27T02:49:38+09:00",
+      "ended_at": "2026-07-27T02:49:38+09:00",
+      "log_sha256": "3a07f8dbb188c135a49fbd82310a58048977009c731b60e18fa9eb095e58f58f"
+    },
+    {
+      "command_id": "trace-integration-check",
+      "exit_code": 1,
+      "started_at": "2026-07-27T02:49:38+09:00",
+      "ended_at": "2026-07-27T02:49:40+09:00",
+      "log_sha256": "e931f9e15336bda57a16ae3ad2f5fefa036343addb12c605ee579c82166495f8"
+    },
+    {
+      "command_id": "formal-trace-unit-tests",
+      "exit_code": 1,
+      "started_at": "2026-07-27T02:49:40+09:00",
+      "ended_at": "2026-07-27T02:49:40+09:00",
+      "log_sha256": "a55b933607a31d0d950797de7860586adb6b22748cb15dec03b2b5c297ce06c5"
+    }
+  ],
+  "result": "FAIL_PRESERVED",
+  "formal_execution": {
+    "total": 279,
+    "status": "NOT_RUN",
+    "pass_claimed": false
+  },
+  "automated_results_do_not_change_formal_status": true,
+  "release_eligibility": "NOT_ELIGIBLE"
+}

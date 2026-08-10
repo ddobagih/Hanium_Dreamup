@@ -1,0 +1,3581 @@
+{
+  "artifact_dispositions": [
+    {
+      "artifact_type_code": "DLV-SEC-01",
+      "audit_classification": "INTERNAL_GAP",
+      "basis": "current generation, scan scope, SLA and gates are now explicit, but actual role acknowledgement and training receipts are both zero; source_commit/build_id and independent approval also remain absent.",
+      "candidate_for_ok": false,
+      "current_disposition": "INTERNAL_GAP_RETAINED",
+      "independent_review_status": "NOT_REQUESTED_FOR_OK_TRANSITION",
+      "priority": "P0",
+      "required_action": "현재 source generation, 역할·교육, scan 도구와 SLA, release gate를 실행 가능한 기준선으로 결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-SEC-02",
+      "audit_classification": "INTERNAL_GAP",
+      "basis": "current DFD nodes, flows, data classes, trust boundaries, entry points, owners and bidirectional threat/control/evidence/risk links are complete; no status transition is applied before independent review.",
+      "candidate_for_ok": true,
+      "current_disposition": "READY_FOR_INDEPENDENT_REVIEW_AS_OK_CANDIDATE",
+      "independent_review_status": "PENDING",
+      "priority": "P0",
+      "required_action": "현재 시스템 DFD와 trust boundary를 작성하고 공격 시나리오별 위험도·통제·검증을 연결한다."
+    },
+    {
+      "artifact_type_code": "DLV-SEC-03",
+      "audit_classification": "INTERNAL_GAP",
+      "basis": "all six source risks are preserved verbatim and extended add-only with cause, path, exposure, due/expiry, residual status and proposed treatment; no status transition is applied before independent review.",
+      "candidate_for_ok": true,
+      "current_disposition": "READY_FOR_INDEPENDENT_REVIEW_AS_OK_CANDIDATE",
+      "independent_review_status": "PENDING",
+      "priority": "P0",
+      "required_action": "각 위험에 원인·공격경로·due date·현재노출·잔여위험·처리결정을 추가한다."
+    }
+  ],
+  "attacker_taxonomy": [
+    {
+      "access": "remote edge",
+      "attacker_id": "ATK-01",
+      "capability": "internet/API probing, malformed input and credential attacks",
+      "name": "unauthenticated remote attacker",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-005",
+        "THR-007"
+      ]
+    },
+    {
+      "access": "user-authorized surface",
+      "attacker_id": "ATK-02",
+      "capability": "valid user session, report/privacy API abuse and replay",
+      "name": "authenticated malicious user",
+      "threat_scenario_ids": [
+        "THR-003",
+        "THR-004",
+        "THR-006",
+        "THR-009"
+      ]
+    },
+    {
+      "access": "user/admin device",
+      "attacker_id": "ATK-03",
+      "capability": "device filesystem, tokens, sensors and local queue observation",
+      "name": "stolen-device thief or local malware",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-004",
+        "THR-005",
+        "THR-006"
+      ]
+    },
+    {
+      "access": "admin plane",
+      "attacker_id": "ATK-04",
+      "capability": "privileged review, recovery and high-risk operations",
+      "name": "compromised administrator",
+      "threat_scenario_ids": [
+        "THR-002",
+        "THR-003",
+        "THR-007",
+        "THR-009"
+      ]
+    },
+    {
+      "access": "internal/operational",
+      "attacker_id": "ATK-05",
+      "capability": "service, data store, backup or evidence access",
+      "name": "malicious or careless insider/operator",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-006",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    },
+    {
+      "access": "supply chain",
+      "attacker_id": "ATK-06",
+      "capability": "package, build input, model/config or evidence substitution",
+      "name": "dependency/build supply-chain attacker",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "access": "network/provider boundary",
+      "attacker_id": "ATK-07",
+      "capability": "MITM, DNS/proxy manipulation, stale/malicious provider response",
+      "name": "network or external-provider adversary",
+      "threat_scenario_ids": [
+        "THR-005",
+        "THR-007"
+      ]
+    },
+    {
+      "access": "device/API resource boundary",
+      "attacker_id": "ATK-08",
+      "capability": "high-volume capture/upload/report requests and storage exhaustion",
+      "name": "resource-abuse actor",
+      "threat_scenario_ids": [
+        "THR-003",
+        "THR-004"
+      ]
+    },
+    {
+      "access": "build/evidence governance plane",
+      "attacker_id": "ATK-09",
+      "capability": "report omission, hash substitution or false release assertion",
+      "name": "evidence or gate manipulator",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "control_id": "CTL-P01",
+      "control_type": "PREVENTIVE",
+      "current_status": "SOURCE_POLICY_PRESENT_NOT_FORMALLY_VALIDATED",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "consent, minimization and FP-035 network policy",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-006",
+        "THR-009"
+      ]
+    },
+    {
+      "control_id": "CTL-P02",
+      "control_type": "PREVENTIVE",
+      "current_status": "DOCUMENTED_AND_PARTIAL_SOURCE_NOT_DEPLOYMENT_EVIDENCED",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "encryption, key separation and least privilege",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001"
+      ]
+    },
+    {
+      "control_id": "CTL-P03",
+      "control_type": "PREVENTIVE",
+      "current_status": "SOURCE_BOUND_ACTUAL_DEVICE_AND_RECOVERY_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "role separation, MFA and high-risk action gate",
+      "owner_role": "프로젝트책임자",
+      "threat_scenario_ids": [
+        "THR-002",
+        "THR-003",
+        "THR-007",
+        "THR-009"
+      ]
+    },
+    {
+      "control_id": "CTL-P04",
+      "control_type": "PREVENTIVE",
+      "current_status": "SOURCE_BOUND_NOT_FORMAL_RELEASE",
+      "evidence_ids": [
+        "EV-01",
+        "EV-02"
+      ],
+      "name": "rate limit, idempotency and bounded request handling",
+      "owner_role": "기술책임자",
+      "threat_scenario_ids": [
+        "THR-003",
+        "THR-004",
+        "THR-006"
+      ]
+    },
+    {
+      "control_id": "CTL-P05",
+      "control_type": "PREVENTIVE",
+      "current_status": "POLICY_PRESENT_CAPACITY_GATE_NOT_RUN",
+      "evidence_ids": [
+        "EV-07"
+      ],
+      "name": "queue byte cap and protected-record deletion priority",
+      "owner_role": "기술책임자",
+      "threat_scenario_ids": [
+        "THR-004"
+      ]
+    },
+    {
+      "control_id": "CTL-P06",
+      "control_type": "PREVENTIVE",
+      "current_status": "SOURCE_POLICY_PRESENT_LIVE_TMAP_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "TMAP timeout/quota/stale-route fail-safe",
+      "owner_role": "접근성·안전책임자",
+      "threat_scenario_ids": [
+        "THR-005"
+      ]
+    },
+    {
+      "control_id": "CTL-P07",
+      "control_type": "PREVENTIVE",
+      "current_status": "INTERNAL_REMEDIATION_PASS_WITH_RESOURCE_BOUNDARY",
+      "evidence_ids": [
+        "EV-03",
+        "EV-05"
+      ],
+      "name": "locked dependency update and deterministic projection",
+      "owner_role": "기술책임자",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "control_id": "CTL-P08",
+      "control_type": "PREVENTIVE",
+      "current_status": "TARGETED_INTERNAL_VALIDATION_PASS_NOT_DEPLOYMENT_EVIDENCE",
+      "evidence_ids": [
+        "EV-02",
+        "EV-06"
+      ],
+      "name": "TLS CA verification and hostname checking",
+      "owner_role": "기술책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-005",
+        "THR-007"
+      ]
+    },
+    {
+      "control_id": "CTL-P09",
+      "control_type": "PREVENTIVE",
+      "current_status": "CURRENT_SOURCE_HASH_BOUND_SIGNING_NOT_ASSESSED",
+      "evidence_ids": [
+        "EV-01",
+        "EV-08"
+      ],
+      "name": "selected-source manifest and hash-bound artifact/evidence custody",
+      "owner_role": "빌드·증거관리자",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "control_id": "CTL-D01",
+      "control_type": "DETECTIVE",
+      "current_status": "PARTIAL_SOURCE_NO_PRODUCTION_ALERT_RECEIPT",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "security telemetry and append-only audit review",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-006",
+        "THR-007",
+        "THR-009"
+      ]
+    },
+    {
+      "control_id": "CTL-D02",
+      "control_type": "DETECTIVE",
+      "current_status": "EXECUTED_CURRENT_SOURCE_WITH_FINDINGS_PENDING_TRIAGE",
+      "evidence_ids": [
+        "EV-02",
+        "EV-03",
+        "EV-04",
+        "EV-09"
+      ],
+      "name": "SAST, SCA and secret scan",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-007",
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "control_id": "CTL-D03",
+      "control_type": "DETECTIVE",
+      "current_status": "SOURCE_LEDGER_PRESENT_PRODUCTION_RECONCILIATION_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "consent/privacy/deletion ledger reconciliation",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-006",
+        "THR-009"
+      ]
+    },
+    {
+      "control_id": "CTL-D04",
+      "control_type": "DETECTIVE",
+      "current_status": "SELF_CHECK_DEFINED_FIVE_RELEASE_GATES_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-08"
+      ],
+      "name": "release gate and fingerprint verification",
+      "owner_role": "빌드·증거관리자",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "control_id": "CTL-R01",
+      "control_type": "RECOVERY",
+      "current_status": "SOURCE_BOUND_RECOVERY_DRILL_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "session revocation, recovery verification and high-risk freeze",
+      "owner_role": "프로젝트책임자",
+      "threat_scenario_ids": [
+        "THR-002"
+      ]
+    },
+    {
+      "control_id": "CTL-R02",
+      "control_type": "RECOVERY",
+      "current_status": "DOCUMENTED_CAPACITY_AND_DELETION_RECEIPTS_ABSENT",
+      "evidence_ids": [
+        "EV-07"
+      ],
+      "name": "raw quarantine, ordered deletion and queue recovery",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-004",
+        "THR-006",
+        "THR-009"
+      ]
+    },
+    {
+      "control_id": "CTL-R03",
+      "control_type": "RECOVERY",
+      "current_status": "SOURCE_POLICY_PRESENT_LIVE_RECOVERY_NOT_RUN",
+      "evidence_ids": [
+        "EV-01",
+        "EV-07"
+      ],
+      "name": "stop unsafe guidance and require user route reselection",
+      "owner_role": "접근성·안전책임자",
+      "threat_scenario_ids": [
+        "THR-005"
+      ]
+    },
+    {
+      "control_id": "CTL-R04",
+      "control_type": "RECOVERY",
+      "current_status": "INTERNAL_EVIDENCE_PRESENT_FORMAL_RELEASE_RETEST_PENDING",
+      "evidence_ids": [
+        "EV-03",
+        "EV-05",
+        "EV-06",
+        "EV-09"
+      ],
+      "name": "dependency/TLS corrective patch and targeted retest",
+      "owner_role": "기술책임자",
+      "threat_scenario_ids": [
+        "THR-007",
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "control_id": "CTL-R05",
+      "control_type": "RECOVERY",
+      "current_status": "PROCEDURE_EXPECTED_NO_DRILL_OR_INCIDENT_RECEIPT",
+      "evidence_ids": [
+        "EV-04",
+        "EV-07",
+        "EV-09"
+      ],
+      "name": "incident containment, credential rotation and evidence preservation",
+      "owner_role": "보안·개인정보책임자",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-006",
+        "THR-007",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    }
+  ],
+  "current_source_subject": {
+    "build_id": null,
+    "claim_boundary": "this is a selected current source generation, not a commit, release build, signed artifact, deployment or formal execution generation",
+    "dependency_remediation": {
+      "approved_versions": {
+        "Pillow": "12.3.0",
+        "idna": "3.15",
+        "python-dotenv": "1.2.2",
+        "python-multipart": "0.0.31"
+      },
+      "binding_ids": [
+        "SRC-DEP-MANIFEST",
+        "SRC-DEP-CHANGES",
+        "SRC-DEP-VALIDATION",
+        "SRC-DEP-DELTA"
+      ],
+      "full_backend_lock_install": "NOT_RUN_RESOURCE_POLICY",
+      "modified_product_files": [
+        {
+          "path": "backend/requirements.txt",
+          "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+        },
+        {
+          "path": "backend/requirements.lock",
+          "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700"
+        },
+        {
+          "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+          "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+        }
+      ],
+      "status": "PASS_WITH_RECOVERED_RECEIPT_EXDEV"
+    },
+    "generation_id": "W5-CURRENT-SOURCE-RUN-20260727-002",
+    "run_id": "W5-SECURITY-SCAN-20260727-002",
+    "selected_source_manifest": {
+      "binding_id": "SRC-RUN002-MANIFEST",
+      "selected_file_count": 528,
+      "selected_file_set_sha256": "45bade9a3e2b1bea39627e3031a3c9302751748195d1458e6c8b1eea1275eea4"
+    },
+    "source_commit": null,
+    "tls_fix": {
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "status": "TARGETED_INTERNAL_PASS_NOT_DEPLOYMENT_EVIDENCE",
+      "subject_file_sha256s": {
+        "scripts/check_walksafe_trusted_proxy_20260716.py": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7",
+        "tests/test_walksafe_full_rc_tooling.py": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+      },
+      "validated_properties": [
+        "CA verification enabled",
+        "hostname checking enabled",
+        "invalid context rejected before network"
+      ]
+    },
+    "w4_terminal_predecessor": {
+      "artifact_status_delta_sha256": "9e8f3547b68874ad6b546dd0bccbfb612647d5923b2026912c1efc05243f4a21",
+      "implementation_receipt_path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "implementation_receipt_sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+      "validation_summary_sha256": "f41fac3a2c497a6109f0c2213800663d1b24094750070ce98449063ed40e2590"
+    }
+  },
+  "data_flow_model": {
+    "data_classes": [
+      {
+        "data_class_id": "DC-AUTH",
+        "name": "authentication/session secrets",
+        "sensitivity": "SECRET",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-002",
+          "THR-007"
+        ]
+      },
+      {
+        "data_class_id": "DC-IDENTITY",
+        "name": "pseudonymous account/device identity",
+        "sensitivity": "CONFIDENTIAL",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ]
+      },
+      {
+        "data_class_id": "DC-RAW",
+        "name": "raw image/audio/sensor/report payload",
+        "sensitivity": "RESTRICTED",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ]
+      },
+      {
+        "data_class_id": "DC-LOCATION",
+        "name": "precise location, route and movement state",
+        "sensitivity": "RESTRICTED",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-005",
+          "THR-006",
+          "THR-007"
+        ]
+      },
+      {
+        "data_class_id": "DC-REPORT",
+        "name": "report, adjudication and agency-delivery state",
+        "sensitivity": "CONFIDENTIAL",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-002",
+          "THR-003",
+          "THR-004",
+          "THR-007"
+        ]
+      },
+      {
+        "data_class_id": "DC-CONSENT",
+        "name": "consent, withdrawal, deletion and privacy-rights ledger",
+        "sensitivity": "CONFIDENTIAL",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006",
+          "THR-009"
+        ]
+      },
+      {
+        "data_class_id": "DC-ADMIN-RECOVERY",
+        "name": "admin recovery factors and high-risk action state",
+        "sensitivity": "SECRET",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-007"
+        ]
+      },
+      {
+        "data_class_id": "DC-MODEL-CONFIG",
+        "name": "model binaries, runtime config, inference input/output",
+        "sensitivity": "INTEGRITY_CRITICAL",
+        "threat_scenario_ids": [
+          "THR-005",
+          "THR-008"
+        ]
+      },
+      {
+        "data_class_id": "DC-TELEMETRY",
+        "name": "security telemetry and append-only audit events",
+        "sensitivity": "CONFIDENTIAL",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-003",
+          "THR-004",
+          "THR-009",
+          "THR-010"
+        ]
+      },
+      {
+        "data_class_id": "DC-BUILD-EVIDENCE",
+        "name": "source, dependency, build, scan and evidence manifests",
+        "sensitivity": "INTEGRITY_CRITICAL",
+        "threat_scenario_ids": [
+          "THR-008",
+          "THR-010"
+        ]
+      }
+    ],
+    "deployment_boundary": "logical current-source DFD; it does not claim production deployment or actual-device execution",
+    "entry_points": [
+      {
+        "entry_point_id": "EP-USER-SENSOR",
+        "name": "user-app sensor/camera/location input",
+        "node_ids": [
+          "N-ANDROID-USER"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-005",
+          "THR-006"
+        ]
+      },
+      {
+        "entry_point_id": "EP-USER-GATEWAY",
+        "name": "user Gateway API routes",
+        "node_ids": [
+          "N-ANDROID-USER",
+          "N-GATEWAY"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ]
+      },
+      {
+        "entry_point_id": "EP-GATEWAY-PROXY",
+        "name": "Gateway proxy boundary",
+        "node_ids": [
+          "N-GATEWAY",
+          "N-BACKEND"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007"
+        ]
+      },
+      {
+        "entry_point_id": "EP-BACKEND-API",
+        "name": "Backend public/internal API",
+        "node_ids": [
+          "N-BACKEND"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-002",
+          "THR-003",
+          "THR-004",
+          "THR-005",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ]
+      },
+      {
+        "entry_point_id": "EP-POSTGIS",
+        "name": "PostGIS query/migration interface",
+        "node_ids": [
+          "N-POSTGIS"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003"
+        ]
+      },
+      {
+        "entry_point_id": "EP-RAW-STORE",
+        "name": "raw encrypted queue/store interface",
+        "node_ids": [
+          "N-RAW-STORE"
+        ],
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006"
+        ]
+      },
+      {
+        "entry_point_id": "EP-MODEL-CONFIG",
+        "name": "model/config load and inference interface",
+        "node_ids": [
+          "N-MODEL-CONFIG"
+        ],
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-005",
+          "THR-008"
+        ]
+      },
+      {
+        "entry_point_id": "EP-TMAP",
+        "name": "TMAP outbound request/inbound response",
+        "node_ids": [
+          "N-TMAP"
+        ],
+        "owner_role": "접근성·안전책임자",
+        "threat_scenario_ids": [
+          "THR-005"
+        ]
+      },
+      {
+        "entry_point_id": "EP-CONSENT",
+        "name": "consent/privacy-rights operations",
+        "node_ids": [
+          "N-CONSENT-LEDGER"
+        ],
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-006",
+          "THR-009"
+        ]
+      },
+      {
+        "entry_point_id": "EP-ADMIN-API",
+        "name": "administrator review/high-risk API",
+        "node_ids": [
+          "N-ANDROID-ADMIN",
+          "N-BACKEND"
+        ],
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-003",
+          "THR-007"
+        ]
+      },
+      {
+        "entry_point_id": "EP-ADMIN-RECOVERY",
+        "name": "administrator recovery operations",
+        "node_ids": [
+          "N-ANDROID-ADMIN",
+          "N-ADMIN-RECOVERY",
+          "N-BACKEND"
+        ],
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002"
+        ]
+      },
+      {
+        "entry_point_id": "EP-BUILD-EVIDENCE",
+        "name": "source/dependency/artifact/evidence ingestion",
+        "node_ids": [
+          "N-BUILD-EVIDENCE"
+        ],
+        "owner_role": "빌드·증거관리자",
+        "threat_scenario_ids": [
+          "THR-008",
+          "THR-010"
+        ]
+      }
+    ],
+    "flows": [
+      {
+        "current_exposure": "source-bound local runtime; signing and actual-device validation are not assessed/run",
+        "data_class_ids": [
+          "DC-MODEL-CONFIG",
+          "DC-RAW",
+          "DC-LOCATION"
+        ],
+        "entry_point_ids": [
+          "EP-USER-SENSOR",
+          "EP-MODEL-CONFIG"
+        ],
+        "flow_id": "F-01",
+        "name": "local model/config load and inference",
+        "owner_role": "기술책임자",
+        "protocol": "local file/runtime API",
+        "source_node_id": "N-ANDROID-USER",
+        "target_node_id": "N-MODEL-CONFIG",
+        "threat_scenario_ids": [
+          "THR-005",
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-DEVICE-USER"
+        ]
+      },
+      {
+        "current_exposure": "capacity, device key custody and deletion receipts are not formally validated",
+        "data_class_ids": [
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT"
+        ],
+        "entry_point_ids": [
+          "EP-USER-SENSOR",
+          "EP-RAW-STORE"
+        ],
+        "flow_id": "F-02",
+        "name": "encrypted local raw queue",
+        "owner_role": "보안·개인정보책임자",
+        "protocol": "local encrypted storage API",
+        "source_node_id": "N-ANDROID-USER",
+        "target_node_id": "N-RAW-STORE",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006"
+        ],
+        "trust_boundary_ids": [
+          "TB-DEVICE-USER",
+          "TB-RAW-CONTROL"
+        ]
+      },
+      {
+        "current_exposure": "source selected; deployed certificate, endpoint and actual-device evidence are NOT_RUN",
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT"
+        ],
+        "entry_point_ids": [
+          "EP-USER-GATEWAY",
+          "EP-GATEWAY-PROXY"
+        ],
+        "flow_id": "F-03",
+        "name": "user authentication, route, report and privacy API",
+        "owner_role": "기술책임자",
+        "protocol": "HTTPS intended",
+        "source_node_id": "N-ANDROID-USER",
+        "target_node_id": "N-GATEWAY",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ],
+        "trust_boundary_ids": [
+          "TB-NETWORK-EDGE"
+        ]
+      },
+      {
+        "current_exposure": "trusted-proxy TLS validator has targeted evidence; deployed topology is NOT_RUN",
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-GATEWAY-PROXY",
+          "EP-BACKEND-API"
+        ],
+        "flow_id": "F-04",
+        "name": "Gateway proxy to Backend",
+        "owner_role": "기술책임자",
+        "protocol": "HTTP(S) deployment-configured",
+        "source_node_id": "N-GATEWAY",
+        "target_node_id": "N-BACKEND",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007"
+        ],
+        "trust_boundary_ids": [
+          "TB-GATEWAY-SERVICE"
+        ]
+      },
+      {
+        "current_exposure": "schema/source present; production least privilege, encryption and backup receipts absent",
+        "data_class_ids": [
+          "DC-IDENTITY",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-BACKEND-API",
+          "EP-POSTGIS"
+        ],
+        "flow_id": "F-05",
+        "name": "metadata, route, report and audit persistence",
+        "owner_role": "기술책임자",
+        "protocol": "database driver; deployment TLS/credentials not evidenced",
+        "source_node_id": "N-BACKEND",
+        "target_node_id": "N-POSTGIS",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003"
+        ],
+        "trust_boundary_ids": [
+          "TB-SERVICE-DATA"
+        ]
+      },
+      {
+        "current_exposure": "logical boundary only; current deployment inventory, KMS and deletion receipts absent",
+        "data_class_ids": [
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT"
+        ],
+        "entry_point_ids": [
+          "EP-BACKEND-API",
+          "EP-RAW-STORE"
+        ],
+        "flow_id": "F-06",
+        "name": "quarantined raw object persistence",
+        "owner_role": "보안·개인정보책임자",
+        "protocol": "object/file storage interface",
+        "source_node_id": "N-BACKEND",
+        "target_node_id": "N-RAW-STORE",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004"
+        ],
+        "trust_boundary_ids": [
+          "TB-SERVICE-DATA",
+          "TB-RAW-CONTROL"
+        ]
+      },
+      {
+        "current_exposure": "live provider, quota and same-generation endpoint validation are NOT_RUN",
+        "data_class_ids": [
+          "DC-LOCATION"
+        ],
+        "entry_point_ids": [
+          "EP-BACKEND-API",
+          "EP-TMAP"
+        ],
+        "flow_id": "F-07",
+        "name": "route/search request",
+        "owner_role": "접근성·안전책임자",
+        "protocol": "HTTPS intended",
+        "source_node_id": "N-BACKEND",
+        "target_node_id": "N-TMAP",
+        "threat_scenario_ids": [
+          "THR-005"
+        ],
+        "trust_boundary_ids": [
+          "TB-EXTERNAL-TMAP"
+        ]
+      },
+      {
+        "current_exposure": "provider response freshness and failover are not live-tested",
+        "data_class_ids": [
+          "DC-LOCATION"
+        ],
+        "entry_point_ids": [
+          "EP-TMAP",
+          "EP-BACKEND-API"
+        ],
+        "flow_id": "F-08",
+        "name": "route/search response",
+        "owner_role": "접근성·안전책임자",
+        "protocol": "HTTPS intended",
+        "source_node_id": "N-TMAP",
+        "target_node_id": "N-BACKEND",
+        "threat_scenario_ids": [
+          "THR-005"
+        ],
+        "trust_boundary_ids": [
+          "TB-EXTERNAL-TMAP"
+        ]
+      },
+      {
+        "current_exposure": "source ledger exists; production immutability and external-store deletion receipts absent",
+        "data_class_ids": [
+          "DC-IDENTITY",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-USER-GATEWAY",
+          "EP-CONSENT"
+        ],
+        "flow_id": "F-09",
+        "name": "append consent/privacy operation",
+        "owner_role": "보안·개인정보책임자",
+        "protocol": "local/service ledger API",
+        "source_node_id": "N-GATEWAY",
+        "target_node_id": "N-CONSENT-LEDGER",
+        "threat_scenario_ids": [
+          "THR-006",
+          "THR-009"
+        ],
+        "trust_boundary_ids": [
+          "TB-GATEWAY-SERVICE"
+        ]
+      },
+      {
+        "current_exposure": "current UI/legal wording and actual-device state reconciliation remain outside this evidence",
+        "data_class_ids": [
+          "DC-IDENTITY",
+          "DC-CONSENT"
+        ],
+        "entry_point_ids": [
+          "EP-CONSENT",
+          "EP-USER-GATEWAY"
+        ],
+        "flow_id": "F-10",
+        "name": "consent/privacy status response",
+        "owner_role": "보안·개인정보책임자",
+        "protocol": "local/service ledger API",
+        "source_node_id": "N-CONSENT-LEDGER",
+        "target_node_id": "N-GATEWAY",
+        "threat_scenario_ids": [
+          "THR-006",
+          "THR-009"
+        ],
+        "trust_boundary_ids": [
+          "TB-GATEWAY-SERVICE"
+        ]
+      },
+      {
+        "current_exposure": "source policy/control present; actual-device and deployed endpoint evidence NOT_RUN",
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-REPORT",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-ADMIN-API",
+          "EP-BACKEND-API"
+        ],
+        "flow_id": "F-11",
+        "name": "admin authentication, review and high-risk action",
+        "owner_role": "프로젝트책임자",
+        "protocol": "HTTPS required by endpoint policy",
+        "source_node_id": "N-ANDROID-ADMIN",
+        "target_node_id": "N-BACKEND",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-003",
+          "THR-007"
+        ],
+        "trust_boundary_ids": [
+          "TB-DEVICE-ADMIN",
+          "TB-NETWORK-EDGE",
+          "TB-PRIVILEGE-RECOVERY"
+        ]
+      },
+      {
+        "current_exposure": "single-admin recovery drill is NOT_RUN",
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-ADMIN-RECOVERY",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-ADMIN-RECOVERY"
+        ],
+        "flow_id": "F-12",
+        "name": "admin recovery start/complete",
+        "owner_role": "프로젝트책임자",
+        "protocol": "privileged app operation",
+        "source_node_id": "N-ANDROID-ADMIN",
+        "target_node_id": "N-ADMIN-RECOVERY",
+        "threat_scenario_ids": [
+          "THR-002"
+        ],
+        "trust_boundary_ids": [
+          "TB-DEVICE-ADMIN",
+          "TB-PRIVILEGE-RECOVERY"
+        ]
+      },
+      {
+        "current_exposure": "recovery source exists; deployed revocation and break-glass evidence absent",
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-ADMIN-RECOVERY",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-ADMIN-RECOVERY",
+          "EP-BACKEND-API"
+        ],
+        "flow_id": "F-13",
+        "name": "recovery verification and session control",
+        "owner_role": "프로젝트책임자",
+        "protocol": "HTTPS privileged API",
+        "source_node_id": "N-ADMIN-RECOVERY",
+        "target_node_id": "N-BACKEND",
+        "threat_scenario_ids": [
+          "THR-002"
+        ],
+        "trust_boundary_ids": [
+          "TB-NETWORK-EDGE",
+          "TB-PRIVILEGE-RECOVERY"
+        ]
+      },
+      {
+        "current_exposure": "selected source hash exists; signed delivery is NOT_ASSESSED",
+        "data_class_ids": [
+          "DC-MODEL-CONFIG",
+          "DC-BUILD-EVIDENCE"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE",
+          "EP-MODEL-CONFIG"
+        ],
+        "flow_id": "F-14",
+        "name": "model/config packaging",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "manifested build input",
+        "source_node_id": "N-BUILD-EVIDENCE",
+        "target_node_id": "N-MODEL-CONFIG",
+        "threat_scenario_ids": [
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      },
+      {
+        "current_exposure": "source selected; release build, signing and deployment NOT_RUN/NOT_ASSESSED",
+        "data_class_ids": [
+          "DC-BUILD-EVIDENCE",
+          "DC-MODEL-CONFIG"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE"
+        ],
+        "flow_id": "F-15",
+        "name": "user-app source/artifact delivery",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "build pipeline",
+        "source_node_id": "N-BUILD-EVIDENCE",
+        "target_node_id": "N-ANDROID-USER",
+        "threat_scenario_ids": [
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      },
+      {
+        "current_exposure": "source selected; release build, signing and deployment NOT_RUN/NOT_ASSESSED",
+        "data_class_ids": [
+          "DC-BUILD-EVIDENCE"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE"
+        ],
+        "flow_id": "F-16",
+        "name": "admin-app source/artifact delivery",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "build pipeline",
+        "source_node_id": "N-BUILD-EVIDENCE",
+        "target_node_id": "N-ANDROID-ADMIN",
+        "threat_scenario_ids": [
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      },
+      {
+        "current_exposure": "source selected; deployment NOT_RUN",
+        "data_class_ids": [
+          "DC-BUILD-EVIDENCE"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE"
+        ],
+        "flow_id": "F-17",
+        "name": "Gateway source/artifact delivery",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "build pipeline",
+        "source_node_id": "N-BUILD-EVIDENCE",
+        "target_node_id": "N-GATEWAY",
+        "threat_scenario_ids": [
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      },
+      {
+        "current_exposure": "dependency remediation is bound; full lock install was NOT_RUN by resource policy and deployment NOT_RUN",
+        "data_class_ids": [
+          "DC-BUILD-EVIDENCE"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE"
+        ],
+        "flow_id": "F-18",
+        "name": "Backend source/dependency delivery",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "build pipeline",
+        "source_node_id": "N-BUILD-EVIDENCE",
+        "target_node_id": "N-BACKEND",
+        "threat_scenario_ids": [
+          "THR-008"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      },
+      {
+        "current_exposure": "run002 aggregate evidence exists; normalized actual findings remain a path-only forward reference",
+        "data_class_ids": [
+          "DC-BUILD-EVIDENCE",
+          "DC-TELEMETRY"
+        ],
+        "entry_point_ids": [
+          "EP-BUILD-EVIDENCE"
+        ],
+        "flow_id": "F-19",
+        "name": "scan/test/evidence capture",
+        "owner_role": "빌드·증거관리자",
+        "protocol": "local controlled evidence write",
+        "source_node_id": "N-BACKEND",
+        "target_node_id": "N-BUILD-EVIDENCE",
+        "threat_scenario_ids": [
+          "THR-010"
+        ],
+        "trust_boundary_ids": [
+          "TB-SUPPLYCHAIN-EVIDENCE"
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "current_source_paths": [
+          "apps/android/app/src/main"
+        ],
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-MODEL-CONFIG"
+        ],
+        "name": "Android user",
+        "node_id": "N-ANDROID-USER",
+        "node_type": "CLIENT_PROCESS",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003",
+          "THR-004",
+          "THR-005",
+          "THR-006",
+          "THR-007",
+          "THR-008",
+          "THR-009"
+        ],
+        "trust_zone": "DEVICE_USER"
+      },
+      {
+        "current_source_paths": [
+          "apps/android/adminapp/src/main"
+        ],
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-REPORT",
+          "DC-ADMIN-RECOVERY",
+          "DC-TELEMETRY"
+        ],
+        "name": "Android admin",
+        "node_id": "N-ANDROID-ADMIN",
+        "node_type": "PRIVILEGED_CLIENT_PROCESS",
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-003",
+          "THR-007",
+          "THR-008"
+        ],
+        "trust_zone": "DEVICE_ADMIN"
+      },
+      {
+        "current_source_paths": [
+          "apps/android-gateway/src"
+        ],
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "name": "Gateway",
+        "node_id": "N-GATEWAY",
+        "node_type": "EDGE_SERVICE",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-008",
+          "THR-009"
+        ],
+        "trust_zone": "EDGE"
+      },
+      {
+        "current_source_paths": [
+          "backend/app"
+        ],
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-IDENTITY",
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-ADMIN-RECOVERY",
+          "DC-TELEMETRY"
+        ],
+        "name": "Backend",
+        "node_id": "N-BACKEND",
+        "node_type": "APPLICATION_SERVICE",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-002",
+          "THR-003",
+          "THR-004",
+          "THR-005",
+          "THR-006",
+          "THR-007",
+          "THR-008",
+          "THR-009",
+          "THR-010"
+        ],
+        "trust_zone": "SERVICE"
+      },
+      {
+        "current_source_paths": [
+          "backend/alembic",
+          "backend/app"
+        ],
+        "data_class_ids": [
+          "DC-IDENTITY",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "name": "PostGIS",
+        "node_id": "N-POSTGIS",
+        "node_type": "DATA_STORE",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003"
+        ],
+        "trust_zone": "DATA"
+      },
+      {
+        "current_source_paths": [
+          "apps/android/app/src/main",
+          "backend/app"
+        ],
+        "data_class_ids": [
+          "DC-RAW",
+          "DC-LOCATION",
+          "DC-REPORT",
+          "DC-CONSENT"
+        ],
+        "deployment_inventory_status": "NOT_EVIDENCED",
+        "name": "raw encrypted queue/store",
+        "node_id": "N-RAW-STORE",
+        "node_type": "DATA_STORE_AGGREGATE",
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006"
+        ],
+        "trust_zone": "RAW_CONTROLLED_DATA"
+      },
+      {
+        "current_source_paths": [
+          "model",
+          "apps/android/app/src/main/assets/model-config"
+        ],
+        "data_class_ids": [
+          "DC-MODEL-CONFIG",
+          "DC-RAW",
+          "DC-LOCATION"
+        ],
+        "name": "model/config",
+        "node_id": "N-MODEL-CONFIG",
+        "node_type": "ARTIFACT_STORE_AND_LOCAL_RUNTIME",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-005",
+          "THR-008"
+        ],
+        "trust_zone": "MODEL_RUNTIME"
+      },
+      {
+        "current_source_paths": [],
+        "data_class_ids": [
+          "DC-LOCATION"
+        ],
+        "external_dependency": true,
+        "name": "TMAP",
+        "node_id": "N-TMAP",
+        "node_type": "EXTERNAL_SERVICE",
+        "owner_role": "접근성·안전책임자",
+        "threat_scenario_ids": [
+          "THR-005"
+        ],
+        "trust_zone": "EXTERNAL_PROVIDER"
+      },
+      {
+        "current_source_paths": [
+          "apps/android-gateway/src/integrated-consent.ts",
+          "apps/android-gateway/src/privacy-rights.ts"
+        ],
+        "data_class_ids": [
+          "DC-IDENTITY",
+          "DC-CONSENT",
+          "DC-TELEMETRY"
+        ],
+        "name": "consent ledger",
+        "node_id": "N-CONSENT-LEDGER",
+        "node_type": "PRIVACY_LEDGER",
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-006",
+          "THR-009"
+        ],
+        "trust_zone": "EDGE_CONTROLLED_DATA"
+      },
+      {
+        "current_source_paths": [
+          "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security"
+        ],
+        "data_class_ids": [
+          "DC-AUTH",
+          "DC-ADMIN-RECOVERY",
+          "DC-TELEMETRY"
+        ],
+        "name": "admin recovery",
+        "node_id": "N-ADMIN-RECOVERY",
+        "node_type": "PRIVILEGED_CONTROL_PLANE",
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002"
+        ],
+        "trust_zone": "PRIVILEGED_RECOVERY"
+      },
+      {
+        "current_source_paths": [
+          "scripts",
+          "tests",
+          "docs/control/execution/artifact-remediation"
+        ],
+        "data_class_ids": [
+          "DC-MODEL-CONFIG",
+          "DC-BUILD-EVIDENCE",
+          "DC-TELEMETRY"
+        ],
+        "name": "build/evidence pipeline",
+        "node_id": "N-BUILD-EVIDENCE",
+        "node_type": "SUPPLY_CHAIN_AND_EVIDENCE_PLANE",
+        "owner_role": "빌드·증거관리자",
+        "threat_scenario_ids": [
+          "THR-008",
+          "THR-010"
+        ],
+        "trust_zone": "BUILD_EVIDENCE"
+      }
+    ],
+    "trust_boundaries": [
+      {
+        "name": "human/OS to user-app sandbox",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003",
+          "THR-004",
+          "THR-005",
+          "THR-006",
+          "THR-008",
+          "THR-009"
+        ],
+        "trust_boundary_id": "TB-DEVICE-USER",
+        "zone_a": "UNTRUSTED_HUMAN_OS_INPUT",
+        "zone_b": "DEVICE_USER"
+      },
+      {
+        "name": "operator/OS to privileged admin-app sandbox",
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-003"
+        ],
+        "trust_boundary_id": "TB-DEVICE-ADMIN",
+        "zone_a": "UNTRUSTED_OR_PRIVILEGED_OPERATOR_INPUT",
+        "zone_b": "DEVICE_ADMIN"
+      },
+      {
+        "name": "device to Gateway/Backend network edge",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-002",
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ],
+        "trust_boundary_id": "TB-NETWORK-EDGE",
+        "zone_a": "DEVICE_USER_OR_ADMIN",
+        "zone_b": "EDGE_OR_SERVICE"
+      },
+      {
+        "name": "Gateway to Backend service",
+        "owner_role": "기술책임자",
+        "threat_scenario_ids": [
+          "THR-003",
+          "THR-006",
+          "THR-007",
+          "THR-009"
+        ],
+        "trust_boundary_id": "TB-GATEWAY-SERVICE",
+        "zone_a": "EDGE",
+        "zone_b": "SERVICE"
+      },
+      {
+        "name": "Backend to PostGIS/raw controlled data",
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-003",
+          "THR-004"
+        ],
+        "trust_boundary_id": "TB-SERVICE-DATA",
+        "zone_a": "SERVICE",
+        "zone_b": "DATA_OR_RAW_CONTROLLED_DATA"
+      },
+      {
+        "name": "Backend to external TMAP",
+        "owner_role": "접근성·안전책임자",
+        "threat_scenario_ids": [
+          "THR-005"
+        ],
+        "trust_boundary_id": "TB-EXTERNAL-TMAP",
+        "zone_a": "SERVICE",
+        "zone_b": "EXTERNAL_PROVIDER"
+      },
+      {
+        "name": "admin privilege and recovery plane",
+        "owner_role": "프로젝트책임자",
+        "threat_scenario_ids": [
+          "THR-002",
+          "THR-007"
+        ],
+        "trust_boundary_id": "TB-PRIVILEGE-RECOVERY",
+        "zone_a": "DEVICE_ADMIN",
+        "zone_b": "PRIVILEGED_RECOVERY_OR_SERVICE"
+      },
+      {
+        "name": "build/evidence plane to runtime artifacts",
+        "owner_role": "빌드·증거관리자",
+        "threat_scenario_ids": [
+          "THR-008",
+          "THR-010"
+        ],
+        "trust_boundary_id": "TB-SUPPLYCHAIN-EVIDENCE",
+        "zone_a": "BUILD_EVIDENCE",
+        "zone_b": "MODEL_RUNTIME_OR_APPLICATION"
+      },
+      {
+        "name": "raw capture to encrypted controlled storage",
+        "owner_role": "보안·개인정보책임자",
+        "threat_scenario_ids": [
+          "THR-001",
+          "THR-004",
+          "THR-006"
+        ],
+        "trust_boundary_id": "TB-RAW-CONTROL",
+        "zone_a": "DEVICE_OR_SERVICE_PROCESSING",
+        "zone_b": "RAW_CONTROLLED_DATA"
+      }
+    ]
+  },
+  "document_id": "WS-W5-SECURITY-PLAN-THREAT-RISK-CURRENT-STATE-20260727-001",
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+    "content_fingerprint": {
+      "value": "3f0b7222ea617bc76944cfd139e619f6bd94bd98a95651045529fcb4e267855f"
+    },
+    "input_set_fingerprint": "3209cb5601b5e190e2d2ffd3a52a057909c43101f5d0a6a0aee6c6c2a1287004",
+    "semantic_projection_fingerprint": "381faa9d084a184f97d9d5d587692935eaed8bf87911334f1bfd6637bb666fdf"
+  },
+  "prepared_on": "2026-07-27",
+  "risk_register": {
+    "extension_policy": {
+      "add_only": true,
+      "authorized_acceptances_added": 0,
+      "review_cadence": "on change/incident and at least monthly while active",
+      "source_risk_count": 6,
+      "source_risks_closed_or_reclassified": 0
+    },
+    "risks": [
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "stolen device or remote/service credential compromise -> raw queue/object/PostGIS access -> bulk exfiltration or purpose-divergent use",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P01",
+            "CTL-P02",
+            "CTL-P08",
+            "CTL-P09",
+            "CTL-D01",
+            "CTL-D02",
+            "CTL-D03",
+            "CTL-D04",
+            "CTL-R02",
+            "CTL-R04",
+            "CTL-R05"
+          ],
+          "current_exposure": "OPEN: source controls exist, but production deployment, key separation, backup deletion, history secret scan and independent review are not evidenced",
+          "due_date": "2026-07-31",
+          "due_role": "보안·개인정보책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-001-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "raw and derived sensitive data crosses device, service and storage boundaries while production key, backup and operator access receipts are absent",
+          "threat_scenario_ids": [
+            "THR-001",
+            "THR-007",
+            "THR-008",
+            "THR-009",
+            "THR-010"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-04",
+            "EV-06",
+            "EV-07",
+            "EV-08",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "영상·음성·정확 위치·센서·신고 원본",
+          "controls": [
+            "최초 동의",
+            "전송·저장 암호화",
+            "키 분리",
+            "최소권한",
+            "접근·복사·삭제 감사",
+            "유한 보존"
+          ],
+          "impact": "CRITICAL",
+          "inherent_rating": "CRITICAL",
+          "likelihood": "MEDIUM",
+          "owner_role": "보안·개인정보책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-001",
+          "status": "OPEN",
+          "threat": "계정·저장소·백업 접근 탈취 또는 내부 오용",
+          "title": "무가림 원본의 유출·목적 외 접근",
+          "verification_refs": [
+            "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+            "SEC-10",
+            "SEC-12",
+            "SEC-14"
+          ]
+        },
+        "source_record_fingerprint": "f1d89cf806a5b0469956e18c17be909914686c6cb06dd146b88d03ccfce89e20"
+      },
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "device theft, session theft or recovery-factor loss -> admin/recovery endpoint use or lockout -> unauthorized high-risk action or unavailable administration",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P03",
+            "CTL-P08",
+            "CTL-D01",
+            "CTL-D02",
+            "CTL-R01",
+            "CTL-R05"
+          ],
+          "current_exposure": "OPEN: MFA/high-risk action source controls exist; actual device, remote revocation and recovery drill evidence are NOT_RUN",
+          "due_date": "2026-08-03",
+          "due_role": "프로젝트책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-002-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "single-admin device and off-device recovery material form a privileged recovery concentration point without an executed recovery drill",
+          "threat_scenario_ids": [
+            "THR-002",
+            "THR-007"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-04",
+            "EV-06",
+            "EV-07",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "관리자 세션·권한·복구자료·고위험 작업",
+          "controls": [
+            "MFA/패스키",
+            "외부 복구코드·보안키",
+            "원격 세션 폐기",
+            "고위험 작업 동결"
+          ],
+          "impact": "HIGH",
+          "inherent_rating": "HIGH",
+          "likelihood": "MEDIUM",
+          "owner_role": "프로젝트책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-002",
+          "status": "OPEN",
+          "threat": "기기 분실 또는 복구수단 동시 상실",
+          "title": "단일 관리자 휴대전화 분실·복구 실패",
+          "verification_refs": [
+            "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+          ]
+        },
+        "source_record_fingerprint": "21ea8b2e410bcf8663bbabd88a5b1634c3b7804a3fad64d177354e3f1b20ccab"
+      },
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "authenticated or automated actor submits duplicate/manipulated reports -> backend persistence -> administrator approves/rejects without sufficient signal or audit review",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P03",
+            "CTL-P04",
+            "CTL-D01",
+            "CTL-D02",
+            "CTL-R05"
+          ],
+          "current_exposure": "OPEN: idempotency, rate limiting and audit-oriented controls are source-bound; formal abuse tests, production alerting and adjudication review are not evidenced",
+          "due_date": "2026-08-05",
+          "due_role": "보안·개인정보책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-003-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "public/user report creation and privileged adjudication combine abuse, duplicate and human-decision risks",
+          "threat_scenario_ids": [
+            "THR-003"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-07",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "자동·수동 신고, 기관 전달, 사용자 상태",
+          "controls": [
+            "고정 신고번호",
+            "idempotency",
+            "rate limit",
+            "유사도 검수",
+            "사유·actor 감사",
+            "정정·항소"
+          ],
+          "impact": "HIGH",
+          "inherent_rating": "HIGH",
+          "likelihood": "MEDIUM",
+          "owner_role": "보안·개인정보책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-003",
+          "status": "OPEN",
+          "threat": "반복·조작 신고 또는 근거 없는 승인·기각",
+          "title": "신고 중복·스팸·관리자 오판",
+          "verification_refs": [
+            "WS-02",
+            "WS-03",
+            "WS-19",
+            "WS-20"
+          ]
+        },
+        "source_record_fingerprint": "6b6414afa55fac029384479c51bb579a6bfa73ecb84f21f51bcb84713060bd17"
+      },
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "large or repeated capture/upload workload -> encrypted queue saturation -> protected report/consent/delete/security record eviction or loss",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P04",
+            "CTL-P05",
+            "CTL-D01",
+            "CTL-D02",
+            "CTL-R02"
+          ],
+          "current_exposure": "OPEN: prioritization policy exists, but supported-device capacity, byte-limit gate and recovery behavior are NOT_RUN",
+          "due_date": "2026-07-31",
+          "due_role": "기술책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-004-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "finite device capacity and an unverified byte ceiling/deletion order can starve protected records",
+          "threat_scenario_ids": [
+            "THR-004"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-07",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "미전송 신고·원본·동의·삭제·보안기록",
+          "controls": [
+            "우선 삭제순서",
+            "신고·권리기록 우선보호",
+            "새 자료 생성 보류",
+            "실시간 안전기능 자원 분리"
+          ],
+          "impact": "HIGH",
+          "inherent_rating": "HIGH",
+          "likelihood": "HIGH",
+          "owner_role": "기술책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-004",
+          "status": "OPEN",
+          "threat": "바이트 상한 미정 또는 잘못된 삭제순서",
+          "title": "휴대전화 대기자료 포화·유실",
+          "verification_refs": [
+            "GATE-PHONE-QUEUE-BYTE-LIMIT",
+            "GATE-SERVER-CAPACITY-STATE-CONTRACT"
+          ]
+        },
+        "source_record_fingerprint": "3fbb8a216c315ef6774d8837b465b6d42663c914aaad4b08b058a70e60dda3b0"
+      },
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "provider/network failure or tampered model/config -> stale or unsafe route state -> continued turn guidance instead of safe stop/reselection",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P06",
+            "CTL-P07",
+            "CTL-P08",
+            "CTL-P09",
+            "CTL-D01",
+            "CTL-D02",
+            "CTL-D04",
+            "CTL-R03",
+            "CTL-R04",
+            "CTL-R05"
+          ],
+          "current_exposure": "OPEN: fail-safe policy and TLS source validation exist; live TMAP, actual-device E2E and signed model/config delivery are NOT_RUN or NOT_ASSESSED",
+          "due_date": "2026-07-31",
+          "due_role": "접근성·안전책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-005-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "external route freshness, quota, GPS confidence and model/config integrity are not validated in a live same-generation journey",
+          "threat_scenario_ids": [
+            "THR-005",
+            "THR-008"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-03",
+            "EV-05",
+            "EV-06",
+            "EV-07",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "경로·회전·도착·이탈 상태",
+          "controls": [
+            "최초 경로 로컬 저장",
+            "연속 이탈 판정",
+            "의심 시 회전안내 중지",
+            "사용자 선택 뒤만 재호출"
+          ],
+          "impact": "CRITICAL",
+          "inherent_rating": "CRITICAL",
+          "likelihood": "MEDIUM",
+          "owner_role": "접근성·안전책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-005",
+          "status": "OPEN",
+          "threat": "timeout·quota·GPS 불신에서 오래된 안내 지속",
+          "title": "TMAP 장애·오래된 경로 안내",
+          "verification_refs": [
+            "WS-06",
+            "WS-07",
+            "WS-18",
+            "WS-20"
+          ]
+        },
+        "source_record_fingerprint": "4e0a8f66d6427fac7f011bb5b0db516e2242d627eddbcb023e27adc40d69322d"
+      },
+      {
+        "add_only_extension": {
+          "acceptance_ref": null,
+          "attack_path": "walking or non-opted-in state misclassified/bypassed -> mobile-network upload of general activity raw data before policy approval",
+          "authorized_acceptance_claimed": false,
+          "control_ids": [
+            "CTL-P01",
+            "CTL-P04",
+            "CTL-D01",
+            "CTL-D03",
+            "CTL-R02",
+            "CTL-R05"
+          ],
+          "current_exposure": "OPEN: source policy is explicit and preserved, but bundled approval, current formal tests and actual-device network behavior are NOT_RUN",
+          "due_date": "2026-08-03",
+          "due_role": "제품책임자",
+          "expiry": "2026-08-31",
+          "extension_id": "W5-SR-006-EXT-20260727-001",
+          "extension_kind": "ADD_ONLY_CURRENT_GOVERNANCE",
+          "release_impact": "BLOCKS_ELIGIBILITY_UNTIL_VALIDATED_OR_AUTHORIZED_TIME_BOUNDED_EXCEPTION",
+          "residual_rating": "NOT_ASSESSED",
+          "root_cause": "captured FP-035 normalization remains pending bundled approval, so implementation and consent state can diverge from the intended transport policy",
+          "threat_scenario_ids": [
+            "THR-006",
+            "THR-009"
+          ],
+          "treatment_decision": "MITIGATE",
+          "treatment_decision_status": "PROPOSED_NOT_APPROVED",
+          "validation_evidence_ids": [
+            "EV-01",
+            "EV-02",
+            "EV-04",
+            "EV-07",
+            "EV-09"
+          ]
+        },
+        "source_record": {
+          "acceptance_ref": null,
+          "asset": "일반 활동원본 전송 정책·동의·구현",
+          "controls": [
+            "CR-0002 정규화 지시 포착·묶음 승인 대기",
+            "보행 중 일반 활동원본 전송 금지",
+            "정지 뒤 명시 선택 사용자만 이동통신망 허용",
+            "미선택 사용자는 Wi-Fi만 허용",
+            "묶음 승인 전 관련 정식 시험 NOT_RUN"
+          ],
+          "impact": "HIGH",
+          "inherent_rating": "HIGH",
+          "likelihood": "MEDIUM",
+          "normalized_policy": {
+            "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다.",
+            "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+            "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다."
+          },
+          "owner_role": "제품책임자",
+          "residual_rating": "NOT_ASSESSED",
+          "risk_id": "SR-006",
+          "status": "OPEN",
+          "threat": "포착된 정규화 지시와 다르거나 묶음 승인 전에 확정된 이동통신망 전송 구현",
+          "title": "FP-035 이동통신망 정규화 지시의 묶음 승인 대기",
+          "verification_refs": [
+            "CR-0002",
+            "ISS-POLICY-FP035-NETWORK-001"
+          ]
+        },
+        "source_record_fingerprint": "dae8c46d1db0a8309c2bad69b970239fe73b9c6848c654706b5cac87f7fdda2d"
+      }
+    ],
+    "source_snapshot": {
+      "metadata": {
+        "approval_status": "NOT_APPROVED",
+        "artifact_type_ids": [
+          "SEC-03"
+        ],
+        "as_of": "2026-07-21",
+        "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+        "lifecycle_status": "DRAFT",
+        "register_id": "WS-SECURITY-RISK-REGISTER-001",
+        "release_status": "NOT_ELIGIBLE",
+        "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+        "title": "WalkSafe 보안 위험대장",
+        "version": "0.1.0"
+      },
+      "preservation_rule": "source_record objects are copied without changing, deleting or closing any source field; all W5 content is under add_only_extension",
+      "rules": {
+        "append_only": true,
+        "closure_requires_evidence_or_approved_exception": true,
+        "empty_or_open_rows_do_not_prove_security": true,
+        "review_cadence": "사건 발생 즉시, 활성 프로젝트 동안 최소 월 1회"
+      },
+      "source_path": "docs/deliverables/07-security/registers/security-risks.json",
+      "source_sha256": "2a428d6aaee5eee214f36e6842ecc929df73379cd3398b7af3f4d24bc6a321cc",
+      "summary": {
+        "accepted": 0,
+        "closed": 0,
+        "open": 6,
+        "release_status": "NOT_ELIGIBLE",
+        "total": 6
+      }
+    }
+  },
+  "schema_version": "walksafe.w5.security-plan-threat-risk-current-state.v1",
+  "scope": {
+    "artifact_count": 3,
+    "exact_artifact_ids": [
+      "DLV-SEC-01",
+      "DLV-SEC-02",
+      "DLV-SEC-03"
+    ],
+    "out_of_scope": [
+      "detailed actual scan finding normalization",
+      "formal test execution",
+      "actual-device execution",
+      "deployment",
+      "signing",
+      "release approval"
+    ]
+  },
+  "security_plan": {
+    "artifact_type_code": "DLV-SEC-01",
+    "exception_policy": {
+      "automatic_extension": false,
+      "current_approved_exception_count": 0,
+      "no_exception_implies_release_override": false,
+      "registry": "SEC-16",
+      "required_fields": [
+        "risk",
+        "alternative considered",
+        "compensating control",
+        "authorized approver",
+        "expiry",
+        "termination condition"
+      ]
+    },
+    "objectives": [
+      "protect confidentiality and privacy of raw/location/admin data",
+      "preserve integrity and availability of route, consent, recovery and evidence decisions",
+      "fail closed at release boundaries without current evidence"
+    ],
+    "receipt_summary": {
+      "acknowledgement_receipt_count": 0,
+      "actual_assignee_count": 0,
+      "closure_rule": "SEC01 cannot become OK until actual role assignment/separation and acknowledgement/training receipts are independently reviewed",
+      "gap_status": "OPEN",
+      "training_receipt_count": 0
+    },
+    "remediation_sla": [
+      {
+        "initial_triage_target": "4 business hours",
+        "rule": "immediately block feature/release; no unblock before containment, fix and retest",
+        "severity": "CRITICAL"
+      },
+      {
+        "initial_triage_target": "1 business day",
+        "rule": "fix and retest before beta/release; otherwise only a time-bounded SEC-16 exception with compensating controls",
+        "severity": "HIGH"
+      },
+      {
+        "initial_triage_target": "5 business days",
+        "rule": "set plan, owner and due date before the next deployment",
+        "severity": "MEDIUM"
+      },
+      {
+        "initial_triage_target": "10 business days",
+        "rule": "register backlog item and next review date",
+        "severity": "LOW"
+      }
+    ],
+    "review_triggers": [
+      "source/dependency/model/config change",
+      "data-flow, permission or external API change",
+      "new or changed finding",
+      "incident or exception",
+      "monthly active-project review",
+      "evidence expiry"
+    ],
+    "role_training_matrix": [
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "security plan",
+          "raw data rules",
+          "incident escalation"
+        ],
+        "required_training": [
+          "secure development",
+          "privacy handling",
+          "incident triage"
+        ],
+        "responsibilities": [
+          "threat/risk ownership",
+          "scan triage",
+          "privacy control oversight"
+        ],
+        "role": "보안·개인정보책임자",
+        "role_id": "ROLE-SEC-PRIV",
+        "separation_expectation": "independent reviewer must not be the sole content author",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "current source subject",
+          "remediation SLA"
+        ],
+        "required_training": [
+          "secure architecture",
+          "supply-chain security",
+          "TLS validation"
+        ],
+        "responsibilities": [
+          "architecture",
+          "dependency/TLS remediation",
+          "capacity controls"
+        ],
+        "role": "기술책임자",
+        "role_id": "ROLE-TECH",
+        "separation_expectation": "cannot self-approve independent security review",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "formal/device boundary",
+          "no-PASS-without-evidence rule"
+        ],
+        "required_training": [
+          "security test evidence",
+          "data-safe testing"
+        ],
+        "responsibilities": [
+          "security evidence review",
+          "negative-test planning",
+          "release gate verification"
+        ],
+        "role": "QA책임자",
+        "role_id": "ROLE-QA",
+        "separation_expectation": "review evidence independently from implementer where required",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "open-risk register",
+          "release block conditions"
+        ],
+        "required_training": [
+          "security risk acceptance",
+          "privacy product decisions"
+        ],
+        "responsibilities": [
+          "scope decisions",
+          "FP-035 policy decision",
+          "release impact"
+        ],
+        "role": "제품책임자",
+        "role_id": "ROLE-PRODUCT",
+        "separation_expectation": "may not substitute product decision for security finding closure",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-10",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "legal-review boundary",
+          "no inferred approval"
+        ],
+        "required_training": [
+          "applicable privacy obligations",
+          "open-source licensing"
+        ],
+        "responsibilities": [
+          "privacy/legal applicability",
+          "dependency/license review"
+        ],
+        "role": "법무·라이선스검토자",
+        "role_id": "ROLE-LEGAL",
+        "separation_expectation": "independent legal conclusion where required",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "five-gate no-waiver state",
+          "six OPEN risks"
+        ],
+        "required_training": [
+          "release governance",
+          "security exception expiry"
+        ],
+        "responsibilities": [
+          "authorized approval",
+          "role assignment",
+          "exception and release decision"
+        ],
+        "role": "프로젝트책임자",
+        "role_id": "ROLE-PROJECT",
+        "separation_expectation": "approval cannot fabricate missing independent review or execution",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-10",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "live-TMAP boundary",
+          "actual-device boundary"
+        ],
+        "required_training": [
+          "fail-safe navigation",
+          "accessible incident response"
+        ],
+        "responsibilities": [
+          "TMAP fallback",
+          "unsafe-guidance stop",
+          "actual-device safety review"
+        ],
+        "role": "접근성·안전책임자",
+        "role_id": "ROLE-SAFETY",
+        "separation_expectation": "safety acceptance requires actual-device evidence",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      },
+      {
+        "acknowledgement_receipt_count": 0,
+        "actual_assignee": null,
+        "due_date": "2026-08-03",
+        "due_role": "프로젝트책임자",
+        "expiry": "2026-08-31",
+        "required_acknowledgements": [
+          "current subject manifest",
+          "path-only successor rule"
+        ],
+        "required_training": [
+          "artifact integrity",
+          "secret-safe evidence handling"
+        ],
+        "responsibilities": [
+          "manifest/hash custody",
+          "scan report custody",
+          "signing/deployment evidence"
+        ],
+        "role": "빌드·증거관리자",
+        "role_id": "ROLE-BUILD",
+        "separation_expectation": "cannot alter execution evidence after capture",
+        "status": "GAP_RECEIPTS_ABSENT",
+        "training_receipt_count": 0
+      }
+    ],
+    "scan_scope": {
+      "actual_finding_authority": {
+        "binding_kind": "PATH_ONLY_FORWARD_REFERENCE",
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+        "sha256": null
+      },
+      "sast": {
+        "current_result": "34 findings, 1 error, pending triage",
+        "scanned_paths": 654,
+        "scope": "backend/app; backend/alembic; Android user/admin main; Gateway src; model; scripts",
+        "tool": "semgrep 1.164.0"
+      },
+      "sca": {
+        "current_result": "6 affected packages, 52 unique primary IDs, pending reachability/triage",
+        "scope": "backend recursive source, 64 packages",
+        "tool": "osv-scanner 2.4.0"
+      },
+      "secret": {
+        "current_result": "0 findings",
+        "history_scan": "NOT_RUN",
+        "scope": "current selected tree only",
+        "tool": "gitleaks 8.30.1"
+      }
+    },
+    "scope": [
+      "Android user/admin",
+      "Gateway",
+      "Backend/PostGIS/raw storage",
+      "model/config",
+      "TMAP",
+      "consent/admin recovery",
+      "build/evidence pipeline"
+    ],
+    "security_readiness_checks": [
+      {
+        "check_id": "CHK-01",
+        "current_status": "PARTIAL",
+        "name": "current generation freeze",
+        "owner_role": "빌드·증거관리자",
+        "reason": "528-file manifest is hash-bound; source_commit and build_id are null",
+        "release_blocking": true,
+        "required_evidence": "selected source manifest plus commit/build identity"
+      },
+      {
+        "check_id": "CHK-02",
+        "current_status": "PENDING_TRIAGE",
+        "name": "SAST triage and retest",
+        "owner_role": "보안·개인정보책임자",
+        "reason": "run002 completed with 34 findings and 1 error; detailed authority is path-only successor",
+        "release_blocking": true,
+        "required_evidence": "normalized finding rows, dispositions, fixes and re-scan hashes"
+      },
+      {
+        "check_id": "CHK-03",
+        "current_status": "PENDING_TRIAGE",
+        "name": "SCA reachability and retest",
+        "owner_role": "기술책임자",
+        "reason": "run002 reports 6 affected packages and 52 unique primary IDs; four-package remediation does not close all findings",
+        "release_blocking": true,
+        "required_evidence": "affected package/CVE reachability, remediation or exception and re-scan"
+      },
+      {
+        "check_id": "CHK-04",
+        "current_status": "PARTIAL",
+        "name": "secret scan current tree and history",
+        "owner_role": "보안·개인정보책임자",
+        "reason": "current selected tree reports zero findings; history scan is NOT_RUN",
+        "release_blocking": true,
+        "required_evidence": "current release source and full-history reports plus response receipts"
+      },
+      {
+        "check_id": "CHK-05",
+        "current_status": "INTERNAL_EVIDENCE_PRESENT_NOT_FORMAL_RELEASE",
+        "name": "dependency and TLS corrective validation",
+        "owner_role": "기술책임자",
+        "reason": "dependency receipt passes with stated resource boundary; TLS CA/hostname positive and pre-network negative tests exited zero",
+        "release_blocking": true,
+        "required_evidence": "remediation manifest and targeted trusted-proxy tests"
+      },
+      {
+        "check_id": "CHK-06",
+        "current_status": "NOT_RUN",
+        "name": "independent security review",
+        "owner_role": "보안·개인정보책임자",
+        "reason": "SEC02/03 are only candidates pending review",
+        "release_blocking": true,
+        "required_evidence": "named independent reviewer, findings, recheck and approval"
+      },
+      {
+        "check_id": "CHK-07",
+        "current_status": "NOT_RUN",
+        "name": "role acknowledgement and training",
+        "owner_role": "프로젝트책임자",
+        "reason": "actual assignment, acknowledgement and training receipt counts are zero",
+        "release_blocking": true,
+        "required_evidence": "role assignments, acknowledgements and training receipts"
+      },
+      {
+        "check_id": "CHK-08",
+        "current_status": "NOT_RUN",
+        "name": "predecessor five release gates",
+        "owner_role": "프로젝트책임자",
+        "reason": "five gates remain unwaived and NOT_RUN",
+        "release_blocking": true,
+        "required_evidence": "five same-generation gate receipts"
+      }
+    ]
+  },
+  "self_validation": {
+    "checks": {
+      "bidirectional_links": {
+        "asymmetry_count": 0,
+        "items": [],
+        "status": "PASS"
+      },
+      "boundary_preservation": {
+        "deployment_not_run": true,
+        "device_not_run": true,
+        "five_gates_unwaived": true,
+        "formal_279_not_run": true,
+        "release_not_eligible": true,
+        "signing_not_assessed": true,
+        "status": "PASS"
+      },
+      "control_class_coverage": {
+        "gap_count": 0,
+        "items": [],
+        "required": [
+          "PREVENTIVE",
+          "DETECTIVE",
+          "RECOVERY"
+        ],
+        "status": "PASS"
+      },
+      "dangling_references": {
+        "count": 0,
+        "items": [],
+        "status": "PASS"
+      },
+      "duplicate_ids": {
+        "duplicate_count": 0,
+        "duplicates": {},
+        "status": "PASS"
+      },
+      "exact_artifact_scope": {
+        "actual": [
+          "DLV-SEC-01",
+          "DLV-SEC-02",
+          "DLV-SEC-03"
+        ],
+        "count": 3,
+        "expected": [
+          "DLV-SEC-01",
+          "DLV-SEC-02",
+          "DLV-SEC-03"
+        ],
+        "status": "PASS",
+        "unique_count": 3
+      },
+      "orphan_records": {
+        "count": 0,
+        "items": {},
+        "status": "PASS"
+      },
+      "scan_findings_forward_binding": {
+        "binding_kind": "PATH_ONLY_FORWARD_REFERENCE",
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+        "sha256": null,
+        "status": "PASS"
+      },
+      "six_risk_add_only_preservation": {
+        "authorized_acceptance_count": 0,
+        "closed_count": 0,
+        "field_gap_count": 0,
+        "source_count": 6,
+        "state_mutation_count": 0,
+        "status": "PASS",
+        "unique_count": 6
+      }
+    },
+    "daylog_written": false,
+    "git_used": false,
+    "method": "in-memory structural/content validation before exclusive file creation",
+    "overall_status": "PASS",
+    "product_tests_run": false
+  },
+  "source_bindings": [
+    {
+      "binding_id": "SRC-AUDIT-BASELINE",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "2026-07-26 SEC01~03 current audit classification and required actions",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc"
+    },
+    {
+      "binding_id": "SRC-SECURITY-PLAN",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "canonical Draft policy, SLA, roles and pre-existing threat inputs",
+      "path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "sha256": "4badcccfd1b4a991faed9e9bd0199b9fbe8c4c823d091afe208da91d013ca286"
+    },
+    {
+      "binding_id": "SRC-RISK-REGISTER",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "add-only preserved opening snapshot of six OPEN risks",
+      "path": "docs/deliverables/07-security/registers/security-risks.json",
+      "sha256": "2a428d6aaee5eee214f36e6842ecc929df73379cd3398b7af3f4d24bc6a321cc"
+    },
+    {
+      "binding_id": "SRC-RUN002-MANIFEST",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "current selected source set, 528 files",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/selected-source-manifest.json",
+      "sha256": "45bade9a3e2b1bea39627e3031a3c9302751748195d1458e6c8b1eea1275eea4"
+    },
+    {
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "current source scan execution aggregates and trusted-proxy validation",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+      "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a"
+    },
+    {
+      "binding_id": "SRC-DEP-MANIFEST",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "dependency remediation receipt manifest",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/manifest.json",
+      "sha256": "fa1bbe0bf3072ef72c7d529b962f42bb47947fdc4f98991fa040456dba3f5153"
+    },
+    {
+      "binding_id": "SRC-DEP-CHANGES",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "three modified dependency declaration/lock files",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/changes.json",
+      "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+    },
+    {
+      "binding_id": "SRC-DEP-VALIDATION",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "determinism, four-package smoke and 28 targeted backend tests",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/validation-summary.json",
+      "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+    },
+    {
+      "binding_id": "SRC-DEP-DELTA",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "approved four-package version projection",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/package-delta.json",
+      "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+    },
+    {
+      "binding_id": "SRC-W4-RECEIPT",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "terminal W4 predecessor receipt",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+    },
+    {
+      "binding_id": "SRC-W4-VALIDATION",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "terminal W4 validation boundary",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "sha256": "f41fac3a2c497a6109f0c2213800663d1b24094750070ce98449063ed40e2590"
+    },
+    {
+      "binding_id": "SRC-W4-DELTA",
+      "binding_kind": "EXACT_FILE_SHA256",
+      "claim": "terminal W4 status delta and release boundary",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+      "sha256": "9e8f3547b68874ad6b546dd0bccbfb612647d5923b2026912c1efc05243f4a21"
+    },
+    {
+      "binding_id": "SRC-SCAN-SUCCESSOR",
+      "binding_kind": "PATH_ONLY_FORWARD_REFERENCE",
+      "claim": "future authoritative normalized actual scan findings; existence, hash and outcome are not claimed",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+      "sha256": null
+    }
+  ],
+  "status": "CURRENT_GOVERNANCE_BASELINE_PENDING_INDEPENDENT_REVIEW_AND_SEC01_RECEIPTS",
+  "threat_scenarios": [
+    {
+      "attacker_ids": [
+        "ATK-01",
+        "ATK-03",
+        "ATK-05"
+      ],
+      "current_exposure": "production device/storage/KMS/backup evidence absent; current SAST findings await triage and history secret scan is NOT_RUN",
+      "data_class_ids": [
+        "DC-AUTH",
+        "DC-IDENTITY",
+        "DC-RAW",
+        "DC-LOCATION",
+        "DC-REPORT",
+        "DC-CONSENT"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02",
+        "CTL-D03"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "보안·개인정보책임자",
+      "entry_point_ids": [
+        "EP-USER-SENSOR",
+        "EP-BACKEND-API",
+        "EP-POSTGIS",
+        "EP-RAW-STORE"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-02",
+        "F-05",
+        "F-06"
+      ],
+      "impact": "CRITICAL",
+      "likelihood": "MEDIUM",
+      "name": "raw data exfiltration or purpose-divergent access",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-BACKEND",
+        "N-POSTGIS",
+        "N-RAW-STORE"
+      ],
+      "preventive_control_ids": [
+        "CTL-P01",
+        "CTL-P02",
+        "CTL-P08"
+      ],
+      "recovery_control_ids": [
+        "CTL-R02",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-001"
+      ],
+      "threat_scenario_id": "THR-001",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-NETWORK-EDGE",
+        "TB-SERVICE-DATA",
+        "TB-RAW-CONTROL"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-04",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-01",
+        "ATK-03",
+        "ATK-04"
+      ],
+      "current_exposure": "admin source controls exist, but actual-device behavior, remote revocation and recovery drill are NOT_RUN",
+      "data_class_ids": [
+        "DC-AUTH",
+        "DC-ADMIN-RECOVERY",
+        "DC-REPORT",
+        "DC-TELEMETRY"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02"
+      ],
+      "due_date": "2026-08-03",
+      "due_role": "프로젝트책임자",
+      "entry_point_ids": [
+        "EP-ADMIN-API",
+        "EP-ADMIN-RECOVERY",
+        "EP-BACKEND-API"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-11",
+        "F-12",
+        "F-13"
+      ],
+      "impact": "HIGH",
+      "likelihood": "MEDIUM",
+      "name": "admin takeover, factor loss or recovery lockout",
+      "node_ids": [
+        "N-ANDROID-ADMIN",
+        "N-BACKEND",
+        "N-ADMIN-RECOVERY"
+      ],
+      "preventive_control_ids": [
+        "CTL-P03",
+        "CTL-P08"
+      ],
+      "recovery_control_ids": [
+        "CTL-R01",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-002"
+      ],
+      "threat_scenario_id": "THR-002",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-ADMIN",
+        "TB-NETWORK-EDGE",
+        "TB-PRIVILEGE-RECOVERY"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-04",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-01",
+        "ATK-02",
+        "ATK-04",
+        "ATK-08"
+      ],
+      "current_exposure": "source idempotency/rate controls are visible; production abuse thresholds, alerts and adjudication review are not evidenced",
+      "data_class_ids": [
+        "DC-IDENTITY",
+        "DC-REPORT",
+        "DC-TELEMETRY"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02"
+      ],
+      "due_date": "2026-08-05",
+      "due_role": "보안·개인정보책임자",
+      "entry_point_ids": [
+        "EP-USER-GATEWAY",
+        "EP-GATEWAY-PROXY",
+        "EP-BACKEND-API",
+        "EP-POSTGIS",
+        "EP-ADMIN-API"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-03",
+        "F-04",
+        "F-05",
+        "F-11"
+      ],
+      "impact": "HIGH",
+      "likelihood": "MEDIUM",
+      "name": "duplicate/spam reports and privileged adjudication error",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-ANDROID-ADMIN",
+        "N-GATEWAY",
+        "N-BACKEND",
+        "N-POSTGIS"
+      ],
+      "preventive_control_ids": [
+        "CTL-P03",
+        "CTL-P04"
+      ],
+      "recovery_control_ids": [
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-003"
+      ],
+      "threat_scenario_id": "THR-003",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-DEVICE-ADMIN",
+        "TB-NETWORK-EDGE",
+        "TB-GATEWAY-SERVICE",
+        "TB-SERVICE-DATA"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-02",
+        "ATK-03",
+        "ATK-08"
+      ],
+      "current_exposure": "byte ceiling, supported-device capacity and ordered recovery gate are NOT_RUN",
+      "data_class_ids": [
+        "DC-RAW",
+        "DC-LOCATION",
+        "DC-REPORT",
+        "DC-CONSENT",
+        "DC-TELEMETRY"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "기술책임자",
+      "entry_point_ids": [
+        "EP-USER-SENSOR",
+        "EP-RAW-STORE",
+        "EP-BACKEND-API"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-02",
+        "F-06"
+      ],
+      "impact": "HIGH",
+      "likelihood": "HIGH",
+      "name": "encrypted queue exhaustion and protected-record loss",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-BACKEND",
+        "N-RAW-STORE"
+      ],
+      "preventive_control_ids": [
+        "CTL-P04",
+        "CTL-P05"
+      ],
+      "recovery_control_ids": [
+        "CTL-R02"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-004"
+      ],
+      "threat_scenario_id": "THR-004",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-SERVICE-DATA",
+        "TB-RAW-CONTROL"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-01",
+        "ATK-03",
+        "ATK-07"
+      ],
+      "current_exposure": "trusted-proxy TLS validation is targeted only; live TMAP, provider quota/fallback and actual-device route behavior are NOT_RUN",
+      "data_class_ids": [
+        "DC-LOCATION",
+        "DC-MODEL-CONFIG"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "접근성·안전책임자",
+      "entry_point_ids": [
+        "EP-USER-SENSOR",
+        "EP-MODEL-CONFIG",
+        "EP-BACKEND-API",
+        "EP-TMAP"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-01",
+        "F-07",
+        "F-08"
+      ],
+      "impact": "CRITICAL",
+      "likelihood": "MEDIUM",
+      "name": "TMAP outage, tampered response or stale-route continuation",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-BACKEND",
+        "N-MODEL-CONFIG",
+        "N-TMAP"
+      ],
+      "preventive_control_ids": [
+        "CTL-P06",
+        "CTL-P08"
+      ],
+      "recovery_control_ids": [
+        "CTL-R03"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-005"
+      ],
+      "threat_scenario_id": "THR-005",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-EXTERNAL-TMAP"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-06",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-02",
+        "ATK-03",
+        "ATK-05"
+      ],
+      "current_exposure": "normalized policy is preserved but bundled approval, formal tests and actual-device network behavior are NOT_RUN",
+      "data_class_ids": [
+        "DC-IDENTITY",
+        "DC-RAW",
+        "DC-LOCATION",
+        "DC-CONSENT"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D03"
+      ],
+      "due_date": "2026-08-03",
+      "due_role": "제품책임자",
+      "entry_point_ids": [
+        "EP-USER-SENSOR",
+        "EP-USER-GATEWAY",
+        "EP-GATEWAY-PROXY",
+        "EP-BACKEND-API",
+        "EP-RAW-STORE",
+        "EP-CONSENT"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-02",
+        "F-03",
+        "F-04",
+        "F-09",
+        "F-10"
+      ],
+      "impact": "HIGH",
+      "likelihood": "MEDIUM",
+      "name": "FP-035 mobile-network upload policy bypass",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-GATEWAY",
+        "N-BACKEND",
+        "N-RAW-STORE",
+        "N-CONSENT-LEDGER"
+      ],
+      "preventive_control_ids": [
+        "CTL-P01",
+        "CTL-P04"
+      ],
+      "recovery_control_ids": [
+        "CTL-R02",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-006"
+      ],
+      "threat_scenario_id": "THR-006",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-NETWORK-EDGE",
+        "TB-GATEWAY-SERVICE",
+        "TB-RAW-CONTROL"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-01",
+        "ATK-04",
+        "ATK-07"
+      ],
+      "current_exposure": "CA/hostname positive and pre-network negative validation passes internally; deployed endpoints and certificates are not evidenced",
+      "data_class_ids": [
+        "DC-AUTH",
+        "DC-IDENTITY",
+        "DC-RAW",
+        "DC-LOCATION",
+        "DC-REPORT",
+        "DC-ADMIN-RECOVERY"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D02"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "기술책임자",
+      "entry_point_ids": [
+        "EP-USER-GATEWAY",
+        "EP-GATEWAY-PROXY",
+        "EP-ADMIN-API",
+        "EP-BACKEND-API"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-03",
+        "F-04",
+        "F-11"
+      ],
+      "impact": "CRITICAL",
+      "likelihood": "MEDIUM",
+      "name": "Gateway/proxy TLS or trust-boundary bypass",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-ANDROID-ADMIN",
+        "N-GATEWAY",
+        "N-BACKEND"
+      ],
+      "preventive_control_ids": [
+        "CTL-P03",
+        "CTL-P08"
+      ],
+      "recovery_control_ids": [
+        "CTL-R04",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-001",
+        "SR-002"
+      ],
+      "threat_scenario_id": "THR-007",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-NETWORK-EDGE",
+        "TB-GATEWAY-SERVICE",
+        "TB-PRIVILEGE-RECOVERY"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-04",
+        "EV-06",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-05",
+        "ATK-06",
+        "ATK-09"
+      ],
+      "current_exposure": "manifest and four-package remediation are bound; scan findings await triage, full lock install is resource-bounded, signing/deployment are not assessed/run",
+      "data_class_ids": [
+        "DC-MODEL-CONFIG",
+        "DC-BUILD-EVIDENCE"
+      ],
+      "detective_control_ids": [
+        "CTL-D02",
+        "CTL-D04"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "기술책임자",
+      "entry_point_ids": [
+        "EP-MODEL-CONFIG",
+        "EP-BUILD-EVIDENCE"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-01",
+        "F-14",
+        "F-15",
+        "F-16",
+        "F-17",
+        "F-18"
+      ],
+      "impact": "CRITICAL",
+      "likelihood": "MEDIUM",
+      "name": "dependency, model/config or runtime artifact substitution",
+      "node_ids": [
+        "N-BUILD-EVIDENCE",
+        "N-MODEL-CONFIG",
+        "N-ANDROID-USER",
+        "N-ANDROID-ADMIN",
+        "N-GATEWAY",
+        "N-BACKEND"
+      ],
+      "preventive_control_ids": [
+        "CTL-P07",
+        "CTL-P09"
+      ],
+      "recovery_control_ids": [
+        "CTL-R04",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-001",
+        "SR-005"
+      ],
+      "threat_scenario_id": "THR-008",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-SUPPLYCHAIN-EVIDENCE"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-03",
+        "EV-05",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-02",
+        "ATK-04",
+        "ATK-05"
+      ],
+      "current_exposure": "ledger source exists; current legal/UI text, production immutability, cross-store reconciliation and deletion receipts are absent",
+      "data_class_ids": [
+        "DC-IDENTITY",
+        "DC-CONSENT",
+        "DC-RAW",
+        "DC-TELEMETRY"
+      ],
+      "detective_control_ids": [
+        "CTL-D01",
+        "CTL-D03"
+      ],
+      "due_date": "2026-08-03",
+      "due_role": "보안·개인정보책임자",
+      "entry_point_ids": [
+        "EP-USER-GATEWAY",
+        "EP-CONSENT",
+        "EP-BACKEND-API"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-03",
+        "F-09",
+        "F-10"
+      ],
+      "impact": "HIGH",
+      "likelihood": "MEDIUM",
+      "name": "consent/privacy ledger tamper, replay or state divergence",
+      "node_ids": [
+        "N-ANDROID-USER",
+        "N-GATEWAY",
+        "N-BACKEND",
+        "N-CONSENT-LEDGER"
+      ],
+      "preventive_control_ids": [
+        "CTL-P01",
+        "CTL-P03"
+      ],
+      "recovery_control_ids": [
+        "CTL-R02",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-001",
+        "SR-006"
+      ],
+      "threat_scenario_id": "THR-009",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-DEVICE-USER",
+        "TB-NETWORK-EDGE",
+        "TB-GATEWAY-SERVICE"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-04",
+        "EV-07",
+        "EV-09"
+      ]
+    },
+    {
+      "attacker_ids": [
+        "ATK-05",
+        "ATK-06",
+        "ATK-09"
+      ],
+      "current_exposure": "run002 and W4 hashes are fixed, but normalized findings are path-only, independent review is pending and five release gates remain NOT_RUN",
+      "data_class_ids": [
+        "DC-BUILD-EVIDENCE",
+        "DC-TELEMETRY"
+      ],
+      "detective_control_ids": [
+        "CTL-D02",
+        "CTL-D04"
+      ],
+      "due_date": "2026-07-31",
+      "due_role": "빌드·증거관리자",
+      "entry_point_ids": [
+        "EP-BUILD-EVIDENCE"
+      ],
+      "expiry": "2026-08-31",
+      "flow_ids": [
+        "F-19"
+      ],
+      "impact": "HIGH",
+      "likelihood": "MEDIUM",
+      "name": "scan evidence omission, hash substitution or false gate assertion",
+      "node_ids": [
+        "N-BACKEND",
+        "N-BUILD-EVIDENCE"
+      ],
+      "preventive_control_ids": [
+        "CTL-P07",
+        "CTL-P09"
+      ],
+      "recovery_control_ids": [
+        "CTL-R04",
+        "CTL-R05"
+      ],
+      "residual_risk": "NOT_ASSESSED",
+      "risk_ids": [
+        "SR-001"
+      ],
+      "threat_scenario_id": "THR-010",
+      "treatment": "MITIGATE",
+      "treatment_status": "PROPOSED_NOT_APPROVED",
+      "trust_boundary_ids": [
+        "TB-SUPPLYCHAIN-EVIDENCE"
+      ],
+      "validation_evidence_ids": [
+        "EV-01",
+        "EV-02",
+        "EV-03",
+        "EV-05",
+        "EV-07",
+        "EV-08",
+        "EV-09"
+      ]
+    }
+  ],
+  "validation_evidence": [
+    {
+      "binding_id": "SRC-RUN002-MANIFEST",
+      "control_ids": [
+        "CTL-P01",
+        "CTL-P02",
+        "CTL-P03",
+        "CTL-P04",
+        "CTL-P06",
+        "CTL-P09",
+        "CTL-D01",
+        "CTL-D03",
+        "CTL-D04",
+        "CTL-R01",
+        "CTL-R03"
+      ],
+      "evidence_id": "EV-01",
+      "limitations": [
+        "source_commit null",
+        "build_id null",
+        "not a release build or deployment receipt"
+      ],
+      "name": "run002 selected-source manifest",
+      "result": "SOURCE_SET_BOUND",
+      "scope": "528 current selected files",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-006",
+        "THR-007",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    },
+    {
+      "aggregate": {
+        "errors": 1,
+        "findings": 34,
+        "normalized_rule_id_count": 5
+      },
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "control_ids": [
+        "CTL-P04",
+        "CTL-P08",
+        "CTL-D02"
+      ],
+      "evidence_id": "EV-02",
+      "limitations": [
+        "no detailed finding disposition asserted here",
+        "actual findings use EV-09 path-only successor"
+      ],
+      "name": "run002 Semgrep SAST aggregate",
+      "result": "COMPLETED_WITH_FINDINGS_PENDING_TRIAGE",
+      "scope": "backend/app, backend/alembic, Android user/admin main, Gateway src, model and scripts; 654 scanned paths",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-006",
+        "THR-007",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    },
+    {
+      "aggregate": {
+        "affected_packages": 6,
+        "unique_primary_ids": 52
+      },
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "control_ids": [
+        "CTL-P07",
+        "CTL-D02",
+        "CTL-R04"
+      ],
+      "evidence_id": "EV-03",
+      "limitations": [
+        "reachability and per-finding treatment pending",
+        "four-package remediation does not imply all SCA findings closed"
+      ],
+      "name": "run002 OSV backend SCA aggregate",
+      "result": "COMPLETED_WITH_FINDINGS_PENDING_TRIAGE",
+      "scope": "backend recursive source; 64 packages",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "aggregate": {
+        "findings": 0
+      },
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "control_ids": [
+        "CTL-D02",
+        "CTL-R05"
+      ],
+      "evidence_id": "EV-04",
+      "limitations": [
+        "history scan NOT_RUN",
+        "zero current-tree findings does not prove full secret absence"
+      ],
+      "name": "run002 Gitleaks current selected tree aggregate",
+      "result": "ZERO_CURRENT_TREE_FINDINGS_WITH_SCOPE_GAP",
+      "scope": "current selected tree only; exact-two-path allowlist plus generic API-key rule",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-007",
+        "THR-009"
+      ]
+    },
+    {
+      "aggregate": {
+        "isolated_package_imports_passed": 4,
+        "targeted_backend_tests_passed": 28
+      },
+      "binding_id": "SRC-DEP-MANIFEST",
+      "control_ids": [
+        "CTL-P07",
+        "CTL-R04"
+      ],
+      "evidence_id": "EV-05",
+      "limitations": [
+        "full backend lock install NOT_RUN by explicit resource policy"
+      ],
+      "name": "dependency remediation receipt",
+      "result": "PASS_WITH_RECOVERED_RECEIPT_EXDEV",
+      "scope": "Pillow 12.3.0, python-multipart 0.0.31, python-dotenv 1.2.2, idna 3.15 and deterministic lock projection",
+      "threat_scenario_ids": [
+        "THR-008",
+        "THR-010"
+      ]
+    },
+    {
+      "binding_id": "SRC-RUN002-SUMMARY",
+      "control_ids": [
+        "CTL-P08",
+        "CTL-R04"
+      ],
+      "evidence_id": "EV-06",
+      "limitations": [
+        "not a deployed endpoint or formal release receipt"
+      ],
+      "name": "trusted-proxy TLS fix targeted validation",
+      "result": "TARGETED_INTERNAL_PASS",
+      "scope": "CA-verified and hostname-checked success context plus invalid context rejected before network",
+      "subject_files": [
+        {
+          "byte_length": 15539,
+          "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+          "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7"
+        },
+        {
+          "byte_length": 132303,
+          "path": "tests/test_walksafe_full_rc_tooling.py",
+          "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+        }
+      ],
+      "test_names": [
+        "test_trusted_proxy_tls_success_context_is_ca_verified_and_hostname_checked",
+        "test_trusted_proxy_tls_negative_context_is_rejected_before_network"
+      ],
+      "threat_scenario_ids": [
+        "THR-005",
+        "THR-007"
+      ]
+    },
+    {
+      "binding_id": "SRC-RISK-REGISTER",
+      "control_ids": [
+        "CTL-P01",
+        "CTL-P02",
+        "CTL-P03",
+        "CTL-P05",
+        "CTL-P06",
+        "CTL-D01",
+        "CTL-D03",
+        "CTL-R01",
+        "CTL-R02",
+        "CTL-R03",
+        "CTL-R05"
+      ],
+      "evidence_id": "EV-07",
+      "limitations": [
+        "all residual ratings NOT_ASSESSED",
+        "all acceptance references null",
+        "release NOT_ELIGIBLE"
+      ],
+      "name": "canonical six-risk opening snapshot",
+      "result": "DRAFT_NOT_APPROVED_OPENING_SNAPSHOT",
+      "scope": "SR-001 through SR-006",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-006",
+        "THR-007",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    },
+    {
+      "binding_id": "SRC-W4-RECEIPT",
+      "control_ids": [
+        "CTL-P09",
+        "CTL-D04"
+      ],
+      "evidence_id": "EV-08",
+      "limitations": [
+        "formal 279 NOT_RUN",
+        "five release gates NOT_RUN and unwaived",
+        "release NOT_ELIGIBLE"
+      ],
+      "name": "W4 terminal predecessor boundary",
+      "result": "PREDECESSOR_BOUND",
+      "scope": "terminal W4 receipt SHA plus W4 validation/delta bindings",
+      "threat_scenario_ids": [
+        "THR-010"
+      ]
+    },
+    {
+      "binding_id": "SRC-SCAN-SUCCESSOR",
+      "control_ids": [
+        "CTL-D02",
+        "CTL-R04",
+        "CTL-R05"
+      ],
+      "evidence_id": "EV-09",
+      "limitations": [
+        "existence not claimed",
+        "sha256 not claimed",
+        "finding status, disposition and closure not claimed"
+      ],
+      "name": "normalized actual security scan findings",
+      "result": "PATH_ONLY_FORWARD_REFERENCE",
+      "scope": "future security-scan-current-state.json",
+      "threat_scenario_ids": [
+        "THR-001",
+        "THR-002",
+        "THR-003",
+        "THR-004",
+        "THR-005",
+        "THR-006",
+        "THR-007",
+        "THR-008",
+        "THR-009",
+        "THR-010"
+      ]
+    }
+  ],
+  "verification_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN_CURRENT_GENERATION",
+    "formal_empty_evidence_ids_count": 279,
+    "formal_evidence_count": 0,
+    "formal_executed_count": 0,
+    "formal_execution_status": "NOT_RUN",
+    "formal_pass_count": 0,
+    "formal_qa_approval_status": "NOT_APPROVED_PENDING",
+    "formal_result_null_count": 279,
+    "formal_test_count": 279,
+    "full_e2e_status": "NOT_RUN",
+    "live_tmap_status": "NOT_RUN",
+    "normalized_scan_finding_authority": "PATH_ONLY_FORWARD_REFERENCE",
+    "performance_status": "NOT_RUN",
+    "physical_talkback_status": "NOT_RUN",
+    "release_eligible_claimed": false,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "security_scan_execution_status": "COMPLETED_CURRENT_SOURCE_WITH_FINDINGS_PENDING_TRIAGE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "wave_id": "W5"
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-VERIFICATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-24T13:46:00+09:00",
+  "checks": [
+    {
+      "name": "focused Android permission and session tests",
+      "command": "./gradlew :app:testDebugUnitTest --tests PermissionSessionPolicyTest --tests AndroidNetworkTransferPolicyTest --tests GatewayFieldSessionTest --tests AndroidGatewaySessionStoreStaticTest --tests ReportPrivacyConsentSessionTest --tests PermissionSessionLifecycleStaticTest --tests MainActivityReportUploadStaticTest --tests MainActivityWalkSessionLifecycleStaticTest --tests RuntimeMetricMainActivityStaticTest --offline --no-daemon",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/focused-android-tests.log",
+      "output_sha256": "e3b822e885bfac34bb4cceacc99a3251f54516db8a8cad93808fe52dec2d50f3",
+      "executed_at": "2026-07-24T13:42:00+09:00"
+    },
+    {
+      "name": "Gateway contract and product-boundary tests",
+      "command": "npm --prefix apps/android-gateway run typecheck && npm --prefix apps/android-gateway test && python -m pytest tests/test_walksafe_android_gateway_boundary_20260723.py -q",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/gateway-contract-boundary.log",
+      "output_sha256": "624a3bf4c0e776d1bfdf2d5d26fff938705563dd17b30270798cfd6b260b68c5",
+      "executed_at": "2026-07-24T13:44:00+09:00"
+    },
+    {
+      "name": "full Android unit/build/lint",
+      "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/full-android-test-build-lint.log",
+      "output_sha256": "67e5a0ad1dcfe1afcfbe4e6f956b694c2a9c0b55255d4eae12a336455c8a4420",
+      "executed_at": "2026-07-24T13:46:00+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "tests": 452,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "gateway_test_summary": {
+    "typecheck": "PASS",
+    "contract_tests": 16,
+    "contract_failures": 0,
+    "boundary_tests": 18,
+    "boundary_failures": 0
+  },
+  "evidence_boundary": {
+    "repository_internal": true,
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_rights_operation_status": "NOT_RUN"
+  }
+}

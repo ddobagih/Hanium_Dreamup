@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP004-PRIORITY-USER-VERIFICATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-24T16:38:30+09:00",
+  "checks": [
+    {
+      "name": "FP-004 focused Android onboarding tests after session resume",
+      "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest --tests kr.co.hanium.dreamup.walksafe.session.PriorityUserOnboardingPolicyTest --tests kr.co.hanium.dreamup.walksafe.PriorityUserOnboardingStaticTest --tests kr.co.hanium.dreamup.walksafe.session.WalkSessionReadinessTest --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/focused-android-tests-resumed.log",
+      "output_sha256": "6404957c139ea90393cf27887e95dac0b0f156fc1e06b12fbba1bc7b46ccb302",
+      "executed_at": "2026-07-24T16:35:51+09:00"
+    },
+    {
+      "name": "full Android unit/build/lint after session resume",
+      "command": "./gradlew --offline --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --rerun-tasks",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/full-android-test-build-lint-resumed.log",
+      "output_sha256": "49afd7887a20fe490fc52478256eaa9ade5df5dfb4c88de436558caa00cdae67",
+      "executed_at": "2026-07-24T16:36:29+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "focused_tests": "PASS",
+    "full_unit_tests": "PASS",
+    "debug_build": "PASS",
+    "lint": "PASS",
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "evidence_boundary": {
+    "repository_internal": true,
+    "formal_test_status": "NOT_RUN",
+    "priority_user_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "guardian_verification_provider_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

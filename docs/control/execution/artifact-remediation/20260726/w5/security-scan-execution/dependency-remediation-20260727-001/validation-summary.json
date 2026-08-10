@@ -1,0 +1,60 @@
+{
+  "determinism": {
+    "backend_byte_identical": true,
+    "backend_sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700",
+    "quality_byte_identical": true,
+    "quality_sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+  },
+  "execution_lineage": "execution-lineage.json",
+  "gate_adjustment": {
+    "accepted_annotation_only_blocks": [
+      "typing-extensions"
+    ],
+    "reason": "Initial strict block gate stopped on typing-extensions annotation-only dependency provenance additions. Parent explicitly permits recorded annotation changes; non-target version/hash/payload remains fail-closed."
+  },
+  "isolated_four_package_smoke": {
+    "result_lines": [
+      "Pillow=12.3.0 import=PIL:PASS",
+      "python-multipart=0.0.31 import=multipart:PASS",
+      "python-dotenv=1.2.2 import=dotenv:PASS",
+      "idna=3.15 import=idna:PASS"
+    ],
+    "status": "PASS"
+  },
+  "official_pip_tools_version_source": "https://pypi.org/pypi/pip-tools/json",
+  "preflight_correction": {
+    "cause": "pgrep matched its own command line",
+    "corrected_status": "PASS_NO_OTHER_HEAVY_LANE",
+    "prior_status": "NOT_RUN_RESOURCES"
+  },
+  "resource_policy": {
+    "concurrent_gradle_or_scan": "none detected",
+    "full_backend_lock_install": "NOT_RUN_RESOURCES",
+    "heavy_lane": "single",
+    "reason": "Explicitly prohibited because resolving/installing the full torch stack risks a large download and resource spike."
+  },
+  "schema_version": 1,
+  "status": "PASS_WITH_RECOVERED_RECEIPT_EXDEV",
+  "targeted_tests": {
+    "environment": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+    "execution": "serial",
+    "full_lock_install": "NOT_RUN_RESOURCE_POLICY",
+    "overlay": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/w3-backend-overlay",
+    "result_tail": [
+      "............................                                             [100%]",
+      "28 passed in 1.27s"
+    ],
+    "status": "PASS",
+    "tests": [
+      "backend/tests/test_request_limits.py",
+      "backend/tests/test_uploads.py",
+      "backend/tests/test_health_readiness.py"
+    ]
+  },
+  "tool_versions": {
+    "pip": "25.0.1",
+    "pip-tools": "7.6.0",
+    "python": "3.12.13",
+    "setuptools": "83.0.0"
+  }
+}

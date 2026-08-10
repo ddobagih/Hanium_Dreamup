@@ -1,0 +1,1733 @@
+{
+  "approval_boundary": {
+    "approval_status": "NOT_APPROVED",
+    "execution_completion_claimed": false,
+    "formal_test_credit": false,
+    "release_credit": false,
+    "release_status": "NOT_ELIGIBLE",
+    "verdict": "NO_GO",
+    "waiver_count": 0
+  },
+  "as_of": "2026-07-27T19:06:09+09:00",
+  "control_record_id": "WS-PHASE0-FORMAL279-NOT-RUN-20260727-001",
+  "immutability": {
+    "add_only_successor_required": true,
+    "immutable": true,
+    "physical_hash_bound_by_manifest": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-manifest.json",
+    "self_fingerprint_included": false
+  },
+  "no_event_disclaimer": "The 279 NOT_RUN tuples describe only the bound controlled register. They do not prove that no unbound real-world activity occurred, and they confer no formal or release credit.",
+  "owner_control": {
+    "approver_role": "제품책임자",
+    "owner_role": "QA책임자",
+    "reviewer_roles": [
+      "기술책임자",
+      "접근성·안전책임자",
+      "독립QA검토자"
+    ]
+  },
+  "prepared_on": "2026-07-27",
+  "reconciliation": {
+    "actual_test_case_tuple_count": 279,
+    "declared_fail_count": 0,
+    "declared_not_run_count": 279,
+    "declared_pass_count": 0,
+    "declared_test_case_count": 279,
+    "execution_status_counts": {
+      "NOT_RUN": 279
+    },
+    "fail_count_match": true,
+    "not_run_count_match": true,
+    "pass_count_match": true,
+    "result_null_count": 279,
+    "result_null_count_match": true,
+    "test_case_count_match": true
+  },
+  "schema_version": "walksafe.formal279-not-run-control-record.v1",
+  "source_binding": {
+    "byte_length": 2590342,
+    "captured_at": "2026-07-27T19:04:59+09:00",
+    "path": "docs/deliverables/06-testing/registers/test-cases.json",
+    "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+    "subject_role": "AUTHORITATIVE_FORMAL_TEST_PLAN_REGISTER"
+  },
+  "status": "NOT_RUN",
+  "test_case_status_tuples": [
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-001-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-001-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-001-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-001-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-002-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-002-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-002-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-002-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-003-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-003-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-003-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-003-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-004-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-004-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-004-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-004-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-005-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-005-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-005-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-005-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-006-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-006-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-006-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-006-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-007-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-007-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-007-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-007-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-008-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-008-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-008-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-008-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-009-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-009-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-009-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-009-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-010-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-010-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-010-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-010-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-011-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-011-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-011-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-011-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-011-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-012-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-012-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-012-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-012-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-012-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-013-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-013-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-013-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-013-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-013-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-014-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-014-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-014-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-015-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-015-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-015-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-015-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-015-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-016-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-016-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-016-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-016-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-017-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-018-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-019-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-020-08"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-08"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-021-09"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-022-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-022-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-022-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-022-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-023-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-023-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-023-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-024-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-024-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-024-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-024-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-025-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-025-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-025-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-025-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-026-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-026-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-026-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-026-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-027-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-027-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-027-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-027-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-028-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-028-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-028-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-028-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-029-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-029-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-029-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-029-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-030-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-030-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-030-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-030-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-031-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-031-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-031-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-031-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-032-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-032-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-032-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-033-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-033-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-033-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-033-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-033-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-034-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-034-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-034-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-034-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-035-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-035-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-035-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-035-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-036-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-036-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-036-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-036-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-036-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-037-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-038-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-039-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-039-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-039-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-039-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-039-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-040-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-041-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-041-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-041-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-041-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-041-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-042-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-043-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-043-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-043-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-044-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-044-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-044-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-044-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-045-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-045-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-045-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-045-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-046-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-046-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-046-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-046-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-046-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-047-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-048-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-049-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-050-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-050-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-050-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-050-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-050-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-051-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-052-08"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-053-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-02"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-03"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-04"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-05"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-06"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-FP-054-07"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-GATE-CLOUD-COST-MEASUREMENT-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-GATE-PHONE-QUEUE-BYTE-LIMIT-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-GATE-RAW-COLLECTION-RELEASE-REVIEW-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-GATE-SERVER-CAPACITY-STATE-CONTRACT-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-GATE-SINGLE-ADMIN-RECOVERY-DRILL-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-AUTO-REPORT-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-DATA-LIFECYCLE-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-NAVIGATION-ROUTE-DIRECTION-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-PERMISSION-SESSION-LIFECYCLE-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-PHONE-QUEUE-CAPACITY-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-RAW-ORIGINAL-COLLECTION-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-SERVER-CAPACITY-STATE-SYNC-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-SERVER-STORAGE-CAPACITY-01"
+    },
+    {
+      "evidence_id_count": 0,
+      "execution_status": "NOT_RUN",
+      "result": null,
+      "test_case_id": "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    }
+  ],
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00"
+}

@@ -1,0 +1,457 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-G-NO-DESTINATION-HAZARD-IMPLEMENTATION-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IMPLEMENTATION_READY",
+    "title": "EPIC-01 Phase G 목적지 미선택 위험안내 정합화 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_phase_f_or_approved_baseline": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": true,
+    "claims_epic_complete": false,
+    "claims_actual_device_pass": false,
+    "claims_formal_test_pass": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "phase_f_record_id": "WS-EPIC-01-PHASE-F-PURPOSE-SURFACES-IMPLEMENTATION-20260723-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-006",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-006",
+    "overlay_predecessor_id": "WS-EPIC-01-PHASE-F-ACTIVE-LEDGER-OVERLAY-20260723-001",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "phase_f_builder",
+        "path": "scripts/build_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py",
+        "bytes": 59339,
+        "sha256": "e961bcbc80bfb9ba510b8f54529ec88a207cf42b97d9059d18d4b587919c78ec",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_f_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py",
+        "bytes": 16544,
+        "sha256": "537d5f0353e894222bc9ffd74614dfb86d221be9982e17f4e7aa7b796b5844e6",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_f_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-f-purpose-surfaces-implementation-record-20260723.json",
+        "bytes": 15447,
+        "sha256": "5c9705238944fb53a4b9961505f9284062d6e60f50a91efa5f4c655730c7af75",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_f_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-f-purpose-surfaces-implementation-record-20260723.md",
+        "bytes": 2702,
+        "sha256": "8b7c536d2918b7397517c175bfca51bc39187d45493e85f7b0438e6f494afa60",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r006",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r006.json",
+        "bytes": 412050,
+        "sha256": "2ccea73214ad12b7484eab353a8c6fb13cdd4e222676d318572891fbc612096c",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r006_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r006.md",
+        "bytes": 932,
+        "sha256": "ad374de629ba243b216937b451fdeca3816eb3dad83155618adeaf1584936916",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r006",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r006.json",
+        "bytes": 57365,
+        "sha256": "723e20fccc03eb93c863f6f63b9a030f6825020e79c10a6c6c2fa2b154f57c06",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r006_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r006.md",
+        "bytes": 761,
+        "sha256": "db516329a1ba1ac1692dcc6a552d5b07559c58feb203742107f4a966b46c9485",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_f_active_overlay",
+        "path": "docs/control/execution/walksafe-epic-01-phase-f-active-ledger-overlay-20260723-r001.json",
+        "bytes": 15225,
+        "sha256": "cf264ab050e86b9668005b13bf7e6bd640f30d859c4c771916f75d0e439495ae",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_f_active_overlay_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-f-active-ledger-overlay-20260723-r001.md",
+        "bytes": 2426,
+        "sha256": "360b431f04312edb9e57d3130e52e9b6dfa79e578e32e1de1816dc6a9f52d436",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "effective_decision_register",
+        "path": "docs/control/decision-interview/walksafe-effective-decision-register.json",
+        "bytes": 346163,
+        "sha256": "cabec4a7ada26dd9e95827084a3679983eec766df543d7112d7a836cf1bd2009"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py",
+        "bytes": 70521,
+        "sha256": "808242a596bda62ea7567bd88d171eb5dcba2ead1153a427c90bee59aa17f9b0"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py",
+        "bytes": 19069,
+        "sha256": "8a176d9b6e51a6f21233595605f4cecd458befe88952f753f357117020e3b3a4"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IMPLEMENTATION_READY",
+    "phase": "PHASE_G_NO_DESTINATION_HAZARD_CONFORMANCE",
+    "directly_reassessed_policy_ids": [
+      "FP-001"
+    ],
+    "directly_reassessed_gap_ids": [
+      "GAP-010"
+    ],
+    "impact_reviewed_policy_ids": [
+      "FP-019",
+      "FP-020",
+      "FP-021",
+      "FP-022",
+      "FP-027",
+      "FP-043"
+    ],
+    "impact_reviewed_gap_ids": [
+      "GAP-028",
+      "GAP-029",
+      "GAP-030",
+      "GAP-031",
+      "GAP-036",
+      "GAP-052"
+    ],
+    "excluded_policy_work": {
+      "source_policy_id": "FP-017",
+      "gap_id": "GAP-026",
+      "reason": "이번 단계는 보행 탐지 세션이 시작된 뒤 위험안내와 경로 gate를 분리한다. 자동 시작·복귀 상태기계 구현은 다음 작업이다."
+    },
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_G_NO_DESTINATION_HAZARD_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "excluded_from_scope": [
+      "unrelated dirty-tree paths",
+      "checkpoint, runbook, indexes, test-layer registry, and daylog",
+      "Phase A-F implementation paths not changed by Phase G",
+      "Phase F immutable predecessors",
+      "Phase G builder, test, and generated trace outputs"
+    ],
+    "file_count": 15,
+    "path_set_sha256": "b6a9d79f1ff08064d376225843184902daa6f70b26fd75b102689c79b4f8b39c",
+    "content_set_sha256": "c0e9717e619d797083b19ee7407e000dc40ca162ca8b407ffe1489c0405b11a9",
+    "files": [
+      {
+        "path": "apps/android/README.md",
+        "bytes": 25568,
+        "sha256": "f38155e9658c57f37049e7df25c02497a2c333f69ed7b3d57c14cccd717fba56"
+      },
+      {
+        "path": "apps/android/USER_GUIDE.md",
+        "bytes": 8081,
+        "sha256": "1b52cbfb61ec79d1503b79db3c97d290207af84843a022228e0554804dfa448e"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "bytes": 312145,
+        "sha256": "f84e9be8304b8b317551359e5ead9cee950b4475345d7281f53cc438813ce68d"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapability.kt",
+        "bytes": 1421,
+        "sha256": "20ea16454300cea7da6e3a8d14f884ecf29c9ead49553c682f24c86bf6bc168f"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicy.kt",
+        "bytes": 11776,
+        "sha256": "161c316318779e01f42ee9dbecb14aae264c85d2a228ef07757c08ee5e5a45d3"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "bytes": 17990,
+        "sha256": "bc21a3f887ec6e7b170dba0a44a9364cdae197472f47c7ba421499cdbda7f8de"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "bytes": 16551,
+        "sha256": "7674b9e09a6df4fe1a9bc9f5486f2a044df37da406dcd6ebf506bb37398f7bcf"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapabilityTest.kt",
+        "bytes": 2295,
+        "sha256": "40bc71693b1d43275522959a7ee007ac9c1b841742e223df0b398e0ffe011fcd"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicyTest.kt",
+        "bytes": 14036,
+        "sha256": "10282d07d20d0376111134a787c96a51e939af41247e22a3000657eecc0e7a67"
+      },
+      {
+        "path": "scripts/summarize_android_field_sessions_20260710.py",
+        "bytes": 46746,
+        "sha256": "298084585d02c9e8714d55928ddd06a88b2e48222d216d4a0c0d279e39bf1c98"
+      },
+      {
+        "path": "scripts/walksafe_external_check_receipt.py",
+        "bytes": 51133,
+        "sha256": "9645fb899b5ad03a31111a81747acf02cc97549e3801017c3e0823811cd9b524"
+      },
+      {
+        "path": "tests/test_android_field_session_summary.py",
+        "bytes": 46404,
+        "sha256": "a5b23c385c56eda2e818cc22102a753019ef3467d6672780d2568cf61552face"
+      },
+      {
+        "path": "tests/test_release_evidence_gate.py",
+        "bytes": 171019,
+        "sha256": "dca7d332f6b6323d08b7715d2f18920121c2da57e993dd13e03591a8b43e99bc"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidanceTest.kt",
+        "bytes": 37103,
+        "sha256": "c2754304ca5fa7f5a6dc633981a7c3e9dae5f70f8dacb5cc185ae75f113b00e9"
+      },
+      {
+        "path": "docs/android/arcore_depth_estimation_architecture.md",
+        "bytes": 11598,
+        "sha256": "1110ea6ff06602ccaa05d78e649847d4a1aadf5a0f24df4a37d30e5ebb82870a"
+      }
+    ],
+    "snapshot_sha256": "a7d06688e9457dd4893d0c3d451441950d5c25a8422b4f7191d518022bc5de4d"
+  },
+  "no_destination_hazard_contract": {
+    "contract_id": "WS-PHASE-G-NO-DESTINATION-HAZARD-CONTRACT-20260723-001",
+    "decision_authority": {
+      "canonical_decision_id": "CD-STARTUP-DETECTION",
+      "register_decision_id": "DEC-STARTUP-DETECTION",
+      "resolution_status": "RESOLVED",
+      "decision_statement": "동의·가입·로그인과 필수 권한 확인이 끝나고 필수 기능이 준비되면 보행 탐지를 자동 시작합니다. 목적지를 정하지 않아도 장애물 탐지와 위험 경고는 동작합니다.",
+      "affected_feature_ids": [
+        "FP-017",
+        "FP-019",
+        "FP-020",
+        "FP-022"
+      ],
+      "source_binding": {
+        "name": "effective_decision_register",
+        "path": "docs/control/decision-interview/walksafe-effective-decision-register.json",
+        "bytes": 346163,
+        "sha256": "cabec4a7ada26dd9e95827084a3679983eec766df543d7112d7a836cf1bd2009"
+      }
+    },
+    "requirements_interpretation": {
+      "precedence": "승인 상위 결정 CD-STARTUP-DETECTION과 FP-017의 목적지 없는 위험 경고를 REQ-03·REQ-06의 FP-020 현재 경로 표현보다 우선 적용한다.",
+      "current_route_expression_scope": "현재 경로 표현은 경로와 관련된 행동·방향 안내에만 적용하며 일반 위험 관측·경고의 필수 gate로 사용하지 않는다.",
+      "approved_baseline_files_modified": false,
+      "new_product_policy_created": false,
+      "active_trace_targets": [
+        "REQ-16",
+        "DES-06"
+      ],
+      "formal_successor_requirement_version_needed": true
+    },
+    "behavior_matrix": [
+      {
+        "state": "NO_DESTINATION_ARCORE_METRIC",
+        "general_hazard": "ALLOWED_WHEN_GENERAL_HAZARD_GATES_PASS",
+        "tactile_local_guidance": "BLOCKED_WITHOUT_TRUSTED_ROUTE",
+        "general_hazard_report": "FORBIDDEN"
+      },
+      {
+        "state": "NO_DESTINATION_CAMERAX_NON_METRIC",
+        "general_hazard": "LOW_SCREEN_RELATIVE_ADVISORY_ALLOWED_WHEN_CAMERA_DETECTOR_IMU_GATES_PASS",
+        "tactile_local_guidance": "BLOCKED",
+        "general_hazard_report": "FORBIDDEN"
+      },
+      {
+        "state": "ROUTE_REQUEST_OR_OFF_ROUTE_OR_ARRIVAL_OR_CANCEL",
+        "general_hazard": "CONTINUES_INDEPENDENTLY",
+        "tactile_local_guidance": "WAITS_OR_STOPS",
+        "general_hazard_report": "FORBIDDEN"
+      },
+      {
+        "state": "ACTIVE_TRUSTED_ROUTE",
+        "general_hazard": "CONTINUES",
+        "tactile_local_guidance": "ALLOWED_ONLY_WHEN_ROUTE_SPECIFIC_GATES_PASS",
+        "general_hazard_report": "FORBIDDEN"
+      }
+    ],
+    "camera_non_metric_constraints": {
+      "required_gates": [
+        "camera_permission",
+        "camera_fallback_running",
+        "detector_available",
+        "fresh_imu"
+      ],
+      "observational_context_only": [
+        "tmap_route_active"
+      ],
+      "stability": "THREE_DISTINCT_FRAMES_AND_700MS",
+      "forbidden_authority": [
+        "metric_distance",
+        "steps",
+        "STOP_OR_HIGH",
+        "local_steering",
+        "route_change",
+        "report_candidate",
+        "vibration",
+        "safety_guarantee"
+      ]
+    },
+    "screen_policy": "FOREGROUND_CAMERAX_SESSION_KEEPS_SCREEN_AWAKE",
+    "general_hazard_motion_context": "ROUTE_NEUTRAL_WITH_LOCATION_FRESHNESS_ONLY",
+    "route_guidance_authority": "TMAP_ROUTE_SPECIFIC_POLICY_REMAINS_FAIL_CLOSED",
+    "field_evidence_contract": "tmap_route_active remains a Boolean observation but is not one of the four CameraX validity gates.",
+    "contract_sha256": "8d433dcce4372db064aa1289f47cb42298391836d4c657915d87bb586e8c52c6"
+  },
+  "implemented_controls": [
+    {
+      "control": "CAMERAX_HAZARD_GATE_ROUTE_INDEPENDENCE",
+      "result": "CameraX 비미터 위험 경고는 목적지·활성 TMAP 경로 대신 카메라 권한·fallback·detector·fresh IMU 네 gate로 판단한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapability.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicy.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapabilityTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicyTest.kt"
+      ]
+    },
+    {
+      "control": "GENERAL_HAZARD_ROUTE_NEUTRALITY",
+      "result": "일반 위험 신뢰도에서 route bearing을 제거하고 route-bound 점자블록 방향 안내의 독립 fail-closed gate는 유지한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidanceTest.kt",
+        "docs/android/arcore_depth_estimation_architecture.md"
+      ]
+    },
+    {
+      "control": "DESTINATIONLESS_FOREGROUND_DELIVERY",
+      "result": "목적지 없는 foreground CameraX 세션도 화면 유지 대상이며 종료·background에서 해제한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt"
+      ]
+    },
+    {
+      "control": "ROUTE_STATUS_OBSERVATIONAL_EVIDENCE",
+      "result": "tmap_route_active를 Boolean 관측값으로 보존하되 field summary와 external receipt의 CameraX 유효 gate에서 제외했다.",
+      "paths": [
+        "scripts/summarize_android_field_sessions_20260710.py",
+        "scripts/walksafe_external_check_receipt.py",
+        "tests/test_android_field_session_summary.py",
+        "tests/test_release_evidence_gate.py"
+      ]
+    },
+    {
+      "control": "APPROVED_DECISION_REQUIREMENTS_INTERPRETATION",
+      "result": "CD-STARTUP-DETECTION/FP-017의 목적지 없는 위험 경고를 우선하고 REQ-03·REQ-06 현재 경로 표현은 경로 관련 행동안내에만 적용한다.",
+      "paths": [
+        "apps/android/README.md",
+        "apps/android/USER_GUIDE.md",
+        "docs/android/arcore_depth_estimation_architecture.md"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "actual_device_execution": "NOT_RUN",
+    "commands": [
+      {
+        "scope": "Phase G CameraX·route separation focused JVM regression",
+        "command": "./gradlew :app:testDebugUnitTest --tests '*AndroidNonMetricObstacleAdvisoryPolicyTest' --tests '*AndroidLocalTactileCapabilityTest' --tests '*CameraXFallbackCompositionStaticTest' --tests '*MainActivityAccessibilityStaticTest' --tests '*AndroidTactileRouteGuidanceTest' --offline --no-daemon --rerun-tasks",
+        "status": "PASS_INTERNAL_FOCUSED"
+      },
+      {
+        "scope": "Android 사용자 앱 전체 JVM·assemble·lint",
+        "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon",
+        "status": "PASS_INTERNAL_382_OF_382_ASSEMBLE_LINT"
+      },
+      {
+        "scope": "CameraX field summary and release evidence contracts",
+        "command": "python -m pytest tests/test_android_field_session_summary.py tests/test_release_evidence_gate.py -q",
+        "status": "PASS_INTERNAL_249_OF_249"
+      }
+    ],
+    "interpretation": "저장소 내부 route 분리·문구·lifecycle·증거 계약 회귀다. 실제 기기, 목적지 없는 현장 보행, 대상 사용자 접근성, 정식 시험 또는 출시 증거가 아니다."
+  },
+  "open_issues": [
+    {
+      "id": "PHASE-G-ACTUAL-DEVICE-NO-DESTINATION",
+      "status": "NOT_RUN",
+      "description": "실제 Android 기기에서 목적지 없는 ARCore·CameraX 위험 경고를 실행하지 않았다."
+    },
+    {
+      "id": "PHASE-G-FORMAL-FP001",
+      "status": "NOT_RUN",
+      "description": "TC-FP-001-01~04를 포함한 정식 시험은 미실행이다."
+    },
+    {
+      "id": "PHASE-G-REQUIREMENT-SUCCESSOR",
+      "status": "OPEN",
+      "description": "REQ-03·REQ-06 현재 경로 표현의 통제 해석은 REQ-16·DES-06 Active 사건에 남기고 후속 정식 요구사항 새 버전에서 명문화해야 한다."
+    },
+    {
+      "id": "EPIC-02-FP017-WALK-SESSION-LIFECYCLE",
+      "status": "PLANNED_NEXT",
+      "description": "준비→보행 중→일시정지→재검사→사용자 확인 후 재개 상태기계를 만들고 잠금·홈 버튼·통화·앱 전환 뒤 사용자 확인 전 자동 재개를 막는다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "actual_device_test_status": "NOT_RUN",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-02",
+    "work_item_id": "EPIC-02-FP017-WALK-SESSION-LIFECYCLE",
+    "source_policy_id": "FP-017",
+    "gap_id": "GAP-026",
+    "status": "PLANNED_NEXT_EPIC",
+    "action": "준비→보행 중→일시정지→재검사→사용자 확인 후 재개 상태기계를 만들고 잠금·홈 버튼·통화·앱 전환 뒤 사용자 확인 전 자동 재개를 막는다."
+  },
+  "record_content_sha256": "ecbc96fd988652ea2b7dd3f46d9266d9b3c38c3c7468ddeacb8e43e25c9fce9c"
+}

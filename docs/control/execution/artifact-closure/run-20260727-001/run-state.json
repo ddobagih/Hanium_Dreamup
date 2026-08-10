@@ -1,0 +1,275 @@
+{
+  "artifact_closure_complete": false,
+  "authorization_boundary": {
+    "acceptance_contract_review_approved": true,
+    "artifact_closure_complete": false,
+    "artifact_execution_started": true,
+    "closure_approval": "NOT_APPROVED",
+    "content_acceptance_complete": false,
+    "deployment_execution": "NOT_STARTED",
+    "evidence_fact_requests_are_policy_questions": false,
+    "execution_complete": false,
+    "execution_completion_claimed": false,
+    "final_n_a_approval_claimed": false,
+    "formal_test_credit": false,
+    "formal_test_execution": "NOT_STARTED",
+    "heavy_execution_started": false,
+    "legal_approval": "NOT_APPROVED",
+    "model_evaluation": "NOT_STARTED",
+    "phase0_complete": true,
+    "phase0_complete_compatibility_semantics": "PHASE0_BASELINE_ONLY",
+    "phase0_policy_reopened": false,
+    "public_beta_or_production_release": "FOLLOW_UP_SCOPE_NOT_STARTED",
+    "release_credit": false,
+    "release_status": "NOT_ELIGIBLE",
+    "resource_pilot_run": true,
+    "signing_execution": "NOT_STARTED",
+    "unsupported_completion_claim_count": 0
+  },
+  "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+  "content_acceptance_complete": false,
+  "content_acceptance_review": {
+    "byte_length": 17730,
+    "open_blocking_findings": [
+      "P0-CONTENT-B-002",
+      "P0-CONTENT-B-003"
+    ],
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase0-content-independent-review.md",
+    "remediation_evidence_bindings": [
+      {
+        "byte_length": 26753,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase0-current-state-attestations/evidence.json",
+        "sha256": "8f162aa636e9d49457c34d1c5253f15b10f1fc9bbb7d29667b5de086bb8b71b8",
+        "subject_role": "PHASE0_CURRENT_STATE_REMEDIATION_EVIDENCE"
+      },
+      {
+        "byte_length": 41119,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+        "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+        "subject_role": "IMMUTABLE_FORMAL279_NOT_RUN_CONTROL_RECORD"
+      },
+      {
+        "byte_length": 1415,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-manifest.json",
+        "sha256": "ec697cdf5730e2cc6d9e640fd6c566673ac9f45780918c85bf5159b1afe24706",
+        "subject_role": "NON_SELF_REFERENTIAL_FORMAL279_CONTROL_MANIFEST"
+      },
+      {
+        "byte_length": 2048,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+        "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d",
+        "subject_role": "PENDING_REVIEW_AND_APPROVAL_CONTROL_RECEIPT"
+      }
+    ],
+    "sha256": "5d60963ebeeb950bbd05c53b73d4edd33f2b6accad431ca66b32b3125feac259",
+    "status": "REMEDIATION_PREPARED_PENDING_INDEPENDENT_REREVIEW",
+    "verdict": "NO_GO_CONTENT_ACCEPTANCE_REMEDIATION_REQUIRED"
+  },
+  "execution": {
+    "completed_artifact_count": 0,
+    "execution_not_started": false,
+    "execution_started": true,
+    "heavy_execution_started": false,
+    "resource_pilot_run": true,
+    "status": "INTERNAL_AUTHORING_AND_RESOURCE_PILOT_RECORDED"
+  },
+  "execution_complete": false,
+  "open_evidence_fact_request_count": 3,
+  "open_evidence_fact_requests": [
+    {
+      "artifact_type_code": "DLV-AIML-01",
+      "policy_effect": "NO_POLICY_REOPEN",
+      "request_id": "PHASE0-EFR-AIML-01",
+      "request_kind": "EVIDENCE_FACT_ONLY",
+      "required_fact": "한이음 제출 범위에서 사용하는 데이터의 실제 출처, 권리·동의 보유 여부와 통제 원본 식별자",
+      "status": "OPEN"
+    },
+    {
+      "artifact_type_code": "DLV-AIML-02",
+      "policy_effect": "NO_POLICY_REOPEN",
+      "request_id": "PHASE0-EFR-AIML-02",
+      "request_kind": "EVIDENCE_FACT_ONLY",
+      "required_fact": "한이음 제출·시연에 결속할 실제 데이터셋 식별자, 버전, 범위와 현재 가용 상태",
+      "status": "OPEN"
+    },
+    {
+      "artifact_type_code": "DLV-AIML-03",
+      "policy_effect": "NO_POLICY_REOPEN",
+      "request_id": "PHASE0-EFR-AIML-03",
+      "request_kind": "EVIDENCE_FACT_ONLY",
+      "required_fact": "출처별 실제 라이선스·동의·사용 허용 범위와 증거 locator",
+      "status": "OPEN"
+    }
+  ],
+  "phase": "PHASE0",
+  "phase0": {
+    "acceptance_contract_binding_status": "BOUND_257_INDEPENDENTLY_REVIEWED",
+    "analysis_status": "BASELINE_COMPLETE_CONTENT_ACCEPTANCE_OPEN",
+    "artifact_ledger_record_count": 257,
+    "complete": true,
+    "complete_semantics": "PHASE0_BASELINE_ONLY",
+    "independent_review": {
+      "byte_length": 3129,
+      "finding_counts": {
+        "BLOCKING": 0,
+        "INFORMATIONAL": 0,
+        "MAJOR": 0,
+        "MINOR": 0
+      },
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase0-independent-review.md",
+      "sha256": "65b321e76710f22e8cb889c27eb69f45974350afccff9848da6a95695bcacdc5",
+      "verdict": "GO_PHASE0_BASELINE_ALLOWED"
+    },
+    "independent_review_status": "GO_PHASE0_BASELINE_ALLOWED",
+    "policy_questions_reopened": false,
+    "policy_questions_unresolved": 0,
+    "provisional_reclassification_status": "RECORDED",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "scope_completion_freeze_status": "FROZEN",
+    "unsupported_completion_claim_count": 0
+  },
+  "phase0_baseline_complete": true,
+  "prepared_on": "2026-07-27",
+  "resource_pilot": {
+    "actual_device_credit": false,
+    "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+    "admission_status": "CONDITIONAL",
+    "boundary_binding": {
+      "byte_length": 5135,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/resource-pilot-boundary.json",
+      "sha256": "d7e38de6a97c1ebb2bec5bb9550a30910ae6be7b2322b8f8c8198aa80698c79a",
+      "subject_role": "RESOURCE_ADMISSION_BOUNDARY"
+    },
+    "capture_limits": {
+      "execution_start_end_times": "NOT_CAPTURED",
+      "execution_time_subject_bytes": "NOT_CAPTURED",
+      "gateway_capture": "CAPTURE_INCOMPLETE",
+      "gradle_daemon_rss": "PARTIAL_NOT_PROCESS_TREE_CEILING",
+      "tool_versions": "NOT_CAPTURED"
+    },
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "heavy_execution_allowed": false,
+    "next_allowed_level": "MODERATE_SINGLE_LANE",
+    "observed_outputs": {
+      "fresh_admin": {
+        "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+        "observed_internal_test_output": "PASS",
+        "passed": 38,
+        "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+        "tests": 38
+      },
+      "fresh_user": {
+        "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+        "observed_internal_test_output": "PASS",
+        "passed": 728,
+        "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+        "tests": 728
+      },
+      "gateway": {
+        "admissible_test_result": "NOT_ESTABLISHED_CAPTURE_INCOMPLETE",
+        "admission_status": "CONDITIONAL",
+        "capture_status": "CAPTURE_INCOMPLETE",
+        "child_passed": 62,
+        "child_process_output_observed": "62_PASS",
+        "child_tests": 62,
+        "raw_log_preserved": false,
+        "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+        "wrapper_exit_status": 1
+      },
+      "up_to_date_admin": {
+        "admissible_current_subject_test_result": "NOT_ESTABLISHED_NO_FRESH_EXECUTION",
+        "fresh_execution_credit": false,
+        "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+        "task_result": "UP_TO_DATE"
+      },
+      "up_to_date_user": {
+        "admissible_current_subject_test_result": "NOT_ESTABLISHED_NO_FRESH_EXECUTION",
+        "fresh_execution_credit": false,
+        "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+        "task_result": "UP_TO_DATE"
+      }
+    },
+    "production_credit": false,
+    "receipt_bindings": [
+      {
+        "byte_length": 3715,
+        "captured_at": "2026-07-27T19:55:52+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-admin-unit-fresh-receipt.json",
+        "sha256": "52e76007d7c6fa126e74a202d92ce10056662c758a0f85487c8e859b94b3d772",
+        "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+      },
+      {
+        "byte_length": 3519,
+        "captured_at": "2026-07-27T19:55:52+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-admin-unit-receipt.json",
+        "sha256": "eb1bd303e9556ce003f497aa3482a7fb6d2535278906cbce7bd1177020e897ae",
+        "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+      },
+      {
+        "byte_length": 3154,
+        "captured_at": "2026-07-27T19:55:52+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-gateway-npm-test-receipt.json",
+        "sha256": "358f969b8444322b5ed4c5f4755feabca3a8050d9def05d68d6d8f547e89127a",
+        "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+      },
+      {
+        "byte_length": 3650,
+        "captured_at": "2026-07-27T19:55:52+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+        "sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c",
+        "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+      },
+      {
+        "byte_length": 3508,
+        "captured_at": "2026-07-27T19:55:52+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-receipt.json",
+        "sha256": "eb307c9c4f151ff363e332bb0a7eee0995e00a4c85ce72bdf2889e66eefef111",
+        "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+      }
+    ],
+    "release_credit": false,
+    "resource_pilot_run": true,
+    "single_lane_only": true,
+    "subject_manifest_bindings": [
+      {
+        "byte_length": 5945,
+        "captured_at": "2026-07-27T19:41:59+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android-gateway.json",
+        "sha256": "a7b7d8823df835e4f2a94c97a002e054c22ec8b107034b66057e0e4532b39e93",
+        "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+      },
+      {
+        "byte_length": 61975,
+        "captured_at": "2026-07-27T19:41:59+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+        "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+        "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+      }
+    ],
+    "up_to_date_fresh_execution_credit": 0
+  },
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.artifact-closure.run-state.v3",
+  "scope_id": "HANIUM_SUBMISSION_AND_DEMO",
+  "serialization_contract": {
+    "encoding": "UTF-8",
+    "final_lf": true,
+    "json_key_order": "LEXICOGRAPHIC_SORT_KEYS",
+    "line_ending": "LF"
+  },
+  "source_snapshot": {
+    "byte_length": 1097484,
+    "path": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+    "raw_sha256": "481339c99f26055f6bbb008a3f4831c029013d2275e0e4a61cab4f7d30444947",
+    "record_count": 257,
+    "snapshot_id": "WS-FINAL-257-SUCCESSOR-20260727-001"
+  },
+  "status": "PHASE0_BASELINE_COMPLETE_CONTENT_ACCEPTANCE_REMEDIATION_RESOURCE_PILOT_RECORDED"
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=WalkSafe field telemetry and test capture retention
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=walksafe
+Group=walksafe
+WorkingDirectory=/srv/walksafe
+EnvironmentFile=/etc/walksafe/walksafe.env
+ExecStart=/srv/walksafe/scripts/run_walksafe_log_retention_20260711.sh
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/walksafe/artifacts /var/lib/walksafe

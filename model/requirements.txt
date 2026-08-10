@@ -1,0 +1,4 @@
+ultralytics==8.4.48
+onnx==1.21.0
+onnxruntime==1.26.0
+huggingface_hub==1.14.0

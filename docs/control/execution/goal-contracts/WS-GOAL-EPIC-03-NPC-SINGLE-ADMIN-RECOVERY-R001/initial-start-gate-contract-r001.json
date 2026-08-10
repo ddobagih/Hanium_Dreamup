@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INITIAL-START-GATE-CONTRACT-20260810-001",
+  "contract_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-START-GATE-R001",
+  "contract_version": "2026-08-10.1",
+  "target_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "target_goal_content_sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+  "gate_purpose": "INITIAL_START",
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "V24_ARTIFACT_WORK_QUEUE",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -c 'from pathlib import Path; from scripts import check_walksafe_goal_graph_v2_4 as g; root=Path(\".\").resolve(); checkpoint=g.continuation.load_json(root/g.continuation.V24_CHECKPOINT_RELATIVE); errors=g.validate_v24_artifact_work_queue(root, checkpoint); print(\"WalkSafe v2.4 artifact work queue check: PASS\" if not errors else \"\\n\".join([\"WalkSafe v2.4 artifact work queue check: FAIL\", *[f\"- {error}\" for error in errors]])); raise SystemExit(bool(errors))'"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_20260711.sh validate"
+    },
+    {
+      "check_id": "BACKEND_TEST_DATABASE_PREFLIGHT",
+      "command": ": \"${WALKSAFE_TEST_DATABASE_URL:?required dedicated test database}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_test_database_20260713.py && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=\"${WALKSAFE_TEST_DATABASE_URL}\" /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m alembic -c backend/alembic.ini upgrade head"
+    },
+    {
+      "check_id": "BACKEND_ADMIN_SECURITY_RECOVERY_POSTGRES",
+      "command": ": \"${WALKSAFE_TEST_DATABASE_URL:?required dedicated test database}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. WALKSAFE_TEST_DATABASE_URL=\"${WALKSAFE_TEST_DATABASE_URL}\" /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q backend/tests/test_admin_security.py"
+    },
+    {
+      "check_id": "ANDROID_ADMIN_INTERNAL",
+      "command": "(cd apps/android && ./gradlew --offline --no-daemon --max-workers=1 :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug)"
+    },
+    {
+      "check_id": "ROOT_NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py tests/test_apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py tests/test_walksafe_project_continuation_v2_4.py"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\""
+    }
+  ]
+}

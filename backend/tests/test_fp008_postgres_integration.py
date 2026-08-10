@@ -1,0 +1,412 @@
+from __future__ import annotations
+
+import base64
+from datetime import datetime, timedelta, timezone
+import hashlib
+import os
+import uuid
+
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+import pytest
+from sqlalchemy import create_engine, func, select, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import sessionmaker
+
+from backend.app.models import (
+    AdminDeviceKey,
+    AdminSecurityAudit,
+    Base,
+    Report,
+    ReportInstitutionDeliveryEvent,
+    ReportReviewDecision,
+)
+from backend.app.schemas import (
+    ReportInstitutionDeliveryRequest,
+    ReportReviewDecisionRequest,
+)
+from backend.app.services.admin_device_proof import (
+    AdminDeviceProofService,
+    canonical_admin_query_sha256,
+    provision_admin_device_key,
+    raw_body_sha256,
+    verify_admin_device_proof,
+)
+from backend.app.services.admin_report_workflow import (
+    AdminReportWorkflowError,
+    append_report_institution_delivery_event,
+    append_report_review_decision,
+    list_report_institution_delivery_events,
+    list_report_review_decisions,
+)
+from backend.app.services.admin_security import (
+    AdminSecurityError,
+    AdminSessionIdentity,
+    record_admin_security_failure,
+)
+
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+
+
+def _session_factory():
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"].strip(),
+        pool_pre_ping=True,
+    )
+    return engine, sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _identity(admin_id: str, device_id: str) -> AdminSessionIdentity:
+    now = datetime.now(timezone.utc)
+    return AdminSessionIdentity(
+        admin_id=admin_id,
+        session_id=uuid.uuid4(),
+        device_id=device_id,
+        device_label="FP-008 PostgreSQL integration",
+        expires_at=now + timedelta(hours=1),
+        step_up_verified_at=None,
+    )
+
+
+def _spki(private_key: ec.EllipticCurvePrivateKey) -> bytes:
+    return private_key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def _rfc3339_utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
+    engine, SessionFactory = _session_factory()
+    table_names = {
+        "admin_device_keys",
+        "admin_device_proof_challenges",
+        "report_review_decisions",
+        "report_institution_delivery_events",
+    }
+
+    def include_fp008(obj, name, type_, reflected, compare_to):
+        del reflected, compare_to
+        if type_ == "table":
+            return name in table_names
+        table = getattr(obj, "table", None)
+        return table is not None and table.name in table_names
+
+    with engine.connect() as connection:
+        differences = compare_metadata(
+            MigrationContext.configure(
+                connection,
+                opts={"include_object": include_fp008},
+            ),
+            Base.metadata,
+        )
+    assert differences == []
+
+    suffix = uuid.uuid4().hex[:12]
+    admin_id = f"fp008.admin.{suffix}"
+    device_id = f"fp008-device-{suffix}"
+    identity = _identity(admin_id, device_id)
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    spki = _spki(private_key)
+    with SessionFactory() as db:
+        provisioned = provision_admin_device_key(
+            db,
+            admin_id=admin_id,
+            device_id=device_id,
+            key_version=1,
+            public_key_spki_der=spki,
+        )
+
+    report_id = uuid.uuid4()
+    correlation_id = uuid.uuid4()
+    body = b'{"decision":"APPROVED"}'
+    now = datetime.now(timezone.utc)
+    with SessionFactory() as db:
+        response = AdminDeviceProofService(db).issue_challenge(
+            purpose="ACTION",
+            action="report.review.decide",
+            admin_id=admin_id,
+            body_sha256=raw_body_sha256(body),
+            correlation_id=str(correlation_id),
+            device_id=device_id,
+            device_key_marker=provisioned.key_marker,
+            device_key_version=1,
+            method="POST",
+            path=f"/reports/{report_id}/review-decisions",
+            query_sha256=canonical_admin_query_sha256(b""),
+            read_purpose=None,
+            session_id=str(identity.session_id),
+            identity=identity,
+            now=now,
+        )
+    signature = base64.urlsafe_b64encode(
+        private_key.sign(
+            response["signing_payload"].encode("utf-8"),
+            ec.ECDSA(hashes.SHA256()),
+        )
+    ).decode("ascii").rstrip("=")
+
+    with SessionFactory.begin() as db:
+        verified = verify_admin_device_proof(
+            db,
+            challenge_id=response["challenge_id"],
+            signature=signature,
+            correlation_id=str(correlation_id),
+            expected_purpose="ACTION",
+            expected_action="report.review.decide",
+            expected_admin_id=admin_id,
+            expected_device_id=device_id,
+            expected_session_id=identity.session_id,
+            expected_method="POST",
+            expected_path=f"/reports/{report_id}/review-decisions",
+            expected_read_purpose=None,
+            raw_body=body,
+            raw_query_string=b"",
+            now=now + timedelta(seconds=1),
+        )
+    assert verified.challenge_id == uuid.UUID(response["challenge_id"])
+
+    with pytest.raises(AdminSecurityError, match="already consumed"):
+        with SessionFactory.begin() as db:
+            verify_admin_device_proof(
+                db,
+                challenge_id=response["challenge_id"],
+                signature=signature,
+                correlation_id=str(correlation_id),
+                expected_purpose="ACTION",
+                expected_action="report.review.decide",
+                expected_admin_id=admin_id,
+                expected_device_id=device_id,
+                expected_session_id=identity.session_id,
+                expected_method="POST",
+                expected_path=f"/reports/{report_id}/review-decisions",
+                expected_read_purpose=None,
+                raw_body=body,
+                raw_query_string=b"",
+                now=now + timedelta(seconds=2),
+            )
+
+    second_private_key = ec.generate_private_key(ec.SECP256R1())
+    second_spki = _spki(second_private_key)
+    with pytest.raises(IntegrityError):
+        with SessionFactory.begin() as db:
+            db.add(
+                AdminDeviceKey(
+                    admin_id=admin_id,
+                    device_id=device_id,
+                    key_version=2,
+                    public_key_spki_der=second_spki,
+                    key_marker=hashlib.sha256(second_spki).hexdigest(),
+                    status="ACTIVE",
+                )
+            )
+    with SessionFactory() as db:
+        active_count = db.scalar(
+            select(func.count())
+            .select_from(AdminDeviceKey)
+            .where(
+                AdminDeviceKey.admin_id == admin_id,
+                AdminDeviceKey.device_id == device_id,
+                AdminDeviceKey.status == "ACTIVE",
+            )
+        )
+    assert active_count == 1
+    engine.dispose()
+
+
+def test_fp008_postgres_review_delivery_authority_and_append_only_history() -> None:
+    engine, SessionFactory = _session_factory()
+    suffix = uuid.uuid4().hex[:12]
+    identity = _identity(f"fp008.admin.{suffix}", f"fp008-device-{suffix}")
+    report_id = uuid.uuid4()
+    captured_at = datetime.now(timezone.utc)
+    with SessionFactory.begin() as db:
+        db.add(
+            Report(
+                id=report_id,
+                status="resolved",
+                class_id=0,
+                class_name="damaged_tactile_block",
+                confidence=0.9,
+                bbox_x=0.1,
+                bbox_y=0.1,
+                bbox_width=0.5,
+                bbox_height=0.5,
+                captured_at=captured_at,
+                source="android",
+                image_path=f"{report_id}.wse",
+                image_content_type="image/jpeg",
+                payload={"agency_review_verified": True},
+            )
+        )
+
+    approved_request = ReportReviewDecisionRequest(
+        decision="APPROVED",
+        reason="위치·사진·개인정보 검수를 완료함",
+        duplicate_of_report_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    with SessionFactory() as db:
+        approved = append_report_review_decision(
+            db,
+            report_id=report_id,
+            payload=approved_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+            now=captured_at + timedelta(seconds=1),
+        )
+
+    first_key = uuid.uuid4()
+    submitted_request = ReportInstitutionDeliveryRequest(
+        institution="보행환경 담당 기관",
+        channel="official_document",
+        recipient="안전관리 담당자",
+        status="SUBMITTED",
+        external_receipt_id=None,
+        reason="관리자 외부 수동 전달 사실을 기록함",
+        evidence_sha256=None,
+        observed_at=_rfc3339_utc(captured_at + timedelta(seconds=2)),
+        expected_revision=0,
+        idempotency_key=first_key,
+    )
+    with SessionFactory() as db:
+        submitted = append_report_institution_delivery_event(
+            db,
+            report_id=report_id,
+            payload=submitted_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+    with SessionFactory() as db:
+        retried = append_report_institution_delivery_event(
+            db,
+            report_id=report_id,
+            payload=submitted_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+    assert retried.id == submitted.id
+
+    acknowledged_request = ReportInstitutionDeliveryRequest(
+        institution="보행환경 담당 기관",
+        channel="official_document",
+        recipient="안전관리 담당자",
+        status="ACKNOWLEDGED",
+        external_receipt_id="receipt-fp008-001",
+        reason="기관 접수번호를 수동 확인해 상태를 기록함",
+        evidence_sha256="a" * 64,
+        observed_at=_rfc3339_utc(captured_at + timedelta(seconds=3)),
+        expected_revision=1,
+        idempotency_key=uuid.uuid4(),
+    )
+    with SessionFactory() as db:
+        acknowledged = append_report_institution_delivery_event(
+            db,
+            report_id=report_id,
+            payload=acknowledged_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+    assert acknowledged.revision == 2
+    assert acknowledged.review_decision_id == approved.id
+
+    rejected_request = ReportReviewDecisionRequest(
+        decision="REJECTED",
+        reason="추가 확인 결과 기관 전달 승인을 철회함",
+        duplicate_of_report_id=None,
+        location_reviewed=True,
+        photo_reviewed=True,
+        privacy_reviewed=True,
+    )
+    with SessionFactory() as db:
+        append_report_review_decision(
+            db,
+            report_id=report_id,
+            payload=rejected_request,
+            identity=identity,
+            correlation_id=uuid.uuid4(),
+        )
+    blocked_request = ReportInstitutionDeliveryRequest(
+        institution="보행환경 담당 기관",
+        channel="official_document",
+        recipient="안전관리 담당자",
+        status="RESOLVED",
+        external_receipt_id="receipt-fp008-001",
+        reason="최신 승인 철회 후에는 전달 이력을 추가할 수 없음",
+        evidence_sha256=None,
+        observed_at=_rfc3339_utc(captured_at + timedelta(seconds=4)),
+        expected_revision=2,
+        idempotency_key=uuid.uuid4(),
+    )
+    with pytest.raises(AdminReportWorkflowError) as blocked:
+        with SessionFactory() as db:
+            append_report_institution_delivery_event(
+                db,
+                report_id=report_id,
+                payload=blocked_request,
+                identity=identity,
+                correlation_id=uuid.uuid4(),
+            )
+    assert blocked.value.code == "latest_review_approval_required"
+
+    with pytest.raises(SQLAlchemyError):
+        with SessionFactory.begin() as db:
+            db.execute(
+                update(ReportReviewDecision)
+                .where(ReportReviewDecision.id == approved.id)
+                .values(reason="append-only violation")
+            )
+    with pytest.raises(SQLAlchemyError):
+        with SessionFactory.begin() as db:
+            event = db.get(ReportInstitutionDeliveryEvent, submitted.id)
+            assert event is not None
+            db.delete(event)
+            db.flush()
+
+    with SessionFactory() as db:
+        decisions = list_report_review_decisions(db, report_id=report_id)
+        deliveries = list_report_institution_delivery_events(db, report_id=report_id)
+    assert [item.revision for item in decisions] == [1, 2]
+    assert decisions[0].reason == approved_request.reason
+    assert [item.status for item in deliveries] == ["SUBMITTED", "ACKNOWLEDGED"]
+
+    failure_correlation_id = uuid.uuid4()
+    record_admin_security_failure(
+        action="report.delivery.create",
+        reason="latest_review_approval_required",
+        outcome="DENIED",
+        method="POST",
+        path=f"/reports/{report_id}/deliveries",
+        admin_id=identity.admin_id,
+        session_id=identity.session_id,
+        device_id=identity.device_id,
+        correlation_id=failure_correlation_id,
+    )
+    with SessionFactory() as db:
+        failure_audit = db.execute(
+            select(AdminSecurityAudit)
+            .where(
+                AdminSecurityAudit.action == "report.delivery.create",
+                AdminSecurityAudit.admin_id == identity.admin_id,
+            )
+            .order_by(AdminSecurityAudit.sequence.desc())
+        ).scalars().first()
+    assert failure_audit is not None
+    assert failure_audit.outcome == "DENIED"
+    assert failure_audit.session_id == identity.session_id
+    assert failure_audit.device_id == identity.device_id
+    assert failure_audit.details["admin_alert_required"] is True
+    assert failure_audit.details["alert_channel"] == "ADMIN_API_RESPONSE"
+    assert failure_audit.details["correlation_id"] == str(failure_correlation_id)
+    engine.dispose()

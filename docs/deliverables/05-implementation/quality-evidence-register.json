@@ -1,0 +1,1235 @@
+{
+  "schema_version": "walksafe.dev-quality-evidence-register.v1",
+  "metadata": {
+    "title": "WalkSafe 개발 품질·공급망 증거 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "DEV-15",
+      "DEV-16",
+      "DEV-19",
+      "DEV-20"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "code_review": {
+    "applicability_status": "ACTIVE_DRAFT_SINGLE_DEVELOPER_CONTROL",
+    "records": [],
+    "single_developer_rule": "작성·재검토 시점을 나누고 diff·checklist·자동검사·rollback 계획을 기록한다. 없는 독립 검토자를 기록하지 않는다.",
+    "note": "이 파일은 빈 Draft snapshot이다. 정식 기록은 별도 append-only instance로 만들며 과거 기록을 자동 승인 증거로 쓰지 않는다."
+  },
+  "lint_static_analysis": {
+    "status": "NOT_RUN_FOR_FORMAL_BASELINE",
+    "evidence": []
+  },
+  "sbom": {
+    "status": "NOT_GENERATED_FOR_FORMAL_BUILD",
+    "evidence": []
+  },
+  "provenance": {
+    "status": "NOT_GENERATED_FOR_FORMAL_BUILD",
+    "evidence": []
+  },
+  "candidate_test_sources": [
+    {
+      "path": "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteDeviceSmokeTest.kt",
+      "sha256": "bb00f2d282f5a6b891df6bf73a182821cdcb461187b369a9600342f9a9cbf24a",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AndroidRiskSelectionPolicyTest.kt",
+      "sha256": "522baf13f0924043afbe7472a3d2d2d125c59d43e287d4e36a6ba3b8a2c0fbb6",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ArCoreAvailabilityPolicyTest.kt",
+      "sha256": "8c6f751403120c6e747cc3c53d623accbd9246277896ac5725b2ff830ad8baf8",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/BuildProvenanceStaticTest.kt",
+      "sha256": "1f68d6977bf44e828a77d5fe193ee1e713c36fb6ee4cf2e2245b9649a33d1464",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+      "sha256": "1adf6b795861e18e2344419b7b73190d06946cf543a107cf3028619630bc6141",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "sha256": "00343190f9b2145303e375405bc41f23d19ae79aafef98940ac0b236943e9d87",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+      "sha256": "b81bfd2c81f9fc9a5f63b414fc13e439a34397e89399fb06d9c05bbc2b5dd4a6",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MetadataCaptureLogTest.kt",
+      "sha256": "65b2539e8fd0a4af234a78699e1f71418d54be85bc5ada968e4c2d3a7f782546",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploaderTest.kt",
+      "sha256": "3e2981c8195a4fd0e76c512ba1dd745f4b8378e5864c9e26c03ab3910c1be118",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/MetadataLogJsonEncoderTest.kt",
+      "sha256": "e569e7e309777068e2902a3bb2b15ce57d1f50338bc545c6a11181cd5bc778a7",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/CoordinateMapperTest.kt",
+      "sha256": "eb338d5c2a1b7b93cc42d220f53aeddbac688217aa6793ec030a2caacb549687",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthEstimatorTest.kt",
+      "sha256": "44fca0acad9ac33d6b67408af3120cb328b6c1a1e3c5fac8d1e297485b719c8b",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthSamplerTest.kt",
+      "sha256": "76e717dd7f084d257553cde4ef4cfd99a78a7804cce48a89c8c3f02f5f06b618",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthSmokePipeline.kt",
+      "sha256": "200c76318a2b3fa6d5e9fad550964ee1fd3ddc5e54b9187a95e5a284be92a748",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthSmokePipelineTest.kt",
+      "sha256": "31db89d1d42e414050a9f1483c2fe542ccd3a355dd1a8aa34f02d769c05db094",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicyTest.kt",
+      "sha256": "e06efb9d593d841726bd40f3379455a6f8c6b5b46c727992ff3089f6cdecb97e",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/MotionContextTest.kt",
+      "sha256": "5d1d0f89c1c51ab3ec6362cb53957d159eb312a9ee932c7b80faa354d1db1ec8",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/ObjectDepthRuntimePipelineTest.kt",
+      "sha256": "1ca990101ec1de84e9cf7142894d0badab438eae738dcba082b8b327be5c116d",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/ObjectTrackerTest.kt",
+      "sha256": "8a84218032707651c25246cc37ea71bfdc1c67049b354683e50684decf6e37e4",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/TactilePathPolicyTest.kt",
+      "sha256": "2d66b503283fdf79f83dd0027d4cc55cdb4750ce091ded6bcffff0987fe4cd7b",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/TrackingRiskPolicyTest.kt",
+      "sha256": "838cadf8353182d850b7e17cd4c064ae94daff75751270eece7d9902bc9ff7eb",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapabilityTest.kt",
+      "sha256": "40bc71693b1d43275522959a7ee007ac9c1b841742e223df0b398e0ffe011fcd",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/DeviceGateTest.kt",
+      "sha256": "37bba2da33bf88989806e0d977f78bc5174b88f608fd53cf979b29ee62ed5c3f",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuatorStaticTest.kt",
+      "sha256": "81be006463ba9a3532867a90727d3ebf1511879403b8510782db66bb68a3c922",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicyTest.kt",
+      "sha256": "10282d07d20d0376111134a787c96a51e939af41247e22a3000657eecc0e7a67",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/NavigationSpeechDeliveryTest.kt",
+      "sha256": "52dce1f178d25de525de634acfa6abfe7b66033e58def0032f74109bb5e1827e",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/PendingSpeechQueueTest.kt",
+      "sha256": "d069f57a4172c9a875f00dbc6b1c96b99e71b4fc5b6b0e0bdc8311ddc9b2b226",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/UtteranceCallbackRegistryTest.kt",
+      "sha256": "9283cca9274625c9424b2d8b25b0cfb9dabd2a9b78db17275bcb7aa827c6c461",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicyTest.kt",
+      "sha256": "cb7683d85cd807fb54649ef13935889ff34e9fbfc1764d79d6080a883f9813de",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+      "sha256": "17dce1211a62d8853b56829112738ed9615a9dd7f0d953363a5c01ef760ab820",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/DetectorRuntimeSupervisorTest.kt",
+      "sha256": "2a8cd54100eda689c6e9823cfbbec217dadb9e5f341dcfe81e30938c9f6cf28d",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelRuntimeConfigTest.kt",
+      "sha256": "7a54711b38f9300a7f9f8df97d6a878164ce441c120ddb8caacaca6220966fe0",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteAssetContractTest.kt",
+      "sha256": "f2ec08096729e2caeb0703d2771861656ecd1b39014b299fdd32fa078a0b456c",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/YoloEndToEndOutputParserTest.kt",
+      "sha256": "710a4cbd636b325799461d4f7ffb215f63ae21a52ef832feb26c8f2068e5e101",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/YuvImagePreprocessorTest.kt",
+      "sha256": "085659c41918810d334ecdf1788dca4d31f4dc329dc2df48e6c7685d1c92e5cf",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidanceTest.kt",
+      "sha256": "c2754304ca5fa7f5a6dc633981a7c3e9dae5f70f8dacb5cc185ae75f113b00e9",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommandTest.kt",
+      "sha256": "d4c10c7b206b4706c6a4514065b79efb83a22b42f059fa605621bf8e1db9fdf3",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactoryTest.kt",
+      "sha256": "5bbb10d9534b16325974d6d6b25d9e0c892f7f1620a3331945d9ff7a9c469b24",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientNetworkTest.kt",
+      "sha256": "045c5519f3293dde83471c251de7705e0689cd46a3890367980cfb401fb364f8",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientTest.kt",
+      "sha256": "511812bfc4ad42b70a11b432fe78dcea42c1e0d85d8c26fe476c0ffb44961739",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicyTest.kt",
+      "sha256": "39a7b33552203aeba6ec25adad9cffdb05d5326f23d8e7752c3f7e69d6551f31",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigatorTest.kt",
+      "sha256": "ae963053cfcbab67a7092e3605f8c8570cc519a06c934d48e052f63be85c6cff",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimatorTest.kt",
+      "sha256": "315dc879c8d5c780125e75f36997b89ef9a78125f1b97a81bb7f742a8d873a35",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicyTest.kt",
+      "sha256": "db8a28c81997e239a34552df7304a6e5536d9466335d363544ef2fd5cd5d1461",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayEndpointPolicyTest.kt",
+      "sha256": "220af4930f360a0a579e0ca817070eebe173bb216f0bd762a02b28bec86c1c35",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "sha256": "64970907e96316ad6b92fd3cbf90c1483d803d6a22ee0c619735a3b2911f1367",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/LocalHttpTestServer.kt",
+      "sha256": "2019134115fbc2e2d666f247fcfdbd8b8f2ef24ef41596e096f04630e15efcac",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicyTest.kt",
+      "sha256": "03e00799b55ac534c132b39aa0738d7b6ecaad100f331da75f9f2a564f557522",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicyTest.kt",
+      "sha256": "94981b5eb45c0873b6e8e4f9eab1bedb633b5f1d0c322b1847f596fe8ebe850e",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+      "sha256": "96ec030a7178497dd42fddfc1a473c87b33b584ffa278b5025f0b714cb517e77",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "sha256": "59fbffefcb55ee48ce64d7532354e8012b5c59ecaeecb91fe5c05a09026450d0",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "sha256": "ddeed74408ef64d0fa79d3d12d882a4d15cfb544ad9cffaec5c4c9c7296450a8",
+      "scope": "ANDROID_USER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/admin-report-summary-policy.test.ts",
+      "sha256": "18ce6b9c7723d03ef82977261afaa814afd40902be95b65ea21fb8730260ebf0",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/api-client-contract-policy.test.ts",
+      "sha256": "0eab44244e0f5cd6efdbda8660af900ae566e79d0d81e14d72ce7ea881810a32",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/auto-report-v2-policy.test.ts",
+      "sha256": "849d1e1011d7beab4c2f50eaede684b47a8ad16b116c09b756204fbb1c5bc598",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/field-telemetry-policy.test.ts",
+      "sha256": "7a65e1f9719abdeeb7487b246a6b45e4be087f747adeb4381f34a205335fdb8f",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/field-test-gateway-policy.test.ts",
+      "sha256": "3f30eed826fee6a134a2b97cd46d687f8adb3ed2a10b24e84603e7cbb414b653",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/image-upload-admission-policy.test.ts",
+      "sha256": "95ea61456b97561540a7c16252b468c4a7358d340b0bf4c17cedb383b772651f",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/motion-projection-policy.test.ts",
+      "sha256": "fcdb6c6a111717984dad9ca913331c7b186bfe93fc0517d08b447e60d0e01530",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/navigation-destination-policy.test.ts",
+      "sha256": "7a13aa953c67bdf0b8673a5db24532443d7de027c3664fb373f503baa455c52e",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/navigation-guidance-policy.test.ts",
+      "sha256": "bd5233fe80ca24586275c3345151ca51b9e2ad7e754649b95e4d24d9e79928f3",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/offline-report-queue-policy.test.ts",
+      "sha256": "434815f0dc6209744e158f8a28b01dd36bea2bc3c2ff6af457bdb280f3983928",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/pwa-release-version-policy.test.ts",
+      "sha256": "0467013e9d9488a3af4a5d69770f4e80819b20577618743078d017ab5376804e",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/pwa-status-policy.test.ts",
+      "sha256": "9527792d2f586d502e9cacf7ae9edf2a22f4a0508d5df6274c8c9c267de3156d",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/risk-evaluator-policy.test.ts",
+      "sha256": "aec0ae7d3b7b0e87202e4f0e2876129629d9d129c054d8398c98153b3a97a8ab",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/route-progress-policy.test.ts",
+      "sha256": "c32e907cf8659445a778824a875befb5596d6a7943090a6bdb36c01a6e82ce0b",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/sensor-heading-policy.test.ts",
+      "sha256": "f34bc3d9f2c487fb4e99d8f25794c070345ca2d9ed82983e03a3533d1903d4e3",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/settings-privacy.test.ts",
+      "sha256": "ba4e06af7541bfaf3aba1fa2ce23246f0d58f6676eb80a542ebf4b54d242d7ed",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/step-length-policy.test.ts",
+      "sha256": "28cd4380871e1eb07be389b365c56ab17a31deacb71c58392c64631e1852d96e",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/upstream-base-url-policy.test.ts",
+      "sha256": "36b325f7a03db3939a63f5faa22ae0ea5b8e702b666ea703016438d7fbcc6625",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/voice-intent-executor.test.ts",
+      "sha256": "9264c805f612a782079c1ac4e355df9b348448f55db161e3091119914b98c910",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "apps/web/tests/walksafe-test-log-policy.test.ts",
+      "sha256": "e0f504d20b82ebc1a3f3fb5e97b0c635146dab943e69ec9a3cb57617a6a81168",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_actor_rate_limit_store.py",
+      "sha256": "08c983e2787f7dd9d6d97630e89afac0c17dd26f21bd8b03608507d312a796b5",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_android_debug_logs.py",
+      "sha256": "0109e02ce342e1dcdf174002f1bbeb3644c25955454a58e1d65bbbf15efac326",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_backup_source.py",
+      "sha256": "957bdb90993a38026f7860ae1c01a70acb05c1e8e95c760e643517c30da16c90",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_detect.py",
+      "sha256": "0c4dbd9da4e8071fd65d0ec84801896cb714f1ad56a383845b3cc3f1fa132138",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_detect_v2.py",
+      "sha256": "d6981ec50995d35be3b61b0f7cbd1efe0217b4c7cefd74528ef7b2f497fcb5f0",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_field_test_security.py",
+      "sha256": "ad7a2288e4624c1f72affa902983f17eb7d28e6cd53c528fe64153c9d3c59c68",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_health_readiness.py",
+      "sha256": "26df879d4bc24554979276b1d02a89bd2d8bd1a47404d86c15189e50d0acfa1e",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_inference_process.py",
+      "sha256": "30900ed4198b3243f2df894a646538c175b6058a7407badde35df543e1eddbd6",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_navigation_routes.py",
+      "sha256": "a55ed9b49221351c14c7dda71d08ac84e16b689f6589b645ffd4361eb4b83895",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_openapi_contract.py",
+      "sha256": "d57d216c374495168944b7f1fd6d04c5cb77b92df15f142bf48a78c096b28f89",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_report_policy.py",
+      "sha256": "7f7d654167c6bba57b4f3993c0e661ef67f61f6bcdf5735422c84fd1cada5f17",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_report_retention.py",
+      "sha256": "585d7f3fe0cffe68e233c23d347f2d226661b5e32f65434280fdd3f525373396",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_report_storage_reconciliation.py",
+      "sha256": "0fbcacd4694ba7188422f3790c0cc8d93c4e7bd33d348210311f8458f59972fa",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_reports.py",
+      "sha256": "89bf41555aab8796f824ee4f7be669cde717698f250582b3be7c2b327ec8aa43",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_reports_v2.py",
+      "sha256": "df02544048725504dcd8de0c53e4b6e755ede635ff6ec1c850d8d64c461f4295",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_request_limits.py",
+      "sha256": "c81c8afa761a08dbbf7a4e3a4e52d5a37fb619b587214081566ff34c0338e140",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_test_storage_isolation.py",
+      "sha256": "6ad1f7c501ac5085e8fe63f0d90cba60f4049e64ed66c0f6ba323c0de39880a3",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_uploads.py",
+      "sha256": "300d7e29d6e92f427f7fb3879384408609aa29deff60edab9a3d8d0fd8b83daa",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "backend/tests/test_yolo_inference_adapter.py",
+      "sha256": "18dd9fcaa05390bca64d0858bafd367105352f61faff99a20479084918d9996e",
+      "scope": "SERVER_PRODUCT",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_agency_submission_receipt.py",
+      "sha256": "0082a9ca03e1d82da6c19b4d34ce1078e5092d65fec5fcacfa1155e12e909838",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_aihub183_dataset_integrity.py",
+      "sha256": "6f812ec1e37a6620242fdf6b56c1939435ac048f0e564862fbe9eb452658e726",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_aihub189_depthprediction_offline.py",
+      "sha256": "bc482d8028755cad376891d1ad0019a1301b40c3f8c48e5c998d2cc608d57994",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_android_apk_model_asset_check.py",
+      "sha256": "eba5d1a9456756ffa428d417eca64e330f863bf508c31b126550a7a8cc8264dc",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_android_depth_scaffold_contract.py",
+      "sha256": "d86f75cbf32eba17e05215841282dad7896c6aee827e835fc433cb6ecbfe32e4",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_android_field_session_summary.py",
+      "sha256": "a5b23c385c56eda2e818cc22102a753019ef3467d6672780d2568cf61552face",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_cloudflare_field_runner.py",
+      "sha256": "70ba02657abb02966c9b42503615fbb128df4e0398b4cdea8acb96534fae0834",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_dataset_content_integrity.py",
+      "sha256": "f1bb4f017eacf40d85cc47c5ed12d7fd3f3e82b51fe51cce837d5b2995e1d7c0",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_field_telemetry_retention.py",
+      "sha256": "230eba67cd829fe016a93ee66a5fe0fd7b652f01922eef68f26f98ac8e226a4a",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_local_model_registry.py",
+      "sha256": "7429d7b5a53f54cd03651b7824ddd2112ca8df069e72251282909be5bc10b888",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_pwa_release_update_checker.py",
+      "sha256": "675031df505781b1e1339dd074e364af1ce9cdd99cb3ed30c0c18915ab5ccc3c",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_release_evidence_gate.py",
+      "sha256": "dca7d332f6b6323d08b7715d2f18920121c2da57e993dd13e03591a8b43e99bc",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_report_retention_scheduler.py",
+      "sha256": "2ad0dc186991f958683c8f5a2838eb6e86d468086811b4f633692df58b6f3547",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_runtime_model_integration.py",
+      "sha256": "ce352b1f528b8411932c9007ff8c4b40705b9ca4242085d5d92948290b3b8025",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_submission_build_io.py",
+      "sha256": "6f7213ec41f4500fda24a6e41cce77907cb5496081f6b937aeefd466f99a114f",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_submission_isolated_python.py",
+      "sha256": "dab4a496ad9f8ec9bd93f151fe60d3ebd6f4f908c2dce5b7369a3cd3df3b593e",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_submission_manifest_policy.py",
+      "sha256": "f8f3c4f3959edb2fe48a9fe238ea655930a22a2803ad94453abef272338fcff0",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_submission_promotion.py",
+      "sha256": "f69c96a2d8f7c2967278365f4a743f4b075cbacc2c0b153cfa9c4f470e3bdf98",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_submission_visual_privacy.py",
+      "sha256": "f478198f201336f712b86f9c529394970a334b613022e8c8dbd2377ec6cea66d",
+      "scope": "SUBMISSION_TOOLING",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_tactile_route_policy_contract.py",
+      "sha256": "78bc11f1175872ad748483daebcdbdf548121532e53d29e70f6f8304c0aa7eaf",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_test_contamination_audit.py",
+      "sha256": "f59a4a1b907a195836436baaf6906c42ed647c3d4bc9bd5e91280705d9354b71",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_voice_intents.py",
+      "sha256": "08a6fba4d9f1bc0fb7d291361840061b42c41dccae2c15ae323917b8a28d77da",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_voice_model_integrity.py",
+      "sha256": "4b7f80603a334314d611c77ed72db58af7d77c63e39fcb8a8115ba89c40e6ae8",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_voice_stt_policy.py",
+      "sha256": "86e2b288d218a07e76d1f715a7560184c28def279ceaf3a6eb93478de97704f5",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_voice_stt_server.py",
+      "sha256": "2b1050e0535d80a2610050fa9408dae5688f5bd82cf3469c879e1f730e3dfbb8",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_voice_tts.py",
+      "sha256": "d4b43a94c4f347723cf09967253fc21ae1dd110c7c37e01311c58b92641c40b3",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_backup_integrity.py",
+      "sha256": "07760ab8a3cb383182c7ea1e5f9fa27f79250b3d68109b29f3cf9bc19aa64fa1",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_backup_prune.py",
+      "sha256": "8176b919a00caaed8c84a836c80b10ee07bc03bd0d3a94b8dfe11234301ccc0b",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_environment_identity.py",
+      "sha256": "ba80f6dd083a08cce88b57338f8f96eda081a529771a2fc68f7626b3fa0bf601",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_full_rc_tooling.py",
+      "sha256": "9d6b0215700b2cb3a65a4e0acd0aeee938c06dafdf524d0445d2ee5239231b91",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_isolated_python_bootstrap.py",
+      "sha256": "741f024510e3a28b2471050ff49aa49f7ed20917d4ccfb9b80ff40577cba39df",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_node_toolchain_lock.py",
+      "sha256": "c826addc7a98b1d9bf1f1943402f38310f2e2b1b10d18847bc6a3a52e960d3e1",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_operator_attestation.py",
+      "sha256": "1f6b9d8448a8292553af8c9b3c384aff28d65269e97016310196d9bc61046f15",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_product_quality_receipt.py",
+      "sha256": "02dd9a1d4eec53aea13e58868e939555301344eb0728a6d3b0e188dcc10fce9e",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_walksafe_test_database_preflight.py",
+      "sha256": "a2756e0ae74e01843b44da21a31a6b27c803c95a789038a82f5b8a533e996bec",
+      "scope": "PRODUCT_OR_TOOLING_REVIEW_REQUIRED",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_web_build_manifest.py",
+      "sha256": "3e1493ec80d05dd30c30854c60e8f071b3d0ae47c2af4ec14c049fd8629f8d19",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_web_field_session_summary.py",
+      "sha256": "e597b719d9a434328c5656b85300e7f38a7ec9867c2f675677e84fc6fb462fac",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    },
+    {
+      "path": "tests/test_web_runtime_trace_scope.py",
+      "sha256": "356254c54ffbabc2d9824c51547ab3bec963a2dfca082d2489e849da12b40d36",
+      "scope": "LEGACY_WEB_REFERENCE",
+      "source_kind": "TEST_CODE",
+      "adoption_status": "CANDIDATE_NOT_REVALIDATED",
+      "result_status": "NOT_CLAIMED",
+      "formal_product_pass_eligible": false
+    }
+  ],
+  "candidate_test_source_summary": {
+    "code_file_count": 130,
+    "scope_counts": {
+      "ANDROID_USER_PRODUCT": 52,
+      "LEGACY_WEB_REFERENCE": 24,
+      "PRODUCT_OR_TOOLING_REVIEW_REQUIRED": 29,
+      "SERVER_PRODUCT": 19,
+      "SUBMISSION_TOOLING": 6
+    },
+    "documentation_files_excluded": true,
+    "legacy_sources_count_as_android_release_evidence": false
+  },
+  "instance_storage": {
+    "mode": "APPEND_ONLY_EXTERNAL_INSTANCES",
+    "path_pattern": "docs/deliverables/05-implementation/evidence/<evidence-id>.json",
+    "generated_snapshot_is_edit_target": false
+  },
+  "approval_boundary": {
+    "candidate_sources_are_pass_evidence": false,
+    "formal_quality_evidence_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

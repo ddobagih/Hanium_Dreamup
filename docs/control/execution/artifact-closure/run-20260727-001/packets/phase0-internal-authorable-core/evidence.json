@@ -1,0 +1,319 @@
+{
+  "schema_version": "walksafe.phase0-internal-authorable-evidence.v2",
+  "packet_id": "WS-PHASE0-INTERNAL-AUTHORABLE-CORE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "prepared_at": "2026-07-27T11:13:16.405Z",
+  "packet_status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+  "scope": "HANIUM_SUBMISSION_AND_DEMO",
+  "effective_policy": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "composition": "PB-WALKSAFE-FEATURE-POLICY-1.0.0 + exact FP-035 correction overlay",
+    "decision_register_subject_id": "SRC-EFFECTIVE-POLICY-DECISION-REGISTER"
+  },
+  "boundaries": {
+    "implementation_conformance": "NOT_ASSESSED_BY_THIS_PACKET",
+    "real_measurement": "NOT_MEASURED_UNLESS_EXPLICITLY_IDENTIFIED",
+    "actual_device_execution": "NOT_RUN",
+    "device_support_matrix": "NOT_MEASURED",
+    "device_possession_fact": "USER_FACT_UNVERIFIED_CANDIDATE",
+    "production_execution": "NOT_RUN",
+    "legal_opinion": "NOT_OBTAINED",
+    "release_claimed": false,
+    "external_signature_required_for_hanium_document_authoring": false
+  },
+  "immutable_source_manifest": {
+    "manifest_id": "WS-PHASE0-CORE-SOURCE-MANIFEST-20260727-001",
+    "manifest_type": "IMMUTABLE_INSPECTED_SOURCE_MANIFEST",
+    "capture_time": "2026-07-27T11:13:16.405Z",
+    "hash_algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "fingerprint_input": "this manifest object excluding manifest_sha256",
+    "items": [
+      {
+        "subject_id": "SRC-EFFECTIVE-POLICY-DECISION-REGISTER",
+        "exact_path": "docs/control/decision-interview/walksafe-effective-decision-register-current-20260726-r001.json",
+        "byte_length": 10001,
+        "sha256": "4a448f65280c2cd8cd850a749434f4e124769e47b7b84e31e2e14c58328d2faf",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "INSPECTED_EFFECTIVE_POLICY_CONTROL_SOURCE"
+      },
+      {
+        "subject_id": "SRC-PHASE0-CONTENT-INDEPENDENT-REVIEW",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/phase0-content-independent-review.md",
+        "byte_length": 17730,
+        "sha256": "5d60963ebeeb950bbd05c53b73d4edd33f2b6accad431ca66b32b3125feac259",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "INSPECTED_REMEDIATION_FINDING_SOURCE"
+      },
+      {
+        "subject_id": "SRC-DSC07-PUBLIC-SOURCE-CAPTURE",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase0-internal-authorable-core/dsc07-public-source-capture.json",
+        "byte_length": 5676,
+        "sha256": "bdc718b19066269f25118957efda0194121c7ac1f65899d601b3aedd99b9a3a9",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CONTROLLED_PUBLIC_SOURCE_CAPTURE_RECEIPT_FOR_DLV-DSC-07"
+      }
+    ],
+    "manifest_sha256": "985ea8349abb41e1a24f08f267eb49388b431d83096009b8701f5bf6971b3115"
+  },
+  "immutable_output_manifest": {
+    "manifest_id": "WS-PHASE0-CORE-OUTPUT-MANIFEST-20260727-001",
+    "manifest_type": "IMMUTABLE_CANONICAL_TARGET_OUTPUT_MANIFEST",
+    "manifest_scope": "six unique canonical target files; packet wrapper excluded to avoid recursive output hashing",
+    "capture_time": "2026-07-27T11:13:16.405Z",
+    "hash_algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "fingerprint_input": "this manifest object excluding manifest_sha256",
+    "items": [
+      {
+        "subject_id": "OUT-DLV-DES-21",
+        "exact_path": "docs/deliverables/04-design/security-and-operations-design.md",
+        "byte_length": 81777,
+        "sha256": "3e076d2d0955882752378a3af2af202c33505a9f32571e2d6d8fe0c8293fc4f1",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-DES-21"
+      },
+      {
+        "subject_id": "OUT-DLV-DSC-05-06-07",
+        "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+        "byte_length": 43076,
+        "sha256": "c4ad2df0a0108591ceeea029e10eac8835b9993773c30539994cb6b501471129",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-DSC-05_DLV-DSC-06_DLV-DSC-07"
+      },
+      {
+        "subject_id": "OUT-DLV-DSC-11",
+        "exact_path": "docs/deliverables/02-discovery/product-definition.md",
+        "byte_length": 23179,
+        "sha256": "f0c835ae6ea3f952e4650b978412e06f150384fcbb01268db710767542589e60",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-DSC-11"
+      },
+      {
+        "subject_id": "OUT-DLV-MGT-03",
+        "exact_path": "docs/deliverables/01-management/project-charter.md",
+        "byte_length": 22749,
+        "sha256": "aa71b094be01928fbf830bec5ffda70635a9afdae4876a3afee181eee3522979",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-MGT-03"
+      },
+      {
+        "subject_id": "OUT-DLV-MGT-08",
+        "exact_path": "docs/deliverables/01-management/project-management-plan.md",
+        "byte_length": 35549,
+        "sha256": "5f292543a0749d9734bf64c9a7b2d362091da6dfd7364b513f65a02d47acd1fa",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-MGT-08"
+      },
+      {
+        "subject_id": "OUT-DLV-REQ-12-13-15",
+        "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+        "byte_length": 689364,
+        "sha256": "ad96200ac62d3c1c46ae6e6a092d3dd2d2bd85d954d8af688ea4fe8fef9e5e56",
+        "capture_time": "2026-07-27T11:13:16.405Z",
+        "subject_role": "CANONICAL_TARGET_FOR_DLV-REQ-12_DLV-REQ-13_DLV-REQ-15"
+      }
+    ],
+    "manifest_sha256": "890a5a300246d25962d8300a493ab26bb99b85f7f4d30a7b2f13c10de8168e7d"
+  },
+  "missing_path_assertions": {
+    "assertion_count": 0,
+    "status": "NOT_APPLICABLE_NO_MISSING_PATH_ASSERTIONS_IN_THIS_PACKET"
+  },
+  "dsc07_public_source_boundary": {
+    "inventory_date": "2026-07-27",
+    "capture_receipt_subject_id": "SRC-DSC07-PUBLIC-SOURCE-CAPTURE",
+    "capture_receipt_id": "WS-DSC07-PUBLIC-SOURCE-CAPTURE-20260727-001",
+    "captured_source_count": 2,
+    "request_count_per_requested_url": 1,
+    "source_capture_receipt_status": "BOUND",
+    "content_fingerprint_status": "AVAILABLE_FOR_BOTH_CAPTURED_RESPONSES",
+    "comparison_review_status": "COMPLETED_WITH_LIMITATIONS",
+    "excluded_review_scope": [
+      "APP_INSTALLATION",
+      "FIELD_COMPARISON",
+      "PERFORMANCE_MEASUREMENT",
+      "USER_RESEARCH",
+      "PRICE_TERMS_PRIVACY_LICENSE_REVIEW",
+      "INDEPENDENT_REFETCH"
+    ],
+    "sources": [
+      {
+        "source_id": "DSC07-PUBLIC-LOOKOUT",
+        "requested_url": "https://support.google.com/accessibility/android/answer/9031274?hl=en-GB"
+      },
+      {
+        "source_id": "DSC07-PUBLIC-ACCESSIBILITY-SCANNER",
+        "requested_url": "https://support.google.com/accessibility/android/answer/6376559?hl=en"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "artifact_type_code": "DLV-DES-21",
+      "exact_path": "docs/deliverables/04-design/security-and-operations-design.md",
+      "anchor": "des-21",
+      "canonical_subject_id": "OUT-DLV-DES-21",
+      "predicate": "처리 목적·데이터 주체·수집·전송·저장 노드·제3자 후보·동의·보존·삭제·접근 통제를 설계 흐름으로 명시하고 실제 실행과 법률 의견을 분리한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-05",
+      "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "anchor": "dsc-05",
+      "canonical_subject_id": "OUT-DLV-DSC-05-06-07",
+      "predicate": "정책 기반 proto-persona의 근거·대표 범위·목표·작업·Android 접근성 서비스·환경·고정관념 방지 경계를 명시한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-06",
+      "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "anchor": "dsc-06",
+      "canonical_subject_id": "OUT-DLV-DSC-05-06-07",
+      "predicate": "준비부터 권리행사까지 단계별 시작·종료, 현재 가설, 목표 접점, 실패·복구, 요구 연결을 제공하고 미조사 사실을 구분한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-07",
+      "exact_path": "docs/deliverables/02-discovery/discovery-evidence-and-analysis.md",
+      "anchor": "dsc-07",
+      "canonical_subject_id": "OUT-DLV-DSC-05-06-07",
+      "predicate": "두 공개 페이지의 access-time HTTP receipt와 content fingerprint에 결속된 네 비교 기준을 검토하고 앱 실행·현장·약관·독립 재조회 한계를 분리한다.",
+      "predicate_result": "COMPLETED_WITH_LIMITATIONS_AWAITING_INDEPENDENT_REVIEW",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-DSC-11",
+      "exact_path": "docs/deliverables/02-discovery/product-definition.md",
+      "anchor": "dsc-11",
+      "canonical_subject_id": "OUT-DLV-DSC-11",
+      "predicate": "KPI 계산식·기준 출처·측정일·목표 시점·세그먼트·표본·책임·주기·데이터 한계를 제공하고 미측정값을 NOT_MEASURED로 기록한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-MGT-03",
+      "exact_path": "docs/deliverables/01-management/project-charter.md",
+      "anchor": "mgt-03",
+      "canonical_subject_id": "OUT-DLV-MGT-03",
+      "predicate": "한이음 제출·시연 SMART 목표, 선행·후행 KPI, 계산·주기·출처·미달 대응·완료 판정 권한을 명시한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-MGT-08",
+      "exact_path": "docs/deliverables/01-management/project-management-plan.md",
+      "anchor": "mgt-08",
+      "canonical_subject_id": "OUT-DLV-MGT-08",
+      "predicate": "역할·실기기·GPU·저장소·지도·음성·cloud·검토 비용의 계획·가용성·측정상태·승인·초과 추적을 구분하며 근거 없는 기기 보유를 주장하지 않는다.",
+      "predicate_result": "AUTHORED_WITH_USER_FACT_UNVERIFIED_CANDIDATE_DEVICE_BOUNDARY",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-12",
+      "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+      "anchor": "req-12",
+      "canonical_subject_id": "OUT-DLV-REQ-12-13-15",
+      "predicate": "응답 percentile·FPS·동시사용자·요청량·업로드·저장용량·기기·망 조건과 측정·열화 계약을 현재 미측정 상태와 분리한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-13",
+      "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+      "anchor": "req-13",
+      "canonical_subject_id": "OUT-DLV-REQ-12-13-15",
+      "predicate": "시연·production 가용성, RTO·RPO, 백업·복원, offline/degraded, 장애 고지·에스컬레이션의 목표와 미실행 경계를 명시한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    },
+    {
+      "artifact_type_code": "DLV-REQ-15",
+      "exact_path": "docs/deliverables/03-requirements/system-requirements.md",
+      "anchor": "req-15",
+      "canonical_subject_id": "OUT-DLV-REQ-12-13-15",
+      "predicate": "개인정보·위치·Play·TMAP·Cloud·OSS·모델·데이터·접근성 의무 inventory와 지역·법률검토 상태를 제공하고 법률 의견 미확보를 명시한다.",
+      "predicate_result": "AUTHOR_ASSERTION_NOT_INDEPENDENTLY_REVIEWED",
+      "status": "AUTHORED_AWAITING_REVIEW_AND_APPROVAL",
+      "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+      "approval_role": "PROJECT_APPROVER",
+      "review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+      "approval_status": "NOT_APPROVED"
+    }
+  ],
+  "review_and_approval": {
+    "frozen_subject_artifact_count": 10,
+    "frozen_unique_canonical_target_count": 6,
+    "content_review_status": "NOT_RUN_AGAINST_THIS_FROZEN_SUBJECT_SET",
+    "reviewer_role": "INDEPENDENT_CONTENT_REVIEWER",
+    "approval_status": "NOT_APPROVED",
+    "approval_role": "PROJECT_APPROVER",
+    "next_required_action": "REVIEW_ONLY_THE_SUBJECT_BYTES_BOUND_BY_THE_TWO_MANIFESTS_AND_RECORD_FINDING_DISPOSITIONS_BEFORE_APPROVAL",
+    "finding_dispositions": [
+      {
+        "finding_id": "P0-CONTENT-B-002",
+        "authoring_disposition": "CANDIDATE_FIX_PREPARED",
+        "independent_review_disposition": "PENDING"
+      },
+      {
+        "finding_id": "P0-CONTENT-M-006",
+        "authoring_disposition": "CANDIDATE_FIX_PREPARED",
+        "independent_review_disposition": "PENDING"
+      },
+      {
+        "finding_id": "P0-CONTENT-M-007",
+        "authoring_disposition": "CANDIDATE_FIX_PREPARED",
+        "independent_review_disposition": "PENDING"
+      }
+    ]
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic JSON key order, compact form",
+    "input_projection": "entire evidence JSON document excluding the top-level packet_content_fingerprint member",
+    "excluded_json_paths": [
+      "$.packet_content_fingerprint"
+    ],
+    "non_self_referential": true,
+    "sha256": "9025bd68fe7f5881f1c57d1e55d87650ec02d3e88f21f21f6fadc8c1a67a35dd"
+  }
+}

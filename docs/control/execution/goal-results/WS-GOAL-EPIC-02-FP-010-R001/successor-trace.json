@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-SUCCESSOR-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+  "kind": "SUCCESSOR_TRACE",
+  "status": "PASS",
+  "observed_at": "2026-07-25T02:44:59+09:00",
+  "canonical_update_event_type": "CANONICAL_BINDINGS_UPDATED",
+  "resulting_canonical_bindings": {
+    "IMPLEMENTATION_BACKLOG": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r014.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-014",
+      "file_sha256": "f98ec0f5aa8a7515fb70939569c31175b61652835091046bebf11a87500fd333"
+    },
+    "IMPLEMENTATION_GAP": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260725-r014.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260725-014",
+      "file_sha256": "ce8d05bd68e70b9f8396e96a050a8b54db29df5e229e7621c02c43f879d33fb3"
+    }
+  },
+  "changed_subject_ids_by_role": {
+    "IMPLEMENTATION_BACKLOG": [
+      "FP-010"
+    ],
+    "IMPLEMENTATION_GAP": [
+      "FP-010",
+      "GAP-019"
+    ]
+  },
+  "next_policy_gap_pair": {
+    "source_policy_id": "FP-011",
+    "gap_id": "GAP-020"
+  }
+}

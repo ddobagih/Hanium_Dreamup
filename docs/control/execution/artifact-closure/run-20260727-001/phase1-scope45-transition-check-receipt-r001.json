@@ -1,0 +1,401 @@
+{
+  "application_binding": {
+    "binding_id": "SCOPE45-TRANSITION-APPLICATION-R001",
+    "byte_length": 169355,
+    "observation_basis": "IN_MEMORY_FINAL_OUTPUT_BYTES_BEFORE_ADD_ONLY_WRITE",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+    "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+    "subject_role": "PHASE1_SCOPE45_TRANSITION_APPLICATION_OUTPUT"
+  },
+  "checks": [
+    {
+      "check_id": "SCOPE45-APP-CHK-001",
+      "expected": {
+        "byte_length": 169355,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+        "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae"
+      },
+      "name": "APPLICATION_PHYSICAL_BINDING",
+      "observed": {
+        "byte_length": 169355,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+        "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-002",
+      "expected": {
+        "capture_sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+        "check_count": 16,
+        "check_status": "PASS",
+        "fail_count": 0,
+        "review_verdict": "PASS_FOR_CONTROLLED_SCOPE_TRANSITION_INPUT_ONLY"
+      },
+      "name": "UPSTREAM_SCOPE_CAPTURE_CHAIN",
+      "observed": {
+        "capture_sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+        "check_count": 16,
+        "check_status": "PASS",
+        "fail_count": 0,
+        "review_verdict": "PASS_FOR_CONTROLLED_SCOPE_TRANSITION_INPUT_ONLY"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-003",
+      "expected": {
+        "byte_length": 2498803,
+        "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052"
+      },
+      "name": "R004_LEDGER_BINDING",
+      "observed": {
+        "byte_length": 2498803,
+        "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-004",
+      "expected": {
+        "manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+        "request_bytes": 22897,
+        "request_sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042"
+      },
+      "name": "R003_REQUEST_AND_MANIFEST_BINDING",
+      "observed": {
+        "manifest_sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+        "request_bytes": 22897,
+        "request_sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-005",
+      "expected": {
+        "count": 45,
+        "extra": 0,
+        "missing": 0,
+        "overlap": 0,
+        "unique": 45
+      },
+      "name": "EXACT45_PARTITION",
+      "observed": {
+        "count": 45,
+        "extra": 0,
+        "missing": 0,
+        "overlap": 0,
+        "unique": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-006",
+      "expected": {
+        "A22": 22,
+        "B17": 17,
+        "C6": 6,
+        "total": 45
+      },
+      "name": "QUESTION_GROUP_COUNTS",
+      "observed": {
+        "A22": 22,
+        "B17": 17,
+        "C6": 6,
+        "total": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-007",
+      "expected": {
+        "IN_SCOPE": 43,
+        "OUT_OF_SCOPE_N_A": 2,
+        "total": 45
+      },
+      "name": "DECISION_COUNTS",
+      "observed": {
+        "IN_SCOPE": 43,
+        "OUT_OF_SCOPE_N_A": 2,
+        "total": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-008",
+      "expected": {
+        "INTERNAL_READY": 25,
+        "INTERNAL_RUN_REQUIRED": 8,
+        "REAL_EVENT_PENDING": 10,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "name": "SUCCESSOR_ROUTE_COUNTS",
+      "observed": {
+        "INTERNAL_READY": 25,
+        "INTERNAL_RUN_REQUIRED": 8,
+        "REAL_EVENT_PENDING": 10,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-009",
+      "expected": {
+        "SCOPE_DECISION_PENDING": 45
+      },
+      "name": "PREDECESSOR_ROUTE_EXACT45",
+      "observed": {
+        "SCOPE_DECISION_PENDING": 45
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-010",
+      "expected": {
+        "closure_credit": 0,
+        "closure_open": 43,
+        "content_credit": 0,
+        "execution_credit": 0,
+        "release_credit": 0,
+        "rows": 43
+      },
+      "name": "IN_SCOPE_ZERO_CREDIT_OPEN",
+      "observed": {
+        "closure_credit": 0,
+        "closure_open": 43,
+        "content_credit": 0,
+        "execution_credit": 0,
+        "release_credit": 0,
+        "rows": 43
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-011",
+      "expected": {
+        "closure": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "closure_credit": 2,
+        "compatibility_pass": 2,
+        "ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "route": "SCOPE_N_A_APPROVED"
+      },
+      "name": "NA_EXACT2_COMPATIBILITY_AND_CLOSURE",
+      "observed": {
+        "closure": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "closure_credit": 2,
+        "compatibility_pass": 2,
+        "ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "route": "SCOPE_N_A_APPROVED"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-012",
+      "expected": {
+        "after_sum": 257,
+        "before_sum": 257,
+        "scope_pending_after": 0
+      },
+      "name": "QUEUE_COUNTS_RECONCILE_257",
+      "observed": {
+        "after_sum": 257,
+        "before_sum": 257,
+        "scope_pending_after": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-013",
+      "expected": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14
+      },
+      "name": "UNAFFECTED_ROUTES",
+      "observed": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-014",
+      "expected": {
+        "count": 45,
+        "sha256": "32288eca0c9f2b09cf133f860511682cff91b692ca0e6889a52938c03b1693ca"
+      },
+      "name": "EXACT45_CAPTURE_FINGERPRINT",
+      "observed": {
+        "count": 45,
+        "sha256": "32288eca0c9f2b09cf133f860511682cff91b692ca0e6889a52938c03b1693ca"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-015",
+      "expected": {
+        "projection_byte_length": 135759,
+        "sha256": "d8b05a43d5ed0f106cb23126b0b88bec8bb23b18db2881ed3610e0d1ed2a01cf"
+      },
+      "name": "APPLICATION_NONSELF_INTEGRITY",
+      "observed": {
+        "projection_byte_length": 135759,
+        "sha256": "d8b05a43d5ed0f106cb23126b0b88bec8bb23b18db2881ed3610e0d1ed2a01cf"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "SCOPE45-APP-CHK-016",
+      "expected": {
+        "policy_gate_reopened": false,
+        "release_credit": 0,
+        "release_eligibility": "NOT_ELIGIBLE"
+      },
+      "name": "RELEASE_AND_POLICY_BOUNDARY",
+      "observed": {
+        "policy_gate_reopened": false,
+        "release_credit": 0,
+        "release_eligibility": "NOT_ELIGIBLE"
+      },
+      "status": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "attestation_credit_count": 0,
+    "canonical_predecessor_mutated": false,
+    "content_acceptance_credit_count": 0,
+    "execution_credit_count": 0,
+    "formal_test_credit_count": 0,
+    "owner14_approval_credit_count": 0,
+    "release_credit_count": 0,
+    "release_eligibility": "NOT_ELIGIBLE",
+    "scope_n_a_current_scope_closure_credit_count": 2
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "38bf9e62c549df558b32a763f78698bce55cf144580f71976c21edea11c65f99",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 10376,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/content_sha256",
+      "/receipt_self_integrity_check/canonical_length"
+    ],
+    "projection_path": "/",
+    "projection_rule": "SET ALL projection_null_paths TO null, recursively sort keys, compact JSON, append LF, encode UTF-8",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json"
+  },
+  "prepared_on": "2026-07-28",
+  "receipt_id": "WS-PHASE1-SCOPE45-TRANSITION-CHECK-20260728-R001",
+  "receipt_self_integrity_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 10376,
+    "content_sha256": "38bf9e62c549df558b32a763f78698bce55cf144580f71976c21edea11c65f99",
+    "encoding": "UTF-8",
+    "final_lf": true,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/content_sha256",
+      "/receipt_self_integrity_check/canonical_length"
+    ],
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json"
+  },
+  "schema_version": "walksafe.phase1-scope45-transition-check-receipt.v1",
+  "source_bindings": [
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 90089,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+      "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_OUTPUT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-REVIEW-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 6065,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-independent-review-r001.md",
+      "sha256": "b5b1f2be1d79e44e3e17ace9900ebbd1d5f3d19c230cf9fddf76b996b9da7ca7",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_INDEPENDENT_REVIEW",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "USER-SCOPE-CAPTURE-CHECK-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 15672,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json",
+      "sha256": "46107c77d4edee70c8181f815b97281c50a0b0752b10c07d28241d3686b3d629",
+      "subject_role": "PHASE1_USER_SCOPE_DECISION_CAPTURE_CHECK_RECEIPT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "EXACT257-R004-LEDGER",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 2498803,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_OUTPUT",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "R003-USER-INPUT-REQUEST",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 22897,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "c197ea70bbb8b5e036d4f8aebf3310209ab54fcb24c71f869208bf6844828042",
+      "subject_role": "PHASE1_CONSOLIDATED_USER_INPUT_REQUEST_R003",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    },
+    {
+      "binding_id": "R003-DECISION-ITEM-MANIFEST",
+      "binding_kind": "DECLARED_CONTROL_CONTEXT_SHA256",
+      "byte_length": null,
+      "locator": "decision-item manifest SHA-256",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-consolidated-user-input-request-r003.md",
+      "sha256": "0d3798d5f3dd0751393741ef54b755cc86bcb9bd1cf0867157a65b983e1a95cd",
+      "subject_role": "R003_DECISION_ITEM_MANIFEST_CONTROL_CONTEXT",
+      "verification_basis": "R003_REQUEST_AND_CAPTURE_CHAIN"
+    },
+    {
+      "binding_id": "EXTERNAL-INPUT-READINESS-R001",
+      "binding_kind": "PHYSICAL_FILE_SHA256",
+      "byte_length": 393682,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+      "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4",
+      "subject_role": "EXACT45_SCOPE_DECISION_READINESS_SOURCE",
+      "verification_basis": "BOUND_UPSTREAM_INDEPENDENT_REVIEW_OR_CHECK"
+    }
+  ],
+  "status": "PASS",
+  "summary": {
+    "check_count": 16,
+    "fail_count": 0,
+    "in_scope_open_count": 43,
+    "pass_count": 16,
+    "queue_sum_after": 257,
+    "scope_n_a_closed_count": 2,
+    "transition_count": 45
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "capture_boundary": {
+    "current_subject_manifest_relation": "POST_HOC_CURRENT_STATE_ONLY_NOT_EXECUTION_TIME_PROOF",
+    "execution_ended_at": "NOT_CAPTURED",
+    "execution_started_at": "NOT_CAPTURED",
+    "execution_time_subject_manifest": "NOT_CAPTURED",
+    "raw_log_status": "CAPTURED_COMMAND_LOG",
+    "tool_versions": {
+      "gradle": "NOT_CAPTURED",
+      "java": "NOT_CAPTURED",
+      "node": "NOT_CAPTURED",
+      "npm": "NOT_CAPTURED"
+    }
+  },
+  "command": "./gradlew :app:testDebugUnitTest --offline --no-daemon --max-workers=1",
+  "credit_boundary": {
+    "actual_device_credit": false,
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "production_credit": false,
+    "release_credit": false
+  },
+  "decision": {
+    "actual_device_credit": false,
+    "admissible_current_subject_test_result": "NOT_ESTABLISHED_NO_FRESH_EXECUTION",
+    "admission_status": "CONDITIONAL_OBSERVATION_ONLY",
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "fresh_execution_credit": false,
+    "note": "The Gradle task was up-to-date; this receipt proves the bounded command succeeded, not that tests were freshly executed.",
+    "observed_command_output": "BUILD_SUCCESSFUL_UP_TO_DATE",
+    "production_credit": false,
+    "release_credit": false,
+    "resource_pilot_result": "DIAGNOSTIC_ONLY",
+    "subject_identity": "POST_HOC_CURRENT_STATE_ONLY"
+  },
+  "integrity": {
+    "canonical_byte_length": 2791,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "a5fce5237f75311f8812570579ae066bfdff68956f4221bd8fdf8df956de32d6"
+  },
+  "limits": {
+    "gradle_jvm_max_mib": 1536,
+    "max_workers": 1,
+    "nice": 10,
+    "timeout_seconds": 600
+  },
+  "observation_classification": {
+    "actual_device_evidence": false,
+    "evidence_grade": false,
+    "formal_evidence": false,
+    "record_class": "DIAGNOSTIC_ADMISSION_OBSERVATION",
+    "release_evidence": false,
+    "scope": "RESOURCE_ADMISSION_ONLY"
+  },
+  "prepared_on": "2026-07-27",
+  "raw_log": {
+    "binding_verified_at": "2026-07-27T19:41:59+09:00",
+    "bytes": 2803,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit.log",
+    "sha256": "4445c5dc6a278e86f2005aa69d094daf2bf5748debbcfcb5222fdd23d8fdf824",
+    "subject_role": "DIAGNOSTIC_RAW_COMMAND_LOG"
+  },
+  "resource_observation": {
+    "cpu_percent": 335,
+    "maximum_resident_set_kib": 618232,
+    "measurement_limitation": "Gradle single-use daemon/process-tree peak was not completely captured; RSS is diagnostic only and not a ceiling.",
+    "measurement_status": "PARTIAL_PROCESS_TREE_NOT_CAPTURED",
+    "swap_operations": 0
+  },
+  "result": {
+    "exit_status": 0,
+    "gradle_result": "BUILD_SUCCESSFUL",
+    "task_result": "UP_TO_DATE",
+    "wall_seconds": 5.2
+  },
+  "schema_version": "walksafe.resource-pilot-diagnostic-observation.v2",
+  "subject": "apps/android/app",
+  "subject_manifest_binding": {
+    "byte_length": 61975,
+    "captured_at": "2026-07-27T19:41:59+09:00",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+    "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+    "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+  },
+  "timezone": "Asia/Seoul",
+  "working_directory": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android"
+}

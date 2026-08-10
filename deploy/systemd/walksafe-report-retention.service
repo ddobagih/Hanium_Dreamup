@@ -1,0 +1,30 @@
+[Unit]
+Description=WalkSafe report row and upload retention
+Requires=walksafe-backend.service
+After=network-online.target walksafe-backend.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=walksafe-backend
+Group=walksafe-backend
+WorkingDirectory=/srv/walksafe/backend
+Environment=PYTHONPATH=/srv/walksafe/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/report-retention.env
+StateDirectory=walksafe/report-retention
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/bin/bash /srv/walksafe/backend/scripts/run_walksafe_report_retention_20260717.sh
+TimeoutStartSec=1h
+TimeoutStopSec=130s
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/report-retention /run/walksafe-backend

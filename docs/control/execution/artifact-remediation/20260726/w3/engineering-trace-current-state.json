@@ -1,0 +1,851 @@
+{
+  "schema_version": "walksafe.engineering-trace-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-ENGINEERING-TRACE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "PARTIAL_WAVE_COMPLETED_WITH_8_OPEN_GAPS",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4"
+  },
+  "document_family": {
+    "paths": {
+      "trace_json": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+      "trace_markdown": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.md",
+      "delta": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+      "validation": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "receipt": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json"
+    },
+    "binding_dag": {
+      "order": [
+        "trace_json",
+        "trace_markdown",
+        "delta",
+        "validation",
+        "receipt"
+      ],
+      "forward_references": "PATH_ONLY",
+      "cycle_status": "ACYCLIC"
+    },
+    "role": "FOUNDATION_TRACE_NO_FORWARD_HASH"
+  },
+  "scope": {
+    "wave_id": "W3",
+    "artifact_count": 17,
+    "exact_artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-02",
+      "DLV-DEV-03",
+      "DLV-DEV-04",
+      "DLV-DEV-05",
+      "DLV-DEV-06",
+      "DLV-DEV-07",
+      "DLV-DEV-08",
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-14",
+      "DLV-DEV-16",
+      "DLV-DEV-17",
+      "DLV-DEV-18",
+      "DLV-DEV-19",
+      "DLV-DEV-20",
+      "DLV-DEV-21"
+    ],
+    "ok_count": 9,
+    "internal_gap_count": 8
+  },
+  "authority_boundary": {
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "approval_claimed": false,
+    "release_completion_claimed": false,
+    "statement": "OK는 W3 내부 required_action 충족만 뜻하며 formal/device/cross-process/TMAP/deploy/production/signing/release 완료가 아니다."
+  },
+  "current_generation": {
+    "build": "run-20260726-003",
+    "evidence": "evidence-20260726-003",
+    "auxiliary": "aux-execution-20260726-005",
+    "integration": "integration-run-20260726-004",
+    "status": "CURRENT_AUTHORITATIVE_INTERNAL_EVIDENCE"
+  },
+  "predecessor_and_failure_lineage": [
+    {
+      "generation_id": "run-20260726-001",
+      "status": "FAILED_PREDECESSOR",
+      "expected_anchor_missing": false,
+      "anchor": {
+        "role": "PREDECESSOR_ANCHOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-001/command-receipt.json",
+        "sha256": "feec206bfce2a50ba4dc157f884b7ffb23a32b123ffd40596c0811bbf66d3d1f",
+        "byte_count": 6114,
+        "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+      },
+      "meaning": "Gradle alias false-positive 초기 실행; current evidence가 아님.",
+      "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+    },
+    {
+      "generation_id": "aux-execution-20260726-002",
+      "status": "FAILED_PREDECESSOR",
+      "expected_anchor_missing": true,
+      "expected_anchor_path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/execution-summary.json",
+      "directory_files": [
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/alembic-upgrade-head-1.log",
+          "sha256": "7efcbe93092b456a04b39ca3054df5eb8e09160a2ecead6950c3e287cfe63dc6",
+          "byte_count": 215
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-admin-lint.log",
+          "sha256": "ff9e721afb1799f978a10edfdae32673b4233559e2bd6e07d7a210b558e75d84",
+          "byte_count": 2383
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-app-lint.log",
+          "sha256": "499bceeda8b403a337791f3cdab3cbbf361e640d782017221c1f8546aeccb599",
+          "byte_count": 2213
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/docker-cached-image-preflight.log",
+          "sha256": "f72ed95049ba2b5f8ada44f7f848e9b772b0d67b3cd2a54d6f820656cb49791d",
+          "byte_count": 4017
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/docker-client-version.log",
+          "sha256": "12b4ea5299ffe1c739fa98685ece403f0709e4efa8af83b1c3dd133cebfc16e7",
+          "byte_count": 168
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/gateway-typecheck.log",
+          "sha256": "450be6540062a7231730f8f389ae4cff23118793118005653acf6aba9203bb2c",
+          "byte_count": 206
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-container-cleanup.log",
+          "sha256": "252de6f3d2dec0fc76beaf558f5ffc5d5ca41db57231d57c094812a3055f5435",
+          "byte_count": 171
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-container-start.log",
+          "sha256": "11de3559de2ed8c4042c04cf1ba6a5a894f8ac66b475e81618d3c063865642fe",
+          "byte_count": 198
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-port-discovery.log",
+          "sha256": "230e171b382a2d3decd50b225fcea1f630c86334e0ac6d7d16baa96125f5765a",
+          "byte_count": 148
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-readiness.log",
+          "sha256": "3a60edb52dda29b183ab4cd7f63f2d7d6ca72bd9420db5d7053cabd10af4b814",
+          "byte_count": 254
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/python-compileall-backend-model.log",
+          "sha256": "a7b482a52c6c1ffeb0221e110089fdd7f5eb1920cd1dd92c4ddc40d6ed979079",
+          "byte_count": 141
+        }
+      ],
+      "directory_file_count": 11,
+      "directory_file_set_sha256": "97fde52c22147cb00372a1ce2b4d80d9c4d54d35a6bd5630e1a2bf2fab615af1",
+      "meaning": "host migration module 부재 실패 로그 원장. JSON anchor 부재를 숨기지 않으며 current evidence가 아님.",
+      "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+    },
+    {
+      "generation_id": "integration-run-20260726-001",
+      "status": "PARTIAL_PREDECESSOR",
+      "expected_anchor_missing": false,
+      "anchor": {
+        "role": "PREDECESSOR_ANCHOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/evidence-reuse-receipt.json",
+        "sha256": "1b49bcb2b682efb3f716c053fdded26cafdb69fdadd7a91d8e3abbe5423b8c53",
+        "byte_count": 12556,
+        "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+      },
+      "meaning": "backend current-source reuse 금지로 종료된 부분 실행; current evidence가 아님.",
+      "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+    },
+    {
+      "generation_id": "integration-run-20260726-002",
+      "status": "FAILED_PREDECESSOR",
+      "expected_anchor_missing": false,
+      "anchor": {
+        "role": "PREDECESSOR_ANCHOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-002/execution-summary.json",
+        "sha256": "947527ed36df7fb06033aba83e83258ce826f350bdf71be11f0e808d7fa4386b",
+        "byte_count": 25117,
+        "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+      },
+      "meaning": "backend schema drift 발견 실행; current evidence가 아님.",
+      "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+    },
+    {
+      "generation_id": "integration-run-20260726-003",
+      "status": "FAILED_PREDECESSOR",
+      "expected_anchor_missing": false,
+      "anchor": {
+        "role": "PREDECESSOR_ANCHOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-003/execution-summary.json",
+        "sha256": "fef5cfd55d7eb206f94d38a92b2db450ee4f78aa87b2eba9a99d0097a0abefae",
+        "byte_count": 23470,
+        "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+      },
+      "meaning": "stale harness monkeypatch 발견 실행; current evidence가 아님.",
+      "authority": "APPEND_ONLY_LINEAGE_NOT_CURRENT"
+    }
+  ],
+  "source_bindings": [
+    {
+      "role": "CURRENT_AUX",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+      "sha256": "94e4f9a1ca65840ca884397d5ca564385dbda791f256021cf344dd5c6362ee8f",
+      "byte_count": 15415,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_LICENSE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/license-review.json",
+      "sha256": "428b90d44a9f293d219c06921f1d7a9c829fbf87f5bb2c78a376259b8041f613",
+      "byte_count": 488821,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_SBOM_VALIDATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/sbom-validation-result.json",
+      "sha256": "ed5048d91819a9e8f5b190f9b782a375e358cc3573b8bc8949135a18d9a1f57b",
+      "byte_count": 2840,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "byte_count": 79444,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.md",
+      "sha256": "8dc103308cccfbdbe2fcf7ff783472f3aba64002ee306090ebe7c942859614d1",
+      "byte_count": 11734,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "byte_count": 48879,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.md",
+      "sha256": "9c32e06d6434104104a147bcf3eca36403e3984127b3bb7bca2bc6e9c4751d7b",
+      "byte_count": 6246,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.json",
+      "sha256": "23707cfbcc5bf66aacaf5a050679acf6f6e5b391ddd6def2d210fb3b36dba20b",
+      "byte_count": 35408,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "FINAL_CONTENT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.md",
+      "sha256": "b1439026585ca1d69abebbad294fc5af8f8b05108b9b7de482a2c23c79457201",
+      "byte_count": 3385,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+      "sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5",
+      "byte_count": 5215,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/fixture-inventory.json",
+      "sha256": "be584ced83fad77cf859dbd5f3ec2e3c2ba8ba56c848d7a16afccdddbc6a1aa6",
+      "byte_count": 68485,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/internal-build-provenance.json",
+      "sha256": "56b7ec0a352bdf590846bcda6ec69d7594a68989d1326917c43874ea016e0492",
+      "byte_count": 126562,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+      "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04",
+      "byte_count": 576621,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/module-inventory.json",
+      "sha256": "5473ba952634f7c9596ce970d377c62bed78beba9be1a86b846d29ac78830fb1",
+      "byte_count": 86869,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce",
+      "byte_count": 815731,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+      "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e",
+      "byte_count": 907864,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+      "byte_count": 637704,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+      "sha256": "006f676b0eb06df3843c1838c7adc247747f886369242cb4c087b26b2f837107",
+      "byte_count": 11495,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION_BINDING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc",
+      "byte_count": 14437,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION_BINDING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-source-binding.json",
+      "sha256": "c44d64f3aa4ae825a81ff8e2925bf5bfaa36624826d82e35426fafab04c75e90",
+      "byte_count": 2655,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9",
+      "byte_count": 22656,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c",
+      "byte_count": 7374,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.md",
+      "sha256": "48470e6ac71e7344b2653e132f55d9d381b6dbcf68fb76dfde0841c89fa1df49",
+      "byte_count": 1208,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_INTEGRATION",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+      "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d",
+      "byte_count": 6592,
+      "authority": "CURRENT_W3_GENERATION"
+    },
+    {
+      "role": "CURRENT_BUILD",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/command-receipt.json",
+      "sha256": "899d88cfd6337e80992c1ccaba620d23fdca4a611f51aeac9cc19923a7b3cdf4",
+      "byte_count": 6114,
+      "authority": "CURRENT_W3_GENERATION"
+    }
+  ],
+  "source_binding_summary": {
+    "count": 25,
+    "exact_path_sha256_set": "490146a7869fb5364363f208fb98b6456bfa85a06bb1a7671282772656c9ae13"
+  },
+  "trace_rows": [
+    {
+      "artifact_type_code": "DLV-DEV-01",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.json",
+      "source_sha256": "23707cfbcc5bf66aacaf5a050679acf6f6e5b391ddd6def2d210fb3b36dba20b",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "현행 module/build inventory가 exact source snapshot에 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-02",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "README가 현행 제품 경계, 정본 문서 링크와 실제 검증 명령을 제공함.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-03",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "고정 toolchain 버전과 bootstrap 절차가 실제 lock/build 설정에 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-04",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "실제 build/check 진입점과 run-003 실행 근거가 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-05",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "기여·코드리뷰 규칙과 append-only 독립 검토 절차가 current guide에 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-06",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "Python·TypeScript·Kotlin·Java 코딩 규칙이 모듈별 실제 경로와 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-07",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.json",
+      "source_sha256": "23707cfbcc5bf66aacaf5a050679acf6f6e5b391ddd6def2d210fb3b36dba20b",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "lockfile/dependency inventory가 fail-closed 생성 근거에 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-08",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/development-guide-current-state.json",
+      "source_sha256": "3aa244fb23e22e4e63233b0e6f8dc7a71c13495d1bddd0b4f2ead908e22826eb",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "환경변수 이름·허용값·secret 처리·오류 계약이 current guide와 구현 근거에 결속됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-09",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "내부 build만 확인됐고 backend/model installable artifact, startup, full runtime은 미검증.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV09-GAP-001",
+        "reason": "내부 build만 확인됐고 backend/model installable artifact, startup, full runtime은 미검증.",
+        "target_waves": [
+          "W4",
+          "W8"
+        ],
+        "closure_condition": "backend/model 포함 installable build와 startup/full runtime을 동일 generation에서 실행한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-12",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "migration/schema 내부 검증은 있으나 현행 formal build roundtrip과 backup/restore 완료 근거가 없음.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV12-GAP-001",
+        "reason": "migration/schema 내부 검증은 있으나 현행 formal build roundtrip과 backup/restore 완료 근거가 없음.",
+        "target_waves": [
+          "W8"
+        ],
+        "closure_condition": "현행 후보의 migration roundtrip과 backup/restore를 실행·결속한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-14",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.json",
+      "source_sha256": "23707cfbcc5bf66aacaf5a050679acf6f6e5b391ddd6def2d210fb3b36dba20b",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "formal fixture 연결이 0/279이고 formal test set은 미승인·미실행.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV14-GAP-001",
+        "reason": "formal fixture 연결이 0/279이고 formal test set은 미승인·미실행.",
+        "target_waves": [
+          "W4"
+        ],
+        "closure_condition": "정확히 279개 formal case fixture를 결속하고 승인 환경에서 실행한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-16",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "명명된 check는 있으나 승인된 전체 static ruleset 및 완전 실행 근거가 없음.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV16-GAP-001",
+        "reason": "명명된 check는 있으나 승인된 전체 static ruleset 및 완전 실행 근거가 없음.",
+        "target_waves": [
+          "W5"
+        ],
+        "closure_condition": "승인 대상 전체 static ruleset을 확정하고 current source에서 실행한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-17",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "dependency 531개 중 known 346, unknown 185, exception 13이며 NOTICE·법무 승인이 없음.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV17-GAP-001",
+        "reason": "dependency 531개 중 known 346, unknown 185, exception 13이며 NOTICE·법무 승인이 없음.",
+        "target_waves": [
+          "W5"
+        ],
+        "closure_condition": "unknown/exception을 해소하고 NOTICE와 권한 있는 license review를 결속한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-18",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-inventory-current-state.json",
+      "source_sha256": "23707cfbcc5bf66aacaf5a050679acf6f6e5b391ddd6def2d210fb3b36dba20b",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "dirty worktree를 숨기지 않은 exact source snapshot과 internal provenance가 생성됨.",
+      "ok_meaning": "CURRENT_W3_INTERNAL_REQUIRED_ACTION_ONLY",
+      "open_gap": null
+    },
+    {
+      "artifact_type_code": "DLV-DEV-19",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "SBOM은 dirty source snapshot 기준이며 fixed release generation 산출물이 아님.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV19-GAP-001",
+        "reason": "SBOM은 dirty source snapshot 기준이며 fixed release generation 산출물이 아님.",
+        "target_waves": [
+          "W8"
+        ],
+        "closure_condition": "fixed release candidate에서 SPDX/CycloneDX SBOM을 재생성·검증한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-20",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "source_sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "internal provenance 1회만 존재하고 repeat build 재현성 및 formal attestation이 없음.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV20-GAP-001",
+        "reason": "internal provenance 1회만 존재하고 repeat build 재현성 및 formal attestation이 없음.",
+        "target_waves": [
+          "W8"
+        ],
+        "closure_condition": "고정 입력 repeat build 동일성을 확인하고 formal attestation을 결속한다."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-DEV-21",
+      "predecessor_classification": "INTERNAL_GAP",
+      "current_classification": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "source_sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c",
+      "independent_review_status": "APPROVED_WITH_OPEN_GAPS",
+      "basis": "internal DB/module check는 통과했으나 actual cross-process, device/network, TMAP, production-shape 통합은 미실행.",
+      "ok_meaning": null,
+      "open_gap": {
+        "gap_id": "W3-DEV21-GAP-002/003/004",
+        "reason": "internal DB/module check는 통과했으나 actual cross-process, device/network, TMAP, production-shape 통합은 미실행.",
+        "target_waves": [
+          "W4",
+          "W8"
+        ],
+        "closure_condition": "Android→Gateway→Backend→PostGIS, device/network/TMAP, production-shape 통합을 실행한다."
+      }
+    }
+  ],
+  "classification_summary": {
+    "OK": {
+      "count": 9,
+      "artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-07",
+        "DLV-DEV-08",
+        "DLV-DEV-18"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 8,
+      "artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-14",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20",
+        "DLV-DEV-21"
+      ]
+    }
+  },
+  "open_gap_registry": [
+    {
+      "artifact_type_code": "DLV-DEV-09",
+      "gap_id": "W3-DEV09-GAP-001",
+      "reason": "내부 build만 확인됐고 backend/model installable artifact, startup, full runtime은 미검증.",
+      "target_waves": [
+        "W4",
+        "W8"
+      ],
+      "closure_condition": "backend/model 포함 installable build와 startup/full runtime을 동일 generation에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-12",
+      "gap_id": "W3-DEV12-GAP-001",
+      "reason": "migration/schema 내부 검증은 있으나 현행 formal build roundtrip과 backup/restore 완료 근거가 없음.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "현행 후보의 migration roundtrip과 backup/restore를 실행·결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-14",
+      "gap_id": "W3-DEV14-GAP-001",
+      "reason": "formal fixture 연결이 0/279이고 formal test set은 미승인·미실행.",
+      "target_waves": [
+        "W4"
+      ],
+      "closure_condition": "정확히 279개 formal case fixture를 결속하고 승인 환경에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-16",
+      "gap_id": "W3-DEV16-GAP-001",
+      "reason": "명명된 check는 있으나 승인된 전체 static ruleset 및 완전 실행 근거가 없음.",
+      "target_waves": [
+        "W5"
+      ],
+      "closure_condition": "승인 대상 전체 static ruleset을 확정하고 current source에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-17",
+      "gap_id": "W3-DEV17-GAP-001",
+      "reason": "dependency 531개 중 known 346, unknown 185, exception 13이며 NOTICE·법무 승인이 없음.",
+      "target_waves": [
+        "W5"
+      ],
+      "closure_condition": "unknown/exception을 해소하고 NOTICE와 권한 있는 license review를 결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-19",
+      "gap_id": "W3-DEV19-GAP-001",
+      "reason": "SBOM은 dirty source snapshot 기준이며 fixed release generation 산출물이 아님.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "fixed release candidate에서 SPDX/CycloneDX SBOM을 재생성·검증한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-20",
+      "gap_id": "W3-DEV20-GAP-001",
+      "reason": "internal provenance 1회만 존재하고 repeat build 재현성 및 formal attestation이 없음.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "고정 입력 repeat build 동일성을 확인하고 formal attestation을 결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-21",
+      "gap_id": "W3-DEV21-GAP-002/003/004",
+      "reason": "internal DB/module check는 통과했으나 actual cross-process, device/network, TMAP, production-shape 통합은 미실행.",
+      "target_waves": [
+        "W4",
+        "W8"
+      ],
+      "closure_condition": "Android→Gateway→Backend→PostGIS, device/network/TMAP, production-shape 통합을 실행한다."
+    }
+  ],
+  "automated_evidence": {
+    "scope": "INTERNAL_AUTOMATED_EVIDENCE_DISTINCT_FROM_FORMAL_279",
+    "build": {
+      "generation": "run-20260726-003",
+      "exact_commands": 5,
+      "passed": 5,
+      "status": "PASS"
+    },
+    "evidence_generation": {
+      "generation": "evidence-20260726-003",
+      "write": "PASS",
+      "check": "PASS",
+      "outputs": 8
+    },
+    "module_tests": [
+      {
+        "module": "android-gateway",
+        "passed": 62,
+        "mode": "CURRENT_RUN"
+      },
+      {
+        "module": "app",
+        "passed": 728,
+        "mode": "REUSED_AFTER_EXACT_MODULE_HASH_EQUALITY"
+      },
+      {
+        "module": "adminapp",
+        "passed": 38,
+        "mode": "REUSED_AFTER_EXACT_MODULE_HASH_EQUALITY"
+      },
+      {
+        "module": "backend-db-free",
+        "passed": 33,
+        "mode": "CURRENT_INTEGRATION"
+      },
+      {
+        "module": "backend-postgres-exact-node",
+        "passed": 2,
+        "mode": "TWO_SEQUENTIAL_RUNS_SAME_SINGLE_USE_DB"
+      }
+    ],
+    "sbom_schema": {
+      "SPDX-2.3": "PASS",
+      "CycloneDX-1.6": "PASS",
+      "validator": "jsonschema 4.25.1",
+      "errors": 0
+    },
+    "license": {
+      "total": 531,
+      "known": 346,
+      "unknown": 185,
+      "exceptions": 13,
+      "NOTICE": "NOT_COMPLETED",
+      "legal_approval": "NOT_APPROVED"
+    },
+    "integration": {
+      "generation": "integration-run-20260726-004",
+      "result": "INTERNAL_INTEGRATION_PASS_WITH_EXTERNAL_BOUNDARIES",
+      "schema_parity": "PASS",
+      "same_db_repeatability": "PASS",
+      "cleanup": "PASS"
+    },
+    "formal_279_relationship": "NO_FORMAL_EXECUTION_OR_PASS_CLAIM"
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_fixture_linked_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "formal_pass_claimed": false,
+    "actual_device_status": "NOT_RUN",
+    "cross_process_android_gateway_backend_postgis": "NOT_RUN",
+    "tmap_status": "NOT_RUN",
+    "deploy_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "signing_status": "NOT_ASSESSED",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "independent_review": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+    "sha256": "006f676b0eb06df3843c1838c7adc247747f886369242cb4c087b26b2f837107",
+    "status": "APPROVED_WITH_OPEN_GAPS",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    }
+  },
+  "integrity": {
+    "artifact_count": 17,
+    "artifact_unique_count": 17,
+    "ok_count": 9,
+    "internal_gap_count": 8,
+    "open_gap_count": 8,
+    "source_binding_count": 25,
+    "source_binding_set_sha256": "490146a7869fb5364363f208fb98b6456bfa85a06bb1a7671282772656c9ae13",
+    "common_fingerprint": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON; ensure_ascii=false; sort_keys=true; compact separators; integrity.content_fingerprint.value=null; trailing LF",
+      "value": "8cd55f551edacbc4f17400e45b2d65bc0f68cda7c0b77fa49c51907c35246e66"
+    }
+  }
+}

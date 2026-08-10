@@ -1,0 +1,146 @@
+{
+  "schema_version": "walksafe.submission-toolchain.v4",
+  "library_bundle_format": "walksafe.semantic-record-bundle.v1",
+  "python_installation": {
+    "installer_lock": {
+      "path": "configs/submission_installer_requirements.lock",
+      "sha256": "f18cd67f07b661db59219d1825cd2557d8e2d9996c5183e116b2ddd64d081901",
+      "bytes": 97
+    },
+    "exact8_lock": {
+      "path": "configs/submission_exact8_requirements.lock",
+      "sha256": "d78dfeaf489a25e88a081bf07ca0fe702b16c3c9a6acdde79ba204fa1c6da87f",
+      "bytes": 827
+    },
+    "pip_version": "26.1.1",
+    "install_flags": [
+      "--require-hashes",
+      "--no-deps",
+      "--no-compile"
+    ]
+  },
+  "python": {
+    "implementation": "CPython",
+    "version": "3.14.4",
+    "platform": {
+      "system": "Linux",
+      "machine": "x86_64"
+    },
+    "executable": {
+      "resolved_path": "/usr/bin/python3.14",
+      "sha256": "b8d8288faefdd300201f43fcf00f6f539a27218eeed3a3dff5ab10b9c4c99700",
+      "bytes": 7481192
+    }
+  },
+  "libraries": [
+    {
+      "distribution": "Pillow",
+      "version": "12.2.0",
+      "file_count": 140,
+      "file_bundle_sha256": "e8575c0a34f0f13b80a6a8e4d75f0b7dddbdb2e945fef5c6a48e3f749be68414"
+    },
+    {
+      "distribution": "python-docx",
+      "version": "1.2.0",
+      "file_count": 125,
+      "file_bundle_sha256": "9f949e50ba25655361112b3b9bf7b8bba3629f9bda1e4e28c0587b406a4be463"
+    },
+    {
+      "distribution": "python-pptx",
+      "version": "1.0.2",
+      "file_count": 116,
+      "file_bundle_sha256": "75a2a9039a88fbda708616b740d73e7f1913de467c52edef109b27f22598a82b"
+    },
+    {
+      "distribution": "lxml",
+      "version": "6.1.1",
+      "file_count": 175,
+      "file_bundle_sha256": "3ad0c1218220eb5dc36d37afd1533015b9648f10758152bb140b6f7e9c3e41cb"
+    },
+    {
+      "distribution": "opencv-python",
+      "version": "4.13.0.92",
+      "file_count": 130,
+      "file_bundle_sha256": "96ef5fe9454f10651d96153bdbfd62393a9c810822126cfa4ef8916cb4480fda"
+    },
+    {
+      "distribution": "numpy",
+      "version": "2.4.4",
+      "file_count": 916,
+      "file_bundle_sha256": "84fa06209da29e162dc50772ebb1157d6c9219478ca904ad5ff7c97da008a6ad"
+    },
+    {
+      "distribution": "typing-extensions",
+      "version": "4.15.0",
+      "file_count": 6,
+      "file_bundle_sha256": "b4138a0faf7444070b8c91de9d6a86646608c312d5b4c94904ba7212ec50c416"
+    },
+    {
+      "distribution": "XlsxWriter",
+      "version": "3.2.9",
+      "file_count": 49,
+      "file_bundle_sha256": "94ba84c6edf774d55ad21bf021235e71cc2d5afb41a5beb399b2c342e829b99d"
+    }
+  ],
+  "tools": [
+    {
+      "name": "libreoffice",
+      "command": "libreoffice",
+      "resolved_path": "/usr/lib/libreoffice/program/soffice",
+      "bytes": 6621,
+      "sha256": "3d585422d7cdddf9bcc954e7064da24c7e44d43508a5abaeb11de9d918d24f13",
+      "runtime_chain": [
+        {
+          "resolved_path": "/usr/lib/libreoffice/program/oosplash",
+          "bytes": 47416,
+          "sha256": "e66a4617a325c3c7b09be9c8c996c3b5e0035f30f6219acd67773be00b7ed13b"
+        },
+        {
+          "resolved_path": "/usr/lib/libreoffice/program/soffice.bin",
+          "bytes": 14568,
+          "sha256": "1c5eeb050f546e1db613e2fc724a87dfe2b180ac85a0b70f2cff618dda1b3326"
+        }
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_output": "LibreOffice 26.2.4.2 620(Build:2)"
+    },
+    {
+      "name": "pdftoppm",
+      "command": "pdftoppm",
+      "resolved_path": "/usr/bin/pdftoppm",
+      "bytes": 39592,
+      "sha256": "ad3659e9229f0609640db64611023130222f892a00706ea318af04a07326014a",
+      "runtime_chain": [],
+      "version_args": [
+        "-v"
+      ],
+      "version_output": "pdftoppm version 26.01.0\nCopyright 2005-2026 The Poppler Developers - http://poppler.freedesktop.org\nCopyright 1996-2011, 2022 Glyph & Cog, LLC"
+    },
+    {
+      "name": "pdfinfo",
+      "command": "pdfinfo",
+      "resolved_path": "/usr/bin/pdfinfo",
+      "bytes": 76368,
+      "sha256": "bc643b05d93f5edf86ac536313c38d759130c8192ea83e0251b9d8d4cb336763",
+      "runtime_chain": [],
+      "version_args": [
+        "-v"
+      ],
+      "version_output": "pdfinfo version 26.01.0\nCopyright 2005-2026 The Poppler Developers - http://poppler.freedesktop.org\nCopyright 1996-2011, 2022 Glyph & Cog, LLC"
+    }
+  ],
+  "fonts": [
+    {
+      "path": "/usr/share/fonts/truetype/nanum/NanumSquareB.ttf",
+      "sha256": "f737d58294faec9c632189af3a2a3e48e49c03c0256de09db61e879e2857bfbf",
+      "bytes": 733500
+    },
+    {
+      "path": "/usr/share/fonts/truetype/nanum/NanumSquareR.ttf",
+      "sha256": "5a51deae5237435d9a0bc0cc6cc30619a914b29801f895698cfdacadcad06e94",
+      "bytes": 723640
+    }
+  ]
+}

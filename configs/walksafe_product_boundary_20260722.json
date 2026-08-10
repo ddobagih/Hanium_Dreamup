@@ -1,0 +1,310 @@
+{
+  "schema_version": "1.3.0",
+  "document_id": "WS-PRODUCT-BOUNDARY-20260722-001",
+  "version": "1.3.0",
+  "effective_policy_baseline": {
+    "version": "1.0.1",
+    "manifest": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "policy_ids": [
+      "FP-003",
+      "FP-002",
+      "FP-007",
+      "FP-009",
+      "FP-001"
+    ]
+  },
+  "implementation_scope": {
+    "epic_id": "EPIC-01",
+    "contract_status": "IMPLEMENTED_PHASE_E_ANDROID_GATEWAY_EXTRACTION_INTERNAL",
+    "does_not_claim": [
+      "production_signing_configured",
+      "google_play_distribution_completed",
+      "private_admin_distribution_completed",
+      "administrator_security_production_provisioning_completed",
+      "administrator_authentication_formally_verified",
+      "administrator_recovery_drill_completed",
+      "legacy_web_source_archived",
+      "historical_external_web_endpoint_decommissioned",
+      "historical_cached_pwa_clients_deactivated",
+      "android_gateway_deployed",
+      "android_gateway_actual_device_verified",
+      "device_profile_field_verified",
+      "runtime_metric_distance_verified",
+      "runtime_speech_failure_formal_verified",
+      "product_purpose_all_surfaces_verified",
+      "formal_test_completed",
+      "release_eligible"
+    ]
+  },
+  "products": {
+    "user_android_app": {
+      "module": ":app",
+      "product_role": "USER",
+      "application_id": "kr.co.hanium.dreamup.walksafe",
+      "display_name": {
+        "canonical": "WalkSafe(워크세이프)",
+        "default": "WalkSafe",
+        "ko": "워크세이프"
+      },
+      "signing": {
+        "contract_id": "WALKSAFE-USER-SIGNER",
+        "configuration_state": "NOT_CONFIGURED"
+      },
+      "session": {
+        "contract_id": "WALKSAFE-USER-SESSION",
+        "server_audience": "walksafe-user-api",
+        "implementation_state": "INTERNAL_GATEWAY_SESSION_IMPLEMENTED_NOT_DEPLOYED"
+      },
+      "distribution": {
+        "target_channel": "GOOGLE_PLAY",
+        "current_channel": "NONE",
+        "current_cohort": "NO_EXTERNAL_DISTRIBUTION"
+      }
+    },
+    "admin_android_app": {
+      "module": ":adminapp",
+      "product_role": "ADMIN",
+      "application_id": "kr.co.hanium.dreamup.walksafe.admin",
+      "display_name": {
+        "default": "WalkSafe Admin",
+        "ko": "워크세이프 관리자"
+      },
+      "signing": {
+        "contract_id": "WALKSAFE-ADMIN-SIGNER",
+        "configuration_state": "NOT_CONFIGURED"
+      },
+      "session": {
+        "contract_id": "WALKSAFE-ADMIN-SESSION",
+        "server_audience": "walksafe-admin-api",
+        "implementation_state": "INTERNAL_IMPLEMENTATION_PENDING_PROVISIONING_AND_FORMAL_TEST",
+        "client_secret_storage": "PROCESS_MEMORY_ONLY",
+        "server_session_token_storage": "SHA256_DIGEST_ONLY",
+        "server_authority": true
+      },
+      "distribution": {
+        "target_channel": "PRIVATE_REGISTERED_DEVICE",
+        "current_channel": "NONE",
+        "current_cohort": "NO_EXTERNAL_DISTRIBUTION"
+      },
+      "authentication": {
+        "mode": "PASSWORD_TOTP",
+        "first_factor": "INDIVIDUAL_ADMIN_PASSWORD_SCRYPT",
+        "second_factor": "TOTP_PYOTP_30_SECOND",
+        "totp_replay_behavior": "REJECT_SAME_OR_OLDER_VERIFIED_TIMECODE",
+        "public_or_shared_password_allowed": false,
+        "hidden_bypass_password_allowed": false
+      },
+      "recovery": {
+        "material": "ONE_TIME_RECOVERY_CODE_STORED_OUTSIDE_ADMIN_PHONE",
+        "server_stores_plaintext_recovery_code": false,
+        "start_behavior": "ENTER_RECOVERY_IN_PROGRESS_AND_REVOKE_SESSIONS_WITHOUT_CONSUMING_CODE",
+        "response_loss_recovery": "SAME_UNUSED_CODE_AND_SAME_DEVICE_MAY_ROTATE_THE_RECOVERY_TOKEN_WITHOUT_EXTENDING_EXPIRY",
+        "code_consumption": "ONLY_AFTER_SUCCESSFUL_RECOVERY_COMPLETION",
+        "completion_requires": [
+          "VALID_UNEXPIRED_RECOVERY_TRANSACTION",
+          "NEW_PASSWORD",
+          "TOTP_FROM_OUT_OF_BAND_ROTATED_SERVER_SECRET"
+        ],
+        "formal_phone_loss_drill_status": "NOT_RUN"
+      },
+      "fail_closed": {
+        "security_control_workflows_enabled": true,
+        "operational_workflows_enabled": false,
+        "network_access_enabled": true,
+        "manifest_permissions": [
+          "android.permission.INTERNET"
+        ],
+        "runtime_permissions": [],
+        "unlock_requires_epic": "EPIC-01",
+        "security_controls_allowed": [
+          "administrator_login",
+          "security_state_read",
+          "session_list",
+          "session_revoke",
+          "reauthenticate",
+          "recovery_start",
+          "recovery_complete"
+        ],
+        "prohibited_until_operational_unlock": [
+          "report_read_or_change",
+          "privilege_change",
+          "data_delete",
+          "release_approval"
+        ]
+      }
+    },
+    "android_api_gateway": {
+      "product_role": "ANDROID_API_GATEWAY",
+      "source_path": "apps/android-gateway",
+      "repository_implementation_state": "INTERNAL_IMPLEMENTATION_VERIFIED_NOT_DEPLOYED",
+      "runtime": "NODE_22_SINGLE_PROCESS",
+      "official_local_bind": "127.0.0.1:8081",
+      "backend_origin": "http://127.0.0.1:8000",
+      "public_routes": [
+        "/api/field-session",
+        "/api/navigation/walking",
+        "/api/navigation/destinations/search",
+        "/api/reports/v2",
+        "/api/field-walk"
+      ],
+      "public_non_api_routes": [
+        "/privacy/rights"
+      ],
+      "other_routes_behavior": "404_NO_STORE",
+      "legacy_next_fallback": "PROHIBITED",
+      "deployment_status": "NOT_RUN",
+      "actual_device_connectivity_status": "NOT_RUN"
+    },
+    "legacy_web": {
+      "product_role": "LEGACY_REFERENCE_ONLY",
+      "source_path": "apps/web",
+      "external_user_runtime_allowed": false,
+      "formal_release_component_allowed": false,
+      "ui_and_pwa_state": "RUNTIME_410_RELEASE_DEPLOY_AND_PUBLIC_LAUNCHERS_BLOCKED",
+      "technical_closure_status": "COMPLETE_WITHOUT_RUNTIME_ALLOWLIST_INTERNAL",
+      "remaining_executable_historical_inputs": [],
+      "external_decommission_evidence": "NOT_AVAILABLE",
+      "historical_cached_pwa_state": "NOT_VERIFIED",
+      "local_execution_exception": {
+        "allowed_purposes": [
+          "LEGACY_STATIC_AND_BUILD_REGRESSION"
+        ],
+        "official_npm_runtime_bind": "127.0.0.1:3000",
+        "legacy_ui_response_status": 410,
+        "formal_release_or_external_ui_runtime_allowed": false
+      },
+      "transitional_android_api_routes": {
+        "state": "EXTRACTED_TO_INDEPENDENT_GATEWAY_INTERNAL",
+        "source_path": "apps/android-gateway",
+        "target_component": "ANDROID_API_GATEWAY",
+        "extraction_status": "INTERNAL_IMPLEMENTATION_VERIFIED_NOT_DEPLOYED",
+        "runtime_allowlist": []
+      }
+    }
+  },
+  "product_purpose": {
+    "canonical_statement": "워크세이프는 시각장애인의 도심 보행 중 가까운 위험과 이동 방향을 알려 주고 손상 점자블록 신고를 돕는 안드로이드 보행 보조 서비스입니다.",
+    "safety_limitation": "워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다.",
+    "required_surfaces": [
+      "ANDROID_FIRST_SCREEN",
+      "CONSENT",
+      "USER_GUIDE",
+      "RELEASE_DESCRIPTION"
+    ],
+    "excluded_first_release_features": [
+      "GUARDIAN_TRACKING",
+      "FALL_DETECTION"
+    ]
+  },
+  "device_support": {
+    "install_min_sdk": 26,
+    "official_support_candidate_min_sdk": 31,
+    "official_support_candidate_label": "Android 12",
+    "official_support_approval_status": "PENDING_DESIGNATED_DEVICE_VERIFICATION",
+    "interim_test_scope": "ANDROID_12_OR_LATER_DESIGNATED_DEVICES_ONLY",
+    "capability_tiers": [
+      "FULL",
+      "LIMITED",
+      "BLOCKED"
+    ],
+    "required_core_capabilities": [
+      "CAMERA",
+      "LOCATION",
+      "MICROPHONE",
+      "ON_DEVICE_SPEECH_RECOGNITION",
+      "OFFLINE_KOREAN_TTS",
+      "VIBRATION"
+    ],
+    "full_tier_requires": [
+      "LIVE_ARCORE_SESSION_DEPTH_MODE_SUPPORT",
+      "STABLE_METRIC_DEPTH_FRAMES",
+      "APPROVED_DESIGNATED_DEVICE_PROFILE"
+    ],
+    "phase_a_full_tier_status": "BLOCKED_PENDING_RUNTIME_METRIC_VERIFICATION",
+    "approved_designated_device_profile": false,
+    "approved_designated_device_profile_version": null,
+    "future_full_tier_input_contract": "stable metric depth=true AND approved designated device profile=true AND non-empty approved profile version",
+    "limited_tier_requires": [
+      "ALL_CORE_CAPABILITIES",
+      "APPROVED_NON_METRIC_OBJECT_CLASS_ADVISORY",
+      "ACCESSIBLE_NOTICE",
+      "EXPLICIT_USER_CONFIRMATION"
+    ],
+    "limited_notice": "이 휴대폰은 거리를 잴 수 없어 물체 종류만 알려드립니다. 거리와 안전 여부는 판단하지 않습니다",
+    "unknown_capability_behavior": "BLOCKED"
+  },
+  "separation_contract": {
+    "application_ids_must_differ": true,
+    "signing_contract_ids_must_differ": true,
+    "session_contract_ids_must_differ": true,
+    "server_audiences_must_differ": true,
+    "target_distribution_channels_must_differ": true,
+    "shared_administrator_session_storage_forbidden": true,
+    "administrator_features_in_user_app_forbidden": true
+  },
+  "release_control": {
+    "current_lifecycle_stage": "PRE_DEMO_DEVELOPMENT",
+    "lifecycle_stage_values": [
+      "PRE_DEMO_DEVELOPMENT",
+      "INTEGRATED_DEMO",
+      "LIMITED_USER_TEST",
+      "PUBLIC_RELEASE"
+    ],
+    "current_distribution_cohort": "NO_EXTERNAL_DISTRIBUTION",
+    "distribution_cohort_values": [
+      "NO_EXTERNAL_DISTRIBUTION",
+      "INTERNAL_TEAM",
+      "NAMED_TEST_PARTICIPANTS",
+      "PUBLIC"
+    ],
+    "release_eligibility": "NOT_ELIGIBLE",
+    "public_distribution_allowed": false,
+    "immutable_bundle_components": [
+      "ANDROID_USER_APP",
+      "ANDROID_ADMIN_APP",
+      "ANDROID_API_GATEWAY",
+      "BACKEND",
+      "MODEL",
+      "THRESHOLDS_AND_CONFIG",
+      "POLICY_BASELINE",
+      "APPROVAL_RECEIPT"
+    ],
+    "approval_invalidation_rule": "ANY_COMPONENT_OR_CONFIGURATION_CHANGE_INVALIDATES_THE_PREVIOUS_STAGE_APPROVAL",
+    "remaining_gates": [
+      {
+        "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "execution_status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+        "execution_status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "execution_status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+        "execution_status": "NOT_RUN",
+        "waived": false
+      },
+      {
+        "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+        "execution_status": "NOT_RUN",
+        "waived": false
+      }
+    ],
+    "promotion_rules": {
+      "public_release_requires": {
+        "release_eligibility": "ELIGIBLE",
+        "all_remaining_gates_execution_status": "PASSED",
+        "approved_release_manifest": true,
+        "approved_distribution_cohort": "PUBLIC"
+      },
+      "fail_closed_rule": "PUBLIC_RELEASE_OR_PUBLIC_COHORT_IS_FORBIDDEN_UNLESS_ALL_PUBLIC_RELEASE_REQUIREMENTS_PASS"
+    }
+  }
+}

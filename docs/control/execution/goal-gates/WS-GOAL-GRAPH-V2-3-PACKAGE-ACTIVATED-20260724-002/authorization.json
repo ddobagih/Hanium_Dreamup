@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATION-AUTHORIZATION-20260724-002",
+  "evidence_type": "PACKAGE_ACTIVATION_AUTHORIZATION",
+  "status": "AUTHORIZED",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
+  "activation_request": {
+    "request_id": "WS-USER-V2-3-ACTIVATION-REQUEST-20260724-001",
+    "source_kind": "USER_EXPLICIT_REQUEST",
+    "request_sha256": "7db70ea6b639a9df50be4e6c370088e5cd21bcfa3a5caa07e608a81a7782efb8",
+    "requested_at": "2026-07-24T18:57:10+09:00"
+  },
+  "authorization_scope": {
+    "static_plan_manifest_sha256": "dfa615686b0223826497fae424c1f3c41538b271102879a9497a33b81f66329c",
+    "initial_event_sha256": "3e2a585a8224527c5c732c3ac39cfc13fb35ed85613a1f97a0295339c71170ef",
+    "focus_goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+    "permitted_transitions": [
+      "PACKAGE_ACTIVATED_AFTER_QUICK_GATE_PASS",
+      "GOAL_STARTED_AFTER_FULL_START_GATE_PASS"
+    ],
+    "continuous_internal_execution": "DEPENDENCY_DAG_UNTIL_REAL_POLICY_OR_EXTERNAL_BLOCKER"
+  },
+  "user_response": {
+    "literal_utf8": "승인합니다",
+    "canonicalization": "UTF-8_WITHOUT_TRAILING_NEWLINE",
+    "sha256": "7db70ea6b639a9df50be4e6c370088e5cd21bcfa3a5caa07e608a81a7782efb8"
+  },
+  "retry_context": {
+    "prior_transition_event_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001",
+    "prior_attempt_status": "FAILED_BEFORE_EVENT_COMMIT",
+    "checkpoint_restored": true,
+    "authorization_scope_changed": false
+  },
+  "timestamp_basis": "ORIGINAL_USER_AUTHORIZATION_WITH_EVENT_VALIDATION_RETRY",
+  "authorized_at": "2026-07-24T18:57:10+09:00",
+  "generated_at": "2026-07-24T19:25:01+09:00"
+}

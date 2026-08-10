@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-WORK-ITEM-COMPLETION-20260726-001",
+  "evidence_type": "WORK_ITEM_EXECUTION_RECEIPT",
+  "status": "ACCEPTED",
+  "result": "PASS",
+  "target_goal_id": "WS-GOAL-EPIC-02-FP-014-R001",
+  "target_goal_content_sha256": "8790f46e43d410c1fb4dc5c6c0b7013fa2dfc87b511a249068df4bdddbc2c06e",
+  "work_item_id": "EPIC-02-FP014-PERMISSION-DENIAL-REVOCATION",
+  "source_policy_ids": [
+    "FP-014"
+  ],
+  "gap_ids": [
+    "GAP-023"
+  ],
+  "target_completion_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+  "execution_start_event_sha256": "2158aa372a00af3024f2a80eeb6e98471fd07b97ec570c07edd5b5ce07c3551e",
+  "execution_session_event": {
+    "sequence": 19,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP014-20260726-001",
+    "event_type": "GOAL_STARTED",
+    "event_sha256": "2158aa372a00af3024f2a80eeb6e98471fd07b97ec570c07edd5b5ce07c3551e"
+  },
+  "implementation_start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP014-20260726-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP014-20260726-001/implementation-start-gate-receipt.json",
+    "file_sha256": "5399d1c272d4c2a2d0d7fe4cd75c3e31de82a32362dd12ccc4dee454b4426720"
+  },
+  "execution_window": {
+    "started_at": "2026-07-26T03:03:19+09:00",
+    "ended_at": "2026-07-26T05:11:01+09:00"
+  },
+  "completed_at": "2026-07-26T05:11:01+09:00",
+  "executor": {
+    "id": "CODEX-FP014-PERMISSION-DENIAL-REVOCATION-IMPLEMENTER-20260726-001",
+    "task": "FP014_PERMISSION_DENIAL_REVOCATION_IMPLEMENTATION",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "authority": "GRAPH_V2_4_STANDING_EXECUTION_AUTHORITY"
+  },
+  "reviewer": {
+    "id": "WS-FP014-INDEPENDENT-REVIEWER-001",
+    "task": "/root/fp014_final_evidence_review",
+    "role": "SEPARATE_INTERNAL_REVIEWER",
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "authority": "INTERNAL_REPOSITORY_CONTROL",
+    "decision": "APPROVED",
+    "decided_at": "2026-07-26T05:11:01+09:00"
+  },
+  "reviewer_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/independent-review.json",
+    "sha256": "f4f3ea2d051a2ac6fdba0146212f13167b51a33ba2b1fe027b1290c686b0e2f4"
+  },
+  "result_evidence": [
+    {
+      "kind": "IMPLEMENTATION_RECORD",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/implementation-record.json",
+      "sha256": "b200db586fd9c16bed10b6895bb8f502276cb2ebca4abea64fbdddd8d010fced"
+    },
+    {
+      "kind": "VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/verification-result.json",
+      "sha256": "e70c039b52457d1cec6031e11047e8b223020ca4b46312f9a8cc05fdee0e7e52"
+    },
+    {
+      "kind": "SUCCESSOR_TRACE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/successor-trace.json",
+      "sha256": "8ed523061652c1d819a6296bd50ed3b16e90503d66e47979512ac1d4f932a92c"
+    }
+  ],
+  "output_evidence_manifest": [
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/implementation-record.json",
+      "sha256": "b200db586fd9c16bed10b6895bb8f502276cb2ebca4abea64fbdddd8d010fced"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/verification-result.json",
+      "sha256": "e70c039b52457d1cec6031e11047e8b223020ca4b46312f9a8cc05fdee0e7e52"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/successor-trace.json",
+      "sha256": "8ed523061652c1d819a6296bd50ed3b16e90503d66e47979512ac1d4f932a92c"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/review-subject.json",
+      "sha256": "3809992833e63d6a32a090a5816ed3f380411071a9293c9e162e972bba1db2ae"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/independent-review.json",
+      "sha256": "f4f3ea2d051a2ac6fdba0146212f13167b51a33ba2b1fe027b1290c686b0e2f4"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r018.json",
+      "sha256": "833ba9a691ec5b7de66c8e16e2bd988f63781fc9f38869e63270b24da9d8bbcd"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r018.md",
+      "sha256": "3ddd4651daf39125f80b8b361fa3630a6e157194fdfbaa7798f7fa59da29cb35"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r018.json",
+      "sha256": "667ae83090e73d39e8ea371f2543e560a5d8465505dad323c84e901f369e31b0"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r018.md",
+      "sha256": "11f6923ad7f82282b861e1574f202298742cc1fbbe140bb212d8e0a69e4261a8"
+    },
+    {
+      "path": "docs/control/execution/walksafe-epic-02-fp014-permission-denial-revocation-active-ledger-overlay-20260726-r001.json",
+      "sha256": "19f7f1e6caa02960ce744605c5ec23383d6a1ef6a93f07916beb988208993937"
+    },
+    {
+      "path": "docs/control/execution/walksafe-epic-02-fp014-permission-denial-revocation-active-ledger-overlay-20260726-r001.md",
+      "sha256": "04439f65a73ad267268d3353c128d13f8321ac1c67036493defbc7d3c3bfc7ba"
+    }
+  ],
+  "output_evidence_manifest_sha256": "969c1841de110d41f7af8d0a4aab181995398384d7e1555e81bb61962a6f41a5",
+  "completion_boundary": {
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "android_platform_review_status": "NOT_RUN",
+    "operational_permission_profile_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "generated_at": "2026-07-26T05:11:01+09:00"
+}

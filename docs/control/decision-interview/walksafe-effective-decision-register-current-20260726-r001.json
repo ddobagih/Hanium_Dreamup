@@ -1,0 +1,231 @@
+{
+  "schema_version": "walksafe.effective-decision-register-composition.v1",
+  "metadata": {
+    "register_id": "WS-EFFECTIVE-DECISION-REGISTER-CURRENT-20260726-001",
+    "register_version": "1.0.1",
+    "controlled_revision": 2,
+    "as_of": "2026-07-26",
+    "lifecycle_status": "ACTIVE",
+    "supersession_status": "CURRENT_COMPOSITE",
+    "materialization_status": "MATERIALIZED_FROM_APPROVED_POLICY"
+  },
+  "source_bindings": {
+    "base_aligned_register": {
+      "path": "docs/control/decision-interview/walksafe-effective-decision-register-aligned-20260721-r001.json",
+      "sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f",
+      "register_id": "WS-EFFECTIVE-DECISION-REGISTER-ALIGNED-20260721-001",
+      "register_version": "1.0.0",
+      "register_content_sha256": "8bf2620a4ff3d4468f46db1fd6f9a6faab86c2c34eb95456478dfd07160020c2",
+      "decision_binding_sha256": "d20171efde70a11fd31f53496e007e009879f9406516583d7f65a473eb0d8e34"
+    },
+    "fp035_pre_activation_candidate": {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "sha256": "7298e024cbb88e8fda5e27dfd9e97f7ebf23250a7adf4ea6185c406adb4ed742",
+      "candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+      "candidate_content_sha256": "1918e10fd03d74fc3a7c292b077f1da51027bcdc7b9945f6c22c0acafc877a9d",
+      "correction_binding_sha256": "5f44ee6d1baae95e57e318946d4b8f0c2bed857a8bd3b9cdc16805a7ae80fcfd",
+      "embedded_approval_status": "NOT_APPROVED",
+      "embedded_effective_status": "NOT_EFFECTIVE",
+      "status_interpretation": "PRE_ACTIVATION_SNAPSHOT_ONLY"
+    },
+    "effective_policy_manifest": {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "baseline_version": "1.0.1",
+      "content_sha256": "8fdeab58e8c901a29f4380de373cdfd2b67350cd43dafa765246b4f6c9f77244"
+    },
+    "bound_artifact_approval": {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+      "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b",
+      "approval_record_id": "WS-ARTIFACT-BASELINE-APPROVAL-20260722-001",
+      "content_sha256": "f0d83889eb784a7407ed11ab4de8ea360a6f44bbcd113ada984812a550d6a437",
+      "policy_phase_0_decision": "APPROVED"
+    },
+    "committed_application_receipt": {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+      "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+      "receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+      "content_sha256": "85a34a21c50a3b0d6ecc15f21bcfa3051c5b408b3f248dcd2a4e22bd90e52090",
+      "transaction_status": "COMMITTED"
+    },
+    "temporal_provenance_supplement": {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-application-temporal-provenance-supplement-20260722-r001.json",
+      "sha256": "99d657d9dde3117b3bdd9ce62f5dcbf26adba38338f46c45e38ed993c5ca7f2c",
+      "content_sha256": "218b920087fd2d0831025ea96eef61ace35ecdde36c565bd6f17e97993ed9452",
+      "exact_effective_time": "NOT_CAPTURED"
+    }
+  },
+  "source_binding_sha256": "c1e8e5a2941abeee8e3b248bea8da44bf3106e88d82fec6431c8c4d32dfcc97c",
+  "effective_policy": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "composition": "PB-WALKSAFE-FEATURE-POLICY-1.0.0 + exact FP-035 correction overlay",
+    "activation_status": "EFFECTIVE_BY_VALID_COMMITTED_RECEIPT"
+  },
+  "precedence": {
+    "state_precedence": [
+      "COMMITTED_RECEIPT",
+      "POLICY_1.0.1_MANIFEST",
+      "BOUND_ARTIFACT_APPROVAL_POLICY_PHASE_0",
+      "PRE_ACTIVATION_CANDIDATE_SNAPSHOT"
+    ],
+    "candidate_status_interpretation": "PRE_ACTIVATION_SNAPSHOT_ONLY",
+    "merge_rule_version": "walksafe.exact-canonical-id-field-replacement.v1",
+    "merge_rule": "COPY_BASE_RECORD_AND_REPLACE_DECLARED_FIELDS_ONLY",
+    "failure_mode": "FAIL_CLOSED_NO_SILENT_FALLBACK",
+    "does_not_rewrite_existing_immutable_records": true
+  },
+  "replacement_decisions": [
+    {
+      "replacement_id": "WS-DECISION-REPLACEMENT-CD-UPLOAD-NETWORK-FP035-20260726-001",
+      "target": {
+        "decision_id": "DEC-UPLOAD-NETWORK",
+        "canonical_decision_id": "CD-UPLOAD-NETWORK",
+        "decision_version": "1.0.0",
+        "content_sha256": "c8b6d5f6899dd2cc827c99d31ac5da71ef5af057e4968f38ff908e97b05901ba"
+      },
+      "replacement_mode": "COPY_BASE_THEN_REPLACE_DECLARED_FIELDS",
+      "replacement_fields": {
+        "decision_version": "1.0.1",
+        "effective_value": {
+          "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+          "policy_baseline_version": "1.0.1",
+          "composition": "PB-WALKSAFE-FEATURE-POLICY-1.0.0 + exact FP-035 correction overlay",
+          "policy_clause_refs": [
+            "FP-035-POLICY-001",
+            "FP-036-POLICY-001",
+            "FP-044-POLICY-001",
+            "FP-045-POLICY-001"
+          ]
+        },
+        "policy_alignment_status": "ALIGNED_TO_EFFECTIVE_POLICY_BASELINE_1.0.1",
+        "baseline_approval_ref": {
+          "approval_record_id": "WS-ARTIFACT-BASELINE-APPROVAL-20260722-001",
+          "approval_record_content_sha256": "f0d83889eb784a7407ed11ab4de8ea360a6f44bbcd113ada984812a550d6a437",
+          "approval_scope": "EXACT_FP035_CORRECTION_OVERLAY_IN_BUNDLED_APPROVAL",
+          "policy_phase_0_decision": "APPROVED",
+          "commit_receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+          "separate_decision_register_reapproval_claimed": false
+        }
+      },
+      "correction_scope": {
+        "changed_feature_id": "FP-035",
+        "changed_policy_clause_refs": [
+          "FP-035-POLICY-001"
+        ],
+        "unchanged_policy_clause_refs": [
+          "FP-036-POLICY-001",
+          "FP-044-POLICY-001",
+          "FP-045-POLICY-001"
+        ],
+        "normative_rule": "일반 활동원본은 보행 중 전송하지 않는다. 사용자가 이동통신망 전송을 명시적으로 선택한 경우 보행이 정지한 뒤 허용된 이동통신망으로 전송할 수 있으며, 선택하지 않은 경우에는 Wi-Fi에서만 전송한다.",
+        "directly_affected_artifact_codes": [
+          "REQ-03",
+          "REQ-06",
+          "DES-04",
+          "DES-13",
+          "DES-20"
+        ],
+        "required_related_record_codes": [
+          "REQ-16",
+          "REQ-18",
+          "DES-06",
+          "MGT-14",
+          "MGT-16",
+          "DOC-05"
+        ]
+      },
+      "preserved_base_assertions": {
+        "affected_feature_ids": [
+          "FP-035",
+          "FP-036",
+          "FP-044",
+          "FP-045"
+        ],
+        "base_affected_artifact_type_ids": [
+          "DES-13",
+          "REQ-12"
+        ],
+        "canonical_decision_id_changed": false,
+        "decision_feature_edges_changed": false
+      },
+      "verification_tracking": {
+        "status": "TRACKED_BY_EFFECTIVE_POLICY_GATES",
+        "completion_claimed": false,
+        "gate_ids": [
+          "GATE-PHONE-QUEUE-BYTE-LIMIT",
+          "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+          "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+        ]
+      },
+      "content_sha256": "ad39b7f923a78f9f6b697744dabc6a838a550f936448cbe82dd66b640f7e806e"
+    }
+  ],
+  "replacement_binding_sha256": "40150c80e4c6804b9a4f4a5807a04a49068c51b471f5ecb103da2ba07c0719a0",
+  "coverage": {
+    "base_decision_count": 135,
+    "base_unique_canonical_decision_count": 135,
+    "base_decision_feature_edge_count": 428,
+    "replacement_count": 1,
+    "new_canonical_decision_count": 0,
+    "effective_decision_count": 135,
+    "effective_unique_canonical_decision_count": 135,
+    "effective_decision_feature_edge_count": 428,
+    "changed_feature_edge_count": 1,
+    "unchanged_feature_edge_count": 427
+  },
+  "approval_boundary": {
+    "source_policy_baseline_status": "BASELINED_1.0.1",
+    "policy_alignment_status": "COMPLETE",
+    "correction_approval_status": "APPROVED_AS_EXACT_OVERLAY",
+    "application_status": "COMMITTED",
+    "register_lifecycle_status": "ACTIVE",
+    "register_update_authority": "DERIVED_CONTROL_UPDATE_FROM_APPROVED_POLICY",
+    "separate_register_reapproval_claimed": false,
+    "implementation_conformance_assessed": false,
+    "test_completion_claimed": false,
+    "remaining_gates_are_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "temporal_boundary": {
+    "effective_event": "VALID_COMMITTED_RECEIPT_EXISTENCE",
+    "exact_effective_time": "NOT_CAPTURED",
+    "backdated_materialization_claimed": false
+  },
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "status": "NOT_RUN",
+      "waived": false
+    }
+  ],
+  "composite_binding_basis": {
+    "base_register_file_sha256": "a86cde7f95e9ebe90aea47d350c2be61149a75c8974d05f122e91108f9c8015f",
+    "base_decision_binding_sha256": "d20171efde70a11fd31f53496e007e009879f9406516583d7f65a473eb0d8e34",
+    "replacement_binding_sha256": "40150c80e4c6804b9a4f4a5807a04a49068c51b471f5ecb103da2ba07c0719a0",
+    "merge_rule_version": "walksafe.exact-canonical-id-field-replacement.v1"
+  },
+  "composite_decision_binding_sha256": "5118df160eb3d37c7c5dd73fde7813d5c4dbfa423d0e8647cb360704606bf4ce",
+  "register_content_sha256": "21c07c9e68e230ba184d692c403b8ec4950240e3e9914a2a412e94da5ed663a7"
+}

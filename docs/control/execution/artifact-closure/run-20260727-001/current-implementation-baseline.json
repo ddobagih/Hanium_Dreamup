@@ -1,0 +1,331 @@
+{
+  "schema_version": "walksafe.current-implementation-baseline.v1",
+  "metadata": {
+    "document_id": "WALKSAFE-CURRENT-IMPLEMENTATION-BASELINE-20260727-001",
+    "prepared_on": "2026-07-27",
+    "lifecycle_status": "CURRENT_INTERNAL_FACT_BASELINE",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "successor_only": true
+  },
+  "claim_boundary": {
+    "clean_commit_claimed": false,
+    "implementation_completion_claimed": false,
+    "formal_test_completion_claimed": false,
+    "device_field_completion_claimed": false,
+    "cross_process_completion_claimed": false,
+    "deployment_claimed": false,
+    "legal_approval_claimed": false,
+    "release_or_approval_claimed": false
+  },
+  "policy_binding": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1",
+    "manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "manifest_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+  },
+  "source_binding": {
+    "binding_kind": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT",
+    "snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+    "prepared_on": "2026-07-26",
+    "source_identity_basis": "FILESYSTEM_TRAVERSAL_NOT_GIT",
+    "source_commit": null,
+    "file_count": 2960,
+    "stable_file_read_count": 2960,
+    "pre_post_path_stat_set_match": true,
+    "path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+    "content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade"
+  },
+  "historical_sources": [
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "as_of": "2026-07-21",
+      "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "status": "HISTORICAL_STALE",
+      "reason": "The 588-file tracked candidate inventory predates the 2026-07-26 exact filesystem snapshot and later product-boundary changes."
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "as_of": "2026-07-21",
+      "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "status": "HISTORICAL_STALE",
+      "reason": "It records the Android admin module as unimplemented and does not inventory the independent Android gateway."
+    },
+    {
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "as_of": "2026-07-21",
+      "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+      "status": "HISTORICAL_STALE",
+      "reason": "Its 130 candidate test sources remain historical inventory and do not include the later W3 exact-source internal execution evidence."
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json",
+      "as_of": "2026-07-22",
+      "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+      "status": "HISTORICAL_STALE",
+      "historical_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+      "reason": "Core product-boundary, Android build, manifest and MainActivity files changed after the diagnostic snapshot; its assessment counts require full reassessment."
+    }
+  ],
+  "staleness_observations": [
+    {
+      "path": "README.md",
+      "historical_sha256": "f73ea9df5c357b0a87a1770a7025de06ef11e51863c65940af8e4cea10666d4d",
+      "current_sha256": "4872261e42e02819ca8f5f7aaea6397b3eefc4538eddec65492134660f890852"
+    },
+    {
+      "path": "apps/android/README.md",
+      "historical_sha256": "fce5f268ec7d7dc9d83df77fabb651b02e67027c929c0dd556d7d593651779a3",
+      "current_sha256": "86eb7088a8a77b12e409cb714596fc6cd08498475181528fd5f8c79f1aa71f07"
+    },
+    {
+      "path": "apps/web/README.md",
+      "historical_sha256": "e66a52f259ff9db4f4adf3c202e7893171001960d92dc3fb33d7128fa83d79a5",
+      "current_sha256": "939c366d0b4171c76a35975f9ad5a0c2e7e5f1f3bedbaa1c02db1fce2814a2b3"
+    },
+    {
+      "path": "apps/android/settings.gradle.kts",
+      "historical_sha256": "f306583522c0183077907c34bfd30b09fc5de3465aa459b4c76d5d76015b867d",
+      "current_sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0"
+    },
+    {
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "historical_sha256": "30efe0264c2d27512e9b63b96a8838ae560809902e41a348975baaf07ff592c2",
+      "current_sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "historical_sha256": "ed9c8df7e7402a6214871a099d9994b182a01030bb01fab7662f062025887803",
+      "current_sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43"
+    },
+    {
+      "path": "apps/android/app/build.gradle.kts",
+      "historical_sha256": "22ce5a8b59c86718bf6c9d319b90beeed5473b63d9fbfc4f4ea461abe01c5e0f",
+      "current_sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160"
+    }
+  ],
+  "implementation_units": [
+    {
+      "unit_id": "MOD-ANDROID-USER",
+      "name": "Android user application",
+      "paths": [
+        "apps/android/app"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "ACTIVE_PRODUCT_CANDIDATE",
+      "application_id": "kr.co.hanium.dreamup.walksafe",
+      "version_name": "0.1.0",
+      "current_facts": [
+        "The Gradle project includes the app module.",
+        "Current source contains first-run, consent, login and user-confirmed resume control paths.",
+        "The application uses the independent Android gateway boundary for product network requests."
+      ],
+      "not_claimed": [
+        "Formal release completion",
+        "Interactive actual-device end-to-end completion",
+        "Safety performance approval"
+      ]
+    },
+    {
+      "unit_id": "MOD-ANDROID-ADMIN",
+      "name": "Separate Android administrator application",
+      "paths": [
+        "apps/android/adminapp"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "SECURITY_BOUNDARY_CANDIDATE",
+      "application_id": "kr.co.hanium.dreamup.walksafe.admin",
+      "version_name": "0.2.0-security",
+      "current_facts": [
+        "The Gradle project includes the separate adminapp module.",
+        "The module contains login, reauthentication, session revocation and recovery security-boundary code.",
+        "The administrator application identifier is distinct from the user application identifier."
+      ],
+      "not_claimed": [
+        "Complete report review, agency transfer and operational administration workflows",
+        "Approved administrator recovery drill",
+        "Signed or deployed administrator release"
+      ]
+    },
+    {
+      "unit_id": "MOD-ANDROID-GATEWAY",
+      "name": "Independent Android API gateway",
+      "paths": [
+        "apps/android-gateway"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "ACTIVE_SERVICE_CANDIDATE_NOT_DEPLOYED",
+      "runtime": "Node.js 22 and TypeScript",
+      "current_facts": [
+        "The service is independent from the Next.js Web/PWA runtime.",
+        "Source declares field-session, walking-navigation, destination-search, report and privacy-rights control surfaces.",
+        "Its documented deployment state is NOT_DEPLOYED."
+      ],
+      "not_claimed": [
+        "Production deployment",
+        "Actual-device gateway connectivity",
+        "Cross-process Android to backend completion"
+      ]
+    },
+    {
+      "unit_id": "MOD-BACKEND",
+      "name": "Backend and PostGIS service",
+      "paths": [
+        "backend"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "ACTIVE_SERVICE_CANDIDATE",
+      "current_facts": [
+        "Current W3 evidence records DB-free backend checks and repeated exact-node checks on a migrated disposable PostgreSQL/PostGIS database.",
+        "The evidence is internal and exact-subject bounded."
+      ],
+      "not_claimed": [
+        "Production database migration",
+        "Production backup, restore or rollback",
+        "Android to gateway to backend to PostGIS end-to-end completion"
+      ]
+    },
+    {
+      "unit_id": "MOD-MODEL",
+      "name": "Detection model and training assets",
+      "paths": [
+        "model",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json",
+        "configs/walksafe_unified_epoch270_field_20260711.json"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "DEVELOPMENT_MODEL_CANDIDATE",
+      "runtime_primary": "unified_walksafe",
+      "runtime_fallback": "legacy_two_model",
+      "registry_stage": "candidate",
+      "deployment_eligible": false,
+      "release_eligible": false,
+      "not_claimed": [
+        "Approved production model",
+        "Independent field performance completion",
+        "Release eligibility"
+      ]
+    },
+    {
+      "unit_id": "MOD-VOICE",
+      "name": "Voice processing candidates",
+      "paths": [
+        "voice",
+        "apps/android/app/src/main"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "BOUNDARY_REVIEW_REQUIRED",
+      "current_facts": [
+        "Android source contains platform speech recognition and TTS control paths.",
+        "Standalone voice sources remain candidate material pending boundary and formal evidence review."
+      ],
+      "not_claimed": [
+        "Offline speech service completion on all supported devices",
+        "Formal accessibility completion"
+      ]
+    },
+    {
+      "unit_id": "MOD-WEB-LEGACY",
+      "name": "Legacy Web/PWA reference",
+      "paths": [
+        "apps/web"
+      ],
+      "inventory_status": "SOURCE_PRESENT",
+      "product_boundary": "LEGACY_REFERENCE_ONLY",
+      "current_facts": [
+        "Web UI, PWA, administrator UI and historical API code are not current WalkSafe products.",
+        "Web evidence cannot substitute for Android product, safety, accessibility or release evidence."
+      ],
+      "not_claimed": [
+        "Current user product",
+        "Current administrator product",
+        "External deployment or release candidate"
+      ]
+    }
+  ],
+  "w3_internal_evidence": {
+    "evidence_boundary": "INTERNAL_EXACT_SOURCE_OR_EXACT_SUBJECT_ONLY",
+    "reused_unchanged_exact_source": [
+      {
+        "check": "Android user internal unit tests",
+        "result": "PASS",
+        "passed_count": 728
+      },
+      {
+        "check": "Android administrator internal unit tests",
+        "result": "PASS",
+        "passed_count": 38
+      },
+      {
+        "check": "Android gateway internal Node tests",
+        "result": "PASS",
+        "passed_count": 62
+      },
+      {
+        "check": "Android user lint",
+        "result": "PASS_REUSED_EXACT_SOURCE"
+      },
+      {
+        "check": "Android administrator lint",
+        "result": "PASS_REUSED_EXACT_SOURCE"
+      },
+      {
+        "check": "Android gateway typecheck",
+        "result": "PASS_REUSED_EXACT_SOURCE"
+      }
+    ],
+    "current_exact_subject": [
+      {
+        "check": "Backend DB-free checks",
+        "result": "PASS",
+        "passed_count": 33
+      },
+      {
+        "check": "Repeated PostgreSQL exact-node checks on one disposable migrated database",
+        "result": "PASS",
+        "sequential_pass_count": 2
+      },
+      {
+        "check": "Backend and model compileall",
+        "result": "PASS_CURRENT_SOURCE"
+      },
+      {
+        "check": "SPDX 2.3 and CycloneDX 1.6 document schema validation",
+        "result": "PASS"
+      }
+    ],
+    "formal_boundary": {
+      "planned_formal_test_count": 279,
+      "formal_test_status": "NOT_RUN",
+      "formal_pass_count": 0,
+      "reproducible_rebuild_status": "NOT_RUN",
+      "attestation_status": "NOT_ASSESSED",
+      "signing_status": "NOT_ASSESSED",
+      "actual_device_interactive_flow_status": "NOT_RUN",
+      "cross_process_android_gateway_backend_postgis_status": "NOT_RUN",
+      "release_status": "NOT_ELIGIBLE"
+    }
+  },
+  "required_refreshes": [
+    {
+      "target": "implementation manifest successor revision",
+      "priority": "P0",
+      "reason": "Bind the current product-source inventory to policy 1.0.1 and the exact 2026-07-26 source snapshot."
+    },
+    {
+      "target": "module register successor revision",
+      "priority": "P0",
+      "reason": "Inventory both Android modules and the independent Android gateway without treating legacy Web as a product."
+    },
+    {
+      "target": "quality evidence register successor revision",
+      "priority": "P0",
+      "reason": "Separate W3 reused exact-source PASS, current exact-subject PASS and formal NOT_RUN."
+    },
+    {
+      "target": "implementation gap analysis successor revision",
+      "priority": "P0",
+      "reason": "Reassess all historical findings against current hashes instead of carrying forward the 2026-07-22 counts."
+    }
+  ]
+}

@@ -1,0 +1,2768 @@
+{
+  "assessments": [
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-001",
+      "historical_planned_test_count": 1,
+      "historical_status": "MISSING",
+      "required_next_action": "Release 원본 저장 경로와 동의 철회 시 삭제 경계를 완성하고 TC-NPC-RAW-ORIGINAL-COLLECTION-01을 실행한다.",
+      "requirement_id": "RQ-NPC-RAW-ORIGINAL-COLLECTION-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-RAW-ORIGINAL-COLLECTION",
+      "title": "활성 보행 중 원본 수집"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-002",
+      "historical_planned_test_count": 1,
+      "historical_status": "PARTIAL",
+      "required_next_action": "휴대전화·gateway·backend·backup별 보존 및 삭제 receipt를 하나의 lifecycle evidence로 결속한다.",
+      "requirement_id": "RQ-NPC-DATA-LIFECYCLE-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-DATA-LIFECYCLE",
+      "title": "보존기간과 삭제기한"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-003",
+      "historical_planned_test_count": 1,
+      "historical_status": "MISSING",
+      "required_next_action": "실제 object storage 용량·backup 성장·월 비용을 측정해 GATE-CLOUD-COST-MEASUREMENT를 판정한다.",
+      "requirement_id": "RQ-NPC-SERVER-STORAGE-CAPACITY-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "NPC-SERVER-STORAGE-CAPACITY",
+      "title": "서버 원본·백업 용량과 저장비"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-004",
+      "historical_planned_test_count": 1,
+      "historical_status": "MISSING",
+      "required_next_action": "휴대전화 대기함의 구현 여부와 최대 byte 수를 확정하고 실제 한도 시험을 실행한다.",
+      "requirement_id": "RQ-NPC-PHONE-QUEUE-CAPACITY-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "NPC-PHONE-QUEUE-CAPACITY",
+      "title": "휴대전화 대기자료 용량"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-005",
+      "historical_planned_test_count": 1,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-NPC-AUTO-REPORT-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-NPC-AUTO-REPORT-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-AUTO-REPORT",
+      "title": "손상 점자블록 자동신고"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-006",
+      "historical_planned_test_count": 1,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-NPC-PERMISSION-SESSION-LIFECYCLE-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-PERMISSION-SESSION-LIFECYCLE",
+      "title": "권한·로그인·동의 상태 분리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-007",
+      "historical_planned_test_count": 1,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-NPC-NAVIGATION-ROUTE-DIRECTION-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-NAVIGATION-ROUTE-DIRECTION",
+      "title": "경로·진행방향·보폭 책임 분리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-09",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-008",
+      "historical_planned_test_count": 1,
+      "historical_status": "MISSING",
+      "required_next_action": "관리자 운영 workflow를 보안 경계에 연결하고 별도 기기 분실 복구훈련을 실행한다.",
+      "requirement_id": "RQ-NPC-SINGLE-ADMIN-RECOVERY-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+      "title": "한 명의 관리자와 계정 복구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-009",
+      "historical_planned_test_count": 1,
+      "historical_status": "MISSING",
+      "required_next_action": "서버 용량 상태 계약과 Android fail-closed 소비 경로를 구현·측정한다.",
+      "requirement_id": "RQ-NPC-SERVER-CAPACITY-STATE-SYNC-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "NPC-SERVER-CAPACITY-STATE-SYNC",
+      "title": "서버 용량상태를 휴대전화에 전달"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current exact-snapshot source removes the historical implementation conflict; formal release completion is not implied.",
+      "current_classification": "RESOLVED_BY_CURRENT_CODE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/web",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-010",
+      "historical_planned_test_count": 4,
+      "historical_status": "PARTIAL",
+      "required_next_action": "RQ-FP-001-001의 현재 source binding을 successor RTM에 유지하고 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-001-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-010-A01",
+          "controlled_locator": {
+            "type": "LINE_RANGE",
+            "value": "lines 3 and 11-17"
+          },
+          "current_assertion": "Current product purpose is an Android walking-assistance candidate with an explicit non-substitution safety boundary.",
+          "exact_file_binding": {
+            "path": "README.md",
+            "sha256": "4872261e42e02819ca8f5f7aaea6397b3eefc4538eddec65492134660f890852",
+            "snapshot_locator": "files[path=README.md]"
+          },
+          "historical_assertion_disproved": "The historical root description treated Web/PWA as the main product and Android as a secondary research path, leaving the approved Android purpose inconsistent.",
+          "receipt_check_locator": {
+            "evidence_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "validation_results[check_id=CHK-POLICY-BINDING] and validation_results[check_id=CHK-MODULE-BOUNDARY]",
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+            "receipt_sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a",
+            "receipt_type": "walksafe.implementation-register-refresh-receipt.v1.1",
+            "related_packet": {
+              "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+              "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+            },
+            "result": "PASS",
+            "scope_limit": "Register structure and boundary checks only; no build, device, formal279 or release credit.",
+            "subject": "IMPLEMENTATION_REGISTER_REFRESH_POLICY_AND_MODULE_BOUNDARY",
+            "subject_hash_kind": "ASSERTION_EXACT_FILE_SHA256",
+            "subject_sha256": "4872261e42e02819ca8f5f7aaea6397b3eefc4538eddec65492134660f890852",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-001",
+      "title": "제품 목적과 우선순위"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current exact-source or exact-subject evidence resolves the historical observation within its stated internal boundary.",
+      "current_classification": "RESOLVED_BY_BOUND_EVIDENCE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-011",
+      "historical_planned_test_count": 4,
+      "historical_status": "EVIDENCE_MISSING",
+      "required_next_action": "현재 NOT_ELIGIBLE 판정을 유지하고 formal 279, signing, device, deployment evidence 전에는 상태를 올리지 않는다.",
+      "requirement_id": "RQ-FP-002-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-011-A01",
+          "controlled_locator": {
+            "type": "JSON_FIELD_LOCATOR",
+            "value": "formal_execution_status=NOT_RUN; release_status=NOT_ELIGIBLE at the current release-readiness boundary"
+          },
+          "current_assertion": "The current completion verdict is explicitly formal execution NOT_RUN and release NOT_ELIGIBLE.",
+          "exact_file_binding": {
+            "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+            "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879",
+            "snapshot_locator": "files[path=docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json]"
+          },
+          "historical_assertion_disproved": "The historical assessment lacked a bound current release-stage verdict and therefore could not state completion eligibility from evidence.",
+          "receipt_check_locator": {
+            "evidence_id": "WS-ARTIFACT-REMEDIATION-W8-IMPLEMENTATION-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "release_current_state.formal_execution_status=NOT_RUN; release_current_state.release_status=NOT_ELIGIBLE",
+            "receipt_path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+            "receipt_sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05",
+            "receipt_type": "walksafe.implementation-receipt.v8",
+            "result": "BOUND_STATE_RECORDED",
+            "scope_limit": "Current release-stage disposition only; no formal or release PASS.",
+            "subject": "W8_RELEASE_READINESS_CURRENT_STATE",
+            "subject_hash_kind": "BOUND_RELEASE_CURRENT_STATE_FILE",
+            "subject_sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+                "physical_file": true,
+                "role": "RELEASE_READINESS_CURRENT_STATE",
+                "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-002",
+      "title": "현재 출시 단계와 완료 판정"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/adminapp",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-012",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "단일 책임자와 대리·복구 권한을 승인 가능한 owner record에 결속한다.",
+      "requirement_id": "RQ-FP-003-001",
+      "resource_class": "OWNER_APPROVAL",
+      "source_policy_id": "FP-003",
+      "title": "단일 책임자 의사결정"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-013",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-004-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-004-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-004",
+      "title": "우선 사용자"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-014",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "승인 사용환경과 횡단보도 시나리오를 실제 지원 기기에서 실행한다.",
+      "requirement_id": "RQ-FP-005-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-005",
+      "title": "공식 사용환경과 횡단보도"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-015",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "장착 방식과 단독 보행 제한을 실제 사용자·기기 시험으로 검증한다.",
+      "requirement_id": "RQ-FP-006-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-006",
+      "title": "단독 보행 목표와 휴대전화 장착"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current exact-source or exact-subject evidence resolves the historical observation within its stated internal boundary.",
+      "current_classification": "RESOLVED_BY_BOUND_EVIDENCE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/web",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-016",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-007-001의 bound evidence를 successor RTM에 유지하되 formal 또는 release PASS로 확대하지 않는다.",
+      "requirement_id": "RQ-FP-007-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-016-A01",
+          "controlled_locator": {
+            "type": "GRADLE_LOCATOR",
+            "value": "include(\":app\") at line 18"
+          },
+          "current_assertion": "The Android Gradle project includes the user application module.",
+          "exact_file_binding": {
+            "path": "apps/android/settings.gradle.kts",
+            "sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+            "snapshot_locator": "files[path=apps/android/settings.gradle.kts]"
+          },
+          "historical_assertion_disproved": "The historical product boundary described Web/PWA as the user product and Android as a non-product research path.",
+          "receipt_check_locator": {
+            "evidence_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "validation_results[check_id=CHK-MODULE-BOUNDARY]",
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+            "receipt_sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a",
+            "receipt_type": "walksafe.implementation-register-refresh-receipt.v1.1",
+            "related_packet": {
+              "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+              "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+            },
+            "result": "PASS",
+            "scope_limit": "Register structure and boundary checks only; no build, device, formal279 or release credit.",
+            "subject": "IMPLEMENTATION_REGISTER_REFRESH_POLICY_AND_MODULE_BOUNDARY",
+            "subject_hash_kind": "ASSERTION_EXACT_FILE_SHA256",
+            "subject_sha256": "49c08cc67c7d619da7cad48ed033fa8c426ac7a967d697efc1817cb4d5ad46b0",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              }
+            ]
+          }
+        },
+        {
+          "assertion_id": "GAP-016-A02",
+          "controlled_locator": {
+            "type": "GRADLE_LOCATOR",
+            "value": "defaultConfig.applicationId=kr.co.hanium.dreamup.walksafe at line 56"
+          },
+          "current_assertion": "The user Android application has its own product application identifier.",
+          "exact_file_binding": {
+            "path": "apps/android/app/build.gradle.kts",
+            "sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+            "snapshot_locator": "files[path=apps/android/app/build.gradle.kts]"
+          },
+          "historical_assertion_disproved": "The historical assertion did not have a bound Android product application identity.",
+          "receipt_check_locator": {
+            "evidence_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "outputs[output_id=MODULE_REGISTER_SUCCESSOR] plus validation_results[check_id=CHK-MODULE-BOUNDARY]",
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+            "receipt_sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a",
+            "receipt_type": "walksafe.implementation-register-refresh-receipt.v1.1",
+            "related_packet": {
+              "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+              "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+            },
+            "result": "PASS",
+            "scope_limit": "Register structure and boundary checks only; no build, device, formal279 or release credit.",
+            "subject": "IMPLEMENTATION_REGISTER_REFRESH_POLICY_AND_MODULE_BOUNDARY",
+            "subject_hash_kind": "ASSERTION_EXACT_FILE_SHA256",
+            "subject_sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-007",
+      "title": "사용자용 안드로이드 전용 앱"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android/adminapp",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-017",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "관리자 앱의 신고 검수·기관 전달·피드백 workflow를 구현하고 formal test에 연결한다.",
+      "requirement_id": "RQ-FP-008-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-008",
+      "title": "관리자용 안드로이드 앱"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current exact-source or exact-subject evidence resolves the historical observation within its stated internal boundary.",
+      "current_classification": "RESOLVED_BY_BOUND_EVIDENCE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/web",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-018",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-009-001의 bound evidence를 successor RTM에 유지하되 formal 또는 release PASS로 확대하지 않는다.",
+      "requirement_id": "RQ-FP-009-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-018-A01",
+          "controlled_locator": {
+            "type": "LINE_RANGE",
+            "value": "lines 1-7 and 44-50"
+          },
+          "current_assertion": "Web/PWA is explicitly classified as LEGACY_REFERENCE_ONLY and is not a current WalkSafe product.",
+          "exact_file_binding": {
+            "path": "apps/web/README.md",
+            "sha256": "939c366d0b4171c76a35975f9ad5a0c2e7e5f1f3bedbaa1c02db1fce2814a2b3",
+            "snapshot_locator": "files[path=apps/web/README.md]"
+          },
+          "historical_assertion_disproved": "The historical Web README called Web/PWA the current main user application.",
+          "receipt_check_locator": {
+            "evidence_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "validation_results[check_id=CHK-MODULE-BOUNDARY]",
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+            "receipt_sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a",
+            "receipt_type": "walksafe.implementation-register-refresh-receipt.v1.1",
+            "related_packet": {
+              "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+              "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+            },
+            "result": "PASS",
+            "scope_limit": "Register structure and boundary checks only; no build, device, formal279 or release credit.",
+            "subject": "IMPLEMENTATION_REGISTER_REFRESH_POLICY_AND_MODULE_BOUNDARY",
+            "subject_hash_kind": "ASSERTION_EXACT_FILE_SHA256",
+            "subject_sha256": "939c366d0b4171c76a35975f9ad5a0c2e7e5f1f3bedbaa1c02db1fce2814a2b3",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              }
+            ]
+          }
+        },
+        {
+          "assertion_id": "GAP-018-A02",
+          "controlled_locator": {
+            "type": "JSON_FIELD_LOCATOR",
+            "value": "legacy_next_fallback=PROHIBITED at line 154; legacy_web.product_role=LEGACY_REFERENCE_ONLY at lines 158-174"
+          },
+          "current_assertion": "The controlled product-boundary configuration prohibits legacy Next fallback and fixes legacy Web to a non-product role.",
+          "exact_file_binding": {
+            "path": "configs/walksafe_product_boundary_20260722.json",
+            "sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+            "snapshot_locator": "files[path=configs/walksafe_product_boundary_20260722.json]"
+          },
+          "historical_assertion_disproved": "The historical boundary allowed Web implementation evidence to conflict with the Android-only approved product boundary.",
+          "receipt_check_locator": {
+            "evidence_id": "WALKSAFE-IMPLEMENTATION-REGISTER-REFRESH-RECEIPT-20260727-001",
+            "identifier_kind": "RECEIPT_DOCUMENT_ID",
+            "locator": "validation_results[check_id=CHK-POLICY-BINDING] and validation_results[check_id=CHK-MODULE-BOUNDARY]",
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+            "receipt_sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a",
+            "receipt_type": "walksafe.implementation-register-refresh-receipt.v1.1",
+            "related_packet": {
+              "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+              "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+            },
+            "result": "PASS",
+            "scope_limit": "Register structure and boundary checks only; no build, device, formal279 or release credit.",
+            "subject": "IMPLEMENTATION_REGISTER_REFRESH_POLICY_AND_MODULE_BOUNDARY",
+            "subject_hash_kind": "ASSERTION_EXACT_FILE_SHA256",
+            "subject_sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-009",
+      "title": "지원 기기와 과거 웹 버전"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-019",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-010-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-010-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-010",
+      "title": "첫 실행과 회원가입"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-020",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-011-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-011-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-011",
+      "title": "장기 로그인 유지"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-021",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-012-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-012-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-012",
+      "title": "여러 기기 동시 로그인"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current exact-snapshot source removes the historical implementation conflict; formal release completion is not implied.",
+      "current_classification": "RESOLVED_BY_CURRENT_CODE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+        "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest.xml",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.log",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-022",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "현행 통합 동의 코드 binding을 successor RTM과 formal case에 유지한다.",
+      "requirement_id": "RQ-FP-013-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-022-A01",
+          "controlled_locator": {
+            "type": "SYMBOL_SET",
+            "value": "firstRunLocalRequest(\"integrated_consent\"); applyIntegratedConsentConfirmation; consentConfirmation checks at lines 2979-3030 and 12421-12540"
+          },
+          "current_assertion": "Android first-run code maintains four independent integrated-consent selections and requires server confirmation before protected use.",
+          "exact_file_binding": {
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+            "sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43",
+            "snapshot_locator": "files[path=apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt]"
+          },
+          "historical_assertion_disproved": "The historical implementation had only an in-memory report consent state and no integrated first-run consent confirmation path.",
+          "receipt_check_locator": {
+            "capture_boundary": {
+              "current_subject_manifest_relation": "POST_HOC_CURRENT_STATE_ONLY_NOT_EXECUTION_TIME_PROOF",
+              "execution_ended_at": "NOT_CAPTURED",
+              "execution_started_at": "NOT_CAPTURED",
+              "execution_time_subject_manifest": "NOT_CAPTURED",
+              "raw_log_status": "CAPTURED",
+              "xml_manifest_status": "INTERNAL_PASS_HASH_RECORDED"
+            },
+            "evidence_id": "PATH:docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+            "identifier_kind": "PATH_IDENTIFIER_NO_INTRINSIC_RECEIPT_ID",
+            "locator": "result: tests=728, passed=728, failures=0, errors=0, skipped=0; decision.observed_internal_test_output=PASS; decision.admissible_current_subject_test_result=NOT_ESTABLISHED; decision.admission_status=CONDITIONAL_OBSERVATION_ONLY",
+            "observation_classification": {
+              "actual_device_evidence": false,
+              "evidence_grade": false,
+              "formal_evidence": false,
+              "record_class": "DIAGNOSTIC_ADMISSION_OBSERVATION",
+              "release_evidence": false,
+              "scope": "RESOURCE_ADMISSION_ONLY"
+            },
+            "receipt_integrity": {
+              "algorithm": "SHA-256",
+              "content_sha256": "e2f296fec46f4f8db84605078c64a81964f963eafb642ee4149624f15b8537a0",
+              "locator": "receipt.integrity.sha256"
+            },
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+            "receipt_sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c",
+            "receipt_type": "walksafe.resource-pilot-diagnostic-observation.v2",
+            "result": "OBSERVED_OUTPUT_PASS_SUBJECT_IDENTITY_NOT_ESTABLISHED",
+            "scope_limit": "Observed test output only. Execution timestamps, tool versions and execution-time subject identity were not captured; this is not an admissible current-subject machine PASS and grants no formal279, device, production or release credit.",
+            "subject": "apps/android/app",
+            "subject_hash_kind": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF",
+            "subject_sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+                "physical_file": true,
+                "role": "RAW_LOG",
+                "sha256": "22a6759067a3d2a34a43cd9e10b3e098eff85f2386c468ebe1a8923ff7576ba0"
+              },
+              {
+                "locator": "android-user-unit-fresh-receipt.json subject_manifest_binding.sha256",
+                "meaning": "Post-hoc current source manifest only; not execution-time source proof.",
+                "path": null,
+                "physical_file": false,
+                "role": "SUBJECT_MANIFEST_DIGEST",
+                "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913"
+              },
+              {
+                "locator": "android-user-unit-fresh-receipt.json result.xml_manifest_sha256",
+                "meaning": "Digest recorded by the fresh receipt for the complete 95-file XML suite set; specific assertion suites are physically bound separately.",
+                "path": null,
+                "physical_file": false,
+                "role": "XML_SUITE_MANIFEST_DIGEST",
+                "sha256": "becc5d0427c46aaccade8ab46ff01bd32dc02842b90c9930c420564e9aec58a0",
+                "suite_files": 95
+              },
+              {
+                "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest.xml",
+                "physical_file": true,
+                "role": "ASSERTION_XML_SUITE",
+                "sha256": "8aac72712fe1fed335f8de5fe3bd097ada4c70d0aeaed2fb264e66dd13c1851e"
+              }
+            ]
+          }
+        },
+        {
+          "assertion_id": "GAP-022-A02",
+          "controlled_locator": {
+            "type": "SYMBOL_SET",
+            "value": "INTEGRATED_CONSENT_CONTROL; IntegratedConsentConfirmation; authorizeIntegratedConsentRequest"
+          },
+          "current_assertion": "The independent Android gateway implements versioned integrated-consent storage, confirmation and authorization.",
+          "exact_file_binding": {
+            "path": "apps/android-gateway/src/integrated-consent.ts",
+            "sha256": "4a47c9fc59c054251f1aafe0a31b9d76d08687eab40b79955d8059feba1b367d",
+            "snapshot_locator": "files[path=apps/android-gateway/src/integrated-consent.ts]"
+          },
+          "historical_assertion_disproved": "The historical implementation had no protected server-side integrated-consent ledger or authorization boundary.",
+          "receipt_check_locator": {
+            "evidence_id": "W3-REUSE-ANDROID-GATEWAY-NODE",
+            "identifier_kind": "QUALITY_REGISTER_EVIDENCE_ID",
+            "locator": "quality evidence_rows[evidence_id=W3-REUSE-ANDROID-GATEWAY-NODE]; command receipt npm test; result passed_count=62 failed_count=0",
+            "quality_index": {
+              "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+              "schema_version": "walksafe.dev-quality-evidence-register.v2.1",
+              "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+            },
+            "receipt_path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json",
+            "receipt_sha256": "79cae4f38d8ccd990aa99b1f15a0a80ca40838e868d9e41cc5e2e02b2901ab6d",
+            "receipt_type": "walksafe.w3-integration-command-receipt.v1",
+            "result": "PASS_REUSED_EXACT_SOURCE",
+            "scope_limit": "Reused exact-source Gateway Node tests only; formal, production and release credit are false.",
+            "subject": "MOD-ANDROID-GATEWAY",
+            "subject_hash_kind": "ANDROID_GATEWAY_CONTENT_SET",
+            "subject_sha256": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.log",
+                "physical_file": true,
+                "role": "RAW_LOG",
+                "sha256": "00bb601dc150b5004e1792d160237cbdd1f2c9dafdbf9558e15d9faea8bd0ab2"
+              },
+              {
+                "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+                "physical_file": true,
+                "role": "QUALITY_REGISTER_CURRENT_R002",
+                "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+              },
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+                "physical_file": true,
+                "role": "REGISTER_REFRESH_PACKET",
+                "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-013",
+      "title": "첫 실행 통합 동의"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-023",
+      "historical_planned_test_count": 3,
+      "historical_status": "PARTIAL",
+      "required_next_action": "RQ-FP-014-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-014-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-014",
+      "title": "권한 거부·철회 시 기능별 처리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-024",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-015-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-015-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-015",
+      "title": "사용 중 철회·계정 삭제"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-025",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-016-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-016-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-016",
+      "title": "로그인 뒤 카메라 중심 무버튼 화면"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current exact-snapshot source removes the historical implementation conflict; formal release completion is not implied.",
+      "current_classification": "RESOLVED_BY_CURRENT_CODE",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+        "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest.xml",
+        "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleFp018Test.xml"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-026",
+      "historical_planned_test_count": 6,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "사용자 확인 재개 경로를 successor RTM에 결속하고 actual-device lifecycle case를 실행한다.",
+      "requirement_id": "RQ-FP-017-001",
+      "resolution_assertions": [
+        {
+          "assertion_id": "GAP-026-A01",
+          "controlled_locator": {
+            "type": "SYMBOL_SET",
+            "value": "onResume at line 3687; requestWalkSessionResumeConfirmation at line 8686; handleWalkSessionResumeRecognition at line 8773"
+          },
+          "current_assertion": "A resumed walking session remains paused until explicit recognized START confirmation passes current recheck state.",
+          "exact_file_binding": {
+            "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+            "sha256": "a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43",
+            "snapshot_locator": "files[path=apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt]"
+          },
+          "historical_assertion_disproved": "The historical implementation resumed walking sensors immediately after returning to the activity without a complete recheck and user confirmation.",
+          "receipt_check_locator": {
+            "capture_boundary": {
+              "current_subject_manifest_relation": "POST_HOC_CURRENT_STATE_ONLY_NOT_EXECUTION_TIME_PROOF",
+              "execution_ended_at": "NOT_CAPTURED",
+              "execution_started_at": "NOT_CAPTURED",
+              "execution_time_subject_manifest": "NOT_CAPTURED",
+              "raw_log_status": "CAPTURED",
+              "xml_manifest_status": "INTERNAL_PASS_HASH_RECORDED"
+            },
+            "evidence_id": "PATH:docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+            "identifier_kind": "PATH_IDENTIFIER_NO_INTRINSIC_RECEIPT_ID",
+            "locator": "result: tests=728, passed=728, failures=0, errors=0, skipped=0; decision.observed_internal_test_output=PASS; decision.admissible_current_subject_test_result=NOT_ESTABLISHED; decision.admission_status=CONDITIONAL_OBSERVATION_ONLY",
+            "observation_classification": {
+              "actual_device_evidence": false,
+              "evidence_grade": false,
+              "formal_evidence": false,
+              "record_class": "DIAGNOSTIC_ADMISSION_OBSERVATION",
+              "release_evidence": false,
+              "scope": "RESOURCE_ADMISSION_ONLY"
+            },
+            "receipt_integrity": {
+              "algorithm": "SHA-256",
+              "content_sha256": "e2f296fec46f4f8db84605078c64a81964f963eafb642ee4149624f15b8537a0",
+              "locator": "receipt.integrity.sha256"
+            },
+            "receipt_path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+            "receipt_sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c",
+            "receipt_type": "walksafe.resource-pilot-diagnostic-observation.v2",
+            "result": "OBSERVED_OUTPUT_PASS_SUBJECT_IDENTITY_NOT_ESTABLISHED",
+            "scope_limit": "Observed test output only. Execution timestamps, tool versions and execution-time subject identity were not captured; this is not an admissible current-subject machine PASS and grants no formal279, device, production or release credit.",
+            "subject": "apps/android/app",
+            "subject_hash_kind": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF",
+            "subject_sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+            "supporting_artifacts": [
+              {
+                "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+                "physical_file": true,
+                "role": "RAW_LOG",
+                "sha256": "22a6759067a3d2a34a43cd9e10b3e098eff85f2386c468ebe1a8923ff7576ba0"
+              },
+              {
+                "locator": "android-user-unit-fresh-receipt.json subject_manifest_binding.sha256",
+                "meaning": "Post-hoc current source manifest only; not execution-time source proof.",
+                "path": null,
+                "physical_file": false,
+                "role": "SUBJECT_MANIFEST_DIGEST",
+                "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913"
+              },
+              {
+                "locator": "android-user-unit-fresh-receipt.json result.xml_manifest_sha256",
+                "meaning": "Digest recorded by the fresh receipt for the complete 95-file XML suite set; specific assertion suites are physically bound separately.",
+                "path": null,
+                "physical_file": false,
+                "role": "XML_SUITE_MANIFEST_DIGEST",
+                "sha256": "becc5d0427c46aaccade8ab46ff01bd32dc02842b90c9930c420564e9aec58a0",
+                "suite_files": 95
+              },
+              {
+                "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest.xml",
+                "physical_file": true,
+                "role": "ASSERTION_XML_SUITE",
+                "sha256": "a2851b2080a5c86d31574c0cae090c83aa7ad4a134375ebdbeb68704b8ffa5d0"
+              },
+              {
+                "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleFp018Test.xml",
+                "physical_file": true,
+                "role": "ASSERTION_XML_SUITE",
+                "sha256": "d1ac889663a9b27a5773d2cf36b350f33e25eb5fd317ca0335f439c1ceed6bae"
+              }
+            ]
+          }
+        }
+      ],
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-017",
+      "title": "보행 자동 시작·다른 화면 전환 시 일시중지"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-027",
+      "historical_planned_test_count": 6,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-018-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-018-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-018",
+      "title": "보행 상태·종료·복구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-028",
+      "historical_planned_test_count": 6,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-019-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-019-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-019",
+      "title": "휴대전화 내부 물체 후보 탐지"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-029",
+      "historical_planned_test_count": 8,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-020-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-020-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-020",
+      "title": "위험 등급·우선순위·행동 안내"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-030",
+      "historical_planned_test_count": 9,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-021-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-021-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-021",
+      "title": "탐지 대상 종류·카메라 품질·거리 근거"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-031",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "live TMAP 목적지 검색·경로 검증을 실제 네트워크와 지원 기기에서 실행한다.",
+      "requirement_id": "RQ-FP-022-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-022",
+      "title": "티맵 목적지 검색과 큰 경로"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway"
+      ],
+      "historical_gap_id": "GAP-032",
+      "historical_planned_test_count": 3,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-023-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-023-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-023",
+      "title": "경로 이탈·재탐색·티맵 장애"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-033",
+      "historical_planned_test_count": 4,
+      "historical_status": "EVIDENCE_MISSING",
+      "required_next_action": "점자블록 local guidance를 실제 카메라·depth·경로 조건에서 검증한다.",
+      "requirement_id": "RQ-FP-024-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-024",
+      "title": "점자블록 휴대전화 내부 경로 보조와 손상 처리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-034",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "길라잡이 호출어와 on-device STT 가용성을 지원 기기별로 검증한다.",
+      "requirement_id": "RQ-FP-025-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-025",
+      "title": "길라잡이 호출어와 휴대전화 내부 음성인식"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-035",
+      "historical_planned_test_count": 4,
+      "historical_status": "PARTIAL",
+      "required_next_action": "RQ-FP-026-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-026-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-026",
+      "title": "음성 명령·확인·중재"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-036",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "TTS·TalkBack·진동 전달과 실패 안전정지를 실제 기기에서 검증한다.",
+      "requirement_id": "RQ-FP-027-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-027",
+      "title": "휴대전화 내부 음성안내·진동 대체 안내"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-037",
+      "historical_planned_test_count": 4,
+      "historical_status": "PARTIAL",
+      "required_next_action": "TalkBack과 화면읽기 흐름을 전맹·저시력 사용자 조건에서 검증한다.",
+      "requirement_id": "RQ-FP-028-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-028",
+      "title": "안드로이드 화면읽기 지원 범위"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-038",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-029-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-029-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-029",
+      "title": "거부·장애 확인창의 접근 가능한 조작"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app"
+      ],
+      "historical_gap_id": "GAP-039",
+      "historical_planned_test_count": 4,
+      "historical_status": "PARTIAL",
+      "required_next_action": "화면 미확인 전체 task flow를 실제 접근성 사용자 시험으로 검증한다.",
+      "requirement_id": "RQ-FP-030-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-030",
+      "title": "화면 미확인 사용과 시각 접근성"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-040",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-031-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-031-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-031",
+      "title": "손상 점자블록 자동신고"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-041",
+      "historical_planned_test_count": 3,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-032-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-032-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-032",
+      "title": "신고 중복·재시도·처리 단계"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-10",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-042",
+      "historical_planned_test_count": 5,
+      "historical_status": "PARTIAL",
+      "required_next_action": "관리자 검수·기관 전달·사용자 피드백 상태기계와 audit receipt를 완성한다.",
+      "requirement_id": "RQ-FP-033-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-033",
+      "title": "관리자 검수·기관 전달·사용자 피드백"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend",
+        "model/registry/walksafe-model-registry.json"
+      ],
+      "historical_gap_id": "GAP-043",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-034-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-034-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-034",
+      "title": "수집할 사용자 활동자료 목록"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "FP-035 is already approved in policy baseline 1.0.1 and committed by the baseline application receipt. The row remains PARTIAL only because implementation conformance, phone-queue behavior, selected-network branch behavior and integration tests remain open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+        "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-044",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "policy_approval_correction": {
+        "bindings": [
+          {
+            "locator": "metadata.baseline_id=PB-WALKSAFE-FEATURE-POLICY-1.0.1; approved_feature_id=FP-035 at line 31",
+            "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+            "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+          },
+          {
+            "locator": "metadata.transaction_status=COMMITTED at line 7; applied baseline manifest binding at line 47",
+            "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+            "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb"
+          }
+        ],
+        "correction_id": "M-004",
+        "open_items": [
+          "implementation conformance",
+          "phone queue behavior and byte limit",
+          "selected Network/mobile-data branch behavior",
+          "Android-to-Gateway-to-Backend integration tests"
+        ],
+        "policy_status": "APPROVED_AND_COMMITTED",
+        "reapproval_required": false
+      },
+      "required_next_action": "정책 1.0.1 승인과 COMMITTED application receipt 결속을 유지하고 재승인을 요구하지 않는다. 구현 적합성, phone queue, selected Network/mobile branch, Android→Gateway→Backend integration tests를 완료한다.",
+      "requirement_id": "RQ-FP-035-001",
+      "resource_class": "INTERNAL_AND_EXTERNAL_EVIDENCE",
+      "source_policy_id": "FP-035",
+      "title": "보행 중 휴대전화 저장·정지 시 서버 전송"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-045",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-036-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-036-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-036",
+      "title": "서버 확인 뒤 휴대전화 삭제·서버 보존"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "The runtime location is now explicit, but unified_walksafe remains a candidate with deployment_eligible=false and release_eligible=false; the historical implementation conflict is therefore not fully resolved.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json"
+      ],
+      "current_source_refs": [
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-046",
+      "historical_planned_test_count": 6,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "개발 runtime 위치는 유지하되 승인된 모델 promotion, 독립 평가, actual-device equivalence와 이전 정상 모델 rollback evidence를 확보한다.",
+      "requirement_id": "RQ-FP-037-001",
+      "resource_class": "INTERNAL_AND_EXTERNAL_EVIDENCE",
+      "source_policy_id": "FP-037",
+      "title": "현재 모델의 사용 위치"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json"
+      ],
+      "current_source_refs": [
+        "backend",
+        "model/registry/walksafe-model-registry.json"
+      ],
+      "historical_gap_id": "GAP-047",
+      "historical_planned_test_count": 6,
+      "historical_status": "PARTIAL",
+      "required_next_action": "데이터 안전검사 뒤 독립 정량 평가와 actual-device conversion equivalence를 실행한다.",
+      "requirement_id": "RQ-FP-038-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-038",
+      "title": "서버 재학습·학습자료 안전검사·독립평가"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json"
+      ],
+      "current_source_refs": [
+        "backend",
+        "model/registry/walksafe-model-registry.json",
+        "configs/walksafe_two_model_runtime_stage1_mvp_20260523.json"
+      ],
+      "historical_gap_id": "GAP-048",
+      "historical_planned_test_count": 5,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "승인 모델 promotion과 이전 정상 모델 rollback을 실제 artifact hash로 검증한다.",
+      "requirement_id": "RQ-FP-039-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-039",
+      "title": "모델 등록·교체·이전 정상 모델 복구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-049",
+      "historical_planned_test_count": 6,
+      "historical_status": "PARTIAL",
+      "required_next_action": "동일 generation에서 Android→Gateway→Backend→PostGIS cross-process 시험을 실행한다.",
+      "requirement_id": "RQ-FP-040-001",
+      "resource_class": "INTERNAL_AND_EXTERNAL_EVIDENCE",
+      "source_policy_id": "FP-040",
+      "title": "휴대전화·서버 역할과 하나의 서버 출입구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-050",
+      "historical_planned_test_count": 5,
+      "historical_status": "PARTIAL",
+      "required_next_action": "RQ-FP-041-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-041-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-041",
+      "title": "계정·공간 데이터베이스와 대용량 원본 저장소"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-051",
+      "historical_planned_test_count": 6,
+      "historical_status": "PARTIAL",
+      "required_next_action": "RQ-FP-042-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-042-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-042",
+      "title": "외부 서비스 비밀키·대기자료·중복방지"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-052",
+      "historical_planned_test_count": 3,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-043-001의 formal·actual-device·cross-process evidence를 해당 경계에서 실행한다.",
+      "requirement_id": "RQ-FP-043-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-043",
+      "title": "장애가 계속될 때 멈출 기능 범위"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-053",
+      "historical_planned_test_count": 4,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-044-001의 formal·actual-device·cross-process evidence를 해당 경계에서 실행한다.",
+      "requirement_id": "RQ-FP-044-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-044",
+      "title": "인터넷이 없거나 일부 기능만 쓸 때의 제한"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json"
+      ],
+      "historical_gap_id": "GAP-054",
+      "historical_planned_test_count": 4,
+      "historical_status": "MISSING",
+      "required_next_action": "저장공간·배터리·발열 gate의 현재 구현을 확인하고 actual-device 임계값 시험을 실행한다.",
+      "requirement_id": "RQ-FP-045-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-045",
+      "title": "저장공간·배터리·발열·복구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-055",
+      "historical_planned_test_count": 5,
+      "historical_status": "MISSING",
+      "required_next_action": "RQ-FP-046-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-046-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-046",
+      "title": "개인정보 수집·보존·사용자 권리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-056",
+      "historical_planned_test_count": 7,
+      "historical_status": "CONFLICTING",
+      "required_next_action": "RQ-FP-047-001의 남은 workflow를 완성하고 연결된 계획 시험을 실행한다.",
+      "requirement_id": "RQ-FP-047-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-047",
+      "title": "사용자·관리자 로그인과 권한 분리"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-057",
+      "historical_planned_test_count": 7,
+      "historical_status": "PARTIAL",
+      "required_next_action": "release secrets, TLS, incident response, signing 경계를 정식 보안 검토에 결속한다.",
+      "requirement_id": "RQ-FP-048-001",
+      "resource_class": "SECURITY_REVIEW",
+      "source_policy_id": "FP-048",
+      "title": "암호화·접속정보·보안사고"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-058",
+      "historical_planned_test_count": 6,
+      "historical_status": "EVIDENCE_MISSING",
+      "required_next_action": "계획된 formal 279 cases를 승인 baseline에서 실행한다.",
+      "requirement_id": "RQ-FP-049-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-049",
+      "title": "출시 전에 반드시 통과할 기능·안전·접근성 시험"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "model/registry/walksafe-model-registry.json",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-059",
+      "historical_planned_test_count": 5,
+      "historical_status": "EVIDENCE_MISSING",
+      "required_next_action": "지원 기기의 성능·카메라·음성·접근성과 현장 사용자 시험을 실행한다.",
+      "requirement_id": "RQ-FP-050-001",
+      "resource_class": "ACTUAL_DEVICE_OR_USER",
+      "source_policy_id": "FP-050",
+      "title": "휴대전화 전체 성능·현장 사용자 시험"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-11",
+        "DLV-REQ-14",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/app",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-060",
+      "historical_planned_test_count": 7,
+      "historical_status": "PARTIAL",
+      "required_next_action": "signed installable build, store version, update와 rollback을 같은 release generation에서 검증한다.",
+      "requirement_id": "RQ-FP-051-001",
+      "resource_class": "RELEASE_OR_CLOUD_OPERATIONS",
+      "source_policy_id": "FP-051",
+      "title": "앱스토어 배포·버전 일치·업데이트·이전 정상판 복구"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-12",
+        "DLV-REQ-13",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-061",
+      "historical_planned_test_count": 8,
+      "historical_status": "PARTIAL",
+      "required_next_action": "실제 monitoring·alert 경로와 지정 관리자 지원 절차를 배포 환경에서 검증한다.",
+      "requirement_id": "RQ-FP-052-001",
+      "resource_class": "INTERNAL_ENGINEERING",
+      "source_policy_id": "FP-052",
+      "title": "운영 상태 확인·알림·단일 관리자 지원"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-12",
+        "DLV-REQ-13",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+      "current_classification": "EVIDENCE_GAP",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "backend"
+      ],
+      "historical_gap_id": "GAP-062",
+      "historical_planned_test_count": 6,
+      "historical_status": "PARTIAL",
+      "required_next_action": "production backup·restore·rollback·capacity·cost evidence를 실행한다.",
+      "requirement_id": "RQ-FP-053-001",
+      "resource_class": "RELEASE_OR_CLOUD_OPERATIONS",
+      "source_policy_id": "FP-053",
+      "title": "백업·복원·비용·용량 운영"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-07",
+        "DLV-REQ-08",
+        "DLV-REQ-09",
+        "DLV-REQ-10",
+        "DLV-REQ-12",
+        "DLV-REQ-13",
+        "DLV-REQ-15"
+      ],
+      "classification_basis": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+      "current_classification": "PARTIAL",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "backend",
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-063",
+      "historical_planned_test_count": 7,
+      "historical_status": "PARTIAL",
+      "required_next_action": "유지보수, 안전 배포, 종료·자료처분 절차의 승인과 실행 receipt를 확보한다.",
+      "requirement_id": "RQ-FP-054-001",
+      "resource_class": "RELEASE_OR_CLOUD_OPERATIONS",
+      "source_policy_id": "FP-054",
+      "title": "유지보수·안전한 배포·서비스 종료"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-06",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-064",
+      "historical_planned_test_count": 1,
+      "historical_status": "BLOCKED",
+      "required_next_action": "휴대전화 대기자료의 실제 byte 한도를 정하고 측정 receipt를 만든다.",
+      "requirement_id": "RQ-GATE-PHONE-QUEUE-BYTE-LIMIT-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "title": "휴대전화 대기자료의 실제 용량 한도"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-06",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-065",
+      "historical_planned_test_count": 1,
+      "historical_status": "BLOCKED",
+      "required_next_action": "서버 용량상태 계약과 Android 동기화 실패 동작을 승인·시험한다.",
+      "requirement_id": "RQ-GATE-SERVER-CAPACITY-STATE-CONTRACT-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-06",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "README.md"
+      ],
+      "historical_gap_id": "GAP-066",
+      "historical_planned_test_count": 1,
+      "historical_status": "BLOCKED",
+      "required_next_action": "무가림 원본 수집을 독립 검토하고 승인 또는 거부 결정을 기록한다.",
+      "requirement_id": "RQ-GATE-RAW-COLLECTION-RELEASE-REVIEW-001",
+      "resource_class": "INDEPENDENT_REVIEW",
+      "source_policy_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "title": "무가림 원본 수집의 출시 전 독립 검토"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-06",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "backend"
+      ],
+      "historical_gap_id": "GAP-067",
+      "historical_planned_test_count": 1,
+      "historical_status": "BLOCKED",
+      "required_next_action": "실제 cloud 저장·backup 부하로 월 비용과 한도를 측정한다.",
+      "requirement_id": "RQ-GATE-CLOUD-COST-MEASUREMENT-001",
+      "resource_class": "EXTERNAL_SERVICE_MEASUREMENT",
+      "source_policy_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "title": "실제 클라우드 저장비 측정"
+    },
+    {
+      "affected_deliverable_ids": [
+        "DLV-REQ-06",
+        "DLV-REQ-12",
+        "DLV-REQ-13"
+      ],
+      "classification_basis": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available.",
+      "current_classification": "UNVERIFIED",
+      "current_evidence_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+        "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+        "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+        "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json"
+      ],
+      "current_source_refs": [
+        "apps/android/adminapp",
+        "apps/android-gateway",
+        "backend"
+      ],
+      "historical_gap_id": "GAP-068",
+      "historical_planned_test_count": 1,
+      "historical_status": "BLOCKED",
+      "required_next_action": "별도 관리자 기기 분실·세션 폐기·복구훈련을 실행하고 승인 receipt를 만든다.",
+      "requirement_id": "RQ-GATE-SINGLE-ADMIN-RECOVERY-DRILL-001",
+      "resource_class": "OWNER_OPERATIONAL_DRILL",
+      "source_policy_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "title": "관리자 휴대전화 분실 복구훈련"
+    }
+  ],
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "cross_process_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "formal_pass_count": 0,
+    "formal_test_279_status": "NOT_RUN",
+    "model_approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "resolved_classifications_are_release_approval": false
+  },
+  "classification_definitions": {
+    "EVIDENCE_GAP": "A candidate implementation or contract exists, but the required formal, actual-device, cross-process, or production evidence is not run.",
+    "NOT_APPLICABLE_TO_SUBMISSION_SCOPE": "The requirement is explicitly outside the approved submission scope.",
+    "PARTIAL": "Current source implements part of the policy path, but a workflow, operational boundary, approval, or formal proof remains open.",
+    "RESOLVED_BY_BOUND_EVIDENCE": "Current exact-source or exact-subject evidence resolves the historical observation within its stated internal boundary.",
+    "RESOLVED_BY_CURRENT_CODE": "Current exact-snapshot source removes the historical implementation conflict; formal release completion is not implied.",
+    "UNVERIFIED": "Neither a sufficient current implementation binding nor the required measurement, review, approval, or drill is available."
+  },
+  "coverage": {
+    "current_assessment_count": 68,
+    "duplicate_historical_gap_id_count": 0,
+    "historical_assessment_count": 68,
+    "historical_counts_partially_updated": false,
+    "historical_planned_test_count": 279,
+    "missing_historical_gap_id_count": 0,
+    "unique_historical_gap_id_count": 68
+  },
+  "input_bindings": [
+    {
+      "bytes": 523,
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityIntegratedConsentStaticTest.xml",
+      "sha256": "8aac72712fe1fed335f8de5fe3bd097ada4c70d0aeaed2fb264e66dd13c1851e"
+    },
+    {
+      "bytes": 2795,
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.MainActivityWalkSessionLifecycleStaticTest.xml",
+      "sha256": "a2851b2080a5c86d31574c0cae090c83aa7ad4a134375ebdbeb68704b8ffa5d0"
+    },
+    {
+      "bytes": 1693,
+      "path": "apps/android/app/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.session.WalkSessionLifecycleFp018Test.xml",
+      "sha256": "d1ac889663a9b27a5773d2cf36b350f33e25eb5fd317ca0335f439c1ceed6bae"
+    },
+    {
+      "bytes": 521661,
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json",
+      "sha256": "e559a9381ce13462e8d377befe5005a9d5250a0cdd33ada8a98a933bad50e8fe"
+    },
+    {
+      "bytes": 4812,
+      "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+      "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb"
+    },
+    {
+      "bytes": 8054,
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+    },
+    {
+      "bytes": 12949,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline.json",
+      "sha256": "ccc0c7ecad9cf0f4c803a3dfc961c7e5c6fd1c1c007020401deb3db08d769de7"
+    },
+    {
+      "bytes": 5311,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+      "sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a"
+    },
+    {
+      "bytes": 5123,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+      "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+    },
+    {
+      "bytes": 3650,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+      "sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c"
+    },
+    {
+      "bytes": 6302,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh.log",
+      "sha256": "22a6759067a3d2a34a43cd9e10b3e098eff85f2386c468ebe1a8923ff7576ba0"
+    },
+    {
+      "bytes": 588435,
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/req-current-state.json",
+      "sha256": "615f35910cb1fffab6284aee456e562e6d21e75671f225bd9f06868ad0785dce"
+    },
+    {
+      "bytes": 86842,
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+      "sha256": "470b4566a0272d5fc5fc028e53a3ee8a8bde19b06b889570ad60adcce53b62ea"
+    },
+    {
+      "bytes": 15871,
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+      "sha256": "0d60327172735809b97c5d4546a6120f265c6f50d1ac101fd4fa9a644b8b46c1"
+    },
+    {
+      "bytes": 48879,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-execution-current-state.json",
+      "sha256": "02a595ad40fd3deb4ff7fa61d31be3b1a115586f7110d6966990af323b146d45"
+    },
+    {
+      "bytes": 637704,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103"
+    },
+    {
+      "bytes": 13325,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/logs/gateway-npm-test.log",
+      "sha256": "00bb601dc150b5004e1792d160237cbdd1f2c9dafdbf9558e15d9faea8bd0ab2"
+    },
+    {
+      "bytes": 1300,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-001/receipts/gateway-npm-test.json",
+      "sha256": "79cae4f38d8ccd990aa99b1f15a0a80ca40838e868d9e41cc5e2e02b2901ab6d"
+    },
+    {
+      "bytes": 87099,
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/testing-current-state.json",
+      "sha256": "6aa20533a50fef0599c54c5bcae79eb2d3368a9355a2ee0c636eada84e80c6b4"
+    },
+    {
+      "bytes": 97289,
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+      "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675"
+    },
+    {
+      "bytes": 150923,
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+      "sha256": "be717aa01b8b9c9f1e218f1bf8dfd90a5b07cfe6aed427255e5fcd0b133b0e32"
+    },
+    {
+      "bytes": 22179,
+      "path": "docs/control/execution/artifact-remediation/20260726/w6/aiml-data-schema-current-state.json",
+      "sha256": "a5a1dc844eb66289f5fd6d21c57b9ab7031a47fb499afe9ce12a58c1bbab0c4f"
+    },
+    {
+      "bytes": 41414,
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+      "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+    },
+    {
+      "bytes": 56684,
+      "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+      "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879"
+    },
+    {
+      "bytes": 237532,
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+      "sha256": "1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda"
+    },
+    {
+      "bytes": 4664,
+      "path": "docs/deliverables/05-implementation/implementation-manifest-20260727-r002.json",
+      "sha256": "f26709242bf7520ec9385feb70f5df859124700657d8fe2dc71c8d1d1df839c2"
+    },
+    {
+      "bytes": 7330,
+      "path": "docs/deliverables/05-implementation/module-register-20260727-r002.json",
+      "sha256": "280094003906e168aa7f85ea9ec64b71ff01501f5a979ce1941c2d83a1ab6750"
+    },
+    {
+      "bytes": 20877,
+      "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+      "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+    }
+  ],
+  "metadata": {
+    "approval_status": "NOT_APPROVED",
+    "content_review_corrections": [
+      "M-003",
+      "M-004",
+      "SUCCESSOR-MAJOR-EVIDENCE-SEMANTICS",
+      "RESOURCE-RECEIPT-DIAGNOSTIC-BOUNDARY",
+      "RESOURCE-RECEIPT-FINAL-RUN-STATE"
+    ],
+    "document_id": "WALKSAFE-CURRENT-IMPLEMENTATION-GAP-ANALYSIS-20260727-001",
+    "historical_counts_reused": false,
+    "prepared_on": "2026-07-27",
+    "release_status": "NOT_ELIGIBLE",
+    "status": "CURRENT_REASSESSMENT_COMPLETE"
+  },
+  "policy_binding": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_version": "1.0.1"
+  },
+  "resolved_evidence_audit": {
+    "current_android_user_diagnostic_receipt": {
+      "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+      "admission_status": "CONDITIONAL_OBSERVATION_ONLY",
+      "observed_internal_test_output": "PASS",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+      "physical_sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c",
+      "raw_log_sha256": "22a6759067a3d2a34a43cd9e10b3e098eff85f2386c468ebe1a8923ff7576ba0",
+      "receipt_integrity_sha256": "e2f296fec46f4f8db84605078c64a81964f963eafb642ee4149624f15b8537a0",
+      "receipt_type": "walksafe.resource-pilot-diagnostic-observation.v2",
+      "resource_pilot_result": "DIAGNOSTIC_ONLY",
+      "subject": "apps/android/app",
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "subject_manifest_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF",
+      "subject_manifest_sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+      "xml_manifest_sha256": "becc5d0427c46aaccade8ab46ff01bd32dc02842b90c9930c420564e9aec58a0"
+    },
+    "current_quality_register": {
+      "path": "docs/deliverables/05-implementation/quality-evidence-register-20260727-r002.json",
+      "sha256": "d116b59dcb05bf8e6ba93de5c2cbcd3d7d8648433739212b89af502bee3a069d"
+    },
+    "current_refresh_packet": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/implementation-register-refresh/evidence.json",
+      "sha256": "95026afb0e2d8a6f0ef6758d803c5bf2471d7befce06c26cc1143644f807ec2a"
+    },
+    "current_refresh_receipt": {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/implementation-register-refresh-receipt.json",
+      "sha256": "c2eac794d4324b32043ef687244c53c07f5419f66799c448b0d7ab1bd710590a"
+    },
+    "downgraded_gap_ids": [],
+    "incorrect_binding_removed": "W3-EXEC-SRC-038 is a PostgreSQL run-2 evidence binding and is not used by GAP-022 or GAP-026.",
+    "required_semantic_fields": [
+      "evidence_id",
+      "identifier_kind",
+      "receipt_type",
+      "subject",
+      "subject_hash_kind",
+      "receipt_path",
+      "receipt_sha256",
+      "locator",
+      "result",
+      "scope_limit"
+    ],
+    "review_status": "PASS",
+    "reviewed_assertion_count": 9,
+    "reviewed_gap_ids": [
+      "GAP-010",
+      "GAP-011",
+      "GAP-016",
+      "GAP-018",
+      "GAP-022",
+      "GAP-026"
+    ]
+  },
+  "schema_version": "walksafe.current-implementation-gap-analysis.v1",
+  "source_binding": {
+    "content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+    "file_count": 2960,
+    "path_set_sha256": "971cee4fbded63faf05e30b0dc7343a9eff41e4612edff307f3df5581c880eff",
+    "snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+    "source_commit": null,
+    "worktree_state": "DIRTY_WORKTREE_EXACT_CONTENT_SNAPSHOT"
+  },
+  "summary": {
+    "classification_counts": {
+      "EVIDENCE_GAP": 14,
+      "NOT_APPLICABLE_TO_SUBMISSION_SCOPE": 0,
+      "PARTIAL": 39,
+      "RESOLVED_BY_BOUND_EVIDENCE": 3,
+      "RESOLVED_BY_CURRENT_CODE": 3,
+      "UNVERIFIED": 9
+    },
+    "headline": "Historical 68 rows were reassessed from zero; six resolved rows now carry assertion-level exact source and receipt bindings, while model approval, formal279, actual-device, cross-process, deployment and five release gates remain open.",
+    "not_release_eligible": true,
+    "resolved_total": 6
+  }
+}

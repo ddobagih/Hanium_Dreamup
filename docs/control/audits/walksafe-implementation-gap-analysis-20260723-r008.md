@@ -1,0 +1,11 @@
+# WalkSafe 구현 Gap 분석 r008
+
+- 보고서 ID: `WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-008`
+- 버전: `0.8.0`
+- 직접 재평가: `GAP-026` (`CONFLICTING` → `PARTIAL`)
+- 승계: r007의 나머지 67개
+- 집계: BLOCKED 5, CONFLICTING 20, EVIDENCE_MISSING 4, MISSING 19, PARTIAL 20, IMPLEMENTED 0
+- 정식 시험: `279/279 NOT_RUN`
+- 실제 기기: `NOT_RUN`
+- gate: `5 NOT_RUN`, 미면제
+- 출시: `NOT_ELIGIBLE`

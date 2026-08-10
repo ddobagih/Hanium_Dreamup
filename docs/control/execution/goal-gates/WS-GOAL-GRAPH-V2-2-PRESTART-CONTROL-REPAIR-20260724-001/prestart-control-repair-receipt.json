@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-RECEIPT-20260724-001",
+  "evidence_type": "PRESTART_CONTROL_REPAIR_RECEIPT",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-2",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001",
+  "source_activation_event_sha256": "d21327bb087478cb00ee829343113845e4005aff4c40e2eb4ca7b5dde16f1951",
+  "reason_code": "STATE_DEPENDENT_TEST_FIXTURE_REPAIR",
+  "repository_snapshot_before": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 332,
+    "path_set_sha256": "3c0f927bdca9b78b0cf392665c017e336c1d3135a739b80dddaf692babe74f25",
+    "content_set_sha256": "301f869232b5054890150cace6ab0e6a5d770c26bdb06a7f961396def2db4e89"
+  },
+  "repository_snapshot_after": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 332,
+    "path_set_sha256": "3c0f927bdca9b78b0cf392665c017e336c1d3135a739b80dddaf692babe74f25",
+    "content_set_sha256": "67905dcf2a090cedde9add8b2d0d1756e6595b74616caad0c2e2d73d6c670786"
+  },
+  "changed_paths": [
+    {
+      "path": "scripts/check_walksafe_goal_graph.py",
+      "before_archive_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/before/scripts/check_walksafe_goal_graph.py",
+      "before_sha256": "e8b153a7981d036acab54d577b0aff9ebe985f52fbeecb95e75c3c3c6a3a2b1f",
+      "after_sha256": "64c5e733499029f608dc56d76096bb25a97bfdf043fa483180565a55d7d68d9e"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph.py",
+      "before_archive_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/before/tests/test_walksafe_goal_graph.py",
+      "before_sha256": "4892c0a6e14f6d0445d8a32d1d3cac465ed347af69e77cbe014c27bf6ebea3ce",
+      "after_sha256": "ba195e5c26d8a91eca6b88e09587d2f58fcc213590977d7ef95b434e781db297"
+    }
+  ],
+  "execution_window": {
+    "started_at": "2026-07-24T04:45:01+09:00",
+    "ended_at": "2026-07-24T10:27:14+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "FAIL_BEFORE",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && \"${WALKSAFE_LOCKED_TEST_PYTHON}\" -m pytest tests/test_walksafe_goal_graph.py tests/test_walksafe_project_continuation.py -q",
+      "executed_at": "2026-07-24T04:45:01+09:00",
+      "exit_code": 1,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/01-FAIL_BEFORE.log",
+      "output_sha256": "0f40a429dc378a8c438bbf78cf4872c3f90b97577f8053164c93ecffacf84f02"
+    },
+    {
+      "check_id": "PASS_AFTER",
+      "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && \"${WALKSAFE_LOCKED_TEST_PYTHON}\" -m pytest tests/test_walksafe_goal_graph.py tests/test_walksafe_project_continuation.py -q --deselect=tests/test_walksafe_goal_graph.py::WalkSafeGoalGraphTest::test_current_goal_graph_is_valid --deselect=tests/test_walksafe_project_continuation.py::WalkSafeProjectContinuationTest::test_current_checkpoint_is_valid",
+      "executed_at": "2026-07-24T10:27:14+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/02-PASS_AFTER.log",
+      "output_sha256": "19589c8c80ef12ad32ba09065a5fab9b5f005bec5206ee7adbeb7090aac44006"
+    }
+  ],
+  "executor": {
+    "id": "WALKSAFE-PRESTART-CONTROL-REPAIR-EXECUTOR-20260724-001",
+    "role": "CONTROL_PLANE_REPAIR_EXECUTOR",
+    "authority": "INTERNAL_REPOSITORY_CONTROL"
+  },
+  "controlled_content_witness_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-CONTROLLED-CONTENT-WITNESS-20260724-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/controlled-content-witness.json",
+    "file_sha256": "7093c693a808ff62fcb87721ef720c55b8a2cb7592ea93642c56541fb4cd160e"
+  },
+  "independent_review_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-REVIEW-20260724-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/independent-review.json",
+    "file_sha256": "513878a6ab61499c5e2762898abda32a59ec95b0643379cb1b698c27cac306e4"
+  },
+  "generated_at": "2026-07-24T10:51:57+09:00"
+}

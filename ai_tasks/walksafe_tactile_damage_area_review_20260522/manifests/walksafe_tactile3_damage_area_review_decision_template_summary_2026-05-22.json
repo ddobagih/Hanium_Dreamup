@@ -1,0 +1,25 @@
+{
+  "date": "2026-05-22",
+  "source_queue": "data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv",
+  "decision_template": "data_sources/manifests/walksafe_tactile3_damage_area_review_decision_template_2026-05-22.csv",
+  "rows": 120,
+  "issue_counts": {
+    "mixed_fn_fp_damage_area": 24,
+    "damage_block_ok_area_missed": 36,
+    "false_negative_damage_area": 36,
+    "hard_negative_false_positive_damage_area": 24
+  },
+  "allowed_decisions": [
+    "accept_existing_labels",
+    "fix_tactile_damage_area_bbox",
+    "remove_false_damage_area_label",
+    "add_missing_tactile_damage_area",
+    "exclude_unclear"
+  ],
+  "manual_box_field": "manual_damage_area_boxes_xywhn",
+  "notes": [
+    "review_decision is intentionally blank; suggestions are non-binding.",
+    "Do not copy model prediction boxes into labels without visual confirmation.",
+    "Rows needing bbox edits require manual YOLO-normalized class-2 boxes before dataset materialization."
+  ]
+}

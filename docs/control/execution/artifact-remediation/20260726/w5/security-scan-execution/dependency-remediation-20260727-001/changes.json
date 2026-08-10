@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "after_sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24",
+      "before_sha256": "a54ae7931a13504b1be671c645832b422d79320f68fce3fd580d5f94bfa51779",
+      "path": "backend/requirements.txt"
+    },
+    {
+      "after_sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700",
+      "before_sha256": "69017e7df8862a09063ab6329535883c28335dd7202caae5d77a5f3dcbc01069",
+      "path": "backend/requirements.lock"
+    },
+    {
+      "after_sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa",
+      "before_sha256": "f16102d14af2dd05eace27c5b04ce60718ebcb9cd670514b691ce75241c89ba3",
+      "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,133 @@
+{
+  "schema_version": "walksafe.artifact-baseline-application-receipt.v1",
+  "metadata": {
+    "receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+    "receipt_version": "1.0.0",
+    "application_id": "WS-ARTIFACT-BASELINE-APPLICATION-20260722-001",
+    "transaction_status": "COMMITTED",
+    "effective_at": "2026-07-22T14:22:21+09:00",
+    "lifecycle_status": "IMMUTABLE"
+  },
+  "approval_binding": {
+    "name": "artifact_baseline_approval",
+    "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+    "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b"
+  },
+  "posttransition_manifest_binding": {
+    "path": "docs/control/baselines/walksafe-artifact-posttransition-verification-20260722-r001.json",
+    "sha256": "9012644a5ebffa835222ae4be6c0948936fd61b810af253f567bfc4b642dcab5"
+  },
+  "committed_output_bindings": [
+    {
+      "path": "docs/control/baselines/walksafe-artifact-approval-prepare-receipt-20260722-r001.json",
+      "byte_length": 5360,
+      "sha256": "5a146ec328fb72aab4fe43af62482915e2cca0e251d9f990b12d322f6e0ed962"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-baseline-approval-20260722-r001.json",
+      "byte_length": 117401,
+      "sha256": "6ad3e60286c24a8519aa92dcd68a1fa7e4f64759da6d84f6817812b6d85d258b"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-posttransition-verification-20260722-r001.json",
+      "byte_length": 5294,
+      "sha256": "9012644a5ebffa835222ae4be6c0948936fd61b810af253f567bfc4b642dcab5"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-pretransition-snapshot-20260722-r001.json",
+      "byte_length": 3689548,
+      "sha256": "1e1fe3ea0b23c8d8d9264bfeac7ffb8750aa175bc9b8b17b569962dc466f54a7"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-artifact-state-transition-20260722-r001.json",
+      "byte_length": 207279,
+      "sha256": "0b6695b40ef54aa279671da60809dc3cacea9bc95f96b0620d45dc7e9aba5b48"
+    },
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "byte_length": 8054,
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308"
+    },
+    {
+      "path": "docs/deliverables/00-control/README.md",
+      "byte_length": 2630,
+      "sha256": "b3dde3a3c3f74fd383979eb8ed3a8ac9d6727592ddad0ea8c86e8b5143e07fa3"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "byte_length": 96734,
+      "sha256": "c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.html",
+      "byte_length": 1295711,
+      "sha256": "30b0a6390dd0887420df9875f02529c00bf968299c230586bee32356eca179c4"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "byte_length": 3499550,
+      "sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6"
+    },
+    {
+      "path": "docs/deliverables/README.md",
+      "byte_length": 1411,
+      "sha256": "9d05b15dbe210fddaf1d78d280260c7b0ef3c11126fab60b59eeeb8ee498695b"
+    }
+  ],
+  "state_summary": {
+    "artifact_count": 257,
+    "approved_baselined": 102,
+    "active": 27,
+    "draft_pending": 53,
+    "planned_not_run": 75
+  },
+  "authority_boundary": {
+    "this_receipt_is_the_single_commit_marker": true,
+    "implementation_conformance_assessed": false,
+    "execution_or_test_completion_claimed": false,
+    "remaining_gates_are_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "time_provenance": {
+    "candidate_prepared_at_interpretation": "FIXED_REPRODUCIBLE_DOCUMENT_VALUE_NOT_EVENT_TIME",
+    "actual_candidate_generation_time": "NOT_CAPTURED",
+    "approval_event_date": "2026-07-22",
+    "effective_at": "2026-07-22T14:22:21+09:00",
+    "effective_at_basis": "TRANSACTION_COMMIT_TIME",
+    "future_fixed_prepared_at_exception_disclosed": true
+  },
+  "product_tree": {
+    "pretransition": {
+      "roots": [
+        "apps",
+        "backend",
+        "configs",
+        "contracts",
+        "data_sources",
+        "deploy",
+        "model",
+        "product",
+        "voice"
+      ],
+      "file_count": 30707,
+      "aggregate_sha256": "e951b4c608d05cde36bdc31528843f0a61e04c64f64b016b13a408c8ea4b11c5"
+    },
+    "posttransition": {
+      "roots": [
+        "apps",
+        "backend",
+        "configs",
+        "contracts",
+        "data_sources",
+        "deploy",
+        "model",
+        "product",
+        "voice"
+      ],
+      "file_count": 30707,
+      "aggregate_sha256": "e951b4c608d05cde36bdc31528843f0a61e04c64f64b016b13a408c8ea4b11c5"
+    },
+    "unchanged": true
+  },
+  "content_sha256": "85a34a21c50a3b0d6ecc15f21bcfa3051c5b408b3f248dcd2a4e22bd90e52090"
+}

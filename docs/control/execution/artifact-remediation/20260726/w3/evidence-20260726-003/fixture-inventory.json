@@ -1,0 +1,2032 @@
+{
+  "assignment_boundary": "Inventory linkage records every one of the 279 formal test IDs. An empty source_fixture_ids list is not an invented assignment.",
+  "claim_boundary": {
+    "fixture_assignment_completion_claimed": false,
+    "formal_tests_executed": false,
+    "formal_tests_passed": false,
+    "release_gate_waived": false
+  },
+  "document_id": "WALKSAFE-W3-FIXTURE-AND-FORMAL-TEST-INVENTORY-20260726",
+  "fixtures": [
+    {
+      "bytes": 1731,
+      "fixture_id": "FIX-0148BD1AF2FF92BD",
+      "path": "contracts/fixtures/walking-route-v1.json",
+      "sha256": "8460df0e1e1532df1cd94127a4ba620e8acc20ef1a3db1aa4e78e6a5e18f0cb6"
+    },
+    {
+      "bytes": 20,
+      "fixture_id": "FIX-4FF47380EDAC018B",
+      "path": "tests/fixtures/model_registry_dataset/image.fixture",
+      "sha256": "a3c5b3421985f7fca96326066859ce7a42d5799d0135956898c272b2ad56d2d5"
+    },
+    {
+      "bytes": 38,
+      "fixture_id": "FIX-1B2B2C5E560F49C7",
+      "path": "tests/fixtures/model_registry_dataset/label.txt",
+      "sha256": "7ca2cb626dfd056f917570bf3180636d9f78b27519c30f85afe14c66fc8bc2a0"
+    },
+    {
+      "bytes": 330,
+      "fixture_id": "FIX-51ABD8675275B293",
+      "path": "tests/fixtures/model_registry_dataset/manifest.csv",
+      "sha256": "d00d088234dc36aef16833a026e7e4f32fca1ac0d77ab0eb6276cbe30ea37441"
+    },
+    {
+      "bytes": 19,
+      "fixture_id": "FIX-A377840F97CF1DFD",
+      "path": "tests/fixtures/model_registry_dataset/training-results.csv",
+      "sha256": "78f28752c649c207a8eaca2c999a75d92f6490fa3b62bbdf79a279eba8c00945"
+    },
+    {
+      "bytes": 6479,
+      "fixture_id": "FIX-3C8955DDD253A494",
+      "path": "tests/fixtures/navigation/tactile_route_policy_cases.json",
+      "sha256": "6b0f84db9f416da02fc27c514569a0f80efc420aeb955345f0a93a21ef4c3f59"
+    }
+  ],
+  "formal_test_fixture_links": [
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-001-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-001-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-001-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-001-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-002-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-002-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-002-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-002-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-003-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-003-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-003-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-003-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-004-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-004-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-004-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-004-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-005-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-005-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-005-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-005-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-006-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-006-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-006-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-006-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-007-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-007-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-007-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-007-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-008-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-008-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-008-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-008-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-009-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-009-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-009-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-009-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-010-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-010-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-010-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-010-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-011-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-011-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-011-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-011-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-011-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-012-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-012-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-012-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-012-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-012-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-013-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-013-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-013-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-013-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-013-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-014-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-014-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-014-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-015-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-015-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-015-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-015-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-015-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-016-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-016-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-016-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-016-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-017-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-018-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-019-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-020-08",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-08",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-021-09",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-022-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-022-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-022-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-022-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-023-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-023-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-023-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-024-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-024-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-024-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-024-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-025-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-025-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-025-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-025-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-026-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-026-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-026-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-026-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-027-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-027-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-027-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-027-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-028-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-028-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-028-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-028-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-029-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-029-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-029-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-029-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-030-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-030-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-030-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-030-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-031-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-031-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-031-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-031-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-032-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-032-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-032-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-033-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-033-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-033-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-033-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-033-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-034-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-034-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-034-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-034-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-035-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-035-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-035-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-035-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-036-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-036-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-036-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-036-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-036-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-037-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-038-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-039-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-039-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-039-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-039-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-039-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-040-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-041-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-041-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-041-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-041-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-041-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-042-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-043-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-043-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-043-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-044-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-044-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-044-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-044-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-045-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-045-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-045-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-045-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-046-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-046-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-046-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-046-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-046-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-047-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-048-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-049-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-050-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-050-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-050-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-050-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-050-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-051-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-052-08",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-053-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-02",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-03",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-04",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-05",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-06",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-FP-054-07",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-RAW-ORIGINAL-COLLECTION-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-DATA-LIFECYCLE-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-SERVER-STORAGE-CAPACITY-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-PHONE-QUEUE-CAPACITY-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-AUTO-REPORT-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-PERMISSION-SESSION-LIFECYCLE-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-NAVIGATION-ROUTE-DIRECTION-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-SINGLE-ADMIN-RECOVERY-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-NPC-SERVER-CAPACITY-STATE-SYNC-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-GATE-PHONE-QUEUE-BYTE-LIMIT-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-GATE-SERVER-CAPACITY-STATE-CONTRACT-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-GATE-RAW-COLLECTION-RELEASE-REVIEW-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-GATE-CLOUD-COST-MEASUREMENT-01",
+      "unresolved_test_data_ids": []
+    },
+    {
+      "declared_test_data_ids": [],
+      "linkage_status": "GAP_REMAINS_NO_EXPLICIT_SOURCE_FIXTURE_ASSIGNMENT",
+      "source_fixture_ids": [],
+      "test_case_id": "TC-GATE-SINGLE-ADMIN-RECOVERY-DRILL-01",
+      "unresolved_test_data_ids": []
+    }
+  ],
+  "formal_test_register": {
+    "bytes": 2590342,
+    "path": "docs/deliverables/06-testing/registers/test-cases.json",
+    "sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee"
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "db05b46a3f1d1070c86dd40f6264e047ba0c1d5ec1da1d4da33be6357a7f2dc9"
+    }
+  },
+  "prepared_on": "2026-07-26",
+  "schema_version": "walksafe.w3-engineering-evidence.fixture-inventory.v1",
+  "source_commit": null,
+  "summary": {
+    "all_fixture_assignments_complete": false,
+    "all_formal_tests_not_run": true,
+    "explicit_source_fixture_link_count": 0,
+    "fixture_assignment_gap_count": 279,
+    "fixture_content_set_sha256": "b2c07e0e6979a3ed4279e73b1a41d961eee1be71f19af72077804c92d4d1bd96",
+    "fixture_count": 6,
+    "formal_test_count": 279,
+    "formal_test_id_set_sha256": "8ab0a039d0a6f9fcaad753bac08428da0f74ef27d40426ad4da49a28d5a0f167",
+    "formal_test_order_sha256": "681b6ad6c222aa73dfcf1bedb021279eca72342a108017688817e3afbfdfe395",
+    "formal_test_unique_count": 279,
+    "unassigned_formal_test_count": 279,
+    "unresolved_declared_test_data_count": 0
+  }
+}

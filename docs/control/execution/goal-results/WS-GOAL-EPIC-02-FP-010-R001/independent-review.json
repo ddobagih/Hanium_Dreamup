@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-INTERNAL-REVIEW-20260725-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+  "status": "PASS",
+  "reviewer_id": "CODEX-FP010-FIRST-RUN-SEPARATE-REVIEW-20260725-001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "6a3fc1a4964b6849bb0e09af0bf06823c36ef41d6c95df51d3f7ea035eb8b09f",
+    "VERIFICATION_RESULT": "e4e1c025b62df25652c07341a83c61f837783ff8d92f99d092e59f717528c378",
+    "SUCCESSOR_TRACE": "58e74678306ed6c6b7a4a4a86b75533d3b5d5b3c75984d45119dddfd3a547780"
+  },
+  "reviewed_at": "2026-07-25T02:45:01+09:00",
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "the first-run order and age/guardian branches are explicit and fail closed",
+      "external evidence cannot be promoted by local identifiers or an unconfigured verifier",
+      "stale, duplicate, reordered and reset-crossing responses cannot advance state",
+      "only a verified ordered receipt prefix is restorable",
+      "raw password, OTP, phone, exact birth date and disability data are absent",
+      "all walk actions and sensitive outputs are gated before first-run completion",
+      "device preflight is isolated from runtime sensor and detector output",
+      "accessible controls avoid duplicate non-emergency TalkBack speech",
+      "the existing FP-004 policy remains unchanged and separately required"
+    ],
+    "known_nonblocking_boundaries": [
+      "external signup, SMS and guardian providers remain unconfigured",
+      "actual activation, login and provider receipt verification were not run",
+      "formal, actual-user TalkBack and actual-device tests were not run"
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "external_provider_tests_remain_not_run": true,
+    "actual_user_tests_remain_not_run": true,
+    "actual_talkback_user_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": "walksafe.v2.5-transition-history.candidate.v1",
+  "history_id": "WS-V25-TRANSITION-HISTORY-20260730-R002",
+  "candidate_state": "SEQ1_PREFIX_NOT_EFFECTIVE",
+  "predecessor_anchor": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+    "checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "checkpoint_sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+    "checkpoint_bytes": 1329415,
+    "tail_event_sha256": "c12be7a16436d96b8939028d7b5bedb50580ad7761955410669d4c9d1cb7cf0a",
+    "event_count": 39
+  },
+  "required_authorized_event_chain": [
+    "PACKAGE_PREPARED",
+    "PACKAGE_ACTIVATED",
+    "BULK_REBASELINE_APPLIED"
+  ],
+  "future_events_materialized": false,
+  "events": [
+    {
+      "sequence": 1,
+      "event_id": "WS-V25-PACKAGE-PREPARED-20260730-002",
+      "event_type": "PACKAGE_PREPARED",
+      "occurred_at": "2026-08-02T17:32:53.360217+09:00",
+      "previous_event_sha256": "c12be7a16436d96b8939028d7b5bedb50580ad7761955410669d4c9d1cb7cf0a",
+      "commit_state": "PREPARED_NOT_ACTIVE",
+      "transaction_plan_binding": {
+        "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/v2.5-application-transaction-plan.candidate.json",
+        "sha256": "a5c955f2f24edced49c2a40cebd8b4e8c664c8416d783eb6082d730a494dd84c",
+        "bytes": 693880
+      },
+      "static_manifest_binding": {
+        "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r002/static-plan-manifest-v2.5.0.candidate.json",
+        "sha256": "382a4f9941ad2db28c9ca1aa0a1fa3f657f7dc8edeeb0baa93648d8f121567f9",
+        "bytes": 34117
+      },
+      "predecessor_checkpoint_binding": {
+        "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+        "sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+        "bytes": 1329415,
+        "tail_event_sha256": "c12be7a16436d96b8939028d7b5bedb50580ad7761955410669d4c9d1cb7cf0a"
+      },
+      "imported_goal_runtime_sha256": "03844e4ea34d00f4d4cf2ede085b1996e3586f66d7d8ac7720b6e6db3ebc1ab2",
+      "goal_status_changes": {},
+      "canonical_binding_changes": {},
+      "r022_applied": false,
+      "delegation_authorization_receipt_present": false,
+      "fresh_quick_gate_present": false,
+      "event_sha256": "de87018e80801ed64dc98a77b07ffbe500149d9fb76bf5754a8246c8e4c331c0"
+    }
+  ],
+  "tail_event_sha256": "de87018e80801ed64dc98a77b07ffbe500149d9fb76bf5754a8246c8e4c331c0",
+  "post_commit_receipt_created": false,
+  "history_content_sha256": "71f194245361d081acdb3f5f765859ff16407d3c53907bd4fe705d5218954f63"
+}

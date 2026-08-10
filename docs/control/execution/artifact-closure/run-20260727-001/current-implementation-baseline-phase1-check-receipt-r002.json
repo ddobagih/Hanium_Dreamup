@@ -1,0 +1,103 @@
+{
+  "check_kind": "DETERMINISTIC_DOCUMENT_INTERNAL_AND_SOURCE_BINDING_CHECK_ONLY",
+  "checked_at": "2026-07-28T11:00:30+09:00",
+  "checks": [
+    {
+      "check_id": "R001-PREDECESSOR-PHYSICAL-BINDING",
+      "detail": "R001 physical source SHA-256 and byte length are bound without modifying R001.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "R001-FACT-BOUNDARY-BINDING-PRESERVATION",
+      "detail": "Implementation facts, original claim-boundary values, policy/source bindings, Android/formal validation, open gaps, governance, and all eight R001 physical evidence bindings are preserved.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "OPENAPI-HISTORY-AND-CURRENT-DELTA",
+      "detail": "Prior BLOCKED_ENVIRONMENT is historical; current R002 receipt/log bind PASS with exit code 0 and W3 summary 4 PASS / 0 blocked.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "OPENAPI-PYTHON-REQUIREMENTS-BINDING",
+      "detail": "Python 3.14.6 .venv and backend/requirements.txt physical SHA-256/byte length are bound.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "DEVICE-CANDIDATE-FACTS",
+      "detail": "Physical SM-G981N observation and user-declared Galaxy S25 are candidate-only; exact S25 model/OS are UNKNOWN and device test/receipt counts remain zero.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "NORMALIZED-STATEMENT-INTEGRITY",
+      "detail": "Both normalized source statements match their declared UTF-8 byte lengths and SHA-256 values; unavailable raw external source files are not claimed.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "PHYSICAL-BINDING-COUNT-UNIQUENESS",
+      "detail": "12 physical binding paths are unique and all declared SHA-256 values have 64 hexadecimal characters.",
+      "result": "PASS"
+    },
+    {
+      "check_id": "NONSELF-INTEGRITY",
+      "detail": "Subject nonself canonical byte length and SHA-256 were calculated with the top-level integrity member excluded.",
+      "result": "PASS"
+    }
+  ],
+  "claim_boundary": {
+    "additional_openapi_check_executed": false,
+    "approval_or_release_credit_granted": false,
+    "device_test_executed": false,
+    "external_device_declaration_verified": false,
+    "git_operation_performed": false,
+    "product_test_executed": false
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_length": 3549,
+    "canonicalization": "sort_keys=true compact separators ensure_ascii=false trailing LF",
+    "scope": "UTF-8 canonical JSON with the top-level $.integrity member excluded",
+    "self_reference_included": false,
+    "sha256": "056a9b7714cc35e2d4404d3de7ee4a7a64a2a97d25d9cbbab5d993a8b31d639b"
+  },
+  "receipt_id": "CURRENT-IMPLEMENTATION-BASELINE-PHASE1-CHECK-R002",
+  "schema_version": "walksafe.current-implementation-baseline-phase1-check-receipt.v1",
+  "source_physical_evidence": [
+    {
+      "binding_id": "PHASE1_R001_BASELINE_SOURCE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-r001.json",
+      "physical_byte_length": 15563,
+      "physical_sha256": "33a2797ce3f948df26362e752f9f6ac461ab415f117c4e822b170c970014dbed"
+    },
+    {
+      "binding_id": "OPENAPI_R002_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-receipt-r002.json",
+      "physical_byte_length": 1515,
+      "physical_sha256": "ec6c92306e8f987823f4670ebb1f8ce083ac4398ddfc13f0bfdc3daebe1bacca"
+    },
+    {
+      "binding_id": "OPENAPI_R002_LOG",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-r002.log",
+      "physical_byte_length": 56,
+      "physical_sha256": "a1652c64ca8bff87adcb7d6146e4ec6e7d38de143ad4a5410d48c65be25c8aaf"
+    },
+    {
+      "binding_id": "BACKEND_REQUIREMENTS_SOURCE",
+      "path": "backend/requirements.txt",
+      "physical_byte_length": 256,
+      "physical_sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+    }
+  ],
+  "subject": {
+    "nonself_canonical_byte_length": 19792,
+    "nonself_integrity_sha256": "0e83f879bf7466c78e6b706c6d2bf897366a84fdd651bc330a7687e85d345faa",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-r002.json",
+    "physical_byte_length": 25164,
+    "physical_sha256": "a59e5796fd5653488b82ea91d69e9894aedd0c91c02dcac83bb0deb115ce3041"
+  },
+  "summary": {
+    "fail": 0,
+    "pass": 8,
+    "result": "PASS",
+    "total": 8
+  }
+}

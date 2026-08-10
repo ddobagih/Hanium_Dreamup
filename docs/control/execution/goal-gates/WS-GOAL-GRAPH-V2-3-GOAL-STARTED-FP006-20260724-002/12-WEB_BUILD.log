@@ -1,0 +1,50 @@
+
+> walksafe-pwa@0.1.0 build
+> next build
+
+▲ Next.js 16.2.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1129ms
+  Running TypeScript ...
+  Finished TypeScript in 1942ms ...
+  Collecting page data using 26 workers ...
+  Generating static pages using 26 workers (0/20) ...
+  Generating static pages using 26 workers (5/20) 
+  Generating static pages using 26 workers (10/20) 
+  Generating static pages using 26 workers (15/20) 
+✓ Generating static pages using 26 workers (20/20) in 183ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ƒ /api/admin-session
+├ ƒ /api/detect
+├ ƒ /api/detect/health
+├ ƒ /api/detect/v2
+├ ƒ /api/detect/v2/health
+├ ƒ /api/health
+├ ƒ /api/navigation/destinations/search/health
+├ ƒ /api/navigation/walking/health
+├ ƒ /api/release-identity
+├ ƒ /api/reports
+├ ƒ /api/reports/[reportId]
+├ ƒ /api/reports/[reportId]/status
+├ ƒ /api/reports/duplicate-check
+├ ƒ /api/reports/export
+├ ƒ /api/reports/summary
+├ ƒ /api/speech/health
+├ ƒ /api/speech/stt
+├ ƒ /api/uploads/[...path]
+├ ƒ /api/walksafe-field-log
+├ ƒ /api/walksafe-test-log
+└ ƒ /sw-version.js
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

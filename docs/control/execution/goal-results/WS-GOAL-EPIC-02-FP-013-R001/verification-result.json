@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP013-INTEGRATED-CONSENT-VERIFICATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+  "kind": "VERIFICATION_RESULT",
+  "status": "PASS",
+  "observed_at": "2026-07-25T16:36:13+09:00",
+  "checks": [
+    {
+      "name": "FP-013 focused Android consent tests",
+      "command": "./gradlew :app:testDebugUnitTest --tests '*MainActivityIntegratedConsentStaticTest' --tests '*IntegratedConsentPolicyTest' --tests '*AndroidReportUploaderTest' --tests '*ReportPrivacyConsentSessionTest' --rerun-tasks --offline --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process",
+      "command_sha256": "2261029e927fb99b3acbfad221cf54ffed3dcba875d480c179473d694f3c7edf",
+      "run_id": "fp013-focused-20260725-003",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/logs/focused-android-tests.log",
+      "output_sha256": "71eb7df0d3424f848ba3b8ba56c8cffaca078d358a0e4715162d8b98fbd61026",
+      "started_at": "2026-07-25T16:33:37+09:00",
+      "executed_at": "2026-07-25T16:34:04+09:00"
+    },
+    {
+      "name": "full Android unit, build and lint verification",
+      "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --rerun-tasks --offline --no-daemon --max-workers=1 -Dkotlin.compiler.execution.strategy=in-process",
+      "command_sha256": "320e457931fde9f9f8b38cae46491fe59821182146568b46ae600e832ae13000",
+      "run_id": "fp013-android-full-20260725-002",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/logs/full-android-verification.log",
+      "output_sha256": "d3a30435c43ddbbd5e903f26397e7c5ba910439f8a89d2ac6c39caa3854602a5",
+      "started_at": "2026-07-25T16:34:16+09:00",
+      "executed_at": "2026-07-25T16:35:33+09:00"
+    },
+    {
+      "name": "Android Gateway integrated-consent typecheck and tests",
+      "command": "cd apps/android-gateway && npm run typecheck && npm test",
+      "command_sha256": "9645b7b924c4a4ccb120b90d157697575fb334cd1bbe7d09dbdf635b25ad1fa7",
+      "run_id": "fp013-gateway-20260725-002",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/logs/android-gateway-verification.log",
+      "output_sha256": "d8d3559636d37c86bccc7d265d65ef34a628121cb57ebd6ad2d5800f81839c8e",
+      "started_at": "2026-07-25T16:35:46+09:00",
+      "executed_at": "2026-07-25T16:35:50+09:00"
+    },
+    {
+      "name": "Android Gateway frozen public-boundary check",
+      "command": "python3 -B scripts/check_walksafe_android_gateway_boundary_20260723.py --root .",
+      "command_sha256": "eaed10b1f0f8d18588454771ad1bde0a11eb7aea34f95ddb2e115a8ca2c0055c",
+      "run_id": "fp013-boundary-20260725-002",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/logs/android-gateway-boundary.log",
+      "output_sha256": "6756bb3a0b2a9714d3c175c3a542a65290dbaa99555e333a575b0c3e559827d4",
+      "started_at": "2026-07-25T16:35:58+09:00",
+      "executed_at": "2026-07-25T16:35:58+09:00"
+    },
+    {
+      "name": "FP-013 deterministic trace regression",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m py_compile scripts/build_walksafe_fp013_integrated_consent_trace_20260725.py && /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q tests/test_walksafe_fp013_integrated_consent_trace_20260725.py",
+      "command_sha256": "4074319e93e13504e89e855600330cee120f959f7395bb1c31e9f2fd4a422789",
+      "run_id": "fp013-control-20260725-005",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/logs/control-plane-verification.log",
+      "output_sha256": "1a9e20648c3b40a0923334ac9f7eda7f73c45920f7f15d7610980cf74a290c82",
+      "started_at": "2026-07-25T16:36:12+09:00",
+      "executed_at": "2026-07-25T16:36:13+09:00"
+    }
+  ],
+  "android_test_summary": {
+    "focused_tests": "PASS",
+    "full_unit_tests": "PASS",
+    "debug_build": "PASS",
+    "lint": "PASS",
+    "gateway_build_typecheck_tests": "PASS",
+    "gateway_test_count": 37,
+    "public_boundary": "PASS",
+    "trace_builder_tests": "PASS",
+    "debug_apk": "apps/android/app/build/outputs/apk/debug/app-debug.apk",
+    "lint_report": "apps/android/app/build/reports/lint-results-debug.html"
+  },
+  "resource_safety": {
+    "execution_mode": "SERIAL_SYSTEMD_USER_UNITS",
+    "gradle_max_workers": 1,
+    "largest_observed_memory_peak": "1.9G",
+    "observed_swap_peak": "0B",
+    "memory_max": "2.5G"
+  },
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-013-01",
+      "TC-FP-013-02",
+      "TC-FP-013-03",
+      "TC-FP-013-04",
+      "TC-FP-013-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "legal_privacy_review_status": "NOT_RUN",
+    "approved_final_consent_copy_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_guardian_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

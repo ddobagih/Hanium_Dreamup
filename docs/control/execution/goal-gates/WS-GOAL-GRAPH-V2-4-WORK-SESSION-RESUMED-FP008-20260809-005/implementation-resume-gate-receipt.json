@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.1",
+  "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-RESUME-GATE-FP008-20260809-005",
+  "evidence_type": "IMPLEMENTATION_START_OR_RESUME_GATE",
+  "gate_purpose": "SESSION_RESUME",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+  "target_goal_content_sha256": "2654fe5f595aefaecf974a4de70bad7946c2385cba9716200f2d2f49d849dd8e",
+  "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+  "source_activation_event_sha256": "900b5603bf1e5046b8e088ab59630a2e15a4980f5edd0d5e19c8d0fa33a521e8",
+  "source_checkpoint_sha256": "9b63a62dbdf3168382f97b6ea9bb22989b21fb9940a495b03f86d14ddc074c8c",
+  "source_ready_event_sha256": "c34c4ab98cba1ff9a26ddb0d86b65f20b8f5cf53f9082543d4fa05881597c07d",
+  "check_command_contract_version": "2026-08-03.1",
+  "check_command_contract_sha256": "b3498acc49f388b9b17f3739ce7e895d33e040c1482386144c0bf33b5241f220",
+  "implementation_start_gate_contract_binding": {
+    "schema_version": "1.0",
+    "document_id": "WS-FP008-INITIAL-START-GATE-CONTRACT-20260803-001",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-008-R001/initial-start-gate-contract-r001.json",
+    "file_sha256": "ef6a9a555bbc46375d655c1d1d6a79ada715b02b164d01b80d5d5a5823d15599",
+    "contract_id": "WS-FP008-INTERNAL-START-GATE-R001",
+    "contract_version": "2026-08-03.1",
+    "canonical_contract_sha256": "b3498acc49f388b9b17f3739ce7e895d33e040c1482386144c0bf33b5241f220"
+  },
+  "runtime_bindings": [
+    {
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.properties",
+      "file_sha256": "1e3d87ddfd70069f68afa0c9ddcaab26913c3baf3d809447b0362d2d49f57325"
+    },
+    {
+      "path": "apps/android/gradle/wrapper/gradle-wrapper.jar",
+      "file_sha256": "b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13"
+    },
+    {
+      "path": "apps/android/gradle/verification-metadata.xml",
+      "file_sha256": "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+    },
+    {
+      "path": "apps/android/app/gradle.lockfile",
+      "file_sha256": "9f62f9279f66c03e58ec07193f56fc6b30209906cc3fabc9db52756c037b3aae"
+    },
+    {
+      "path": "apps/android/adminapp/gradle.lockfile",
+      "file_sha256": "a4b167f814bbe8df8fcfffeb7114c81024c89913c43af560ffc6f55d48062a13"
+    }
+  ],
+  "execution_window": {
+    "started_at": "2026-08-09T11:41:52+09:00",
+    "ended_at": "2026-08-09T11:43:40+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/01-CONTINUATION.log",
+      "output_sha256": "25b5c8cf65854e11a04a9d0810dd2503585037683809c153f578c08a076ac5a7",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:10.712383+09:00"
+    },
+    {
+      "check_id": "V24_ARTIFACT_WORK_QUEUE",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -c 'from pathlib import Path; from scripts import check_walksafe_goal_graph_v2_4 as g; root=Path(\".\").resolve(); checkpoint=g.continuation.load_json(root/g.continuation.V24_CHECKPOINT_RELATIVE); errors=g.validate_v24_artifact_work_queue(root, checkpoint); print(\"WalkSafe v2.4 artifact work queue check: PASS\" if not errors else \"\\n\".join([\"WalkSafe v2.4 artifact work queue check: FAIL\", *[f\"- {error}\" for error in errors]])); raise SystemExit(bool(errors))'",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/02-V24_ARTIFACT_WORK_QUEUE.log",
+      "output_sha256": "a37a733968dbd711193cb4536a24a72d6402a0de0a8ba0f99451ad80e76e701e",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:11.085823+09:00"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_20260711.sh validate",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/03-TEST_LAYER_REGISTRY_VALIDATE.log",
+      "output_sha256": "1eef448a998bf080cbe648b330b4c9369d49ea95bbccf662ce8d077b56c96187",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:11.455849+09:00"
+    },
+    {
+      "check_id": "BACKEND_TEST_DATABASE_PREFLIGHT",
+      "command": ": \"${WALKSAFE_TEST_DATABASE_URL:?required dedicated test database}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_test_database_20260713.py && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=\"${WALKSAFE_TEST_DATABASE_URL}\" /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m alembic -c backend/alembic.ini upgrade head",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/04-BACKEND_TEST_DATABASE_PREFLIGHT.log",
+      "output_sha256": "4a8f96e5ef153c0c05d84db19847eb52901ec113c7a0e97d8c602c193cadb8d6",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:11.624224+09:00"
+    },
+    {
+      "check_id": "BACKEND_ADMIN_REPORTS_OPENAPI_POSTGRES",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q backend/tests/test_admin_security.py backend/tests/test_openapi_contract.py backend/tests/test_reports.py backend/tests/test_reports_v2.py backend/tests/test_report_original_access.py",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/05-BACKEND_ADMIN_REPORTS_OPENAPI_POSTGRES.log",
+      "output_sha256": "607aafae4e9e6618dca84f1d19c061ff7bcfb81bb3c17459f6a0415145a7949b",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:12.227352+09:00"
+    },
+    {
+      "check_id": "ANDROID_USER_INTERNAL",
+      "command": "(cd apps/android && ./gradlew --offline --no-daemon --max-workers=1 :app:testDebugUnitTest :app:assembleDebug :app:lintDebug)",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/06-ANDROID_USER_INTERNAL.log",
+      "output_sha256": "36c3415855ef023e345d0a78784698f484649879d7143c24228217ddd63d65fa",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:42:15.505435+09:00"
+    },
+    {
+      "check_id": "ANDROID_ADMIN_INTERNAL",
+      "command": "(cd apps/android && ./gradlew --offline --no-daemon --max-workers=1 :adminapp:testDebugUnitTest :adminapp:assembleDebug :adminapp:lintDebug)",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/07-ANDROID_ADMIN_INTERNAL.log",
+      "output_sha256": "63c9886cddbd380185a882cff555970aaebf41e138f1491cbcd9c995fdfe24f8",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:43:22.939525+09:00"
+    },
+    {
+      "check_id": "ROOT_FP008_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp008_goal_seq45_46_20260803.py tests/test_walksafe_fp008_goal_start_gate_20260803.py tests/test_walksafe_project_continuation_v2_4.py",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/08-ROOT_FP008_CONTROL_REGRESSION.log",
+      "output_sha256": "634188f6ba8af92fb15d480ab94bfa6125aaaa326dabbedbf3c5cc0e37e075ce",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:43:33.953045+09:00"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\"",
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005/09-REPOSITORY_STATE.log",
+      "output_sha256": "8faf37bf0f95bf19645141e8878d3294c1f9ae4f809d4c49290651a0fe996684",
+      "exit_code": 0,
+      "executed_at": "2026-08-09T11:43:39.153974+09:00"
+    }
+  ],
+  "repository_snapshot": {
+    "gate_event_id": "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+    "snapshot_scope": "AFTER_EXACT_TRANSACTION_EXCLUSIONS",
+    "head_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "object_format": "sha1",
+    "git_status_raw_sha256": "3a19de3f4b951463804476085bbd23993e228fa9211bbc6880e225e213f5e76d",
+    "git_status_raw_byte_count": 388787,
+    "git_status_raw_record_count": 2913,
+    "dirty_path_count": 2913,
+    "path_set_sha256": "6e3666c5f77d0138e2014317cb37537d74eda3790a934561a648576e6cb7c31d",
+    "content_set_sha256": "133e6a1ee0e3338a3b8dc3e9112759e182907ef7848df4e8b8a23a101a337b35",
+    "index_state_sha256": "85b6a7c76dd24c9619317520b5caba991ca8ec73d947d4afef19db45b808ecf6",
+    "checkpoint_base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "checkpoint_managed_path_count": 631,
+    "checkpoint_path_set_sha256": "3a5eca3f77294aad56eedf7a921de3e2bd0ddc2f969e8fa88026a7d46bff0d74",
+    "checkpoint_content_set_sha256": "a84282bcea70f23300bf769cf5cdc762947280aad7c29a9acea95b3caeee488b",
+    "gate_repository_state_output_sha256": "8faf37bf0f95bf19645141e8878d3294c1f9ae4f809d4c49290651a0fe996684"
+  },
+  "generated_at": "2026-08-09T11:43:44+09:00"
+}

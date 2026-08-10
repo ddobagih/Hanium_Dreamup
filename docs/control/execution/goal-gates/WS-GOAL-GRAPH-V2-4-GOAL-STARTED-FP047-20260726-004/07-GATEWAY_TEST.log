@@ -1,0 +1,298 @@
+
+> walksafe-android-gateway@0.1.0 test
+> npm run build && node --test dist/test/*.test.js
+
+
+> walksafe-android-gateway@0.1.0 build
+> npm run clean && tsc
+
+
+> walksafe-android-gateway@0.1.0 clean
+> node --input-type=module --eval "import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })"
+
+TAP version 13
+# Subtest: long-lived mode requires explicit enablement and all bounded TTL values
+ok 1 - long-lived mode requires explicit enablement and all bounded TTL values
+  ---
+  duration_ms: 25.409039
+  type: 'test'
+  ...
+# Subtest: field long-lived enablement does not change the admin short-session contract
+ok 2 - field long-lived enablement does not change the admin short-session contract
+  ---
+  duration_ms: 1.211373
+  type: 'test'
+  ...
+# Subtest: device login returns split credentials while persisted state contains only digests
+ok 3 - device login returns split credentials while persisted state contains only digests
+  ---
+  duration_ms: 4.117104
+  type: 'test'
+  ...
+# Subtest: rotation is one-time and consumed-token reuse revokes only that device family
+ok 4 - rotation is one-time and consumed-token reuse revokes only that device family
+  ---
+  duration_ms: 10.351775
+  type: 'test'
+  ...
+# Subtest: concurrent use of one refresh token permits one rotation then fails closed
+ok 5 - concurrent use of one refresh token permits one rotation then fails closed
+  ---
+  duration_ms: 4.649452
+  type: 'test'
+  ...
+# Subtest: a random refresh mismatch does not revoke the valid family
+ok 6 - a random refresh mismatch does not revoke the valid family
+  ---
+  duration_ms: 4.589988
+  type: 'test'
+  ...
+# Subtest: access, refresh idle, and refresh absolute boundaries expire at the exact timestamp
+ok 7 - access, refresh idle, and refresh absolute boundaries expire at the exact timestamp
+  ---
+  duration_ms: 1.496443
+  type: 'test'
+  ...
+# Subtest: device listing and selective revoke remain bound to the authenticated actor
+ok 8 - device listing and selective revoke remain bound to the authenticated actor
+  ---
+  duration_ms: 11.272479
+  type: 'test'
+  ...
+# Subtest: removing an actor account immediately closes status and device-management access
+ok 9 - removing an actor account immediately closes status and device-management access
+  ---
+  duration_ms: 3.035847
+  type: 'test'
+  ...
+# Subtest: refresh-proof logout works without an access cookie and is idempotent
+ok 10 - refresh-proof logout works without an access cookie and is idempotent
+  ---
+  duration_ms: 4.879397
+  type: 'test'
+  ...
+# Subtest: account lock and security incident revoke every actor session but no other actor
+ok 11 - account lock and security incident revoke every actor session but no other actor
+  ---
+  duration_ms: 16.024154
+  type: 'test'
+  ...
+# Subtest: pre-commit storage failures preserve the old refresh proof for one retry
+ok 12 - pre-commit storage failures preserve the old refresh proof for one retry
+  ---
+  duration_ms: 7.286603
+  type: 'test'
+  ...
+# Subtest: post-rename durability failure is outcome-unknown and old proof fails closed
+ok 13 - post-rename durability failure is outcome-unknown and old proof fails closed
+  ---
+  duration_ms: 3.443639
+  type: 'test'
+  ...
+# Subtest: field-session query and refresh shapes reject ambiguous input
+ok 14 - field-session query and refresh shapes reject ambiguous input
+  ---
+  duration_ms: 2.860505
+  type: 'test'
+  ...
+# Subtest: field walk lease is idempotent and takeover uses the current walk and fence
+ok 15 - field walk lease is idempotent and takeover uses the current walk and fence
+  ---
+  duration_ms: 4.306151
+  type: 'test'
+  ...
+# Subtest: expired lease is audited before a new acquisition
+ok 16 - expired lease is audited before a new acquisition
+  ---
+  duration_ms: 0.922967
+  type: 'test'
+  ...
+# Subtest: renew and end reject stale lease CAS values
+ok 17 - renew and end reject stale lease CAS values
+  ---
+  duration_ms: 0.897689
+  type: 'test'
+  ...
+# Subtest: malformed nested ledger state fails closed
+ok 18 - malformed nested ledger state fails closed
+  ---
+  duration_ms: 0.733228
+  type: 'test'
+  ...
+# Subtest: POST revalidates the exact long-session binding after body read
+ok 19 - POST revalidates the exact long-session binding after body read
+  ---
+  duration_ms: 9.767289
+  type: 'test'
+  ...
+# Subtest: prototype-named account and request ids remain isolated
+ok 20 - prototype-named account and request ids remain isolated
+  ---
+  duration_ms: 1.097177
+  type: 'test'
+  ...
+# Subtest: OpenAPI and router expose exactly five public paths and approved methods
+ok 21 - OpenAPI and router expose exactly five public paths and approved methods
+  ---
+  duration_ms: 11.801349
+  type: 'test'
+  ...
+# Subtest: privacy rights page is public, separate from the five APIs, and links only to approved HTTPS intake
+ok 22 - privacy rights page is public, separate from the five APIs, and links only to approved HTTPS intake
+  ---
+  duration_ms: 1.064816
+  type: 'test'
+  ...
+# Subtest: configuration accepts only the fixed loopback backend and bind host
+ok 23 - configuration accepts only the fixed loopback backend and bind host
+  ---
+  duration_ms: 0.308815
+  type: 'test'
+  ...
+# Subtest: privacy rights intake configuration accepts only one exact HTTPS URL
+ok 24 - privacy rights intake configuration accepts only one exact HTTPS URL
+  ---
+  duration_ms: 0.150255
+  type: 'test'
+  ...
+# Subtest: production field configuration does not require an admin credential
+ok 25 - production field configuration does not require an admin credential
+  ---
+  duration_ms: 0.229745
+  type: 'test'
+  ...
+# Subtest: field session is actor-bound, revocable, secure on HTTPS, and never cached
+ok 26 - field session is actor-bound, revocable, secure on HTTPS, and never cached
+  ---
+  duration_ms: 14.767865
+  type: 'test'
+  ...
+# Subtest: field login limiter blocks the sixth attempt from one trusted client
+ok 27 - field login limiter blocks the sixth attempt from one trusted client
+  ---
+  duration_ms: 6.884012
+  type: 'test'
+  ...
+# Subtest: walking and search proxy only approved data and internal actor credentials
+ok 28 - walking and search proxy only approved data and internal actor credentials
+  ---
+  duration_ms: 4.434735
+  type: 'test'
+  ...
+# Subtest: upstream 401 and 403 never invalidate the Android field session
+ok 29 - upstream 401 and 403 never invalidate the Android field session
+  ---
+  duration_ms: 5.180377
+  type: 'test'
+  ...
+# Subtest: report multipart is bounded and proxied only after field authentication
+ok 30 - report multipart is bounded and proxied only after field authentication
+  ---
+  duration_ms: 23.223782
+  type: 'test'
+  ...
+# Subtest: multipart part counting ignores boundary text inside a payload
+ok 31 - multipart part counting ignores boundary text inside a payload
+  ---
+  duration_ms: 0.161446
+  type: 'test'
+  ...
+# Subtest: report authentication and busy admission reject before opening the body
+ok 32 - report authentication and busy admission reject before opening the body
+  ---
+  duration_ms: 6.09622
+  type: 'test'
+  ...
+# Subtest: report admission enforces one in-flight upload and twelve actor events per minute
+ok 33 - report admission enforces one in-flight upload and twelve actor events per minute
+  ---
+  duration_ms: 0.232501
+  type: 'test'
+  ...
+# Subtest: bounded navigation body and upstream deadline fail closed
+ok 34 - bounded navigation body and upstream deadline fail closed
+  ---
+  duration_ms: 8.976102
+  type: 'test'
+  ...
+# Subtest: four selections are independent, versioned, idempotent, and current
+ok 35 - four selections are independent, versioned, idempotent, and current
+  ---
+  duration_ms: 14.048183
+  type: 'test'
+  ...
+# Subtest: withdrawal advances revision and makes the prior receipt stale
+ok 36 - withdrawal advances revision and makes the prior receipt stale
+  ---
+  duration_ms: 3.238951
+  type: 'test'
+  ...
+# Subtest: all-denied selection is valid and wrong policy requires reconsent
+ok 37 - all-denied selection is valid and wrong policy requires reconsent
+  ---
+  duration_ms: 1.490591
+  type: 'test'
+  ...
+# Subtest: control secret protects read and write access
+ok 38 - control secret protects read and write access
+  ---
+  duration_ms: 1.263953
+  type: 'test'
+  ...
+# Subtest: older client revision cannot reverse a newer withdrawal
+ok 39 - older client revision cannot reverse a newer withdrawal
+  ---
+  duration_ms: 1.160066
+  type: 'test'
+  ...
+# Subtest: cellular authorization requires the independent mobile selection
+ok 40 - cellular authorization requires the independent mobile selection
+  ---
+  duration_ms: 1.671254
+  type: 'test'
+  ...
+# Subtest: receipt binds to the first field actor until explicit reconsent
+ok 41 - receipt binds to the first field actor until explicit reconsent
+  ---
+  duration_ms: 1.72734
+  type: 'test'
+  ...
+# Subtest: real loopback HTTP adapter supplies peer IP for direct Android login
+ok 42 - real loopback HTTP adapter supplies peer IP for direct Android login
+  ---
+  duration_ms: 34.504987
+  type: 'test'
+  ...
+# Subtest: response backpressure settles and cancels the body when the client closes
+ok 43 - response backpressure settles and cancels the body when the client closes
+  ---
+  duration_ms: 0.568776
+  type: 'test'
+  ...
+# Subtest: deletion tombstones the generation and exposes nine external-pending SLA items
+ok 44 - deletion tombstones the generation and exposes nine external-pending SLA items
+  ---
+  duration_ms: 28.311102
+  type: 'test'
+  ...
+# Subtest: item transitions use secret authorization, operation idempotency, and revision CAS
+ok 45 - item transitions use secret authorization, operation idempotency, and revision CAS
+  ---
+  duration_ms: 142.320579
+  type: 'test'
+  ...
+# Subtest: tombstone rejects old access and refresh before replay retries revocation
+ok 46 - tombstone rejects old access and refresh before replay retries revocation
+  ---
+  duration_ms: 21.477787
+  type: 'test'
+  ...
+1..46
+# tests 46
+# suites 0
+# pass 46
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 642.471408

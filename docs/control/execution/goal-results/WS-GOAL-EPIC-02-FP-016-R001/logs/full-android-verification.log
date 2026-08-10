@@ -1,0 +1,91 @@
+WALKSAFE_EXECUTION_EVENT_SEQUENCE=24
+WALKSAFE_EXECUTION_EVENT_ID=WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP016-20260726-001
+WALKSAFE_EXECUTION_EVENT_SHA256=4939c7612a7b1b452df2273977305f057ff856e7f95633f5b2922d7052bc71f6
+WALKSAFE_IMPLEMENTATION_EXACT_13_CONTENT_SET_SHA256=ff9f07c1b811d11bda64a0b52fbc58844c917197f6b0e8d82b0c11847f662fd6
+WALKSAFE_RUN_ID=walksafe-fp016-full-android-20260726-002
+WALKSAFE_COMMAND_SHA256=b4a0bbb123a2ea93d95f761463d553c40380a122f4b49dff59857db27ecaac8d
+WALKSAFE_RESOURCE_LIMIT=MemoryMax:6G,MemoryHigh:5G,CPUQuota:250%,GradleMaxWorkers:1
+WALKSAFE_COMMAND_STARTED_AT=2026-07-26T07:49:18+09:00
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:generateDebugRFile
+
+> Task :app:compileDebugKotlin
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:11381:24 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:11569:59 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+
+> Task :app:javaPreCompileDebug
+> Task :app:compileDebugJavaWithJavac
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugJavaRes
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeDebugJavaResource
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+> Task :app:stripDebugDebugSymbols
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:generateDebugAndroidTestLintModel
+> Task :app:extractProguardFiles
+> Task :app:generateDebugLintReportModel
+> Task :app:generateDebugUnitTestLintModel
+> Task :app:lintAnalyzeDebug
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebugUnitTest
+
+> Task :app:lintReportDebug
+Wrote HTML report to file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/build/reports/lint-results-debug.html
+
+> Task :app:lintDebug
+
+BUILD SUCCESSFUL in 1m 5s
+53 actionable tasks: 53 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+WALKSAFE_JUNIT_XML_FILES=92
+WALKSAFE_JUNIT_TESTS=691
+WALKSAFE_JUNIT_FAILURES=0
+WALKSAFE_JUNIT_ERRORS=0
+WALKSAFE_JUNIT_SKIPPED=0
+WALKSAFE_JUNIT_XML_CONTENT_SET_SHA256=27d7d07c8c87b56fc3d7858f641ccb4f146a9a9bc86a3f582a6c226b171f2616
+WALKSAFE_JUNIT_SUMMARIZER_SHA256=f40d6e4d97b6e1721661fef4e735e17f81d24e46b40d2e807bd31d8068bae11f
+WALKSAFE_COMMAND_ENDED_AT=2026-07-26T07:50:24+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0

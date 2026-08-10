@@ -1,0 +1,863 @@
+{
+  "schema_version": "walksafe.phase1-current-state-attestation-evidence.v1",
+  "packet_id": "WS-PHASE1-CURRENT-STATE-ATTESTATION-20260727-001",
+  "prepared_on": "2026-07-27",
+  "prepared_on_precision": "DAY_ONLY",
+  "materialized_at": "2026-07-27T22:58:18+09:00",
+  "packet_status": "CURRENT_PHYSICAL_SOURCES_RECAPTURED_PENDING_INDEPENDENT_QA_AND_SCOPE_OWNER_APPROVAL",
+  "predecessor_packet_binding": {
+    "packet_id": "WS-PHASE0-CURRENT-STATE-ATTESTATIONS-20260727-001",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase0-current-state-attestations/evidence.json",
+    "byte_length": 26753,
+    "file_sha256": "8f162aa636e9d49457c34d1c5253f15b10f1fc9bbb7d29667b5de086bb8b71b8",
+    "predecessor_integrity": {
+      "canonical_byte_length": 21372,
+      "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+      "self_reference_included": false,
+      "sha256": "efead7b32b3e36837d0bbdfa08d03b217a314d6e4a6131cf9ceb08744ff55b8f"
+    },
+    "predecessor_source_set_fingerprint": {
+      "canonical_byte_length": 1655,
+      "canonicalization": "physical source bindings sorted by path; UTF-8 JSON sort_keys=true compact separators trailing LF",
+      "self_reference_included": false,
+      "sha256": "2209ca31eb63715fe55c9f6fda1b6f8912ec8e40981f3a8a71c05260d19e38a8"
+    },
+    "role": "HISTORICAL_PREDECESSOR_ONLY",
+    "predecessor_modified": false
+  },
+  "successor_reason": "W1_CURRENT_TEST_CASES_AND_TEST_PLAN_TRANSITIVE_SOURCE_RECAPTURE_WITHOUT_ATTESTATION_MEANING_AS_OF_APPROVAL_OR_STATE_PROMOTION_CHANGE",
+  "history_control": {
+    "phase0_packet_role": "HISTORICAL_PREDECESSOR_ONLY",
+    "phase0_formal279_record_manifest_receipt_role": "HISTORICAL_TRANSITIVE_CONTROL_ONLY",
+    "current_packet_role": "CURRENT_ATTESTATION_DECISION_INPUT",
+    "historical_files_modified": false,
+    "add_only_successor": true
+  },
+  "as_of": "2026-07-27T19:10:32+09:00",
+  "as_of_precision": "SECOND",
+  "as_of_semantics": "EXACT_TIMESTAMP_LATEST_BOUND_SOURCE_CAPTURE",
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00",
+  "attestation_boundary": {
+    "absence_interpretation": "An empty opening ledger means that no event is recorded in the declared inspection scope. It does not prove that no real-world incident, operational change, or deletion event occurred.",
+    "claim_scope": "The attestations report only the state recorded in the named repository artifacts and fields as of the stated date.",
+    "excluded_search_domains": [
+      "runtime infrastructure and cloud consoles",
+      "external incident or ticketing systems",
+      "email, chat, and approval systems outside the bound repository records",
+      "user devices and operator-local records"
+    ],
+    "fabricated_event_or_receipt_allowed": false,
+    "implementation_completion_claimed": false,
+    "method": "CONTROLLED_REPOSITORY_RECORD_INSPECTION",
+    "release_completion_claimed": false,
+    "test_completion_claimed": false
+  },
+  "approval_boundary": {
+    "approval_status": "NOT_APPROVED",
+    "content_acceptance_complete": false,
+    "execution_completion_claimed": false,
+    "formal_test_credit": false,
+    "release_credit": false,
+    "release_status": "NOT_ELIGIBLE",
+    "verdict": "NO_GO_CONTENT_ACCEPTANCE_REMEDIATION_REQUIRED"
+  },
+  "no_event_disclaimer": "Empty preopened registers and 279 NOT_RUN tuples are bound repository observations only. They neither prove real-world absence nor complete an event, test, approval, or release decision.",
+  "packet_claims": {
+    "actual_deletion_execution_claimed": false,
+    "actual_incident_claimed": false,
+    "actual_operational_change_claimed": false,
+    "approval_claimed": false,
+    "empty_ledgers_prove_real_world_absence": false,
+    "known_recorded_data_disposition_execution_count_in_scope": 0,
+    "known_recorded_incident_count_in_scope": 0,
+    "known_recorded_operational_change_count_in_scope": 0,
+    "release_completion_claimed": false,
+    "release_status": "NOT_ELIGIBLE",
+    "tst22_go_decision": "NO_GO",
+    "tst22_readiness_status": "NOT_READY"
+  },
+  "attestation_count": 4,
+  "attestations": [
+    {
+      "append_trigger": {
+        "approval_boundary": "The service owner must approve the exact incident scope and postmortem before incident closure is claimed.",
+        "condition": "A real event affects a user, data, or an applicable SLO in the controlled operating scope.",
+        "required_action": "Append one incident row with the real incident ID, severity, start/detect/end times, impact, timeline, containment, recovery, owner, evidence references, postmortem status, and receipt reference; do not alter this opening-state attestation."
+      },
+      "approval_status": "NOT_APPROVED",
+      "artifact_type_code": "DLV-OPS-17",
+      "as_of": "2026-07-27T19:10:32+09:00",
+      "as_of_precision": "SECOND",
+      "as_of_semantics": "EXACT_TIMESTAMP_LATEST_BOUND_SOURCE_CAPTURE",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-17-20260727-001",
+      "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+      "current_state_judgment": {
+        "approval_status": "NOT_APPROVED",
+        "completion_claimed": false,
+        "execution_status": "NOT_RUN",
+        "postmortem_status": "NOT_RUN",
+        "proves_no_real_incidents": false,
+        "status": "NO_RECORDED_INCIDENT_IN_DECLARED_SCOPE"
+      },
+      "display_code": "OPS-17",
+      "execution_status": "NOT_RUN",
+      "inspection_scope": {
+        "record_fields": [
+          "opening_snapshot.operations_started",
+          "opening_snapshot.incident_record_count",
+          "incidents",
+          "external_execution_contracts[W9-EXT-OPS-17].current_state"
+        ],
+        "source_ids": [
+          "SRC-ARTIFACT-REGISTER",
+          "SRC-OPERATIONS-REGISTER-JSON",
+          "SRC-OPERATIONS-CANONICAL-DOCUMENT"
+        ]
+      },
+      "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred.",
+      "opening_ledger_state": {
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "operations_started": false,
+        "record_array": "incidents",
+        "record_count": 0,
+        "record_ids": [],
+        "register_mode": "PREOPENED_APPEND_ONLY"
+      },
+      "owner_control": {
+        "approver_role": "서비스소유자",
+        "attestor_identity_status": "CONTROLLED_ROLE_BOUND_NO_PERSON_IDENTITY_CLAIM",
+        "attestor_role": "운영책임자",
+        "reviewer_roles": [
+          "기술책임자",
+          "보안·개인정보책임자",
+          "지원책임자"
+        ]
+      },
+      "reconciliation": {
+        "actual_tuple_count": 0,
+        "declared_tuple_count": 0,
+        "matched": true,
+        "operations_started": false,
+        "proves_no_incidents": false,
+        "result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW"
+      },
+      "release_decision": "NO_GO",
+      "review_status": "PENDING_INDEPENDENT_REVIEW",
+      "source_binding_ids": [
+        "SRC-ARTIFACT-REGISTER",
+        "SRC-OPERATIONS-CANONICAL-DOCUMENT",
+        "SRC-OPERATIONS-REGISTER-JSON"
+      ],
+      "timezone": "Asia/Seoul",
+      "title": "장애 기록 current-state attestation",
+      "utc_offset": "+09:00",
+      "predecessor_attestation_id": "ATT-PHASE0-DLV-OPS-17-20260727-001",
+      "successor_recapture_status": "MEANING_AND_AS_OF_PRESERVED_CURRENT_PHYSICAL_SOURCES_REBOUND"
+    },
+    {
+      "append_trigger": {
+        "approval_boundary": "The service owner must approve the exact scope and effective window before the operational change is executed.",
+        "condition": "A real configuration, permission, infrastructure, operational release, or other controlled operational change is requested.",
+        "required_action": "Before execution, append an authorized change row with scope, risk, release/config reference, execution window, rollback plan, operator; after execution append verification and the actual receipt. Do not alter this opening-state attestation."
+      },
+      "approval_status": "NOT_APPROVED",
+      "artifact_type_code": "DLV-OPS-19",
+      "as_of": "2026-07-27T19:10:32+09:00",
+      "as_of_precision": "SECOND",
+      "as_of_semantics": "EXACT_TIMESTAMP_LATEST_BOUND_SOURCE_CAPTURE",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-19-20260727-001",
+      "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+      "current_state_judgment": {
+        "approval_status": "NOT_APPROVED",
+        "completion_claimed": false,
+        "execution_status": "NOT_RUN",
+        "proves_no_real_changes": false,
+        "status": "NO_RECORDED_OPERATIONAL_CHANGE_IN_DECLARED_SCOPE",
+        "verification_status": "NOT_RUN"
+      },
+      "display_code": "OPS-19",
+      "execution_status": "NOT_RUN",
+      "inspection_scope": {
+        "record_fields": [
+          "opening_snapshot.operations_started",
+          "opening_snapshot.operation_change_record_count",
+          "operation_changes",
+          "external_execution_contracts[W9-EXT-OPS-19].current_state"
+        ],
+        "source_ids": [
+          "SRC-ARTIFACT-REGISTER",
+          "SRC-OPERATIONS-REGISTER-JSON",
+          "SRC-OPERATIONS-CANONICAL-DOCUMENT"
+        ]
+      },
+      "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred.",
+      "opening_ledger_state": {
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "operations_started": false,
+        "record_array": "operation_changes",
+        "record_count": 0,
+        "record_ids": [],
+        "register_mode": "PREOPENED_APPEND_ONLY"
+      },
+      "owner_control": {
+        "approver_role": "서비스소유자",
+        "attestor_identity_status": "CONTROLLED_ROLE_BOUND_NO_PERSON_IDENTITY_CLAIM",
+        "attestor_role": "운영책임자",
+        "reviewer_roles": [
+          "기술책임자",
+          "보안·개인정보책임자",
+          "지원책임자"
+        ]
+      },
+      "reconciliation": {
+        "actual_tuple_count": 0,
+        "declared_tuple_count": 0,
+        "matched": true,
+        "operations_started": false,
+        "proves_no_changes": false,
+        "result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW"
+      },
+      "release_decision": "NO_GO",
+      "review_status": "PENDING_INDEPENDENT_REVIEW",
+      "source_binding_ids": [
+        "SRC-ARTIFACT-REGISTER",
+        "SRC-OPERATIONS-CANONICAL-DOCUMENT",
+        "SRC-OPERATIONS-REGISTER-JSON"
+      ],
+      "timezone": "Asia/Seoul",
+      "title": "운영 변경 기록 current-state attestation",
+      "utc_offset": "+09:00",
+      "predecessor_attestation_id": "ATT-PHASE0-DLV-OPS-19-20260727-001",
+      "successor_recapture_status": "MEANING_AND_AS_OF_PRESERVED_CURRENT_PHYSICAL_SOURCES_REBOUND"
+    },
+    {
+      "append_trigger": {
+        "approval_boundary": "A zero-row opening ledger is not a deletion-completion receipt; completion requires the real execution and verification evidence.",
+        "condition": "A retention period expires, a valid user deletion request is accepted, service closure requires disposition, or another approved policy trigger requires deletion or anonymization.",
+        "required_action": "Append a disposition row containing execution ID, effective policy version, target type/time range/scope, request and legal-hold state, deleted or anonymized counts, verification, failures and retries, operator time, controlled evidence reference, and receipt hash. Do not store raw personal data in this Git packet and do not alter this opening-state attestation."
+      },
+      "approval_status": "NOT_APPROVED",
+      "artifact_type_code": "DLV-OPS-23",
+      "as_of": "2026-07-27T19:10:32+09:00",
+      "as_of_precision": "SECOND",
+      "as_of_semantics": "EXACT_TIMESTAMP_LATEST_BOUND_SOURCE_CAPTURE",
+      "attestation_id": "ATT-PHASE1-DLV-OPS-23-20260727-001",
+      "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+      "current_state_judgment": {
+        "approval_status": "NOT_APPROVED",
+        "completion_claimed": false,
+        "execution_status": "NOT_RUN",
+        "proves_no_real_deletion_or_disposition_events": false,
+        "status": "NO_RECORDED_DATA_DISPOSITION_EXECUTION_IN_DECLARED_SCOPE"
+      },
+      "display_code": "OPS-23",
+      "execution_status": "NOT_RUN",
+      "inspection_scope": {
+        "record_fields": [
+          "opening_snapshot.operations_started",
+          "data_disposition_executions",
+          "approval_boundary.actual_execution_receipt_count"
+        ],
+        "source_ids": [
+          "SRC-ARTIFACT-REGISTER",
+          "SRC-OPERATIONS-REGISTER-JSON",
+          "SRC-OPERATIONS-CANONICAL-DOCUMENT"
+        ]
+      },
+      "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred.",
+      "opening_ledger_state": {
+        "actual_receipt_ids": [],
+        "operations_started": false,
+        "record_array": "data_disposition_executions",
+        "record_count": 0,
+        "record_ids": [],
+        "register_mode": "PREOPENED_APPEND_ONLY"
+      },
+      "owner_control": {
+        "approver_role": "서비스소유자",
+        "attestor_identity_status": "CONTROLLED_ROLE_BOUND_NO_PERSON_IDENTITY_CLAIM",
+        "attestor_role": "운영책임자",
+        "reviewer_roles": [
+          "기술책임자",
+          "보안·개인정보책임자",
+          "지원책임자"
+        ]
+      },
+      "reconciliation": {
+        "actual_execution_receipt_count": 0,
+        "actual_tuple_count": 0,
+        "declared_tuple_count": 0,
+        "matched": true,
+        "operations_started": false,
+        "result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW"
+      },
+      "release_decision": "NO_GO",
+      "review_status": "PENDING_INDEPENDENT_REVIEW",
+      "source_binding_ids": [
+        "SRC-ARTIFACT-REGISTER",
+        "SRC-OPERATIONS-CANONICAL-DOCUMENT",
+        "SRC-OPERATIONS-REGISTER-JSON"
+      ],
+      "timezone": "Asia/Seoul",
+      "title": "데이터 보존·삭제 실행 기록 current-state attestation",
+      "utc_offset": "+09:00",
+      "predecessor_attestation_id": "ATT-PHASE0-DLV-OPS-23-20260727-001",
+      "successor_recapture_status": "MEANING_AND_AS_OF_PRESERVED_CURRENT_PHYSICAL_SOURCES_REBOUND"
+    },
+    {
+      "additional_open_prerequisites": [
+        "Approved TST-20 report for one distinguishable build",
+        "TST-21 unresolved-defect and residual-risk snapshot with acceptance decisions from the same time",
+        "REL-01 release plan and REL-02 canonical approval checklist",
+        "SEC-14 penetration test for the active scope",
+        "WS-20 real-phone end-to-end video and result",
+        "REL-15 previous-version rollback procedure and execution evidence required by TST-17",
+        "WS-21 participant consent and safety plan for any field test"
+      ],
+      "append_trigger": {
+        "condition": "A single named release candidate has bound build, model, configuration, environment, approved prerequisite evidence, closed or formally approved gate dispositions, and a same-time defect and residual-risk snapshot.",
+        "required_action": "Create a new TST-22 decision for that exact candidate and evidence packet; obtain the required human reviews and explicit product-owner approval. Preserve this NO_GO snapshot as history.",
+        "status_change_prohibited_without_trigger": true
+      },
+      "approval_status": "NOT_APPROVED",
+      "artifact_type_code": "DLV-TST-22",
+      "as_of": "2026-07-27T19:10:32+09:00",
+      "as_of_precision": "SECOND",
+      "as_of_semantics": "EXACT_TIMESTAMP_LATEST_BOUND_SOURCE_CAPTURE",
+      "attestation_id": "ATT-PHASE1-DLV-TST-22-20260727-001",
+      "attestation_status": "OWNER_ROLE_ATTESTATION_RECORDED_PENDING_INDEPENDENT_REVIEW",
+      "current_state_judgment": {
+        "approval_status": "NOT_APPROVED",
+        "conditional_go_claimed": false,
+        "decision_kind": "CURRENT_STATE_ASSESSMENT_NOT_RELEASE_APPROVAL",
+        "go_decision": "NO_GO",
+        "readiness_status": "NOT_READY",
+        "reason": "All five mandatory gates are open and NOT_RUN, the formal 279-artifact execution aggregate is NOT_RUN, no named release candidate is bound, and the current prerequisite evidence is incomplete.",
+        "release_approval_claimed": false,
+        "release_completion_claimed": false,
+        "release_status": "NOT_ELIGIBLE"
+      },
+      "display_code": "TST-22",
+      "evaluated_candidate": {
+        "build_id": null,
+        "candidate_state": "NO_NAMED_RELEASE_CANDIDATE_BOUND",
+        "config_version": null,
+        "model_id": null,
+        "release_candidate_id": null,
+        "target_environment": null
+      },
+      "execution_status": "NOT_RUN",
+      "formal_execution_state": {
+        "aggregate_execution_status": "NOT_RUN",
+        "completion_receipt_bound": false,
+        "formal_artifact_count": 279
+      },
+      "inspection_scope": {
+        "evaluated_dimensions": [
+          "DLV-TST-22 artifact lifecycle and verification projection",
+          "five mandatory policy gates",
+          "formal artifact execution aggregate",
+          "named prerequisite evidence in the current release-readiness document"
+        ],
+        "source_ids": [
+          "SRC-ARTIFACT-REGISTER",
+          "SRC-OPERATIONS-REGISTER-JSON",
+          "SRC-RELEASE-READINESS",
+          "SRC-PHASE1-FORMAL279-CURRENT-OBSERVATION"
+        ]
+      },
+      "mandatory_gate_summary": {
+        "closed_count": 0,
+        "gate_count": 5,
+        "not_run_count": 5,
+        "waived_count": 0
+      },
+      "mandatory_gates": [
+        {
+          "gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+          "status": "NOT_RUN",
+          "waived": false
+        },
+        {
+          "gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+          "status": "NOT_RUN",
+          "waived": false
+        }
+      ],
+      "no_event_disclaimer": "A zero or NOT_RUN tuple count is a repository current-state observation only; it does not prove that no real-world event occurred.",
+      "owner_control": {
+        "approver_role": "제품책임자",
+        "attestor_identity_status": "CONTROLLED_ROLE_BOUND_NO_PERSON_IDENTITY_CLAIM",
+        "attestor_role": "QA책임자",
+        "reviewer_roles": [
+          "제품책임자",
+          "기술책임자",
+          "접근성·안전책임자",
+          "독립QA검토자"
+        ]
+      },
+      "reconciliation": {
+        "actual_tuple_count": 279,
+        "declared_tuple_count": 279,
+        "fail_count": 0,
+        "formal_case_count": 279,
+        "formal_result_null_count": 279,
+        "matched": true,
+        "pass_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "result": "RECONCILED_CURRENT_STATE_PENDING_REVIEW"
+      },
+      "release_decision": "NO_GO",
+      "review_status": "PENDING_INDEPENDENT_REVIEW",
+      "source_binding_ids": [
+        "SRC-ARTIFACT-REGISTER",
+        "SRC-RELEASE-READINESS",
+        "SRC-FORMAL279-PLAN",
+        "SRC-PHASE1-FORMAL279-CURRENT-OBSERVATION"
+      ],
+      "timezone": "Asia/Seoul",
+      "title": "출시 준비도 current-state attestation",
+      "utc_offset": "+09:00",
+      "predecessor_attestation_id": "ATT-PHASE0-DLV-TST-22-20260727-001",
+      "successor_recapture_status": "MEANING_AND_AS_OF_PRESERVED_CURRENT_PHYSICAL_SOURCES_REBOUND"
+    }
+  ],
+  "source_bindings": [
+    {
+      "byte_length": 3499550,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "inspected_projection_keys": [
+        "DLV-OPS-17",
+        "DLV-OPS-19",
+        "DLV-OPS-23",
+        "DLV-TST-22"
+      ],
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "purpose": "Artifact applicability, lifecycle, authoring readiness, canonical path, trigger, and completion boundary",
+      "sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+      "source_id": "SRC-ARTIFACT-REGISTER",
+      "subject_role": "AUTHORITATIVE_ARTIFACT_FORM_OWNER_AND_COMPLETION_CONTRACT_SOURCE",
+      "current_physical_recalculation": "MATCH",
+      "current_semantic_authority": true
+    },
+    {
+      "byte_length": 2592818,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+      "source_id": "SRC-FORMAL279-PLAN",
+      "subject_role": "AUTHORITATIVE_FORMAL_TEST_PLAN_REGISTER",
+      "current_physical_recalculation": "MATCH",
+      "current_semantic_authority": true
+    },
+    {
+      "byte_length": 57361,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "inspected_sections": [
+        "ops-17",
+        "ops-19",
+        "ops-23"
+      ],
+      "path": "docs/deliverables/10-operations/operations-control-registers.md",
+      "purpose": "Canonical operating rules for incident, operational-change, and data-disposition registers",
+      "sha256": "e5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2",
+      "source_id": "SRC-OPERATIONS-CANONICAL-DOCUMENT",
+      "subject_role": "CANONICAL_CURRENT_STATE_TARGET",
+      "current_physical_recalculation": "MATCH",
+      "current_semantic_authority": true
+    },
+    {
+      "byte_length": 32049,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "inspected_fields": [
+        "register_mode",
+        "opening_snapshot",
+        "w9_content_contracts.OPS-17",
+        "w9_content_contracts.OPS-19",
+        "external_execution_contracts[W9-EXT-OPS-17]",
+        "external_execution_contracts[W9-EXT-OPS-19]",
+        "incidents",
+        "operation_changes",
+        "data_disposition_executions",
+        "remaining_gates",
+        "approval_boundary"
+      ],
+      "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+      "purpose": "Opening ledger state, recorded row counts, execution boundary, append triggers, and open release gates",
+      "sha256": "8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a",
+      "source_id": "SRC-OPERATIONS-REGISTER-JSON",
+      "subject_role": "AUTHORITATIVE_CURRENT_STATE_TUPLE_SOURCE",
+      "current_physical_recalculation": "MATCH",
+      "current_semantic_authority": true
+    },
+    {
+      "aggregate_execution_status": "NOT_RUN",
+      "byte_length": 41119,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "formal_artifact_count": 279,
+      "independent_execution_receipt_bound": false,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+      "purpose": "Current formal-artifact execution state supplied to this Phase 0 attestation task; this packet does not upgrade it to an execution result",
+      "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+      "source_id": "SRC-PHASE0-FORMAL279-STATE-HISTORICAL",
+      "source_kind": "PHASE0_EXECUTION_CONTROL_INPUT",
+      "subject_role": "HISTORICAL_TRANSITIVE_CONTROL_ONLY",
+      "current_physical_recalculation": "MATCH",
+      "predecessor_source_id": "SRC-PHASE0-FORMAL279-STATE",
+      "current_semantic_authority": false
+    },
+    {
+      "byte_length": 2780,
+      "captured_at": "2026-07-27T22:58:18+09:00",
+      "inspected_sections": [
+        "판단 결과",
+        "반드시 끝내야 할 검증 5개",
+        "추가 선행조건",
+        "금지된 우회",
+        "다음 판단 시점"
+      ],
+      "path": "docs/deliverables/06-testing/release-readiness-decision.md",
+      "purpose": "Current TST-22 release-readiness judgment and prerequisites",
+      "sha256": "402a5ff58f72e4053b80f06e712b001bc729d7faf318d39f036308177c30bbc3",
+      "source_id": "SRC-RELEASE-READINESS",
+      "subject_role": "CANONICAL_TST22_RELEASE_READINESS_TARGET",
+      "current_physical_recalculation": "MATCH",
+      "current_semantic_authority": true
+    }
+  ],
+  "source_set_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "projection": "direct source_bindings fields byte_length,captured_at,path,sha256,subject_role sorted by path",
+    "source_count": 6,
+    "canonical_byte_length": 1646,
+    "sha256": "65980d546a1d941e16b29e2dfa688faa3455db0c59e1d790ba8660a22a20132f"
+  },
+  "transitive_source_manifest": {
+    "manifest_id": "WS-PHASE1-CURRENT-STATE-ATTESTATION-TRANSITIVE-SOURCE-MANIFEST-20260727-001",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "hash_algorithm": "SHA-256",
+    "manifest_sha256_excluded_member": "manifest_sha256",
+    "subject_order": "LEXICOGRAPHIC_BY_EXACT_PATH",
+    "subject_count": 13,
+    "current_semantic_subject_count": 10,
+    "historical_transitive_control_count": 3,
+    "subjects": [
+      {
+        "subject_id": "HIST-FORMAL279-MANIFEST",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-manifest.json",
+        "byte_length": 1415,
+        "sha256": "ec697cdf5730e2cc6d9e640fd6c566673ac9f45780918c85bf5159b1afe24706",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "HISTORICAL_TRANSITIVE_CONTROL_ONLY",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": false
+      },
+      {
+        "subject_id": "HIST-FORMAL279-RECEIPT",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+        "byte_length": 2048,
+        "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "HISTORICAL_TRANSITIVE_CONTROL_ONLY",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": false
+      },
+      {
+        "subject_id": "HIST-FORMAL279-RECORD",
+        "exact_path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+        "byte_length": 41119,
+        "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "HISTORICAL_TRANSITIVE_CONTROL_ONLY",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": false
+      },
+      {
+        "subject_id": "SRC-ARTIFACT-REGISTER",
+        "exact_path": "docs/deliverables/00-control/artifact-register.json",
+        "byte_length": 3499550,
+        "sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_ATTESTATION_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "INV-ACCEPTANCE-RECEIPT",
+        "exact_path": "docs/deliverables/06-testing/acceptance-receipt.md",
+        "byte_length": 2011,
+        "sha256": "24f10efec664ffdc9b8c00aefd6b3cf473d3c56ee001b3eb48d302178a8e0eed",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_DIRECTORY_INVENTORY_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "SRC-FORMAL279-PLAN",
+        "exact_path": "docs/deliverables/06-testing/registers/test-cases.json",
+        "byte_length": 2592818,
+        "sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_FORMAL279_PLAN_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "SRC-RELEASE-READINESS",
+        "exact_path": "docs/deliverables/06-testing/release-readiness-decision.md",
+        "byte_length": 2780,
+        "sha256": "402a5ff58f72e4053b80f06e712b001bc729d7faf318d39f036308177c30bbc3",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_ATTESTATION_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "INV-SOFTWARE-TEST-REPORT",
+        "exact_path": "docs/deliverables/06-testing/software-test-report.md",
+        "byte_length": 2868,
+        "sha256": "3bf316ad9ae04df83804a42d821daf96ec327db05927d2e01d868da27b50d275",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_DIRECTORY_INVENTORY_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "INV-TEST-EVIDENCE",
+        "exact_path": "docs/deliverables/06-testing/test-evidence.md",
+        "byte_length": 6636,
+        "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_DIRECTORY_INVENTORY_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "INV-TEST-PLAN",
+        "exact_path": "docs/deliverables/06-testing/test-plan.md",
+        "byte_length": 10905,
+        "sha256": "a01a410b77479e351f3e73ee04ecbfdfab64a820fef63714e5fbec87540189e2",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_DIRECTORY_INVENTORY_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "INV-TEST-QUALITY-REPORT",
+        "exact_path": "docs/deliverables/06-testing/test-quality-report.md",
+        "byte_length": 3279,
+        "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_DIRECTORY_INVENTORY_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "SRC-OPERATIONS-CANONICAL-DOCUMENT",
+        "exact_path": "docs/deliverables/10-operations/operations-control-registers.md",
+        "byte_length": 57361,
+        "sha256": "e5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_ATTESTATION_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      },
+      {
+        "subject_id": "SRC-OPERATIONS-REGISTER-JSON",
+        "exact_path": "docs/deliverables/10-operations/registers/operations-registers.json",
+        "byte_length": 32049,
+        "sha256": "8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a",
+        "capture_time": "2026-07-27T22:58:18+09:00",
+        "subject_role": "CURRENT_ATTESTATION_SOURCE",
+        "current_physical_bytes_captured": true,
+        "current_semantic_authority": true
+      }
+    ],
+    "manifest_sha256": "e2995ab050429af8def30570c4c3692f0cc5e319e1cc8b13860fe471b80b66e3"
+  },
+  "directory_inventory": {
+    "asserted_missing": false,
+    "asserted_missing_path": "docs/deliverables/06-testing/test-quality-report.md",
+    "captured_at": "2026-07-27T19:06:09+09:00",
+    "directory_path": "docs/deliverables/06-testing",
+    "entries": [
+      {
+        "byte_length": 2011,
+        "name": "acceptance-receipt.md",
+        "path": "docs/deliverables/06-testing/acceptance-receipt.md",
+        "sha256": "24f10efec664ffdc9b8c00aefd6b3cf473d3c56ee001b3eb48d302178a8e0eed",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      },
+      {
+        "name": "evidence",
+        "path": "docs/deliverables/06-testing/evidence",
+        "type": "DIRECTORY"
+      },
+      {
+        "name": "registers",
+        "path": "docs/deliverables/06-testing/registers",
+        "type": "DIRECTORY"
+      },
+      {
+        "byte_length": 2780,
+        "name": "release-readiness-decision.md",
+        "path": "docs/deliverables/06-testing/release-readiness-decision.md",
+        "sha256": "402a5ff58f72e4053b80f06e712b001bc729d7faf318d39f036308177c30bbc3",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      },
+      {
+        "byte_length": 2868,
+        "name": "software-test-report.md",
+        "path": "docs/deliverables/06-testing/software-test-report.md",
+        "sha256": "3bf316ad9ae04df83804a42d821daf96ec327db05927d2e01d868da27b50d275",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      },
+      {
+        "byte_length": 6636,
+        "name": "test-evidence.md",
+        "path": "docs/deliverables/06-testing/test-evidence.md",
+        "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      },
+      {
+        "byte_length": 10905,
+        "name": "test-plan.md",
+        "path": "docs/deliverables/06-testing/test-plan.md",
+        "sha256": "a01a410b77479e351f3e73ee04ecbfdfab64a820fef63714e5fbec87540189e2",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      },
+      {
+        "byte_length": 3279,
+        "name": "test-quality-report.md",
+        "path": "docs/deliverables/06-testing/test-quality-report.md",
+        "sha256": "b2abd9915504d7dfd8578b465ed850c5fd1cdcf34a8654d4c46e1a44726f319c",
+        "type": "FILE",
+        "current_physical_recalculation": "MATCH"
+      }
+    ],
+    "entry_count": 8,
+    "timezone": "Asia/Seoul",
+    "utc_offset": "+09:00"
+  },
+  "current_formal279_observation": {
+    "binding_id": "SRC-PHASE1-FORMAL279-CURRENT-OBSERVATION",
+    "source_path": "docs/deliverables/06-testing/registers/test-cases.json",
+    "source_byte_length": 2592818,
+    "source_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+    "detected_279_item_array_json_paths": [
+      "$.test_cases"
+    ],
+    "formal_artifact_count": 279,
+    "formal_result_null_count": 279,
+    "pass_count": 0,
+    "fail_count": 0,
+    "aggregate_execution_status": "NOT_RUN",
+    "completion_receipt_bound": false,
+    "release_status": "NOT_ELIGIBLE",
+    "derivation_boundary": "CURRENT_STRUCTURE_AND_PHASE0_NO_EVENT_SEMANTICS_ONLY_NOT_TEST_EXECUTION"
+  },
+  "predecessor_control_chain": {
+    "output_bindings": {
+      "OUT-FORMAL279-MANIFEST": {
+        "byte_length": 1415,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-manifest.json",
+        "sha256": "ec697cdf5730e2cc6d9e640fd6c566673ac9f45780918c85bf5159b1afe24706",
+        "subject_role": "NON_SELF_REFERENTIAL_FORMAL279_CONTROL_MANIFEST"
+      },
+      "OUT-FORMAL279-RECEIPT": {
+        "byte_length": 2048,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+        "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d",
+        "subject_role": "PENDING_REVIEW_AND_APPROVAL_CONTROL_RECEIPT"
+      },
+      "OUT-FORMAL279-RECORD": {
+        "byte_length": 41119,
+        "captured_at": "2026-07-27T19:10:32+09:00",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-record.json",
+        "sha256": "41a862efe4171ebcaecb4198dce9ddf3a1086d458e3afe0725901cb82f61dd81",
+        "subject_role": "IMMUTABLE_FORMAL279_NOT_RUN_CONTROL_RECORD"
+      }
+    },
+    "review_and_approval_receipt_binding": {
+      "byte_length": 2048,
+      "captured_at": "2026-07-27T19:10:32+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/formal279-not-run-control-receipt.json",
+      "sha256": "f95f4b381382cc92ef71a0eacd965668ba51c5a91af5d8c460ecd5b1b133ea3d",
+      "subject_role": "PENDING_REVIEW_AND_APPROVAL_CONTROL_RECEIPT"
+    },
+    "role": "HISTORICAL_ONLY_NOT_CURRENT_REVIEW_OR_APPROVAL_AUTHORITY",
+    "transitive_binding_status": "PHYSICAL_BYTES_RECAPTURED_INTERNAL_TEST_CASE_BINDINGS_STALE"
+  },
+  "reconciliation_summary": {
+    "attestation_count": 4,
+    "formal279_not_run_tuple_count": 279,
+    "matched_count": 4,
+    "mismatch_count": 0,
+    "ops17_tuple_count": 0,
+    "ops19_tuple_count": 0,
+    "ops23_tuple_count": 0
+  },
+  "review_status": "REMEDIATION_EVIDENCE_PREPARED_PENDING_INDEPENDENT_REREVIEW",
+  "review_and_approval": {
+    "independent_qa_status": "PENDING",
+    "independent_qa_actual_decision": null,
+    "independent_qa_identity": null,
+    "independent_qa_decided_on": null,
+    "scope_owner_status": "PENDING",
+    "scope_owner_actual_decision": null,
+    "scope_owner_identity": null,
+    "scope_owner_decided_on": null,
+    "actual_qa_approval_count": 0,
+    "actual_scope_owner_approval_count": 0
+  },
+  "successor_control": {
+    "attestation_meaning_changed": false,
+    "attestation_disposition_changed": false,
+    "attestation_as_of_changed": false,
+    "actual_execution_count": 0,
+    "actual_qa_approval_count": 0,
+    "actual_scope_owner_approval_count": 0,
+    "state_promotion_performed": false,
+    "formal_test_status": "NOT_RUN",
+    "release_decision": "NO_GO",
+    "release_status": "NOT_ELIGIBLE",
+    "final_approval_receipt": false
+  },
+  "packet_content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 recursive lexicographic object-key order, compact JSON, no trailing LF",
+    "input_projection": "entire evidence JSON excluding top-level packet_content_fingerprint",
+    "excluded_json_paths": [
+      "$.packet_content_fingerprint"
+    ],
+    "non_self_referential": true,
+    "canonical_byte_length": 30878,
+    "sha256": "ce3e4d7e435ac3bf4ada767d950070f84c835e39caa528b2d4b2c24425318d5b"
+  }
+}

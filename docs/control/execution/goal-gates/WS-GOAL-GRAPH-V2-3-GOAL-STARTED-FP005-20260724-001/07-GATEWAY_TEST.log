@@ -1,0 +1,118 @@
+
+> walksafe-android-gateway@0.1.0 test
+> npm run build && node --test dist/test/*.test.js
+
+
+> walksafe-android-gateway@0.1.0 build
+> npm run clean && tsc
+
+
+> walksafe-android-gateway@0.1.0 clean
+> node --input-type=module --eval "import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })"
+
+TAP version 13
+# Subtest: OpenAPI and router expose exactly four public paths and approved methods
+ok 1 - OpenAPI and router expose exactly four public paths and approved methods
+  ---
+  duration_ms: 10.698247
+  type: 'test'
+  ...
+# Subtest: privacy rights page is public, separate from the four APIs, and links only to approved HTTPS intake
+ok 2 - privacy rights page is public, separate from the four APIs, and links only to approved HTTPS intake
+  ---
+  duration_ms: 1.05551
+  type: 'test'
+  ...
+# Subtest: configuration accepts only the fixed loopback backend and bind host
+ok 3 - configuration accepts only the fixed loopback backend and bind host
+  ---
+  duration_ms: 0.305078
+  type: 'test'
+  ...
+# Subtest: privacy rights intake configuration accepts only one exact HTTPS URL
+ok 4 - privacy rights intake configuration accepts only one exact HTTPS URL
+  ---
+  duration_ms: 0.144213
+  type: 'test'
+  ...
+# Subtest: production field configuration does not require an admin credential
+ok 5 - production field configuration does not require an admin credential
+  ---
+  duration_ms: 0.236167
+  type: 'test'
+  ...
+# Subtest: field session is actor-bound, revocable, secure on HTTPS, and never cached
+ok 6 - field session is actor-bound, revocable, secure on HTTPS, and never cached
+  ---
+  duration_ms: 9.702692
+  type: 'test'
+  ...
+# Subtest: field login limiter blocks the sixth attempt from one trusted client
+ok 7 - field login limiter blocks the sixth attempt from one trusted client
+  ---
+  duration_ms: 6.896134
+  type: 'test'
+  ...
+# Subtest: walking and search proxy only approved data and internal actor credentials
+ok 8 - walking and search proxy only approved data and internal actor credentials
+  ---
+  duration_ms: 2.775037
+  type: 'test'
+  ...
+# Subtest: upstream 401 and 403 never invalidate the Android field session
+ok 9 - upstream 401 and 403 never invalidate the Android field session
+  ---
+  duration_ms: 2.91932
+  type: 'test'
+  ...
+# Subtest: report multipart is bounded and proxied only after field authentication
+ok 10 - report multipart is bounded and proxied only after field authentication
+  ---
+  duration_ms: 17.319521
+  type: 'test'
+  ...
+# Subtest: multipart part counting ignores boundary text inside a payload
+ok 11 - multipart part counting ignores boundary text inside a payload
+  ---
+  duration_ms: 0.13193
+  type: 'test'
+  ...
+# Subtest: report authentication and busy admission reject before opening the body
+ok 12 - report authentication and busy admission reject before opening the body
+  ---
+  duration_ms: 3.280845
+  type: 'test'
+  ...
+# Subtest: report admission enforces one in-flight upload and twelve actor events per minute
+ok 13 - report admission enforces one in-flight upload and twelve actor events per minute
+  ---
+  duration_ms: 0.263679
+  type: 'test'
+  ...
+# Subtest: bounded navigation body and upstream deadline fail closed
+ok 14 - bounded navigation body and upstream deadline fail closed
+  ---
+  duration_ms: 6.743797
+  type: 'test'
+  ...
+# Subtest: real loopback HTTP adapter supplies peer IP for direct Android login
+ok 15 - real loopback HTTP adapter supplies peer IP for direct Android login
+  ---
+  duration_ms: 26.120475
+  type: 'test'
+  ...
+# Subtest: response backpressure settles and cancels the body when the client closes
+ok 16 - response backpressure settles and cancels the body when the client closes
+  ---
+  duration_ms: 0.577695
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 94.51031

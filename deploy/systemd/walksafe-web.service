@@ -1,0 +1,34 @@
+# LEGACY_REFERENCE_ONLY — DO NOT INSTALL.
+# TECHNICALLY_CLOSED — documentation-only stub with no active systemd section.
+# The historical unit is preserved below as comments for traceability only.
+#
+# [Unit]
+# Description=WalkSafe Web gateway (single instance)
+# After=network-online.target walksafe-backend.service walksafe-voice.service
+# Wants=network-online.target
+#
+# [Service]
+# Type=simple
+# User=walksafe-web
+# Group=walksafe-web
+# WorkingDirectory=/srv/walksafe/web/web
+# EnvironmentFile=/etc/walksafe/web.env
+# RuntimeDirectory=walksafe-web
+# RuntimeDirectoryMode=0700
+# StateDirectory=walksafe/web-gateway walksafe/web-field-logs walksafe/web-test-logs
+# StateDirectoryMode=0700
+# ExecStart=/usr/bin/python3 /srv/walksafe/web/scripts/run_walksafe_web_single_instance_20260713.py -- /usr/bin/node /srv/walksafe/web/web/server.js
+# Restart=on-failure
+# RestartSec=3
+# NoNewPrivileges=true
+# PrivateTmp=true
+# PrivateDevices=true
+# ProtectSystem=strict
+# ProtectHome=true
+# ProtectKernelTunables=true
+# ProtectKernelModules=true
+# ProtectControlGroups=true
+# ReadWritePaths=/var/lib/walksafe/web-gateway /var/lib/walksafe/web-field-logs /var/lib/walksafe/web-test-logs /run/walksafe-web
+#
+# [Install]
+# WantedBy=multi-user.target

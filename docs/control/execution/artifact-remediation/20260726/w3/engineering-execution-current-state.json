@@ -1,0 +1,1218 @@
+{
+  "allowed_claims": [
+    "Final run003 Android user/admin and Gateway internal builds passed with exact logs and staged artifact SHA-256 bindings.",
+    "Current backend/model compileall passed as interpreted syntax closure only.",
+    "Gateway typecheck and two Android lint results are reused only because exact source content sets are unchanged; current compileall is newly executed.",
+    "Current backend exact subject passed DB-free 33 tests and two sequential exact PostgreSQL node runs on the same fresh migrated single-use database, including schema parity and cleanup.",
+    "Final current license metadata totals 531 = 346 known + 185 unknown, with 13 exceptions requiring follow-up.",
+    "Final current SPDX 2.3 and CycloneDX 1.6 each passed offline official JSON Schema validation with zero errors.",
+    "Final current dirty-worktree provenance and backend integration trace exist while source_commit, reproducible rebuild, attestation and signing remain open."
+  ],
+  "artifact_coverage": [
+    {
+      "artifact_type_id": "DLV-DEV-09",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "final run003에서 Android user/admin debug APK와 Gateway dist를 exact command/tool/log/artifact hash로 PASS 결속했다. backend/model current compileall이 PASS이고 수정된 backend subject에서 DB-free 33건과 동일 DB PostgreSQL exact node 2회가 PASS했지만 설치 가능 Python release artifact·startup·cross-process runtime은 아니다.",
+        "disposition_id": "W3-DEV09-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-003",
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-005",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-007",
+          "W3-EXEC-SRC-008",
+          "W3-EXEC-SRC-009",
+          "W3-EXEC-SRC-010",
+          "W3-EXEC-SRC-011",
+          "W3-EXEC-SRC-012",
+          "W3-EXEC-SRC-013",
+          "W3-EXEC-SRC-014",
+          "W3-EXEC-SRC-015",
+          "W3-EXEC-SRC-019",
+          "W3-EXEC-SRC-020",
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-035",
+          "W3-EXEC-SRC-037",
+          "W3-EXEC-SRC-038"
+        ],
+        "gap_ids": [
+          "W3-DEV09-GAP-001"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "CURRENT_BUILD_AND_BACKEND_INTERNAL_INTEGRATION_PASS_PYTHON_RELEASE_BUILD_BOUNDARY_OPEN"
+      },
+      "priority": "P0",
+      "work_item": "현행 제품 build 입력·명령·출력·hash 기록"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-12",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "integration-run004의 current backend exact subject에서 database preflight, Alembic head, ORM schema parity, 동일 single-use DB의 PostgreSQL exact node 2회, container·secret cleanup이 PASS했다. production migration, backup·restore, lock/volume 측정은 없다.",
+        "disposition_id": "W3-DEV12-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-012",
+          "W3-EXEC-SRC-020",
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-036",
+          "W3-EXEC-SRC-037",
+          "W3-EXEC-SRC-038",
+          "W3-EXEC-SRC-039",
+          "W3-EXEC-SRC-040"
+        ],
+        "gap_ids": [
+          "W3-DEV12-GAP-001"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "CURRENT_BACKEND_POSTGIS_MIGRATION_SCHEMA_REPEATABILITY_PASS_BACKUP_BOUNDARY_OPEN"
+      },
+      "priority": "P0",
+      "work_item": "migration chain·upgrade/downgrade 결과·backup 결속"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-16",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "aux005는 evidence003과 동일한 app/adminapp/gateway source에 대해 기존 typecheck·두 lint PASS를 재사용하고 current backend/model compileall을 새로 PASS했다. current backend DB-free/PostgreSQL 통합 PASS도 exact subject로 추적되지만 승인된 전체 static-analysis ruleset과 formal279는 별도 NOT_RUN이다.",
+        "disposition_id": "W3-DEV16-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-012",
+          "W3-EXEC-SRC-013",
+          "W3-EXEC-SRC-016",
+          "W3-EXEC-SRC-017",
+          "W3-EXEC-SRC-018",
+          "W3-EXEC-SRC-019",
+          "W3-EXEC-SRC-020",
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-035"
+        ],
+        "gap_ids": [
+          "W3-DEV16-GAP-001"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "CURRENT_STATIC_AND_SYNTAX_CHECKS_PASS_REUSED_EXACT_SOURCE_FORMAL_BASELINE_OPEN"
+      },
+      "priority": "P0",
+      "work_item": "exact source·도구·ruleset 기반 lint/static analysis 기록"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-17",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "final evidence003 CycloneDX의 531개 component를 aux005가 known 346, unknown 185, exception 13으로 결정론적으로 분류했다. 이는 license compatibility, NOTICE 완전성 또는 법무 승인 결과가 아니다.",
+        "disposition_id": "W3-DEV17-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-020",
+          "W3-EXEC-SRC-021",
+          "W3-EXEC-SRC-022",
+          "W3-EXEC-SRC-023"
+        ],
+        "gap_ids": [
+          "W3-DEV17-GAP-001",
+          "W3-DEV17-GAP-002"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "FINAL_CURRENT_LICENSE_METADATA_INVENTORY_COMPLETE_UNKNOWN_AND_LEGAL_REVIEW_OPEN"
+      },
+      "priority": "P1",
+      "work_item": "release generation 전체 제3자 license·notice 의무 검토"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-19",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "final evidence003 SPDX 2.3과 CycloneDX 1.6을 aux005가 offline jsonschema 4.25.1과 공식 schema로 각각 error_count=0 PASS했다. 이는 formal279, license/legal, 고정 release generation, signing 또는 release PASS가 아니다.",
+        "disposition_id": "W3-DEV19-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-020",
+          "W3-EXEC-SRC-023",
+          "W3-EXEC-SRC-024",
+          "W3-EXEC-SRC-025",
+          "W3-EXEC-SRC-026",
+          "W3-EXEC-SRC-027",
+          "W3-EXEC-SRC-028",
+          "W3-EXEC-SRC-029"
+        ],
+        "gap_ids": [
+          "W3-DEV19-GAP-001"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "FINAL_CURRENT_SBOM_OFFICIAL_SCHEMA_VALIDATION_PASS_RELEASE_BINDING_OPEN"
+      },
+      "priority": "P0",
+      "work_item": "SPDX·CycloneDX SBOM 생성·공식 schema 검증"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-20",
+      "baseline_classification": "INTERNAL_GAP",
+      "disposition": {
+        "approval_or_release_change_claimed": false,
+        "baseline_required_action_result": "PARTIALLY_SATISFIED",
+        "current_evidence_summary": "final run/evidence003의 dirty-worktree exact path/SHA, APK/Gateway outputs와 backend/model/config subjects를 결속했고 integration-run004가 동일 current backend subject의 내부 통합 PASS를 연결한다. source_commit은 null이고 재현 빌드·attestation·signing은 NOT_ASSESSED, release는 NOT_ELIGIBLE이다.",
+        "disposition_id": "W3-DEV20-DISP-001",
+        "evidence_binding_ids": [
+          "W3-EXEC-SRC-003",
+          "W3-EXEC-SRC-004",
+          "W3-EXEC-SRC-005",
+          "W3-EXEC-SRC-006",
+          "W3-EXEC-SRC-007",
+          "W3-EXEC-SRC-008",
+          "W3-EXEC-SRC-009",
+          "W3-EXEC-SRC-012",
+          "W3-EXEC-SRC-013",
+          "W3-EXEC-SRC-014",
+          "W3-EXEC-SRC-015",
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-035",
+          "W3-EXEC-SRC-037",
+          "W3-EXEC-SRC-038"
+        ],
+        "gap_ids": [
+          "W3-DEV20-GAP-001",
+          "W3-DEV20-GAP-002"
+        ],
+        "status": "PARTIAL_INTERNAL_REMEDIATION",
+        "type": "FINAL_CURRENT_PROVENANCE_AND_BACKEND_INTEGRATION_CAPTURED_REPRODUCIBILITY_SIGNING_RELEASE_OPEN"
+      },
+      "priority": "P0",
+      "work_item": "reproducible formal build provenance·output hash·attestation"
+    }
+  ],
+  "authority_boundary": {
+    "approval_or_baseline_changed": false,
+    "builders_or_checkers_modified": false,
+    "checkpoint_or_daylog_modified": false,
+    "interpretation": "Append-only current-state execution evidence. It does not rewrite predecessor facts or promote approval, formal verification, gate or release state.",
+    "legacy_canonical_documents_modified": false,
+    "legacy_registers_modified": false,
+    "product_code_modified": false
+  },
+  "common_subject": {
+    "backend_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+    "core_source_content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+    "current_state_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "UTF-8 lines for artifact ID set, source path/SHA set, aux005 common subject, integration004 current-state and local-validation fingerprints in declared order",
+      "value": "2a871b8237bbd6a37f55714ba365f7a0386c26de27693e9f9d88bc6ca4a8390c"
+    },
+    "evidence003_manifest_content_fingerprint": "07acced540b5a1c18e30faab12bea4c11220a011a74b8d908b3c33ecc2fb45e4",
+    "source_commit": null,
+    "source_identity": "DIRTY_WORKTREE_EXACT_PATH_SHA256_CONTENT_SET",
+    "upstream_fingerprints": {
+      "aux005_common_subject": "00781d4b26ca8d8b854d61af5d6684780e193e3d54c20d9c57a53ad19c7360d3",
+      "integration004_current_state": "101e565547945a56c938b9f27b71beff4dac450e0352db978bf0a147a428bbe1",
+      "integration004_local_validation": "4632d6ccb25424365ee6e63e41beb3aee59891ab8885147038dfb24f338be708"
+    }
+  },
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-ENGINEERING-EXECUTION-CURRENT-STATE-20260727-001",
+  "execution_current_state": {
+    "DLV-DEV-09": {
+      "android_build": {
+        "artifacts": [
+          {
+            "binding_id": "W3-EXEC-SRC-007",
+            "kind": "USER_DEBUG_APK",
+            "sha256": "90555b9232e3ed27d8df1149013128e484680db379d151ed99c90cc1eb943a65"
+          },
+          {
+            "binding_id": "W3-EXEC-SRC-008",
+            "kind": "ADMIN_DEBUG_APK",
+            "sha256": "444cec1c996040828bb062df25ea42da1e733743e754f3043948a55f68cc50b1"
+          }
+        ],
+        "command": "./gradlew :app:assembleDebug :adminapp:assembleDebug",
+        "log_binding_id": "W3-EXEC-SRC-010",
+        "status": "PASS",
+        "tool_version": "Gradle 9.3.1"
+      },
+      "current_backend_integration_trace": {
+        "binding_ids": [
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-035",
+          "W3-EXEC-SRC-037",
+          "W3-EXEC-SRC-038"
+        ],
+        "cross_process_android_gateway_backend": "NOT_RUN",
+        "db_free": {
+          "deselected": 1,
+          "passed": 33,
+          "status": "PASS"
+        },
+        "postgres_exact_node_runs": [
+          {
+            "passed": 1,
+            "run": 1,
+            "status": "PASS"
+          },
+          {
+            "passed": 1,
+            "run": 2,
+            "status": "PASS"
+          }
+        ],
+        "same_database_repeatability": "PASS"
+      },
+      "final_generation": {
+        "evidence_id": "evidence-20260726-003",
+        "run_id": "run-20260726-003",
+        "source_commit": null,
+        "source_content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade"
+      },
+      "gateway_build": {
+        "artifact": {
+          "binding_id": "W3-EXEC-SRC-009",
+          "kind": "GATEWAY_DIST_ARCHIVE",
+          "sha256": "9fc2e4d60ced90fd3434a75955e1781b6b64a36cd5b312a3aca3d8d42e1c5472"
+        },
+        "command": "npm run build",
+        "log_binding_id": "W3-EXEC-SRC-011",
+        "status": "PASS",
+        "tool_version": "node v22.22.1; npm 9.2.0"
+      },
+      "python_subjects": {
+        "backend_source_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+        "boundary": "compileall is interpreted source syntax closure only; no installable package, startup or runtime build claim.",
+        "compileall_log_binding_id": "W3-EXEC-SRC-019",
+        "compileall_status": "PASS",
+        "config_source_content_set_sha256": "0a22d7617f719090c2f0d9b8d0b9ad9d4387827b1213322b6c495139c330e63b",
+        "model_source_content_set_sha256": "59ba4343c88257f027c1b1c6c1e034b7725779cb17440206a6c63972ed3b71b4"
+      },
+      "result": "PASS_FINAL_NAMED_INTERNAL_BUILD_AND_CURRENT_BACKEND_INTEGRATION_WITH_BOUNDARY"
+    },
+    "DLV-DEV-12": {
+      "boundary": "Internal single-use fresh PostGIS integration only; no production migration, backup, restore, lock/volume measurement, cross-process application traffic or deployment PASS.",
+      "integration_run_id": "integration-run-20260726-004",
+      "result": "PASS_CURRENT_BACKEND_FRESH_POSTGIS_MIGRATION_SCHEMA_AND_REPEATABILITY",
+      "source_binding": {
+        "backend_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+        "backend_subject_binding_id": "W3-EXEC-SRC-032",
+        "source_commit": null
+      },
+      "steps": [
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-030",
+          "status": "PASS",
+          "step": "database_preflight"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-036",
+          "status": "PASS",
+          "step": "alembic_upgrade_head"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-033",
+          "status": "PASS",
+          "step": "orm_schema_parity"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-037",
+          "passed": 1,
+          "status": "PASS",
+          "step": "postgres_exact_node_run_1"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-038",
+          "passed": 1,
+          "status": "PASS",
+          "step": "postgres_exact_node_run_2_same_db"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-033",
+          "status": "PASS",
+          "step": "reconfirmation_cleanup_repeatability"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-039",
+          "status": "PASS",
+          "step": "postgis_container_cleanup"
+        },
+        {
+          "evidence_binding_id": "W3-EXEC-SRC-040",
+          "status": "PASS",
+          "step": "secret_file_removal"
+        }
+      ]
+    },
+    "DLV-DEV-16": {
+      "boundary": "These named checks and integration trace are not the approved full static-analysis baseline or formal279 PASS.",
+      "checks": [
+        {
+          "binding_id": "W3-EXEC-SRC-016",
+          "check": "typecheck",
+          "scope": "android-gateway",
+          "status": "PASS_REUSED_EXACT_SOURCE"
+        },
+        {
+          "binding_id": "W3-EXEC-SRC-017",
+          "check": "lint",
+          "scope": "android-user",
+          "status": "PASS_REUSED_EXACT_SOURCE"
+        },
+        {
+          "binding_id": "W3-EXEC-SRC-018",
+          "check": "lint",
+          "scope": "android-admin",
+          "status": "PASS_REUSED_EXACT_SOURCE"
+        },
+        {
+          "binding_id": "W3-EXEC-SRC-019",
+          "check": "compileall",
+          "scope": "backend-and-model",
+          "status": "PASS_CURRENT_SOURCE"
+        }
+      ],
+      "current_backend_integration_status": "PASS_EXACT_SUBJECT_TRACE_BOUND",
+      "result": "PASS_CURRENT_NAMED_INTERNAL_STATIC_AND_SYNTAX_CHECKS",
+      "reuse_source_content_sets": {
+        "adminapp": "93590be19b2900ccbe19c7d44bcd1ba3f33f57d28d4105290395f567d028b664",
+        "android-gateway": "9956340a4d695d21c8449e1e8fd2ebf1924573977bf3346f7c449fd6b5bbea15",
+        "app": "9092bade122fbee6aa426c51f1c00c77ffb36eed58da796a9659ef4bfd760585"
+      }
+    },
+    "DLV-DEV-17": {
+      "boundary": "Metadata classification is not license compatibility, legal approval, NOTICE completeness or release eligibility.",
+      "component_count": 531,
+      "exception_count": 13,
+      "followup_targets": [
+        "W5",
+        "W8"
+      ],
+      "known_count": 346,
+      "known_plus_unknown_equals_component_count": true,
+      "legal_approval_claimed": false,
+      "legal_review_completed": false,
+      "result": "PASS_FINAL_CURRENT_METADATA_INVENTORY_NOT_LEGAL_APPROVAL",
+      "review_binding_id": "W3-EXEC-SRC-021",
+      "review_log_binding_id": "W3-EXEC-SRC-022",
+      "sbom_binding_id": "W3-EXEC-SRC-023",
+      "unknown_count": 185
+    },
+    "DLV-DEV-19": {
+      "auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-005",
+      "boundary": "Official schema PASS validates document structure only and is distinct from formal279, license/legal review, fixed release identity, signing and release eligibility.",
+      "documents": [
+        {
+          "binding_id": "W3-EXEC-SRC-024",
+          "format": "SPDX-2.3",
+          "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e"
+        },
+        {
+          "binding_id": "W3-EXEC-SRC-023",
+          "format": "CycloneDX-1.6",
+          "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+        }
+      ],
+      "log_binding_id": "W3-EXEC-SRC-029",
+      "result": "PASS_FINAL_CURRENT_SBOM_AND_OFFICIAL_SCHEMA_VALIDATION",
+      "result_binding_id": "W3-EXEC-SRC-028",
+      "validations": [
+        {
+          "error_count": 0,
+          "format": "SPDX-2.3",
+          "schema_binding_id": "W3-EXEC-SRC-027",
+          "status": "PASS"
+        },
+        {
+          "error_count": 0,
+          "format": "CycloneDX-1.6",
+          "schema_binding_ids": [
+            "W3-EXEC-SRC-025",
+            "W3-EXEC-SRC-026"
+          ],
+          "status": "PASS"
+        }
+      ],
+      "validator": {
+        "name": "jsonschema",
+        "network_used": false,
+        "runtime": "uv run --no-project --offline --with jsonschema==4.25.1",
+        "version": "4.25.1"
+      }
+    },
+    "DLV-DEV-20": {
+      "attestation_status": "NOT_ASSESSED",
+      "backend_content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c",
+      "build_subjects": [
+        {
+          "artifact_id": "USER_APK",
+          "sha256": "90555b9232e3ed27d8df1149013128e484680db379d151ed99c90cc1eb943a65"
+        },
+        {
+          "artifact_id": "ADMIN_APK",
+          "sha256": "444cec1c996040828bb062df25ea42da1e733743e754f3043948a55f68cc50b1"
+        },
+        {
+          "artifact_id": "GATEWAY_DIST_ARCHIVE",
+          "sha256": "9fc2e4d60ced90fd3434a75955e1781b6b64a36cd5b312a3aca3d8d42e1c5472"
+        },
+        {
+          "artifact_id": "BACKEND_SOURCE_SUBJECT",
+          "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+        },
+        {
+          "artifact_id": "MODEL_SOURCE_SUBJECT",
+          "sha256": "c4e14157b92d471200febfed1e86bbbc0ed2bf7df48ac209f8db5b1a2e28533a"
+        },
+        {
+          "artifact_id": "CONFIG_SOURCE_SUBJECT",
+          "sha256": "63b7167ff77106cf90ab1aebf96bb0b1805259dd038c232813ff60b5e3151570"
+        }
+      ],
+      "current_backend_integration": {
+        "binding_ids": [
+          "W3-EXEC-SRC-030",
+          "W3-EXEC-SRC-031",
+          "W3-EXEC-SRC-032",
+          "W3-EXEC-SRC-033",
+          "W3-EXEC-SRC-034",
+          "W3-EXEC-SRC-035",
+          "W3-EXEC-SRC-037",
+          "W3-EXEC-SRC-038"
+        ],
+        "db_free_passed": 33,
+        "postgres_exact_node_runs_passed": 2,
+        "same_database_repeatability": "PASS",
+        "schema_parity": "PASS",
+        "status": "PASS_INTERNAL"
+      },
+      "provenance_binding_id": "W3-EXEC-SRC-005",
+      "raw_command_receipt_sha256": "899d88cfd6337e80992c1ccaba620d23fdca4a611f51aeac9cc19923a7b3cdf4",
+      "release_status": "NOT_ELIGIBLE",
+      "reproducible_rebuild_status": "NOT_RUN",
+      "result": "FINAL_CURRENT_INTERNAL_PROVENANCE_AND_BACKEND_INTEGRATION_CAPTURED_WITH_OPEN_FORMAL_BOUNDARIES",
+      "signing_status": "NOT_ASSESSED",
+      "source_commit": null,
+      "source_content_set_sha256": "f7a05a1abd7b89053dd7d7d052508dfd43b19821174c8de5a82fe754ae90cade",
+      "source_identity": "DIRTY_WORKTREE_EXACT_PATH_SHA256_CONTENT_SET"
+    }
+  },
+  "final_rebinding": {
+    "final_auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-005",
+    "final_evidence_id": "evidence-20260726-003",
+    "final_integration_run_id": "integration-run-20260726-004",
+    "final_run_id": "run-20260726-003",
+    "interpretation": "The current-state supplement now points to the latest exact current source/build/SBOM/integration evidence; predecessor receipts remain historical and are not relabeled.",
+    "mode": "NON_DESTRUCTIVE_FINAL_EVIDENCE_REBIND",
+    "predecessor_evidence_rewritten": false
+  },
+  "integrity": {
+    "artifact_count": 6,
+    "artifact_id_set_sha256": "6ca0c089ef48689f10af6a1d4007d8b57971086114c2a80596d9848fc9bbb4e0",
+    "artifact_unique_count": 6,
+    "common_subject_fingerprint": "2a871b8237bbd6a37f55714ba365f7a0386c26de27693e9f9d88bc6ca4a8390c",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "3c07d7d073513361261421887bdad2e8e8839df9e0003693a457f67b282e4c21"
+    },
+    "disposition_count": 6,
+    "gap_count": 8,
+    "gap_duplicate_count": 0,
+    "gap_orphan_count": 0,
+    "gap_unique_count": 8,
+    "source_binding_count": 40,
+    "source_content_set_sha256": "167dc8e0a2f0ef2929b88ababdb2b44d249e321c0409d13e66e4fbc4898df3de",
+    "source_path_set_sha256": "30ed3c80e07c39c06bc417d9f16830599c9e457c90a9c7b9d5a8d18f6de90c60",
+    "source_path_sha256_set_sha256": "86af875b658e3cd2ea90f8d169adcdb071788d4a757c72a26e983dad739345a8"
+  },
+  "prepared_on": "2026-07-27",
+  "prohibited_claims": [
+    "Formal 279 tests passed.",
+    "Actual-device, actual-user, field, TMAP, Android-to-Gateway-to-Backend cross-process, production, deployment or external review passed.",
+    "License compatibility, NOTICE completeness or legal approval was established.",
+    "Python compileall produced a deployable package or proved installation/startup/runtime behavior.",
+    "The internal fresh PostGIS integration proves production migration, backup, restore, rollback safety or lock/volume bounds.",
+    "SBOM schema validation proves component correctness, license compliance, signing or release eligibility.",
+    "A reproducible formal build, source commit attestation or signed release provenance exists.",
+    "Any of the five release gates ran or was waived, or the project is release eligible."
+  ],
+  "revision": "2.0.0",
+  "schema_version": "walksafe.artifact-remediation.engineering-execution-current-state.v1",
+  "scope": {
+    "artifact_count": 6,
+    "artifact_id_set_contract": "SHA256_UTF8_SORTED_IDS_EACH_WITH_TRAILING_LF",
+    "artifact_id_set_sha256": "6ca0c089ef48689f10af6a1d4007d8b57971086114c2a80596d9848fc9bbb4e0",
+    "artifact_ids": [
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-16",
+      "DLV-DEV-17",
+      "DLV-DEV-19",
+      "DLV-DEV-20"
+    ],
+    "exact_expected_set": true,
+    "gap_disposition_count": 6,
+    "gap_disposition_rule": "EXACTLY_ONE_DISPOSITION_OBJECT_PER_ARTIFACT",
+    "modified_predecessor_files": false,
+    "predecessor_classification": "INTERNAL_GAP",
+    "update_mode": "ADD_ONLY_SUCCESSOR_SUPPLEMENT",
+    "wave_id": "W3",
+    "work_package": "W3-DEV-EXECUTION"
+  },
+  "source_bindings": [
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-001",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "role": "AUDIT_BASELINE",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-002",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "role": "WAVE_PLAN",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-003",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/command-receipt.json",
+      "role": "FINAL_RUN003_COMMAND_RECEIPT",
+      "sha256": "899d88cfd6337e80992c1ccaba620d23fdca4a611f51aeac9cc19923a7b3cdf4"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-004",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/engineering-evidence-manifest.json",
+      "role": "FINAL_EVIDENCE003_MANIFEST",
+      "sha256": "13674e1132727cd7d065bf67658505d8ba2859bf1c2680e316495dc6738825d5"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-005",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/internal-build-provenance.json",
+      "role": "FINAL_INTERNAL_BUILD_PROVENANCE",
+      "sha256": "56b7ec0a352bdf590846bcda6ec69d7594a68989d1326917c43874ea016e0492"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-006",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "role": "FINAL_DIRTY_WORKTREE_SOURCE_SNAPSHOT",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-007",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/artifacts/user-app-internal.apk",
+      "role": "FINAL_USER_DEBUG_APK",
+      "sha256": "90555b9232e3ed27d8df1149013128e484680db379d151ed99c90cc1eb943a65"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-008",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/artifacts/admin-app-internal.apk",
+      "role": "FINAL_ADMIN_DEBUG_APK",
+      "sha256": "444cec1c996040828bb062df25ea42da1e733743e754f3043948a55f68cc50b1"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-009",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/artifacts/android-gateway-dist.tar.gz",
+      "role": "FINAL_GATEWAY_DIST_ARCHIVE",
+      "sha256": "9fc2e4d60ced90fd3434a75955e1781b6b64a36cd5b312a3aca3d8d42e1c5472"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09"
+      ],
+      "binding_id": "W3-EXEC-SRC-010",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/logs/android-internal-build.log",
+      "role": "FINAL_ANDROID_BUILD_LOG",
+      "sha256": "4bd0a1b5ff667233ed2dd28f04e7d738d0fe8ec4cd592882a6b6844769c34249"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09"
+      ],
+      "binding_id": "W3-EXEC-SRC-011",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/logs/gateway-internal-build.log",
+      "role": "FINAL_GATEWAY_BUILD_LOG",
+      "sha256": "447a8bbe4da47c367d08c47d3edddaf23561c63d7b35b29265341a87eaec7f51"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-012",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/subjects/backend.json",
+      "role": "FINAL_BACKEND_SOURCE_SUBJECT",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-013",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/subjects/model.json",
+      "role": "FINAL_MODEL_SOURCE_SUBJECT",
+      "sha256": "c4e14157b92d471200febfed1e86bbbc0ed2bf7df48ac209f8db5b1a2e28533a"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-014",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/subjects/config.json",
+      "role": "FINAL_CONFIG_SOURCE_SUBJECT",
+      "sha256": "63b7167ff77106cf90ab1aebf96bb0b1805259dd038c232813ff60b5e3151570"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-015",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-003/logs/source-subject-capture.log",
+      "role": "FINAL_SOURCE_CAPTURE_LOG",
+      "sha256": "4387cc9b2c886e14fb2784282144b5587957c3179682013a6323a5fe6630fd92"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-16"
+      ],
+      "binding_id": "W3-EXEC-SRC-016",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/gateway-typecheck.log",
+      "role": "REUSED_EXACT_GATEWAY_TYPECHECK_LOG",
+      "sha256": "450be6540062a7231730f8f389ae4cff23118793118005653acf6aba9203bb2c"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-16"
+      ],
+      "binding_id": "W3-EXEC-SRC-017",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-app-lint.log",
+      "role": "REUSED_EXACT_ANDROID_USER_LINT_LOG",
+      "sha256": "499bceeda8b403a337791f3cdab3cbbf361e640d782017221c1f8546aeccb599"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-16"
+      ],
+      "binding_id": "W3-EXEC-SRC-018",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-admin-lint.log",
+      "role": "REUSED_EXACT_ANDROID_ADMIN_LINT_LOG",
+      "sha256": "ff9e721afb1799f978a10edfdae32673b4233559e2bd6e07d7a210b558e75d84"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-16"
+      ],
+      "binding_id": "W3-EXEC-SRC-019",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/logs/python-compileall-backend-model.log",
+      "role": "AUX005_CURRENT_PYTHON_COMPILEALL_LOG",
+      "sha256": "3cfc1c779d037f81803d3c24244a7b95eabc689b15421c4aaa7da481abb2a075"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-020",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/execution-summary.json",
+      "role": "AUX005_FINAL_EXECUTION_SUMMARY",
+      "sha256": "94e4f9a1ca65840ca884397d5ca564385dbda791f256021cf344dd5c6362ee8f"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-17"
+      ],
+      "binding_id": "W3-EXEC-SRC-021",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/license-review.json",
+      "role": "AUX005_FINAL_LICENSE_REVIEW",
+      "sha256": "428b90d44a9f293d219c06921f1d7a9c829fbf87f5bb2c78a376259b8041f613"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-17"
+      ],
+      "binding_id": "W3-EXEC-SRC-022",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/logs/license-metadata-review-current-sbom.log",
+      "role": "AUX005_LICENSE_REVIEW_LOG",
+      "sha256": "8014670dc46fe301cc2432388961bf64d01eaebde55f95e73f68162a77f776df"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-17",
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-023",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "role": "FINAL_CYCLONEDX_1_6_SBOM",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-024",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.spdx.json",
+      "role": "FINAL_SPDX_2_3_SBOM",
+      "sha256": "7599f3129872f20b44ca9b8c6363b29880018f536a54100279cd4a90a66ddb9e"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-025",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-1.6.schema.json",
+      "role": "CYCLONEDX_1_6_OFFICIAL_SCHEMA",
+      "sha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-026",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-jsf-0.82.schema.json",
+      "role": "CYCLONEDX_JSF_0_82_OFFICIAL_SCHEMA",
+      "sha256": "8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-027",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/spdx-2.3.schema.json",
+      "role": "SPDX_2_3_OFFICIAL_SCHEMA",
+      "sha256": "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-028",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/sbom-validation-result.json",
+      "role": "AUX005_FINAL_OFFICIAL_SCHEMA_VALIDATION",
+      "sha256": "ed5048d91819a9e8f5b190f9b782a375e358cc3573b8bc8949135a18d9a1f57b"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-19"
+      ],
+      "binding_id": "W3-EXEC-SRC-029",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-005/logs/official-schema-validation-current-sbom.log",
+      "role": "AUX005_OFFICIAL_SCHEMA_VALIDATION_LOG",
+      "sha256": "d8f802ca5844f8a6d27c9c31f011198120dc4a845911ead7d785de887159b1f4"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-030",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/execution-summary.json",
+      "role": "INTEGRATION004_EXECUTION_SUMMARY",
+      "sha256": "716254c045795adf85f1cb9a1cf9bef033b59d9d5f20185e74aa1c6fd46c13e9"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-031",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-source-binding.json",
+      "role": "INTEGRATION004_CURRENT_SOURCE_BINDING",
+      "sha256": "c44d64f3aa4ae825a81ff8e2925bf5bfaa36624826d82e35426fafab04c75e90"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-032",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/current-backend-subject.json",
+      "role": "INTEGRATION004_CURRENT_BACKEND_SUBJECT",
+      "sha256": "eeae9b7e143dcf0336e97ed504a8456283d5fa2c46b355fd5af9f79989bd45cc"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-033",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/integration-current-state.json",
+      "role": "INTEGRATION004_CURRENT_STATE",
+      "sha256": "dca362040f241734201d00d94b912ec0b901ec444e506cf7a0b731e71f3d6a2c"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-034",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/local-validation.json",
+      "role": "INTEGRATION004_LOCAL_VALIDATION",
+      "sha256": "81dee07752e36ec3907fb4b03e6b2fb9b98f005b2cfadb32320fa43741c3810d"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-16",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-035",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-dbfree.json",
+      "role": "INTEGRATION004_DBFREE_RECEIPT",
+      "sha256": "5e66a8fb0055ca658ddf1fffdfc0414870c0547733335b47cb9885aafb8bdec6"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-12"
+      ],
+      "binding_id": "W3-EXEC-SRC-036",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/alembic-upgrade-head.json",
+      "role": "INTEGRATION004_ALEMBIC_UPGRADE_RECEIPT",
+      "sha256": "aafa55368483c3fedd6e8b095cceb0a0255313a58ceae13591e889349f2add8e"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-037",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-postgres-node-run-1.json",
+      "role": "INTEGRATION004_POSTGRES_NODE_RUN1_RECEIPT",
+      "sha256": "e7c6e1549730e49ff3f1ef217008732ff8c0d6fcea1779fd218c5ad867a21270"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-20"
+      ],
+      "binding_id": "W3-EXEC-SRC-038",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/backend-admin-postgres-node-run-2.json",
+      "role": "INTEGRATION004_POSTGRES_NODE_RUN2_RECEIPT",
+      "sha256": "aab8fdde540cb64883d2250c2e22d42318ab144159b26615c8b071670254caa5"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-12"
+      ],
+      "binding_id": "W3-EXEC-SRC-039",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/postgis-container-cleanup.json",
+      "role": "INTEGRATION004_POSTGIS_CLEANUP_RECEIPT",
+      "sha256": "1e12c0156992c3bf20dcd9e18f6457e9e6403fd923b7af539b116f5cfe793855"
+    },
+    {
+      "applies_to_artifact_ids": [
+        "DLV-DEV-12"
+      ],
+      "binding_id": "W3-EXEC-SRC-040",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/integration-run-20260726-004/receipts/secret-file-removal.json",
+      "role": "INTEGRATION004_SECRET_REMOVAL_RECEIPT",
+      "sha256": "c86f8efc09f3a5f5857f5752d73b9019b65f3d7289ccdc60b4217944ca558912"
+    }
+  ],
+  "source_commit": null,
+  "stable_gaps": [
+    {
+      "artifact_type_id": "DLV-DEV-09",
+      "closure_condition": "하나의 불변 release candidate source identity와 고정 Python dependency closure에서 backend·model 설치 가능 산출물, startup smoke 및 전체 제품 build receipt를 생성해 hash로 결속한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/formal-build-record.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/python-runtime-closure-validation.json"
+      ],
+      "gap_id": "W3-DEV09-GAP-001",
+      "owners": [
+        "빌드책임자",
+        "Backend책임자",
+        "Model책임자",
+        "QA책임자"
+      ],
+      "status": "OPEN_BOUNDARY",
+      "target_wave": "W8"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-12",
+      "closure_condition": "불변 release candidate와 서명된 backup을 결속한 production-like 환경에서 migration, rollback, restore를 수행하고 최종 head·data integrity·lock/volume 결과를 기록한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/migration-backup-restore-drill.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/migration-lock-volume-measurement.json"
+      ],
+      "gap_id": "W3-DEV12-GAP-001",
+      "owners": [
+        "DB책임자",
+        "운영책임자",
+        "QA책임자"
+      ],
+      "status": "OPEN_BOUNDARY",
+      "target_wave": "W8"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-16",
+      "closure_condition": "승인된 언어별 lint·static-analysis ruleset과 불변 source snapshot을 결속해 전체 대상 scope를 실행하고 raw result를 보존한다. 정식 279건 시험과 별도 판정을 유지한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w6/static-analysis-baseline.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/static-analysis-raw-result-manifest.json"
+      ],
+      "gap_id": "W3-DEV16-GAP-001",
+      "owners": [
+        "QA책임자",
+        "기술책임자",
+        "Android책임자",
+        "Backend책임자"
+      ],
+      "status": "OPEN_BOUNDARY",
+      "target_wave": "W6"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-17",
+      "closure_condition": "license metadata가 unknown인 185개 component를 source/binary/model/dataset/SDK 범위별로 분류하고 근거 출처와 reviewer를 기록한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/license-unknown-classification.json"
+      ],
+      "gap_id": "W3-DEV17-GAP-001",
+      "owners": [
+        "보안·개인정보책임자",
+        "법무검토책임자",
+        "빌드책임자"
+      ],
+      "status": "OPEN_INTERNAL",
+      "target_wave": "W5"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-17",
+      "closure_condition": "13개 metadata exception과 전체 제3자 의무·NOTICE·재배포 조건을 고정 release generation에 대해 법무 검토하고 승인 또는 수정 결정을 남긴다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/legal-license-review-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/third-party-notice-release-binding.json"
+      ],
+      "gap_id": "W3-DEV17-GAP-002",
+      "owners": [
+        "법무검토책임자",
+        "제품책임자"
+      ],
+      "status": "OPEN_EXTERNAL_REVIEW",
+      "target_wave": "W8"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-19",
+      "closure_condition": "고정 release candidate로 SPDX 2.3과 CycloneDX 1.6을 재생성하고 release artifact·license review·official schema PASS를 동일 provenance subject에 결속한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/release-sbom-validation.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/release-sbom-provenance.json"
+      ],
+      "gap_id": "W3-DEV19-GAP-001",
+      "owners": [
+        "빌드책임자",
+        "보안·개인정보책임자",
+        "QA책임자"
+      ],
+      "status": "OPEN_BOUNDARY",
+      "target_wave": "W8"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-20",
+      "closure_condition": "승인된 source commit 또는 동등한 불변 source identity에서 격리 재빌드를 두 번 수행해 byte/content equivalence를 입증하고 provenance attestation과 signing 결과를 남긴다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/reproducible-build-comparison.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/signed-provenance-attestation.json"
+      ],
+      "gap_id": "W3-DEV20-GAP-001",
+      "owners": [
+        "빌드책임자",
+        "보안·개인정보책임자"
+      ],
+      "status": "OPEN_INTERNAL",
+      "target_wave": "W8"
+    },
+    {
+      "artifact_type_id": "DLV-DEV-20",
+      "closure_condition": "서명·attestation 검증 결과를 다섯 release gate와 연결하고 미면제 gate가 모두 종료된 뒤 별도 release eligibility 결정을 기록한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w9/release-provenance-gate-binding.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/release-eligibility-decision.json"
+      ],
+      "gap_id": "W3-DEV20-GAP-002",
+      "owners": [
+        "릴리스책임자",
+        "제품책임자",
+        "QA책임자"
+      ],
+      "status": "OPEN_RELEASE_GATE",
+      "target_wave": "W9"
+    }
+  ],
+  "status": "DRAFT_CURRENT_STATE_SUCCESSOR_FINAL_REBOUND",
+  "validation_invariants": {
+    "artifact_exact_set": {
+      "actual_count": 6,
+      "expected_count": 6,
+      "result": "PASS"
+    },
+    "artifact_unique_count": {
+      "actual_count": 6,
+      "expected_count": 6,
+      "result": "PASS"
+    },
+    "exactly_one_disposition_per_artifact": {
+      "actual_count": 6,
+      "expected_count": 6,
+      "result": "PASS"
+    },
+    "final_subject_rebinding": {
+      "aux005": true,
+      "evidence003": true,
+      "integration004": true,
+      "result": "PASS",
+      "run003": true
+    },
+    "formal_signing_device_deploy_release_boundary": {
+      "result": "PASS"
+    },
+    "gap_registry": {
+      "duplicate_count": 0,
+      "orphan_count": 0,
+      "referenced_count": 8,
+      "registered_count": 8,
+      "result": "PASS"
+    },
+    "source_path_sha256_verification": {
+      "checked_count": 40,
+      "mismatch_count": 0,
+      "result": "PASS"
+    },
+    "target_wave_range": {
+      "allowed": [
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
+        "W8",
+        "W9"
+      ],
+      "invalid_count": 0,
+      "result": "PASS"
+    }
+  },
+  "verification_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "cross_process_android_gateway_backend_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "field_test_status": "NOT_RUN",
+    "formal_tests": {
+      "execution_status": "NOT_RUN",
+      "pass_claimed": false,
+      "planned_count": 279
+    },
+    "internal_execution_evidence_only": true,
+    "legal_approval_status": "NOT_APPROVED_OR_COMPLETED",
+    "production_validation_status": "NOT_RUN",
+    "release_gates": {
+      "count": 5,
+      "status": "NOT_RUN",
+      "waived": false
+    },
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED",
+    "tmap_integration_status": "NOT_RUN"
+  }
+}

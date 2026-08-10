@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP018-IMPLEMENTATION-RECORD-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-24T12:32:00+09:00",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "562e3843c2eadec531bfb9084478629e8fc5d1347fe48fb0b8e9ea113b78e883",
+      "before_sha256": "15e896424a3154865a3e6a2f6ad034514089f9d62f7c52da69623aeebab75925"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/AndroidWalkSessionResourceProbe.kt",
+      "after_sha256": "e2cb83044df1431ff92d568540e504ea53391ca017283ad790c3a073010960d7"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicy.kt",
+      "after_sha256": "4620484885c1a970f6e59eccf18922a6b50c21af6c2a30669ad09460f6cef6e6"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+      "after_sha256": "15ad2fa627c60ee6bd7f0741b1e420fea1a14e68bfdc889b1b6d57cefec46b0c",
+      "before_sha256": "c902db98e300fe34defead1df96334062847168b7e3b46d77ccaf99d8ea776d6"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "after_sha256": "2a539912516c337c2acb346dacd3a9694368bd7ae1dbc7ee1be0df54be9b0d06",
+      "before_sha256": "299e18925a61e6429e3f152083f6c673981421690da61b0711c55defede4fb0c"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "after_sha256": "98a4e4758164317bc2a76d01ea3d76cab8fd9e5ae25d2f33b86e9eda63553a57"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+      "after_sha256": "9a03adf36c97b198e143637b51c0f2310d1d57c785d486d8097c31650cdd30d9",
+      "before_sha256": "734d08e8467683f4443b394cc7b5cb1f5bdd2a8098996f9991232f5923d928af"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "703e31d8752f57de658eda174245b0550ddad9ba1dc70b3ccc9d0b0580b2b83e"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+      "after_sha256": "167360607687607a30bd94fbc9a2e3efa6971a7d6b7b68a9f161341141700f83",
+      "before_sha256": "cbb5f5b52046be7d23dbe388d4c6e55ce6507da03522e5ba80d2d9446597c4e7"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "3bb4b06a2615aa60b62345b6b867216ec0b05b053f58799f5cd723bd73a8cec4",
+      "before_sha256": "5b6b622393cd6ed4b3bd555bd3e4d857e83843966166464459c9673d65947873"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+      "after_sha256": "b81bfd2c81f9fc9a5f63b414fc13e439a34397e89399fb06d9c05bbc2b5dd4a6"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "d45a9ea330a6dbd4a7fb2eb8c4d4061e2c88ee2287dec02e635dc0842e41a941",
+      "before_sha256": "22a27ba6d25caadd7c1d5bf539191efaa5ff4aaded37e243aa986dbc10d3c20e"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSessionDeviceResourceSnapshotTest.kt",
+      "after_sha256": "0a15f83bd09a53411ac715f492b0ea6787cd630b1ccadb04f07e71d819b426cf"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicyTest.kt",
+      "after_sha256": "cb7683d85cd807fb54649ef13935889ff34e9fbfc1764d79d6080a883f9813de"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "after_sha256": "3d840e3706c88f4ddd479dca672670df2e8544b09d448913a1a0dccc54407e65"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleFp018Test.kt",
+      "after_sha256": "d0b607b3942df2084ec8a85cd6f108a8cb4e75ac95a0712b6d4d31fc43c13e40"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "0bcb928ccb7d30d76fd0fddf7b2cec3299068271ed5bece7b5ae23be96a4f1dc"
+    }
+  ],
+  "implemented_controls": [
+    "readiness snapshots are bound to one walk epoch and one action",
+    "start and resume accept only their matching readiness action",
+    "active permission changes limit dependent features before stopping the walk",
+    "late asynchronous callbacks require the current walk epoch and local generation",
+    "new walks clear prior route, location, risk, feedback, and step state",
+    "resource-driven safety stops announce their reason non-visually"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-018-01",
+      "TC-FP-018-02",
+      "TC-FP-018-03",
+      "TC-FP-018-04",
+      "TC-FP-018-05",
+      "TC-FP-018-06"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

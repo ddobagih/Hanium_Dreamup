@@ -1,0 +1,3837 @@
+{
+  "schema_version": "walksafe.final-257-audit-manifest.v1",
+  "manifest_id": "WS-FINAL-257-AUDIT-MANIFEST-20260727-001",
+  "prepared_on": "2026-07-27",
+  "input_raw_bindings": [
+    {
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+      "byte_length": 229471
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "byte_length": 56499
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+      "byte_length": 53979
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+      "sha256": "895ff118ab2d41c67d4dfa767260bc7c4959a444aecfce5073cb3bea3fa2c641",
+      "byte_length": 16850
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "sha256": "755e341c712e755540f95f97f3936cca8da2cc5bccf220a292e593358f02a1f8",
+      "byte_length": 17827
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+      "sha256": "9a9517a1f0d1c8bc4644acb564c1f62cada65c3e9f46956ca9cc686bc3cc912b",
+      "byte_length": 61298
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+      "sha256": "e5b601c36313438d9d8fbdd0af49399bb7493189c51fc47c803169b352a1a9ad",
+      "byte_length": 23176
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "sha256": "9280ded6353ba5cbc4b1056eaaafb7d0ec8dbb9578f7e43b253901caf42bbb24",
+      "byte_length": 26961
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+      "sha256": "b4cfc2a7d126227f5d87dda42c53f2fefc93cc26d9c90c7071775b5a0f085407",
+      "byte_length": 8601
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+      "sha256": "0c816c830a4371fc4abbef0e3f4848940daa130837e3cead06a0e7a9eb800ce0",
+      "byte_length": 37403
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+      "byte_length": 637704
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+      "sha256": "ebd8e565a3c9111b2ef1f5cd66f1285d51b1d2ac6d2169e482f869c309f00dcb",
+      "byte_length": 10298
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "sha256": "72a9cbfa0d8f1035888884b6a8f2daaf8dc0bcd4ee43e0131d4a88d8cf7296f5",
+      "byte_length": 11078
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+      "sha256": "9e8f3547b68874ad6b546dd0bccbfb612647d5923b2026912c1efc05243f4a21",
+      "byte_length": 27600
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+      "byte_length": 19207
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+      "byte_length": 123312
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "sha256": "f41fac3a2c497a6109f0c2213800663d1b24094750070ce98449063ed40e2590",
+      "byte_length": 22499
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+      "sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+      "byte_length": 64421
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+      "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+      "byte_length": 47592
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+      "sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+      "byte_length": 47147
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+      "sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341",
+      "byte_length": 31223
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+      "sha256": "5f04aa4c55ca4d52c9fd9e995ae8336413c7c957b983cef87d26da08c81e3db1",
+      "byte_length": 22403
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+      "sha256": "72e048d7f9fac090f138bc48b3fc13fc6fbd465a5d5cc99a53feee93dcaa9896",
+      "byte_length": 20872
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+      "sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0",
+      "byte_length": 32623
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+      "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4",
+      "byte_length": 23293
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+      "sha256": "58ad8417d3ba6c657d08fcd2371b01de2b216af873059cd4c62ac008cd3c7771",
+      "byte_length": 21731
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+      "sha256": "0051091685e07e8b3adf29b7c8b56008ef89ea5c272ef733daddb38e871203e3",
+      "byte_length": 35307
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+      "sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05",
+      "byte_length": 29777
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+      "sha256": "bbf9a1ba4b2c973a7e397cd02eb4269cb0d967c5a1b4cedb6e070949a93300a9",
+      "byte_length": 29611
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+      "sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427",
+      "byte_length": 58451
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+      "sha256": "f26637765d92e736e527d2ee7ba258a38c07dc21e265c832b75407f727850ce9",
+      "byte_length": 10218
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+      "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+      "byte_length": 9392
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+      "sha256": "d06abb36b55190b9219cc95011b60a552013d0cc79788a8c950b11698e051fb8",
+      "byte_length": 43250
+    },
+    {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+      "sha256": "fb29723de686defd551976edf2a1b9dcc6ba519aad204c37f22a0bcbcd5bdc56",
+      "byte_length": 44603
+    },
+    {
+      "path": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+      "sha256": "0b17a52380753422e8b55cdc03f9a1e9745521272da2370b40b9d0c83ac0d7fc",
+      "byte_length": 83848
+    }
+  ],
+  "input_source_set": {
+    "canonicalization": "repository-relative path sort; [{path,sha256,byte_length}]; UTF-8 JSON; ensure_ascii=false; sort_keys=true; compact separators; trailing LF",
+    "bindings": [
+      {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+        "byte_length": 229471
+      },
+      {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+        "byte_length": 56499
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+        "sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+        "byte_length": 53979
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+        "sha256": "895ff118ab2d41c67d4dfa767260bc7c4959a444aecfce5073cb3bea3fa2c641",
+        "byte_length": 16850
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+        "sha256": "755e341c712e755540f95f97f3936cca8da2cc5bccf220a292e593358f02a1f8",
+        "byte_length": 17827
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+        "sha256": "9a9517a1f0d1c8bc4644acb564c1f62cada65c3e9f46956ca9cc686bc3cc912b",
+        "byte_length": 61298
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "sha256": "e5b601c36313438d9d8fbdd0af49399bb7493189c51fc47c803169b352a1a9ad",
+        "byte_length": 23176
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "sha256": "9280ded6353ba5cbc4b1056eaaafb7d0ec8dbb9578f7e43b253901caf42bbb24",
+        "byte_length": 26961
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "sha256": "b4cfc2a7d126227f5d87dda42c53f2fefc93cc26d9c90c7071775b5a0f085407",
+        "byte_length": 8601
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "sha256": "0c816c830a4371fc4abbef0e3f4848940daa130837e3cead06a0e7a9eb800ce0",
+        "byte_length": 37403
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+        "byte_length": 637704
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "sha256": "ebd8e565a3c9111b2ef1f5cd66f1285d51b1d2ac6d2169e482f869c309f00dcb",
+        "byte_length": 10298
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "sha256": "72a9cbfa0d8f1035888884b6a8f2daaf8dc0bcd4ee43e0131d4a88d8cf7296f5",
+        "byte_length": 11078
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+        "sha256": "9e8f3547b68874ad6b546dd0bccbfb612647d5923b2026912c1efc05243f4a21",
+        "byte_length": 27600
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+        "byte_length": 19207
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+        "byte_length": 123312
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "sha256": "f41fac3a2c497a6109f0c2213800663d1b24094750070ce98449063ed40e2590",
+        "byte_length": 22499
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+        "byte_length": 64421
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+        "byte_length": 47592
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+        "byte_length": 47147
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341",
+        "byte_length": 31223
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "sha256": "5f04aa4c55ca4d52c9fd9e995ae8336413c7c957b983cef87d26da08c81e3db1",
+        "byte_length": 22403
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "sha256": "72e048d7f9fac090f138bc48b3fc13fc6fbd465a5d5cc99a53feee93dcaa9896",
+        "byte_length": 20872
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0",
+        "byte_length": 32623
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4",
+        "byte_length": 23293
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "sha256": "58ad8417d3ba6c657d08fcd2371b01de2b216af873059cd4c62ac008cd3c7771",
+        "byte_length": 21731
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+        "sha256": "0051091685e07e8b3adf29b7c8b56008ef89ea5c272ef733daddb38e871203e3",
+        "byte_length": 35307
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05",
+        "byte_length": 29777
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "sha256": "bbf9a1ba4b2c973a7e397cd02eb4269cb0d967c5a1b4cedb6e070949a93300a9",
+        "byte_length": 29611
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427",
+        "byte_length": 58451
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+        "sha256": "f26637765d92e736e527d2ee7ba258a38c07dc21e265c832b75407f727850ce9",
+        "byte_length": 10218
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+        "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+        "byte_length": 9392
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "sha256": "d06abb36b55190b9219cc95011b60a552013d0cc79788a8c950b11698e051fb8",
+        "byte_length": 43250
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "sha256": "fb29723de686defd551976edf2a1b9dcc6ba519aad204c37f22a0bcbcd5bdc56",
+        "byte_length": 44603
+      },
+      {
+        "path": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+        "sha256": "0b17a52380753422e8b55cdc03f9a1e9745521272da2370b40b9d0c83ac0d7fc",
+        "byte_length": 83848
+      }
+    ],
+    "binding_count": 35,
+    "sha256": "c5a1c09c3b433d81cad0cb904f3ddae2b0a201e98a207b1fae959fdcea8e17b4"
+  },
+  "output_raw_bindings": [
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+      "sha256": "481339c99f26055f6bbb008a3f4831c029013d2275e0e4a61cab4f7d30444947",
+      "byte_length": 1097484
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+      "sha256": "8affcd6eb729271bdc1e7bb513abe6fdf55e233b74153958694f0855d061cc33",
+      "byte_length": 69047
+    },
+    {
+      "path": "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+      "sha256": "c34cbbed9269e55461695574363aa0184d95ac5d37e84fbfed839666562be40c",
+      "byte_length": 587592
+    }
+  ],
+  "replay_epochs": [
+    {
+      "wave_id": "W1",
+      "authority_order": 1,
+      "transition_count": 18,
+      "changed_count": 18,
+      "retained_count": 0,
+      "before_counts": {
+        "OK": 59,
+        "INTERNAL_GAP": 123,
+        "EXTERNAL": 39,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 16,
+        "INTERNAL_GAP": -18,
+        "EXTERNAL": 2,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 75,
+        "INTERNAL_GAP": 105,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "BOUND_FINAL_INDEPENDENT_REVIEW_APPROVED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/independent-review.md",
+        "status": "GO_INTERNAL_STATUS_PROJECTION_ONLY"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+        "sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+        "byte_length": 53979
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+        "sha256": "755e341c712e755540f95f97f3936cca8da2cc5bccf220a292e593358f02a1f8",
+        "byte_length": 17827
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+        "sha256": "895ff118ab2d41c67d4dfa767260bc7c4959a444aecfce5073cb3bea3fa2c641",
+        "byte_length": 16850
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W2",
+      "authority_order": 2,
+      "transition_count": 23,
+      "changed_count": 23,
+      "retained_count": 0,
+      "before_counts": {
+        "OK": 75,
+        "INTERNAL_GAP": 105,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 23,
+        "INTERNAL_GAP": -23,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 98,
+        "INTERNAL_GAP": 82,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "BOUND_FINAL_INDEPENDENT_REVIEW_APPROVED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "status": "GO_INTERNAL_STATUS_PROJECTION_ONLY"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+        "sha256": "9a9517a1f0d1c8bc4644acb564c1f62cada65c3e9f46956ca9cc686bc3cc912b",
+        "byte_length": 61298
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "sha256": "9280ded6353ba5cbc4b1056eaaafb7d0ec8dbb9578f7e43b253901caf42bbb24",
+        "byte_length": 26961
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "sha256": "e5b601c36313438d9d8fbdd0af49399bb7493189c51fc47c803169b352a1a9ad",
+        "byte_length": 23176
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W3",
+      "authority_order": 3,
+      "transition_count": 17,
+      "changed_count": 9,
+      "retained_count": 8,
+      "before_counts": {
+        "OK": 98,
+        "INTERNAL_GAP": 82,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 9,
+        "INTERNAL_GAP": -9,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 107,
+        "INTERNAL_GAP": 73,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "ROW_LEVEL_BOUND_GO_AUTHORITY",
+        "path": null,
+        "status": "APPROVED_WITH_OPEN_GAPS"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "sha256": "b4cfc2a7d126227f5d87dda42c53f2fefc93cc26d9c90c7071775b5a0f085407",
+        "byte_length": 8601
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "sha256": "72a9cbfa0d8f1035888884b6a8f2daaf8dc0bcd4ee43e0131d4a88d8cf7296f5",
+        "byte_length": 11078
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "sha256": "ebd8e565a3c9111b2ef1f5cd66f1285d51b1d2ac6d2169e482f869c309f00dcb",
+        "byte_length": 10298
+      },
+      "predecessor_bridge_bindings": [
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+          "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+          "byte_length": 637704
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+          "sha256": "0c816c830a4371fc4abbef0e3f4848940daa130837e3cead06a0e7a9eb800ce0",
+          "byte_length": 37403
+        }
+      ]
+    },
+    {
+      "wave_id": "W4",
+      "authority_order": 4,
+      "transition_count": 13,
+      "changed_count": 2,
+      "retained_count": 11,
+      "before_counts": {
+        "OK": 107,
+        "INTERNAL_GAP": 73,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 2,
+        "INTERNAL_GAP": -2,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 109,
+        "INTERNAL_GAP": 71,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "ROW_LEVEL_BOUND_GO_AUTHORITY",
+        "path": null,
+        "status": "GO_FOR_INTERNAL_ARTIFACT_DELTA"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+        "sha256": "9e8f3547b68874ad6b546dd0bccbfb612647d5923b2026912c1efc05243f4a21",
+        "byte_length": 27600
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "sha256": "f41fac3a2c497a6109f0c2213800663d1b24094750070ce98449063ed40e2590",
+        "byte_length": 22499
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+        "byte_length": 19207
+      },
+      "predecessor_bridge_bindings": [
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+          "sha256": "d46a9ea3ecc5334c15531947733a520469b5cf712a0eed216d53413a18187893",
+          "byte_length": 123312
+        }
+      ]
+    },
+    {
+      "wave_id": "W5",
+      "authority_order": 5,
+      "transition_count": 9,
+      "changed_count": 6,
+      "retained_count": 3,
+      "before_counts": {
+        "OK": 109,
+        "INTERNAL_GAP": 71,
+        "EXTERNAL": 41,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 5,
+        "INTERNAL_GAP": -6,
+        "EXTERNAL": 1,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 114,
+        "INTERNAL_GAP": 65,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "ROW_LEVEL_BOUND_GO_AUTHORITY",
+        "path": null,
+        "status": "GO_STATUS_DELTA_ALLOWED"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+        "byte_length": 64421
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+        "byte_length": 47147
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+        "byte_length": 47592
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W6",
+      "authority_order": 6,
+      "transition_count": 8,
+      "changed_count": 1,
+      "retained_count": 7,
+      "before_counts": {
+        "OK": 114,
+        "INTERNAL_GAP": 65,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 1,
+        "INTERNAL_GAP": -1,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 115,
+        "INTERNAL_GAP": 64,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "EXPLICIT_GO_STATUS_DELTA_ALLOWED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+        "status": "GO"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "sha256": "72dae9c85b1fb7f8de334ec5dbdd19080cbb2929cc3fa93702c8d871f0597341",
+        "byte_length": 31223
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "sha256": "72e048d7f9fac090f138bc48b3fc13fc6fbd465a5d5cc99a53feee93dcaa9896",
+        "byte_length": 20872
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "sha256": "5f04aa4c55ca4d52c9fd9e995ae8336413c7c957b983cef87d26da08c81e3db1",
+        "byte_length": 22403
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W7",
+      "authority_order": 7,
+      "transition_count": 8,
+      "changed_count": 1,
+      "retained_count": 7,
+      "before_counts": {
+        "OK": 115,
+        "INTERNAL_GAP": 64,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 1,
+        "INTERNAL_GAP": -1,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 116,
+        "INTERNAL_GAP": 63,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "EXPLICIT_GO_STATUS_DELTA_ALLOWED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+        "status": "GO"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "sha256": "3ac944a44cbcd621a0c9f7b5ed265d0acffd3240f32f92ca022ad8e519d725b0",
+        "byte_length": 32623
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "sha256": "58ad8417d3ba6c657d08fcd2371b01de2b216af873059cd4c62ac008cd3c7771",
+        "byte_length": 21731
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4",
+        "byte_length": 23293
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W8",
+      "authority_order": 8,
+      "transition_count": 5,
+      "changed_count": 1,
+      "retained_count": 4,
+      "before_counts": {
+        "OK": 116,
+        "INTERNAL_GAP": 63,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 1,
+        "INTERNAL_GAP": -1,
+        "EXTERNAL": 0,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 117,
+        "INTERNAL_GAP": 62,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "EXPLICIT_GO_STATUS_DELTA_ALLOWED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-final-review.md",
+        "status": "GO_STATUS_DELTA_ALLOWED"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+        "sha256": "0051091685e07e8b3adf29b7c8b56008ef89ea5c272ef733daddb38e871203e3",
+        "byte_length": 35307
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "sha256": "bbf9a1ba4b2c973a7e397cd02eb4269cb0d967c5a1b4cedb6e070949a93300a9",
+        "byte_length": 29611
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05",
+        "byte_length": 29777
+      },
+      "predecessor_bridge_bindings": []
+    },
+    {
+      "wave_id": "W9",
+      "authority_order": 9,
+      "transition_count": 15,
+      "changed_count": 14,
+      "retained_count": 1,
+      "before_counts": {
+        "OK": 117,
+        "INTERNAL_GAP": 62,
+        "EXTERNAL": 42,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "applied_delta": {
+        "OK": 7,
+        "INTERNAL_GAP": -14,
+        "EXTERNAL": 7,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      },
+      "after_counts": {
+        "OK": 124,
+        "INTERNAL_GAP": 48,
+        "EXTERNAL": 49,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      },
+      "authority": {
+        "kind": "EXPLICIT_GO_STATUS_DELTA_ALLOWED",
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+        "status": "GO_STATUS_DELTA_ALLOWED"
+      },
+      "delta_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427",
+        "byte_length": 58451
+      },
+      "validation_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "sha256": "fb29723de686defd551976edf2a1b9dcc6ba519aad204c37f22a0bcbcd5bdc56",
+        "byte_length": 44603
+      },
+      "receipt_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "sha256": "d06abb36b55190b9219cc95011b60a552013d0cc79788a8c950b11698e051fb8",
+        "byte_length": 43250
+      },
+      "predecessor_bridge_bindings": [],
+      "final_go_seal_binding": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+        "sha256": "f26637765d92e736e527d2ee7ba258a38c07dc21e265c832b75407f727850ce9",
+        "byte_length": 10218
+      },
+      "historical_superseded": [
+        {
+          "kind": "PRIOR_W9_RECEIPT_RAW_HASH",
+          "sha256": "88f0114458e6ce0fda969cb8aabb74f603151681d95fc996d6b8ad4ce8685cc9",
+          "physical_path": null,
+          "status": "HISTORICAL_SUPERSEDED_NOT_AUTHORITY"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+          "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+          "byte_length": 9392,
+          "kind": "PRIOR_CENTRAL_NO_GO_REVIEW",
+          "verdict": "NO_GO",
+          "status": "REMEDIATION_HISTORY_NOT_TRANSITION_AUTHORITY"
+        }
+      ]
+    }
+  ],
+  "replay_summary": {
+    "epoch_count": 9,
+    "authority_order": [
+      "W1",
+      "W2",
+      "W3",
+      "W4",
+      "W5",
+      "W6",
+      "W7",
+      "W8",
+      "W9"
+    ],
+    "initial_counts": {
+      "OK": 59,
+      "INTERNAL_GAP": 123,
+      "EXTERNAL": 39,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "final_counts": {
+      "OK": 124,
+      "INTERNAL_GAP": 48,
+      "EXTERNAL": 49,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "initial_to_final_delta": {
+      "OK": 65,
+      "INTERNAL_GAP": -75,
+      "EXTERNAL": 10,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    }
+  },
+  "action_summary": {
+    "internal_group_count": 9,
+    "internal_artifact_count": 48,
+    "external_group_count": 5,
+    "external_artifact_count": 49,
+    "overlap_count": 0,
+    "unknown_count": 0
+  },
+  "validation_matrix": [
+    {
+      "id": "BASELINE_EXACT_257",
+      "status": "PASS",
+      "observed": 257
+    },
+    {
+      "id": "AUTHORITY_REPLAY_W1_W9",
+      "status": "PASS",
+      "observed": 9
+    },
+    {
+      "id": "FROM_STATE_MATCH",
+      "status": "PASS",
+      "mismatch_count": 0
+    },
+    {
+      "id": "CURRENT_AUTHORITY_GO",
+      "status": "PASS",
+      "non_go_count": 0
+    },
+    {
+      "id": "RECEIPT_HASH_CHAIN",
+      "status": "PASS",
+      "missing_count": 0
+    },
+    {
+      "id": "FINAL_COUNTS",
+      "status": "PASS",
+      "observed": {
+        "OK": 124,
+        "INTERNAL_GAP": 48,
+        "EXTERNAL": 49,
+        "N_A_CANDIDATE": 36,
+        "TOTAL": 257
+      }
+    },
+    {
+      "id": "INITIAL_FINAL_DELTA",
+      "status": "PASS",
+      "observed": {
+        "OK": 65,
+        "INTERNAL_GAP": -75,
+        "EXTERNAL": 10,
+        "N_A_CANDIDATE": 0,
+        "TOTAL": 0
+      }
+    },
+    {
+      "id": "N_A_MEANING_UNCHANGED",
+      "status": "PASS",
+      "promotion_count": 0
+    },
+    {
+      "id": "INTERNAL_ACTION_MEMBERSHIP",
+      "status": "PASS",
+      "observed": 48
+    },
+    {
+      "id": "EXTERNAL_ACTION_MEMBERSHIP",
+      "status": "PASS",
+      "observed": 49
+    },
+    {
+      "id": "ACTION_OVERLAP_UNKNOWN",
+      "status": "PASS",
+      "observed": "0/0"
+    },
+    {
+      "id": "JSON_MD_PACKET_TUPLE_PARITY",
+      "status": "PASS",
+      "observed": 257
+    },
+    {
+      "id": "GLOBAL_BOUNDARY_RELAXATION",
+      "status": "PASS",
+      "observed": 0
+    },
+    {
+      "id": "NON_CIRCULAR_DAG",
+      "status": "PASS",
+      "observed": "ACYCLIC"
+    },
+    {
+      "id": "FINAL_REVIEW_OR_SEAL_NOT_GENERATED",
+      "status": "PASS",
+      "observed": 0
+    }
+  ],
+  "binding_dag": {
+    "nodes": [
+      "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+      "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+      "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+      "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+      "scripts/build_walksafe_final_artifact_audit_20260727.py"
+    ],
+    "edges": [
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "relation": "HASH_BINDS_REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "relation": "HASH_BINDS_REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "relation": "HASH_BINDS_REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "relation": "REPLAY_PREDECESSOR"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "relation": "PLANNED_AUTHORITY_ORDER"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "relation": "VALIDATES_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "relation": "RECEIPTS_VALIDATED_DELTA"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+        "relation": "REMEDIATION_HISTORY_ONLY_NOT_TRANSITION_AUTHORITY"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+        "to": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "relation": "W9_GO_SEAL_AUTHORIZES_RECEIPT"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+        "relation": "FINAL_REPLAY_INPUT"
+      },
+      {
+        "from": "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+        "relation": "FINAL_EXTERNAL_BOUNDARY_INPUT"
+      },
+      {
+        "from": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+        "relation": "GENERATES"
+      },
+      {
+        "from": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+        "relation": "GENERATES"
+      },
+      {
+        "from": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+        "relation": "GENERATES"
+      },
+      {
+        "from": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json",
+        "relation": "GENERATES"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+        "relation": "RENDERS"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+        "relation": "RENDERS_EXTERNAL_PARITY"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json",
+        "relation": "BINDS_RAW_OUTPUT"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json",
+        "relation": "BINDS_RAW_OUTPUT"
+      },
+      {
+        "from": "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+        "to": "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json",
+        "relation": "BINDS_RAW_OUTPUT"
+      }
+    ],
+    "topological_order": [
+      "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/test-trace-current-state.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w9/central-final-sealing-review.md",
+      "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+      "scripts/build_walksafe_final_artifact_audit_20260727.py",
+      "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.json",
+      "docs/control/execution/artifact-audits/20260727/final-257/external-action-packet.json",
+      "docs/control/execution/artifact-audits/20260727/final-257/artifact-audit-successor-snapshot.md",
+      "docs/control/execution/artifact-audits/20260727/final-257/final-audit-manifest.json"
+    ],
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS",
+    "manifest_is_not_an_output_hash_input": true
+  },
+  "global_boundary": {
+    "formal_279": {
+      "status": "NOT_RUN",
+      "executed_count": 0,
+      "pass_count": 0,
+      "evidence_count": 0
+    },
+    "actual_device_validation": "NOT_RUN",
+    "deployment_execution": "NOT_RUN",
+    "deployment_approval": "NOT_APPROVED",
+    "signing_execution": "NOT_RUN",
+    "signing_approval": "NOT_APPROVED",
+    "legal_approval": "NOT_APPROVED",
+    "model_evaluation": "NOT_RUN",
+    "model_approval": "NOT_APPROVED",
+    "closure_execution": "NOT_RUN",
+    "closure_approval": "NOT_APPROVED",
+    "remaining_gates": {
+      "count": 5,
+      "status": "NOT_RUN",
+      "waived_count": 0
+    },
+    "release_status": "NOT_ELIGIBLE",
+    "boundary_relaxation_count": 0
+  },
+  "authorization_boundary": {
+    "baseline_modified": false,
+    "wave_plan_modified": false,
+    "final_independent_review_generated": false,
+    "final_seal_generated": false,
+    "output_manifest_self_hash_included": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "input_count": 35,
+    "output_hash_count": 3,
+    "semantic_projection": {
+      "projection_schema": "walksafe.final-257-successor.semantic.v1",
+      "included_fields": [
+        "projection_schema",
+        "artifact_status_tuples",
+        "internal_action_membership",
+        "external_action_membership",
+        "replay_epoch_counts",
+        "global_boundary"
+      ],
+      "canonicalization": "exact payload shown below; UTF-8 JSON; ensure_ascii=false; sort_keys=true; compact separators; trailing LF",
+      "payload": {
+        "projection_schema": "walksafe.final-257-successor.semantic.v1",
+        "artifact_status_tuples": [
+          {
+            "artifact_type_code": "DLV-AIML-01",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-02",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-03",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-04",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-05",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-10",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-11",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-12",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-13",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-18",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-19",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-20",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-21",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-22",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-23",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-24",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-25",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-AIML-26",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-01",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-02",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-03",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-04",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-05",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-06",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-10",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-11",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-12",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-13",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-CLS-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-DES-01",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-02",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-04",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-05",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-10",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-11",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-12",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-13",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DES-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DES-20",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DES-21",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DES-22",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-23",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-24",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-25",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-26",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DES-27",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-01",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-02",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-04",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-05",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-10",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-11",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-12",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-13",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-15",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DEV-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-20",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-21",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-DOC-01",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DOC-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DOC-03",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DOC-04",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DOC-05",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-04",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-05",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-06",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RESEARCH-OBSERVATION"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-08",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RESEARCH-OBSERVATION"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-10",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-11",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-12",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-13",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-DSC-15",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-03",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-MGT-04",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-05",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-08",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-MGT-09",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-10",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-11",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-12",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-13",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-MGT-18",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-03",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-04",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-05",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-06",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-07",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-08",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-09",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-10",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-11",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-12",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-13",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-14",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-15",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-16",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-18",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-20",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-21",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-OPS-22",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-23",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-24",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-03",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-04",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-05",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-06",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-07",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-08",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-09",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-10",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-11",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-12",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-13",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-14",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REL-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-20",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-21",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-22",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-04",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-05",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-07",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-08",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-09",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-10",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-11",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-12",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-13",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-14",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-15",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-16",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-17",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-REQ-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-01",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-02",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-04",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-05",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-07",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-08",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-10",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-11",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-12",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-13",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-14",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-15",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-16",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-17",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-18",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-SEC-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-TST-01",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-02",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-03",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-04",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-05",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-06",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-07",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-09",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-10",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-11",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-12",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-13",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-14",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-15",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-16",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-17",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-TST-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-19",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-20",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-21",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-22",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-TST-23",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-WS-01",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-02",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-03",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-04",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-05",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-06",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-07",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-08",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-09",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-10",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "INTERNAL_GAP",
+            "action_kind": "INTERNAL",
+            "action_group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-WS-11",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-12",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-13",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-14",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-15",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-16",
+            "initial_status": "N_A_CANDIDATE",
+            "current_status": "N_A_CANDIDATE",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-17",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-18",
+            "initial_status": "INTERNAL_GAP",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-19",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          },
+          {
+            "artifact_type_code": "DLV-WS-20",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-21",
+            "initial_status": "EXTERNAL",
+            "current_status": "EXTERNAL",
+            "action_kind": "EXTERNAL",
+            "action_group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-22",
+            "initial_status": "OK",
+            "current_status": "OK",
+            "action_kind": "NONE",
+            "action_group_id": null
+          }
+        ],
+        "internal_action_membership": [
+          {
+            "artifact_type_code": "DLV-AIML-05",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-06",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-07",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-08",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-09",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-10",
+            "group_id": "FINAL-INT-DATA-QUALITY-SPLIT"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-11",
+            "group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-12",
+            "group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-13",
+            "group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-15",
+            "group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-16",
+            "group_id": "FINAL-INT-TRAINING-MODEL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-17",
+            "group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-21",
+            "group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-23",
+            "group_id": "FINAL-INT-EVALUATION-EQUIV"
+          },
+          {
+            "artifact_type_code": "DLV-DES-15",
+            "group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DES-19",
+            "group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DES-20",
+            "group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-09",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-12",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-14",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-16",
+            "group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-17",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-19",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-20",
+            "group_id": "FINAL-INT-BUILD-SUPPLY"
+          },
+          {
+            "artifact_type_code": "DLV-DEV-21",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-15",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-16",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-18",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-19",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-REL-22",
+            "group_id": "FINAL-INT-INTEGRATION-RELEASE"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-01",
+            "group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-10",
+            "group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-12",
+            "group_id": "FINAL-INT-STATIC-SECRET"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-19",
+            "group_id": "FINAL-INT-DESIGN-SECURITY"
+          },
+          {
+            "artifact_type_code": "DLV-TST-02",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-03",
+            "group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-05",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-06",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-07",
+            "group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-08",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-09",
+            "group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-11",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-14",
+            "group_id": "FINAL-INT-TEST-ENV-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-18",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-19",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-20",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-TST-21",
+            "group_id": "FINAL-INT-TEST-GOV-TRACE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-10",
+            "group_id": "FINAL-INT-EVALUATION-EQUIV"
+          }
+        ],
+        "external_action_membership": [
+          {
+            "artifact_type_code": "DLV-AIML-01",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-02",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-03",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-AIML-22",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-02",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-04",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-08",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-10",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-11",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-14",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-15",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-16",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-DES-21",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-05",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-06",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-07",
+            "group_id": "FINAL-EXT-RESEARCH-OBSERVATION"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-09",
+            "group_id": "FINAL-EXT-RESEARCH-OBSERVATION"
+          },
+          {
+            "artifact_type_code": "DLV-DSC-11",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-MGT-03",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-MGT-08",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-06",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-11",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-13",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-17",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-19",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-22",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-23",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-13",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-20",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REL-21",
+            "group_id": "FINAL-EXT-RELEASE-OPS"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-12",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-13",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-REQ-15",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-04",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-05",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-06",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-SEC-17",
+            "group_id": "FINAL-EXT-DATA-LEGAL"
+          },
+          {
+            "artifact_type_code": "DLV-TST-22",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-TST-23",
+            "group_id": "FINAL-EXT-APPROVAL-HANDOVER"
+          },
+          {
+            "artifact_type_code": "DLV-WS-06",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-07",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-09",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-12",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-13",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-14",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-15",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-17",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-20",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          },
+          {
+            "artifact_type_code": "DLV-WS-21",
+            "group_id": "FINAL-EXT-FIELD-DEVICE"
+          }
+        ],
+        "replay_epoch_counts": [
+          {
+            "wave_id": "W1",
+            "before": {
+              "OK": 59,
+              "INTERNAL_GAP": 123,
+              "EXTERNAL": 39,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 16,
+              "INTERNAL_GAP": -18,
+              "EXTERNAL": 2,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 75,
+              "INTERNAL_GAP": 105,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W2",
+            "before": {
+              "OK": 75,
+              "INTERNAL_GAP": 105,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 23,
+              "INTERNAL_GAP": -23,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 98,
+              "INTERNAL_GAP": 82,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W3",
+            "before": {
+              "OK": 98,
+              "INTERNAL_GAP": 82,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 9,
+              "INTERNAL_GAP": -9,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 107,
+              "INTERNAL_GAP": 73,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W4",
+            "before": {
+              "OK": 107,
+              "INTERNAL_GAP": 73,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 2,
+              "INTERNAL_GAP": -2,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 109,
+              "INTERNAL_GAP": 71,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W5",
+            "before": {
+              "OK": 109,
+              "INTERNAL_GAP": 71,
+              "EXTERNAL": 41,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 5,
+              "INTERNAL_GAP": -6,
+              "EXTERNAL": 1,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 114,
+              "INTERNAL_GAP": 65,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W6",
+            "before": {
+              "OK": 114,
+              "INTERNAL_GAP": 65,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 1,
+              "INTERNAL_GAP": -1,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 115,
+              "INTERNAL_GAP": 64,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W7",
+            "before": {
+              "OK": 115,
+              "INTERNAL_GAP": 64,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 1,
+              "INTERNAL_GAP": -1,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 116,
+              "INTERNAL_GAP": 63,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W8",
+            "before": {
+              "OK": 116,
+              "INTERNAL_GAP": 63,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 1,
+              "INTERNAL_GAP": -1,
+              "EXTERNAL": 0,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 117,
+              "INTERNAL_GAP": 62,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          },
+          {
+            "wave_id": "W9",
+            "before": {
+              "OK": 117,
+              "INTERNAL_GAP": 62,
+              "EXTERNAL": 42,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            },
+            "delta": {
+              "OK": 7,
+              "INTERNAL_GAP": -14,
+              "EXTERNAL": 7,
+              "N_A_CANDIDATE": 0,
+              "TOTAL": 0
+            },
+            "after": {
+              "OK": 124,
+              "INTERNAL_GAP": 48,
+              "EXTERNAL": 49,
+              "N_A_CANDIDATE": 36,
+              "TOTAL": 257
+            }
+          }
+        ],
+        "global_boundary": {
+          "formal_279": {
+            "status": "NOT_RUN",
+            "executed_count": 0,
+            "pass_count": 0,
+            "evidence_count": 0
+          },
+          "actual_device_validation": "NOT_RUN",
+          "deployment_execution": "NOT_RUN",
+          "deployment_approval": "NOT_APPROVED",
+          "signing_execution": "NOT_RUN",
+          "signing_approval": "NOT_APPROVED",
+          "legal_approval": "NOT_APPROVED",
+          "model_evaluation": "NOT_RUN",
+          "model_approval": "NOT_APPROVED",
+          "closure_execution": "NOT_RUN",
+          "closure_approval": "NOT_APPROVED",
+          "remaining_gates": {
+            "count": 5,
+            "status": "NOT_RUN",
+            "waived_count": 0
+          },
+          "release_status": "NOT_ELIGIBLE",
+          "boundary_relaxation_count": 0
+        }
+      },
+      "sha256": "449a1228b7cb8830dce9f0bb8f84f4a6129f478686d94027aa29be36780405ad"
+    },
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, compact separators, integrity.content_fingerprint.value=null, trailing LF",
+      "value": "887234e52fc1e611c49e586a5d24c40860e41592559ed25f799bb8b8bb705eeb"
+    }
+  }
+}

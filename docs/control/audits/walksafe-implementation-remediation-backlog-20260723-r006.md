@@ -1,0 +1,16 @@
+# WalkSafe 구현 수정 백로그 r006
+
+- 백로그: `WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-006` v0.6.0
+- EPIC-01: **IN_PROGRESS**
+- 목적 표면: `INTERNAL_IMPLEMENTATION_VERIFIED`
+- REL-17: `DRAFT_NOT_APPROVED`
+- REL-09: `PLANNED_NOT_RUN_NOT_PUBLISHED`
+- 다른 EPIC: `PLANNED` 유지
+
+`EPIC-01-PURPOSE-SURFACES` 내부 작업은 완료 처리했지만 EPIC-01 전체는 아직 `IMPLEMENTATION_READY`가 아니다.
+
+## 다음 한 가지 작업
+
+`EPIC-01-NO-DESTINATION-HAZARD-CONFORMANCE` — 목적지를 선택하지 않은 상태에서도 가까운 위험 안내가 작동하도록 길안내와 위험안내의 경로 의존 조건을 분리하고 검증한다.
+
+내용 지문: `41a426ad53d6e9fc948602d3b634ed2620ba8e40ad9aae05749b9ac9d8048885`

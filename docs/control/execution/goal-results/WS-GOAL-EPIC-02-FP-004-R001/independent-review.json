@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP004-PRIORITY-USER-INTERNAL-REVIEW-20260724-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+  "status": "PASS",
+  "reviewer_id": "CODEX-FP004-PRIORITY-USER-SEPARATE-REVIEW-20260724-001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "202e9fa0cbf39e28c569e2129fff0e6037969ffa082095a65e5ad3a75bbd3b94",
+    "VERIFICATION_RESULT": "f909470b507faff07fff6da0d2f9b734b8c8569894e07fc70f9d090ddb289b2e",
+    "SUCCESSOR_TRACE": "e1c5d5b9354b4178097a818217a608909a98201418dbe36493284ebd5d680d77"
+  },
+  "reviewed_at": "2026-07-24T16:40:00+09:00",
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "education acknowledgement cannot complete practice",
+      "speech and vibration delivery are both required",
+      "account-scoped profiles cannot leak completion between actors",
+      "profile mutation is durably invalidated before a replacement is committed",
+      "the hazard practice advances the ordered practice state while lifecycle-changing actions use the production reducer",
+      "minor and unsupported-device conditions fail closed",
+      "large-text, high-contrast and explicit focus-order source contracts are present",
+      "onboarding persistence cannot restore a prior walk"
+    ],
+    "known_nonblocking_boundaries": [
+      "SharedPreferences power-loss and storage-fault injection were not executed on an actual device",
+      "actual TalkBack, 200-percent text rendering and physical vibration delivery remain untested"
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "priority_user_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "guardian_verification_provider_tests_remain_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

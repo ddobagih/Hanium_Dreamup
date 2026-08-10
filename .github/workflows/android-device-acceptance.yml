@@ -1,0 +1,246 @@
+name: Android physical-device TFLite load/invoke smoke (2 tests)
+
+run-name: TFLite load/invoke smoke 2 tests · ${{ inputs.expected_model }} · API ${{ inputs.expected_api_min }}-${{ inputs.expected_api_max }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_serial:
+        description: Exact adb serial of the approved physical device
+        required: true
+        type: string
+      expected_model:
+        description: Exact ro.product.model value of the approved physical device
+        required: true
+        type: string
+      expected_api_min:
+        description: Minimum allowed Android API level
+        required: true
+        default: 29
+        type: number
+      expected_api_max:
+        description: Maximum allowed Android API level
+        required: true
+        default: 36
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: walksafe-physical-android-device
+  cancel-in-progress: false
+
+jobs:
+  physical-device-smoke:
+    name: TFLite load/invoke smoke 2 tests (physical device)
+    runs-on: [self-hosted, walksafe-android-device]
+    environment:
+      name: walksafe-android-device
+    timeout-minutes: 30
+    env:
+      EXPECTED_DEVICE_SERIAL: ${{ inputs.expected_serial }}
+      EXPECTED_DEVICE_MODEL: ${{ inputs.expected_model }}
+      EXPECTED_API_MIN: ${{ inputs.expected_api_min }}
+      EXPECTED_API_MAX: ${{ inputs.expected_api_max }}
+      DEVICE_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/android-device-acceptance
+      CONNECTED_RESULT_ROOT: ${{ github.workspace }}/apps/android/app/build/outputs/androidTest-results/connected/debug
+      CONNECTED_REPORT_ROOT: ${{ github.workspace }}/apps/android/app/build/reports/androidTests/connected/debug
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Clear stale acceptance outputs
+        run: |
+          set -euo pipefail
+          rm -rf \
+            "$DEVICE_ARTIFACT_DIR" \
+            "${CONNECTED_RESULT_ROOT%/debug}" \
+            "${CONNECTED_REPORT_ROOT%/debug}"
+          mkdir -p "$DEVICE_ARTIFACT_DIR"
+
+      - name: Validate approved physical device
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$EXPECTED_DEVICE_SERIAL" =~ ^[A-Za-z0-9._:-]+$ ]]; then
+            echo "::error::expected_serial is empty or contains unsupported characters"
+            exit 1
+          fi
+          if [[ -z "${EXPECTED_DEVICE_MODEL//[[:space:]]/}" || "$EXPECTED_DEVICE_MODEL" == *$'\n'* ]]; then
+            echo "::error::expected_model must be a single non-empty model name"
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_API_MIN" =~ ^[0-9]+$ || ! "$EXPECTED_API_MAX" =~ ^[0-9]+$ ]]; then
+            echo "::error::API bounds must be non-negative integers"
+            exit 1
+          fi
+          if (( EXPECTED_API_MIN > EXPECTED_API_MAX )); then
+            echo "::error::expected_api_min must be less than or equal to expected_api_max"
+            exit 1
+          fi
+
+          adb start-server
+          adb_output="$(adb devices -l)"
+          printf '%s\n' "$adb_output"
+          mapfile -t attached_rows < <(printf '%s\n' "$adb_output" | awk 'NR > 1 && NF')
+          if (( ${#attached_rows[@]} != 1 )); then
+            echo "::error::Exactly one adb transport must be attached; found ${#attached_rows[@]}"
+            exit 1
+          fi
+
+          read -r actual_serial actual_state _ <<< "${attached_rows[0]}"
+          if [[ "$actual_state" != "device" ]]; then
+            echo "::error::The only adb transport is not authorized and online: state=$actual_state"
+            exit 1
+          fi
+          if [[ "$actual_serial" == emulator-* ]]; then
+            echo "::error::adb emulator transports are not accepted"
+            exit 1
+          fi
+          if [[ "$actual_serial" != "$EXPECTED_DEVICE_SERIAL" ]]; then
+            echo "::error::adb serial does not match the approved expected_serial"
+            exit 1
+          fi
+          if [[ "$(adb -s "$actual_serial" get-state)" != "device" ]]; then
+            echo "::error::The approved adb serial did not remain online"
+            exit 1
+          fi
+
+          trim_property() {
+            tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+          }
+          actual_model="$(adb -s "$actual_serial" shell getprop ro.product.model | trim_property)"
+          actual_api="$(adb -s "$actual_serial" shell getprop ro.build.version.sdk | trim_property)"
+          actual_manufacturer="$(adb -s "$actual_serial" shell getprop ro.product.manufacturer | trim_property)"
+          actual_fingerprint="$(adb -s "$actual_serial" shell getprop ro.build.fingerprint | trim_property)"
+          kernel_qemu="$(adb -s "$actual_serial" shell getprop ro.kernel.qemu | trim_property)"
+          boot_qemu="$(adb -s "$actual_serial" shell getprop ro.boot.qemu | trim_property)"
+
+          if [[ "$kernel_qemu" == "1" || "$boot_qemu" == "1" ]]; then
+            echo "::error::The approved adb serial reports an emulated device"
+            exit 1
+          fi
+          if [[ "$actual_model" != "$EXPECTED_DEVICE_MODEL" ]]; then
+            echo "::error::Device model mismatch: expected '$EXPECTED_DEVICE_MODEL', actual '$actual_model'"
+            exit 1
+          fi
+          if [[ ! "$actual_api" =~ ^[0-9]+$ ]]; then
+            echo "::error::Device API level is missing or invalid: '$actual_api'"
+            exit 1
+          fi
+          if (( actual_api < EXPECTED_API_MIN || actual_api > EXPECTED_API_MAX )); then
+            echo "::error::Device API $actual_api is outside approved range $EXPECTED_API_MIN-$EXPECTED_API_MAX"
+            exit 1
+          fi
+
+          {
+            echo "scope=TFLite load/invoke smoke 2 tests"
+            echo "serial=$actual_serial"
+            echo "manufacturer=$actual_manufacturer"
+            echo "model=$actual_model"
+            echo "api=$actual_api"
+            echo "fingerprint=$actual_fingerprint"
+            echo "ro.kernel.qemu=${kernel_qemu:-unset}"
+            echo "ro.boot.qemu=${boot_qemu:-unset}"
+            echo "validated_at_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } > "$DEVICE_ARTIFACT_DIR/device-info.txt"
+          echo "ANDROID_SERIAL=$actual_serial" >> "$GITHUB_ENV"
+
+      - name: Run TFLite load/invoke smoke 2 tests
+        working-directory: apps/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          rm -rf \
+            app/build/outputs/androidTest-results/connected \
+            app/build/reports/androidTests/connected
+          ./gradlew connectedDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteDeviceSmokeTest \
+            --no-daemon
+
+      - name: Verify exactly two smoke test results
+        run: |
+          set -euo pipefail
+          if [[ ! -d "$CONNECTED_RESULT_ROOT" ]]; then
+            echo "::error::Connected Android test result directory is missing"
+            exit 1
+          fi
+          mapfile -d '' -t result_xml < <(find "$CONNECTED_RESULT_ROOT" -maxdepth 1 -type f -name 'TEST-*.xml' -print0)
+          if (( ${#result_xml[@]} != 1 )); then
+            echo "::error::Expected exactly one connected-test XML result; found ${#result_xml[@]}"
+            exit 1
+          fi
+          suite_line="$(grep -F -m1 '<testsuite name="kr.co.hanium.dreamup.walksafe.inference.UnifiedTfliteDeviceSmokeTest"' "${result_xml[0]}" || true)"
+          if [[ -z "$suite_line" ]]; then
+            echo "::error::UnifiedTfliteDeviceSmokeTest suite is missing"
+            exit 1
+          fi
+          for expected_attribute in 'tests="2"' 'failures="0"' 'errors="0"' 'skipped="0"'; do
+            if [[ "$suite_line" != *"$expected_attribute"* ]]; then
+              echo "::error::Unexpected smoke suite result; required $expected_attribute"
+              exit 1
+            fi
+          done
+          if [[ "$(grep -c '<testcase ' "${result_xml[0]}" || true)" -ne 2 ]]; then
+            echo "::error::Expected exactly two smoke test cases"
+            exit 1
+          fi
+          for test_name in \
+            unifiedAssetLoadsAndInvokesOnTheAndroidRuntime \
+            declaredLegacyFallbackAssetsPassHashAndInterpreterLoadContracts; do
+            if [[ "$(grep -c "name=\"$test_name\"" "${result_xml[0]}" || true)" -ne 1 ]]; then
+              echo "::error::Required smoke test result is missing or duplicated: $test_name"
+              exit 1
+            fi
+          done
+          if [[ ! -d "$CONNECTED_REPORT_ROOT" || ! -f "$CONNECTED_REPORT_ROOT/index.html" ]]; then
+            echo "::error::Connected Android HTML report is missing"
+            exit 1
+          fi
+
+      - name: Write acceptance scope summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Android physical-device acceptance"
+            echo
+            echo "- Result: $JOB_STATUS"
+            echo "- Scope: **TFLite load/invoke smoke 2 tests** on one approved physical Android device"
+            echo "- Device contract: exact adb serial and model, authorized/online, non-emulator, API within the approved range"
+            echo "- Not covered: camera pipeline, ARCore bbox-depth alignment, TTS/haptic behavior, TMAP navigation, or outdoor/field E2E"
+            echo "- A passing run must not be cited as full Android or product acceptance"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload physical-device information
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-physical-device-info-${{ github.sha }}
+          path: artifacts/android-device-acceptance/device-info.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload TFLite smoke test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-tflite-load-invoke-smoke-2-tests-${{ github.sha }}
+          path: |
+            apps/android/app/build/outputs/androidTest-results/connected/debug/
+            apps/android/app/build/reports/androidTests/connected/debug/
+          if-no-files-found: error
+          retention-days: 14

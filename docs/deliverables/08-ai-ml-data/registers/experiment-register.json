@@ -1,0 +1,92 @@
+{
+  "schema_version": "walksafe.aiml-experiment-register.v1",
+  "metadata": {
+    "document_id": "WS-AIML-EXPERIMENT-REGISTER-20260721",
+    "title": "experiment-register",
+    "document_version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "AIML-12"
+    ]
+  },
+  "required_fields": [
+    "experiment_id",
+    "purpose",
+    "hypothesis",
+    "source_commit",
+    "dataset_id",
+    "dataset_manifest_sha256",
+    "split_sha256",
+    "config_sha256",
+    "code_sha256",
+    "seed",
+    "environment_id",
+    "started_at",
+    "ended_at",
+    "status",
+    "metrics",
+    "artifact_ids",
+    "conclusion",
+    "failure_reason"
+  ],
+  "formal_experiments": [],
+  "formal_execution_count": 0,
+  "candidate_training_controls": [
+    {
+      "path": "model/train_yolo.py",
+      "purpose": "학습·검증·변환 후보 코드",
+      "exists": true,
+      "sha256": "a2a6cc2cb88051de9c20dc40c6d616471effe39e4f89f81b5add9a7788cddbad",
+      "byte_length": 2511,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false
+    },
+    {
+      "path": "model/validate_yolo_dataset.py",
+      "purpose": "학습·검증·변환 후보 코드",
+      "exists": true,
+      "sha256": "7af225818426977d08044335794dc5614d3fc976f7d550cbdb48cc5c38140ea7",
+      "byte_length": 5482,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false
+    },
+    {
+      "path": "model/sample_yolo_failures.py",
+      "purpose": "학습·검증·변환 후보 코드",
+      "exists": true,
+      "sha256": "916f5edeebf07247e77da2a5cda3e1407bab70b2fbc938399357f68224824e33",
+      "byte_length": 15621,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false
+    },
+    {
+      "path": "scripts/export_walksafe_unified_tflite_20260601.py",
+      "purpose": "학습·검증·변환 후보 코드",
+      "exists": true,
+      "sha256": "f9a8efa228bb978bfa97ab48cf7e111f05e2043fbda46d1a0eb0a9287631114c",
+      "byte_length": 7866,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false
+    },
+    {
+      "path": "scripts/check_android_apk_model_asset_20260713.py",
+      "purpose": "학습·검증·변환 후보 코드",
+      "exists": true,
+      "sha256": "30cc1e721b5d447b7fcd220245919a9954c8fe36e48d201fcb39169636682777",
+      "byte_length": 4665,
+      "classification": "CANDIDATE_REVALIDATION_REQUIRED",
+      "formal_evidence": false
+    }
+  ],
+  "candidate_history": [
+    {
+      "source": "model/registry/walksafe-model-registry.json",
+      "status": "CANDIDATE_METADATA_ONLY_REVALIDATION_REQUIRED",
+      "formal_experiment_id": null,
+      "reason": "dataset manifest와 results 파일이 현재 작업공간에 없어 정식 재현 기록으로 승격하지 않음"
+    }
+  ]
+}

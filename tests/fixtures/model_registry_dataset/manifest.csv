@@ -1,0 +1,2 @@
+split,source,image_ref,target_image,target_label,image_sha256,label_sha256,boxes
+val,test,fixture,tests/fixtures/model_registry_dataset/image.fixture,tests/fixtures/model_registry_dataset/label.txt,a3c5b3421985f7fca96326066859ce7a42d5799d0135956898c272b2ad56d2d5,7ca2cb626dfd056f917570bf3180636d9f78b27519c30f85afe14c66fc8bc2a0,1

@@ -1,0 +1,829 @@
+{
+  "schema_version": "walksafe.artifact-status-delta.v8",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W8-STATUS-DELTA-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "PARTIAL_WAVE_COMPLETED_WITH_4_OPEN_INTERNAL_GAPS",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "d78adebb5f1175db27ac9cc35b0e91453fa3f60e4db874bb7f4de0c6848fc02e"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json",
+    "upstream_inputs": [
+      {
+        "role": "W8_DIRECT_CURRENT_USER_GUIDE",
+        "path": "apps/android/USER_GUIDE.md",
+        "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b",
+        "byte_count": 13833
+      },
+      {
+        "role": "W8_AUDIT_BASELINE",
+        "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+        "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44",
+        "byte_count": 39673
+      },
+      {
+        "role": "W4_SUPPORTING_RECEIPT",
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+        "byte_count": 19207
+      },
+      {
+        "role": "W5_SUPPORTING_RECEIPT",
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+        "byte_count": 47592
+      },
+      {
+        "role": "W7_CURRENT_PREDECESSOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+        "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611",
+        "byte_count": 41414
+      },
+      {
+        "role": "W7_PREDECESSOR_IMPLEMENTATION_RECEIPT",
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4",
+        "byte_count": 23293
+      },
+      {
+        "role": "W7_REREVIEW_PREDECESSOR",
+        "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+        "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8",
+        "byte_count": 3444
+      },
+      {
+        "role": "W8_INDEPENDENT_FINAL_REVIEW_SOLE_AUTHORITY",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-final-review.md",
+        "sha256": "f66f04b6fe55c34fa0eb9b88397568e368529e5488c5b9dd9da718da92227ecd",
+        "byte_count": 7144
+      },
+      {
+        "role": "W8_HISTORICAL_NONREPRODUCIBLE_GO_REREVIEW",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-rereview.md",
+        "sha256": "a2acd1e0555cfce4b5fad6a53cb557cb919ee359b98e3da8f029d0caeebf71b3",
+        "byte_count": 6180
+      },
+      {
+        "role": "W8_HISTORICAL_NO_GO_REVIEW",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "sha256": "556ba08d0b88d96760309e5226a9f09bb5647705b2787761cc3054ca25937010",
+        "byte_count": 9302
+      },
+      {
+        "role": "W8_CURRENT_JSON",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879",
+        "byte_count": 56684
+      },
+      {
+        "role": "W8_CURRENT_MARKDOWN",
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+        "sha256": "8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e",
+        "byte_count": 31392
+      },
+      {
+        "role": "CURRENT_REL_HANDOVER_CONTAINER",
+        "path": "docs/deliverables/09-release/delivery-and-handover.md",
+        "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c",
+        "byte_count": 31028
+      },
+      {
+        "role": "W9_SHARED_SUCCESSOR_MANIFEST",
+        "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+        "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a",
+        "byte_count": 125261
+      },
+      {
+        "role": "W9_SHARED_SUCCESSOR_BUILDER",
+        "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+        "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6",
+        "byte_count": 132367
+      },
+      {
+        "role": "W9_SHARED_SUCCESSOR_TEST",
+        "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+        "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12",
+        "byte_count": 28178
+      }
+    ],
+    "input_set_sha256": "aa940edd66b899d9356937e6a4db3859e79e79643f6435965996874567834a89",
+    "final_review_subject_set_sha256": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d",
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+      "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC"
+  },
+  "scope": {
+    "wave_id": "W8",
+    "artifact_count": 5,
+    "exact_artifact_ids": [
+      "DLV-REL-15",
+      "DLV-REL-16",
+      "DLV-REL-17",
+      "DLV-REL-19",
+      "DLV-REL-22"
+    ]
+  },
+  "baseline_counts_before_w8": {
+    "OK": 116,
+    "INTERNAL_GAP": 63,
+    "EXTERNAL": 42,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "applied_delta": {
+    "OK": 1,
+    "INTERNAL_GAP": -1,
+    "EXTERNAL": 0,
+    "N_A_CANDIDATE": 0,
+    "TOTAL": 0
+  },
+  "counts_after_w8": {
+    "OK": 117,
+    "INTERNAL_GAP": 62,
+    "EXTERNAL": 42,
+    "N_A_CANDIDATE": 36,
+    "TOTAL": 257
+  },
+  "transitions": [
+    {
+      "artifact_type_code": "DLV-REL-15",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "rollback template만 존재하며 실제 rollback 실행은 NOT_RUN이고 result는 null임.",
+      "transition_authority_status": "GO_STATUS_DELTA_ALLOWED",
+      "open_gap": {
+        "target": [
+          "FORMAL_ROLLBACK_EXECUTION"
+        ],
+        "reason": "rollback template만 존재하며 실제 rollback 실행은 NOT_RUN이고 result는 null임."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-REL-16",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "signed artifact가 0개이고 signing/install은 NOT_RUN, signing assessment는 NOT_ASSESSED임.",
+      "transition_authority_status": "GO_STATUS_DELTA_ALLOWED",
+      "open_gap": {
+        "target": [
+          "SIGNED_ARTIFACT_AND_INSTALLATION_EXECUTION"
+        ],
+        "reason": "signed artifact가 0개이고 signing/install은 NOT_RUN, signing assessment는 NOT_ASSESSED임."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-REL-17",
+      "from": "INTERNAL_GAP",
+      "to": "OK",
+      "transition": "INTERNAL_GAP_TO_OK",
+      "basis": "현재 사용자 설명서와 REL17 section이 consent exact4, network exact3, privacy operation, TMAP 외부 경계와 W7 model3 register-only 한계를 완전하게 투영하며 current test evidence에 결속됨.",
+      "transition_authority_status": "GO_STATUS_DELTA_ALLOWED",
+      "ok_meaning": "INTERNAL_CURRENT_CONTENT_COMPLETENESS_CANDIDATE_ONLY",
+      "formal_approval_claimed": false,
+      "release_completion_claimed": false,
+      "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+      "exclusive_w8_change_attribution_claimed": false,
+      "historical_pre_w9_byte_preservation_claimed": false
+    },
+    {
+      "artifact_type_code": "DLV-REL-19",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "demo/training 실행은 NOT_RUN이며 participant/session receipt가 0임.",
+      "transition_authority_status": "GO_STATUS_DELTA_ALLOWED",
+      "open_gap": {
+        "target": [
+          "CONTROLLED_DEMO_TRAINING_EXECUTION"
+        ],
+        "reason": "demo/training 실행은 NOT_RUN이며 participant/session receipt가 0임."
+      }
+    },
+    {
+      "artifact_type_code": "DLV-REL-22",
+      "from": "INTERNAL_GAP",
+      "to": "INTERNAL_GAP",
+      "transition": "INTERNAL_GAP_RETAINED",
+      "basis": "license inventory는 known 346, unknown 185, total 531이며 final notice가 없고 reconciliation은 NOT_RUN임.",
+      "transition_authority_status": "GO_STATUS_DELTA_ALLOWED",
+      "open_gap": {
+        "target": [
+          "FINAL_LICENSE_NOTICE_AND_RECONCILIATION"
+        ],
+        "reason": "license inventory는 known 346, unknown 185, total 531이며 final notice가 없고 reconciliation은 NOT_RUN임."
+      }
+    }
+  ],
+  "classification_result": {
+    "OK": {
+      "count": 1,
+      "artifact_ids": [
+        "DLV-REL-17"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 4,
+      "artifact_ids": [
+        "DLV-REL-15",
+        "DLV-REL-16",
+        "DLV-REL-19",
+        "DLV-REL-22"
+      ]
+    }
+  },
+  "transition_authority": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-final-review.md",
+    "sha256": "f66f04b6fe55c34fa0eb9b88397568e368529e5488c5b9dd9da718da92227ecd",
+    "byte_count": 7144,
+    "status": "GO_STATUS_DELTA_ALLOWED",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "sole_transition_authority": true,
+    "subject_set_sha256": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d",
+    "subject_count": 14,
+    "subject_preimage_byte_length": 2004,
+    "subject_digest_reproduced": true,
+    "historical_reviews": [
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "sha256": "556ba08d0b88d96760309e5226a9f09bb5647705b2787761cc3054ca25937010",
+        "status": "NO_GO",
+        "findings": {
+          "blocking": 0,
+          "major": 2,
+          "minor": 0
+        },
+        "authority": "HISTORICAL_ONLY"
+      },
+      {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-rereview.md",
+        "sha256": "a2acd1e0555cfce4b5fad6a53cb557cb919ee359b98e3da8f029d0caeebf71b3",
+        "status": "GO_STATUS_DELTA_ALLOWED",
+        "findings": {
+          "blocking": 0,
+          "major": 0,
+          "minor": 0
+        },
+        "subject_set_sha256": "216ede1c6c2c810608fa6292a8a372f249152299e913c114aa106aa7b52b91ae",
+        "authority": "HISTORICAL_GO_WITH_NON_REPRODUCIBLE_SUBJECT_PREIMAGE_NOT_TRANSITION_AUTHORITY"
+      }
+    ]
+  },
+  "latest_pair_and_source_fingerprints": {
+    "current_pair": {
+      "json": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+        "byte_count": 56684,
+        "raw_sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879"
+      },
+      "markdown": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+        "byte_count": 31392,
+        "raw_sha256": "8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e"
+      }
+    },
+    "source": "fd913a725400b57f274865da0f0c54e60a1025ea8a7634a03aa87764789e5897",
+    "content": "c2b9f33958da5a8c2c83dafd7473c9ad0cb8982f243eee79f3ea247f3efacb45",
+    "logical_input_set": "d6f21a1cc13b62dfa79e8b650889759b5a3bbf5a7fc7699da79c3898be31615c",
+    "semantic_projection": "0d457c61834098d327220d63b34df5df13248f21ca63153ec3ff8a1db85f0991",
+    "logical_source_binding_count": 11,
+    "stale_binding_count": 0,
+    "all_reproduced": true
+  },
+  "source_attribution_lineage": {
+    "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+    "w8_direct_authored_current": {
+      "count": 1,
+      "paths": [
+        "apps/android/USER_GUIDE.md"
+      ]
+    },
+    "w9_shared_current_successor": {
+      "count": 3,
+      "paths": [
+        "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+        "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+        "tests/test_walksafe_formal_rel_ops_cls.py"
+      ]
+    },
+    "current_rel17_content_evidence": {
+      "container_path": "docs/deliverables/09-release/delivery-and-handover.md",
+      "byte_offset_start": 6011,
+      "byte_offset_end_exclusive": 11332,
+      "byte_length": 5321,
+      "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+    },
+    "exclusive_w8_attribution_count": 0,
+    "unsupported_byte_preservation_claim_count": 0,
+    "historical_pre_w9_byte_preservation_claimed": false,
+    "historical_pre_w9_digest_status": {
+      "builder": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "test": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "manifest": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+      "rel17_section": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED"
+    }
+  },
+  "completion_scope": {
+    "REL17": "INTERNAL_CURRENT_CONTENT_COMPLETENESS_CANDIDATE_NOT_RELEASE_LEGAL_MODEL_OR_DEPLOYMENT_APPROVAL",
+    "consent_choice_count": 4,
+    "consent_default_off_count": 4,
+    "consent_mutually_independent": true,
+    "network_state_count": 3,
+    "privacy_operations": [
+      "WITHDRAWAL",
+      "DELETION",
+      "RECONSENT"
+    ],
+    "tmap_boundary": "EXTERNAL_THIRD_PARTY_PROCESSING_NOT_APPROVED_LIVE_NOT_RUN",
+    "model_boundary": "W7_EXACT3_REGISTER_ONLY_ALL_NOT_APPROVED_NOT_RUN_NOT_DEPLOYABLE"
+  },
+  "authority_boundary": {
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "formal_approval_claimed": false,
+    "formal_execution_claimed": false,
+    "release_completion_claimed": false,
+    "statement": "W8 OK는 REL17 현재 내용 완전성만 뜻하며 rollback/install/demo/license, formal279, device/live/sign/deploy/legal/model/release 완료가 아니다."
+  },
+  "verification_boundary": {
+    "rollback_execution_status": "NOT_RUN",
+    "rollback_result": null,
+    "installation_execution_status": "NOT_RUN",
+    "installation_receipt_count": 0,
+    "controlled_demo_execution_status": "NOT_RUN",
+    "training_or_demo_receipt_count": 0,
+    "license_inventory": {
+      "known": 346,
+      "unknown": 185,
+      "total": 531,
+      "final_notice_file_count": 0,
+      "final_notice_status": "ABSENT",
+      "release_artifact_dependency_reconciliation_status": "NOT_RUN"
+    },
+    "formal_test_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "live_tmap_status": "NOT_RUN",
+    "signing_execution_status": "NOT_RUN",
+    "signing_assessment_status": "NOT_ASSESSED",
+    "signed_artifact_count": 0,
+    "deployment_execution_status": "NOT_RUN",
+    "legal_approval_status": "NOT_APPROVED",
+    "model_approval_status": "NOT_APPROVED",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "actual_execution_evidence_count": 0,
+    "external_original_count": 0
+  },
+  "evidence_exclusion_boundary": {
+    "raw_secret_material_included": false,
+    "raw_advisory_dump_included": false,
+    "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+  },
+  "accounting_invariants": {
+    "pre_total_exact_257": true,
+    "post_total_exact_257": true,
+    "ok_delta_exact_1": true,
+    "internal_gap_delta_exact_minus_1": true,
+    "external_unchanged": true,
+    "n_a_candidate_unchanged": true,
+    "out_of_scope_status_change_count": 0
+  },
+  "integrity": {
+    "input_count": 16,
+    "input_set_sha256": "aa940edd66b899d9356937e6a4db3859e79e79643f6435965996874567834a89",
+    "final_review_subject_count": 14,
+    "final_review_subject_set_sha256": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d",
+    "transition_count": 5,
+    "transition_unique_count": 5,
+    "changed_count": 1,
+    "retained_count": 4,
+    "common_fingerprint": "d78adebb5f1175db27ac9cc35b0e91453fa3f60e4db874bb7f4de0c6848fc02e",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "2d53f9fefb8a6fb2159eefeedfde6a684c04e8839ecd2c5cad2e4ba39f12bc7a"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact physical input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "role_excluded": true
+      },
+      "preimage": [
+        {
+          "byte_count": 13833,
+          "path": "apps/android/USER_GUIDE.md",
+          "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+        },
+        {
+          "byte_count": 39673,
+          "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+          "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44"
+        },
+        {
+          "byte_count": 19207,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+          "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+        },
+        {
+          "byte_count": 47592,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+          "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe"
+        },
+        {
+          "byte_count": 41414,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611"
+        },
+        {
+          "byte_count": 23293,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+          "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4"
+        },
+        {
+          "byte_count": 3444,
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+          "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8"
+        },
+        {
+          "byte_count": 7144,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-final-review.md",
+          "sha256": "f66f04b6fe55c34fa0eb9b88397568e368529e5488c5b9dd9da718da92227ecd"
+        },
+        {
+          "byte_count": 6180,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-rereview.md",
+          "sha256": "a2acd1e0555cfce4b5fad6a53cb557cb919ee359b98e3da8f029d0caeebf71b3"
+        },
+        {
+          "byte_count": 9302,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+          "sha256": "556ba08d0b88d96760309e5226a9f09bb5647705b2787761cc3054ca25937010"
+        },
+        {
+          "byte_count": 56684,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+          "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879"
+        },
+        {
+          "byte_count": 31392,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+          "sha256": "8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e"
+        },
+        {
+          "byte_count": 31028,
+          "path": "docs/deliverables/09-release/delivery-and-handover.md",
+          "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c"
+        },
+        {
+          "byte_count": 125261,
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a"
+        },
+        {
+          "byte_count": 132367,
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6"
+        },
+        {
+          "byte_count": 28178,
+          "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+          "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "aa940edd66b899d9356937e6a4db3859e79e79643f6435965996874567834a89"
+    },
+    "final_review_subject_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "14 unique physical files explicitly enumerated by the final independent review",
+      "record_serialization": "<path><TAB><sha256><TAB><byte_length><LF>",
+      "record_count": 14,
+      "preimage_byte_length": 2004,
+      "preimage_records": [
+        {
+          "path": "apps/android/USER_GUIDE.md",
+          "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b",
+          "byte_length": 13833
+        },
+        {
+          "path": "docs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json",
+          "sha256": "d465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44",
+          "byte_length": 39673
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+          "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+          "byte_length": 19207
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+          "sha256": "c229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe",
+          "byte_length": 47592
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json",
+          "sha256": "887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611",
+          "byte_length": 41414
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md",
+          "sha256": "4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8",
+          "byte_length": 3444
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-rereview.md",
+          "sha256": "a2acd1e0555cfce4b5fad6a53cb557cb919ee359b98e3da8f029d0caeebf71b3",
+          "byte_length": 6180
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+          "sha256": "556ba08d0b88d96760309e5226a9f09bb5647705b2787761cc3054ca25937010",
+          "byte_length": 9302
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+          "sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879",
+          "byte_length": 56684
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+          "sha256": "8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e",
+          "byte_length": 31392
+        },
+        {
+          "path": "docs/deliverables/09-release/delivery-and-handover.md",
+          "sha256": "34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c",
+          "byte_length": 31028
+        },
+        {
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a",
+          "byte_length": 125261
+        },
+        {
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6",
+          "byte_length": 132367
+        },
+        {
+          "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+          "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12",
+          "byte_length": 28178
+        }
+      ],
+      "preimage_utf8_text": "apps/android/USER_GUIDE.md\t746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b\t13833\ndocs/control/execution/artifact-audits/20260726/release-ops-ws-closure-audit.json\td465905e6e33c720aa776ffb48145c29ef7b8036d7d1da416641fb5c9226af44\t39673\ndocs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json\te924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba\t19207\ndocs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json\tc229b45989463a5f1eb4943289af42a4a9a8a720131de25421683ca59dc12dbe\t47592\ndocs/control/execution/artifact-remediation/20260726/w7/aiml-model-governance-current-state.json\t887fa726af570aa506e906dff5202818a14137b42009a1bee13b2cbf5cffa611\t41414\ndocs/control/execution/artifact-remediation/20260726/w7/independent-rereview.md\t4c1aa9d62ffd936672a697ffcc03e3d8d8a4b9fa49ee5c0e38d3cfc19f2da3c8\t3444\ndocs/control/execution/artifact-remediation/20260726/w8/independent-rereview.md\ta2acd1e0555cfce4b5fad6a53cb557cb919ee359b98e3da8f029d0caeebf71b3\t6180\ndocs/control/execution/artifact-remediation/20260726/w8/independent-review.md\t556ba08d0b88d96760309e5226a9f09bb5647705b2787761cc3054ca25937010\t9302\ndocs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json\t49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879\t56684\ndocs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md\t8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e\t31392\ndocs/deliverables/09-release/delivery-and-handover.md\t34a263359cab57d9245520a50f2733f50ab4848322646d771410738b9b82c82c\t31028\ndocs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json\tc02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a\t125261\nscripts/build_walksafe_formal_rel_ops_cls_20260721.py\t3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6\t132367\ntests/test_walksafe_formal_rel_ops_cls.py\t78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12\t28178\n",
+      "ordering": "path ascending by UTF-8 byte order",
+      "encoding": "UTF-8",
+      "trailing_newline": "one LF after every record including the final record",
+      "digest": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact W8 central state, final authority, predecessor, current source attribution and conservative boundary object reproduced in preimage",
+      "basis_fields": [
+        "schema",
+        "wave_id",
+        "predecessor",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "final_review_subject_set_sha256",
+        "transition_authority",
+        "latest_pair_and_source_fingerprints",
+        "attribution_lineage",
+        "boundary",
+        "evidence_exclusion_boundary"
+      ],
+      "preimage": {
+        "schema": "walksafe.w8-central-common.v1",
+        "wave_id": "W8",
+        "predecessor": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+          "sha256": "90bd754abe86e5bdd833a796c42af46e60bee4a50cc179a0a11793cf3bd94ad4",
+          "byte_count": 23293
+        },
+        "exact": [
+          "DLV-REL-15",
+          "DLV-REL-16",
+          "DLV-REL-17",
+          "DLV-REL-19",
+          "DLV-REL-22"
+        ],
+        "OK": [
+          "DLV-REL-17"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-REL-15",
+          "DLV-REL-16",
+          "DLV-REL-19",
+          "DLV-REL-22"
+        ],
+        "pre": {
+          "OK": 116,
+          "INTERNAL_GAP": 63,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 117,
+          "INTERNAL_GAP": 62,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "aa940edd66b899d9356937e6a4db3859e79e79643f6435965996874567834a89",
+        "final_review_subject_set_sha256": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d",
+        "transition_authority": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/independent-final-review.md",
+          "sha256": "f66f04b6fe55c34fa0eb9b88397568e368529e5488c5b9dd9da718da92227ecd",
+          "byte_count": 7144,
+          "status": "GO_STATUS_DELTA_ALLOWED",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 0
+          },
+          "sole_transition_authority": true,
+          "subject_set_sha256": "ef8e490bf88dc157a3f9f8b159a7777ee74407c88cb87a69c9a5afbe9b14f31d",
+          "subject_count": 14,
+          "subject_preimage_byte_length": 2004,
+          "subject_digest_reproduced": true
+        },
+        "latest_pair_and_source_fingerprints": {
+          "current_pair": {
+            "json": {
+              "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.json",
+              "byte_count": 56684,
+              "raw_sha256": "49a5885953c32031eb977181c3d76b359b88eeb2b1b13d66ab320b52974c2879"
+            },
+            "markdown": {
+              "path": "docs/control/execution/artifact-remediation/20260726/w8/release-readiness-current-state.md",
+              "byte_count": 31392,
+              "raw_sha256": "8a1575492fc58f0bb28e8d6d05cc1a0d0b5429354741e5c9404e4950637ff50e"
+            }
+          },
+          "source": "fd913a725400b57f274865da0f0c54e60a1025ea8a7634a03aa87764789e5897",
+          "content": "c2b9f33958da5a8c2c83dafd7473c9ad0cb8982f243eee79f3ea247f3efacb45",
+          "logical_input_set": "d6f21a1cc13b62dfa79e8b650889759b5a3bbf5a7fc7699da79c3898be31615c",
+          "semantic_projection": "0d457c61834098d327220d63b34df5df13248f21ca63153ec3ff8a1db85f0991",
+          "logical_source_binding_count": 11,
+          "stale_binding_count": 0,
+          "all_reproduced": true
+        },
+        "attribution_lineage": {
+          "candidate_basis": "CURRENT_CONTENT_COMPLETENESS_AND_CURRENT_TEST",
+          "w8_direct_authored_current": {
+            "count": 1,
+            "paths": [
+              "apps/android/USER_GUIDE.md"
+            ]
+          },
+          "w9_shared_current_successor": {
+            "count": 3,
+            "paths": [
+              "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+              "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+              "tests/test_walksafe_formal_rel_ops_cls.py"
+            ]
+          },
+          "current_rel17_content_evidence": {
+            "container_path": "docs/deliverables/09-release/delivery-and-handover.md",
+            "byte_offset_start": 6011,
+            "byte_offset_end_exclusive": 11332,
+            "byte_length": 5321,
+            "sha256": "f6fe0a8e7cc6788cec9d2a0e56b7b3ccdc06c296b27ab68487a93807d7c2e61a"
+          },
+          "exclusive_w8_attribution_count": 0,
+          "unsupported_byte_preservation_claim_count": 0,
+          "historical_pre_w9_byte_preservation_claimed": false,
+          "historical_pre_w9_digest_status": {
+            "builder": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "test": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "manifest": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED",
+            "rel17_section": "HISTORICAL_PRE_W9_DIGEST_UNKNOWN_NOT_RETAINED"
+          }
+        },
+        "boundary": {
+          "rollback_execution_status": "NOT_RUN",
+          "rollback_result": null,
+          "installation_execution_status": "NOT_RUN",
+          "installation_receipt_count": 0,
+          "controlled_demo_execution_status": "NOT_RUN",
+          "training_or_demo_receipt_count": 0,
+          "license_inventory": {
+            "known": 346,
+            "unknown": 185,
+            "total": 531,
+            "final_notice_file_count": 0,
+            "final_notice_status": "ABSENT",
+            "release_artifact_dependency_reconciliation_status": "NOT_RUN"
+          },
+          "formal_test_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "actual_device_status": "NOT_RUN",
+          "live_tmap_status": "NOT_RUN",
+          "signing_execution_status": "NOT_RUN",
+          "signing_assessment_status": "NOT_ASSESSED",
+          "signed_artifact_count": 0,
+          "deployment_execution_status": "NOT_RUN",
+          "legal_approval_status": "NOT_APPROVED",
+          "model_approval_status": "NOT_APPROVED",
+          "release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "release_approval_status": "NOT_APPROVED",
+          "release_status": "NOT_ELIGIBLE",
+          "actual_execution_evidence_count": 0,
+          "external_original_count": 0
+        },
+        "evidence_exclusion_boundary": {
+          "raw_secret_material_included": false,
+          "raw_advisory_dump_included": false,
+          "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+        }
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "arrays": "preserve declared semantic order"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "all central raw output SHA-256 values",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "d78adebb5f1175db27ac9cc35b0e91453fa3f60e4db874bb7f4de0c6848fc02e"
+    }
+  },
+  "digest_contract_validation": {
+    "input_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "final_review_subject_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "common_fingerprint": "PASS_INDEPENDENT_RECOMPUTE"
+  }
+}

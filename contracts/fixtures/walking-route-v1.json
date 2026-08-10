@@ -1,0 +1,82 @@
+{
+  "request": {
+    "default_speed": null,
+    "destination": {
+      "latitude": 37.001,
+      "longitude": 127.0,
+      "name": null
+    },
+    "origin": {
+      "latitude": 37.0,
+      "longitude": 127.0,
+      "name": null
+    },
+    "priority": "STAIR_AVOID",
+    "radius_m": 5000,
+    "waypoints": []
+  },
+  "response": {
+    "guide_points": [
+      {
+        "bearing_deg": 0.0,
+        "distance_from_start_m": 120,
+        "facility_type": 15,
+        "index": 0,
+        "instruction": "목적지 도착",
+        "point": {
+          "latitude": 37.001,
+          "longitude": 127.0,
+          "name": null
+        },
+        "point_type": "E",
+        "remaining_distance_m": 0,
+        "turn_type": 201
+      }
+    ],
+    "polyline": [
+      {
+        "latitude": 37.0,
+        "longitude": 127.0,
+        "name": null
+      },
+      {
+        "latitude": 37.001,
+        "longitude": 127.0,
+        "name": null
+      }
+    ],
+    "priority": "STAIR_AVOID",
+    "provider": "tmap_pedestrian",
+    "provider_result_code": 0,
+    "provider_result_message": "OK",
+    "provider_route_id": "contract-route-1",
+    "schema_version": "walksafe.walking_route.v1",
+    "steps": [
+      {
+        "distance_m": 120,
+        "duration_s": 100,
+        "facility_type": 15,
+        "index": 0,
+        "instruction": "직진",
+        "points": [
+          {
+            "latitude": 37.0,
+            "longitude": 127.0,
+            "name": null
+          },
+          {
+            "latitude": 37.001,
+            "longitude": 127.0,
+            "name": null
+          }
+        ],
+        "road_name": null,
+        "turn_type": 11
+      }
+    ],
+    "summary": {
+      "distance_m": 120,
+      "duration_s": 100
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": "walksafe.field-test-external-record-index.v1",
+  "metadata": {
+    "register_id": "WS-FIELD-TEST-EXTERNAL-RECORD-INDEX-001",
+    "title": "WalkSafe 현장시험 외부기록 색인",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "planned_artifact_type_ids": [
+    "WS-21"
+  ],
+  "execution_status": "NOT_RUN",
+  "storage_policy": {
+    "raw_personal_data_in_git": false,
+    "external_original_required": true,
+    "git_fields_only": [
+      "test_plan_id",
+      "plan_version",
+      "plan_approval_ref",
+      "participant_pseudonym_id",
+      "external_record_id",
+      "signer_role",
+      "signed_at",
+      "sha256",
+      "retention_until",
+      "withdrawal_status"
+    ]
+  },
+  "plan_instances": [],
+  "participant_consent_records": [],
+  "summary": {
+    "approved_plan_count": 0,
+    "participant_count": 0,
+    "signed_consent_count": 0,
+    "field_session_count": 0
+  }
+}

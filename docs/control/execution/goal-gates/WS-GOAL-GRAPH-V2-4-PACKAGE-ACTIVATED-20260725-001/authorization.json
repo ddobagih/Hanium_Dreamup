@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-4-PACKAGE-ACTIVATION-AUTHORIZATION-20260725-001",
+  "evidence_type": "PACKAGE_ACTIVATION_AUTHORIZATION",
+  "status": "AUTHORIZED",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
+  "activation_request": {
+    "request_id": "WS-V24-PACKAGE-ACTIVATION-REQUEST-20260725-001",
+    "source_kind": "USER_EXPLICIT_REQUEST",
+    "request_sha256": "dd9fc5e00ff856059f4d0b908ed3b4f4ea1fd5bf0eea34cc9364bf5c2933e83a",
+    "requested_at": "2026-07-25T09:49:53+09:00"
+  },
+  "authorization_scope": {
+    "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+    "initial_event_sha256": "58c2b31637b5355609db14bf9e0779d4fd33d99f97a692866718a51fa64875d9",
+    "focus_goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+    "permitted_transitions": [
+      "PACKAGE_ACTIVATED_AFTER_QUICK_GATE_PASS",
+      "GOAL_STARTED_AFTER_FULL_START_GATE_PASS"
+    ],
+    "continuous_internal_execution": "DEPENDENCY_DAG_UNTIL_REAL_POLICY_OR_EXTERNAL_BLOCKER"
+  },
+  "timestamp_basis": "LOCAL_SESSION_PROCESSING_TIME_AFTER_USER_RESPONSE",
+  "authorized_at": "2026-07-25T09:50:00+09:00",
+  "generated_at": "2026-07-25T09:50:09+09:00",
+  "user_response": {
+    "literal_utf8": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4의 manifest SHA-256 7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07 및 PACKAGE_PREPARED seq1 SHA-256 58c2b31637b5355609db14bf9e0779d4fd33d99f97a692866718a51fa64875d9에 결속해 활성화를 승인합니다.",
+    "canonicalization": "UTF-8_WITHOUT_TRAILING_NEWLINE",
+    "sha256": "dd9fc5e00ff856059f4d0b908ed3b4f4ea1fd5bf0eea34cc9364bf5c2933e83a"
+  }
+}

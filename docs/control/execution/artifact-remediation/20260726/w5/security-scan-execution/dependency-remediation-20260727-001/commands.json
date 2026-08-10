@@ -1,0 +1,356 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/python-3.12.13+20260510/bin/python",
+        "-m",
+        "venv",
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.9,
+      "ended_at_utc": "2026-07-26T19:25:39.148516+00:00",
+      "exit_code": 0,
+      "id": "python312-venv-create",
+      "log_path": "logs/python312-venv-create.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:25:38.248462+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "pip-tools==7.6.0"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 1.066,
+      "ended_at_utc": "2026-07-26T19:25:40.214989+00:00",
+      "exit_code": 0,
+      "id": "piptools-install",
+      "log_path": "logs/piptools-install.log",
+      "log_sha256": "791ac4a92d921b3ac9d10548577f3acce0312944bdd5fe5f188028401de5b76f",
+      "started_at_utc": "2026-07-26T19:25:39.148732+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-c",
+        "import sys; from importlib.metadata import version; print('python='+sys.version.split()[0]); print('pip='+version('pip')); print('pip-tools='+version('pip-tools')); print('setuptools='+version('setuptools'))"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.027,
+      "ended_at_utc": "2026-07-26T19:25:40.242168+00:00",
+      "exit_code": 0,
+      "id": "tool-version",
+      "log_path": "logs/tool-version.log",
+      "log_sha256": "94bd172f5211fafe85cf1f6e84db455515430ff0decc6ebad17fb8891a813e26",
+      "started_at_utc": "2026-07-26T19:25:40.215214+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-m",
+        "piptools",
+        "compile",
+        "--resolver=backtracking",
+        "--constraint=/tmp/walksafe-backend-installed.constraints",
+        "--generate-hashes",
+        "--reuse-hashes",
+        "--allow-unsafe",
+        "--strip-extras",
+        "--no-header",
+        "--quiet",
+        "--output-file=backend/requirements.lock",
+        "--upgrade-package=Pillow==12.3.0",
+        "--upgrade-package=python-multipart==0.0.31",
+        "--upgrade-package=python-dotenv==1.2.2",
+        "--upgrade-package=idna==3.15",
+        "backend/requirements.txt"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 79.823,
+      "ended_at_utc": "2026-07-26T19:27:00.065071+00:00",
+      "exit_code": 0,
+      "id": "backend-lock-compile-1",
+      "log_path": "logs/backend-lock-compile-1.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:25:40.242343+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-m",
+        "piptools",
+        "compile",
+        "--resolver=backtracking",
+        "--generate-hashes",
+        "--reuse-hashes",
+        "--allow-unsafe",
+        "--strip-extras",
+        "--no-header",
+        "--quiet",
+        "--output-file=tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "tests/general-quality-cp312-linux-x86_64-cpu.in"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 22.967,
+      "ended_at_utc": "2026-07-26T19:28:33.228827+00:00",
+      "exit_code": 0,
+      "id": "quality-lock-compile-1",
+      "log_path": "logs/quality-lock-compile-1.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:28:10.261352+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-m",
+        "piptools",
+        "compile",
+        "--resolver=backtracking",
+        "--constraint=/tmp/walksafe-backend-installed.constraints",
+        "--generate-hashes",
+        "--reuse-hashes",
+        "--allow-unsafe",
+        "--strip-extras",
+        "--no-header",
+        "--quiet",
+        "--output-file=backend/requirements.lock",
+        "--upgrade-package=Pillow==12.3.0",
+        "--upgrade-package=python-multipart==0.0.31",
+        "--upgrade-package=python-dotenv==1.2.2",
+        "--upgrade-package=idna==3.15",
+        "backend/requirements.txt"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 4.523,
+      "ended_at_utc": "2026-07-26T19:28:37.755624+00:00",
+      "exit_code": 0,
+      "id": "backend-lock-compile-2",
+      "log_path": "logs/backend-lock-compile-2.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:28:33.232765+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/piptools-venv/bin/python",
+        "-m",
+        "piptools",
+        "compile",
+        "--resolver=backtracking",
+        "--generate-hashes",
+        "--reuse-hashes",
+        "--allow-unsafe",
+        "--strip-extras",
+        "--no-header",
+        "--quiet",
+        "--output-file=tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "tests/general-quality-cp312-linux-x86_64-cpu.in"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 2.93,
+      "ended_at_utc": "2026-07-26T19:28:40.686275+00:00",
+      "exit_code": 0,
+      "id": "quality-lock-compile-2",
+      "log_path": "logs/quality-lock-compile-2.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:28:37.755889+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/python-3.12.13+20260510/bin/python",
+        "-m",
+        "venv",
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/four-package-smoke-venv"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.87,
+      "ended_at_utc": "2026-07-26T19:29:44.840778+00:00",
+      "exit_code": 0,
+      "id": "smoke-venv-create",
+      "log_path": "logs/smoke-venv-create.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "started_at_utc": "2026-07-26T19:29:43.970937+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/four-package-smoke-venv/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--only-binary=:all:",
+        "--no-deps",
+        "Pillow==12.3.0",
+        "python-multipart==0.0.31",
+        "python-dotenv==1.2.2",
+        "idna==3.15"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 1.216,
+      "ended_at_utc": "2026-07-26T19:29:46.057184+00:00",
+      "exit_code": 0,
+      "id": "smoke-wheel-install",
+      "log_path": "logs/smoke-wheel-install.log",
+      "log_sha256": "ef03cbbb62636e3cb9eb5e8399208dfa4b0f18cb12bea032776a6ff57d549bbd",
+      "started_at_utc": "2026-07-26T19:29:44.841099+00:00"
+    },
+    {
+      "argv": [
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/four-package-smoke-venv/bin/python",
+        "-c",
+        "from importlib import import_module, metadata\nexpected={'Pillow':('PIL','12.3.0'),'python-multipart':('multipart','0.0.31'),'python-dotenv':('dotenv','1.2.2'),'idna':('idna','3.15')}\nfor dist,(module,want) in expected.items():\n    import_module(module)\n    got=metadata.version(dist)\n    print(f'{dist}={got} import={module}:PASS')\n    assert got==want,(dist,got,want)\n"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.03,
+      "ended_at_utc": "2026-07-26T19:29:46.087222+00:00",
+      "exit_code": 0,
+      "id": "smoke-import-version",
+      "log_path": "logs/smoke-import-version.log",
+      "log_sha256": "791e789f8a0ef445f4d3fc481acc66e545cc4c254438072d5e27ea99139ad1fa",
+      "started_at_utc": "2026-07-26T19:29:46.057537+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-c",
+        "from importlib import metadata\nnames=['fastapi','starlette','pytest','sqlalchemy','httpx','Pillow','python-multipart','python-dotenv','idna','torch','ultralytics']\nfor name in names:\n    try: print(f'{name}={metadata.version(name)}')\n    except metadata.PackageNotFoundError: print(f'{name}=MISSING')\n"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.03,
+      "ended_at_utc": "2026-07-26T19:29:46.117769+00:00",
+      "exit_code": 0,
+      "id": "locked-env-inventory",
+      "log_path": "logs/locked-env-inventory.log",
+      "log_sha256": "04b6430e0eccc0d57fd3cffefcfda732ddc2488ef453ca5e86a0f975686a19a6",
+      "started_at_utc": "2026-07-26T19:29:46.087483+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/python-3.12.13+20260510/bin/python",
+        "-c",
+        "from pathlib import Path\nm={}\nfor line in Path('/proc/meminfo').read_text().splitlines():\n    if ':' in line:\n        k,v=line.split(':',1);m[k]=v.strip()\nprint('MemAvailable='+m.get('MemAvailable','UNKNOWN'))\nprint('LoadAvg='+Path('/proc/loadavg').read_text().strip())\n"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.011,
+      "ended_at_utc": "2026-07-26T19:29:46.129090+00:00",
+      "exit_code": 0,
+      "id": "targeted-test-resource-preflight",
+      "log_path": "logs/targeted-test-resource-preflight.log",
+      "log_sha256": "ed249b804f96683f417efea4944e6ffee529319c8de4cf692850d0ce9f83f49f",
+      "started_at_utc": "2026-07-26T19:29:46.118030+00:00"
+    },
+    {
+      "argv": [
+        "bash",
+        "-lc",
+        "pgrep -af '(gradle|osv-scanner|pip-compile|piptools)' || true"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.045,
+      "ended_at_utc": "2026-07-26T19:29:46.174801+00:00",
+      "exit_code": 0,
+      "id": "targeted-test-heavy-process-check",
+      "log_path": "logs/targeted-test-heavy-process-check.log",
+      "log_sha256": "50116801fdea799a6989accd674dc435bb7218cac88de042f67d774a7e7480b5",
+      "started_at_utc": "2026-07-26T19:29:46.129364+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-c",
+        "from pathlib import Path\nimport os\nhits=[]\nfor p in Path('/proc').iterdir():\n    if not p.name.isdigit() or int(p.name)==os.getpid(): continue\n    try: parts=(p/'cmdline').read_bytes().split(b'\\0');args=[x.decode(errors='replace') for x in parts if x]\n    except OSError: continue\n    if not args: continue\n    exe=Path(args[0]).name.lower();joined=' '.join(args[1:]).lower()\n    if exe in {'gradle','gradlew','osv-scanner','pip-compile'} or (exe.startswith('python') and '-m piptools' in joined): hits.append({'pid':int(p.name),'argv0':args[0],'args':args[1:4]})\nprint(hits)\nraise SystemExit(1 if hits else 0)\n"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.015,
+      "ended_at_utc": "2026-07-26T19:30:26.140008+00:00",
+      "exit_code": 0,
+      "id": "targeted-test-heavy-process-check-corrected",
+      "log_path": "logs/targeted-test-heavy-process-check-corrected.log",
+      "log_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "started_at_utc": "2026-07-26T19:30:26.124763+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--only-binary=:all:",
+        "--no-deps",
+        "--target",
+        "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj/w3-backend-overlay",
+        "Pillow==12.3.0",
+        "python-multipart==0.0.31",
+        "python-dotenv==1.2.2",
+        "idna==3.15"
+      ],
+      "cwd": "/tmp/walksafe-w5-dependency-remediation-20260727-001-zhxtpicj",
+      "duration_seconds": 0.466,
+      "ended_at_utc": "2026-07-26T19:30:26.605822+00:00",
+      "exit_code": 0,
+      "id": "targeted-overlay-install",
+      "log_path": "logs/targeted-overlay-install.log",
+      "log_sha256": "9382582b14e79be4db5aeef738349190d39e49b73af38ee341987c00a8f2b671",
+      "started_at_utc": "2026-07-26T19:30:26.140205+00:00"
+    },
+    {
+      "argv": [
+        "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python",
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-q",
+        "backend/tests/test_request_limits.py",
+        "backend/tests/test_uploads.py",
+        "backend/tests/test_health_readiness.py"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "duration_seconds": 1.566,
+      "ended_at_utc": "2026-07-26T19:30:28.172187+00:00",
+      "exit_code": 0,
+      "id": "targeted-backend-tests",
+      "log_path": "logs/targeted-backend-tests.log",
+      "log_sha256": "6c3f6d266536b5db5c07c56d272c1609bb0005a16f0b944e92636750ad5b8d51",
+      "started_at_utc": "2026-07-26T19:30:26.606240+00:00"
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/walksafe_w5_backend_remediation_apply.py"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "duration_seconds": null,
+      "ended_at_utc": null,
+      "exit_code": 1,
+      "id": "apply-product-files-and-receipt-attempt",
+      "log_path": "logs/apply-attempt.log",
+      "log_sha256": "cda3ad2be3c8dc5d6c3d17b3f6690292a9fe812f7b870c8126b9afc02a7690fc",
+      "python_version": "3.14.6",
+      "started_at_utc": null,
+      "timestamp_note": "not captured by inner command recorder"
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/walksafe_w5_backend_receipt_recover.py"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "duration_seconds": null,
+      "ended_at_utc": "2026-07-26T19:33:24.359551+00:00",
+      "exit_code": 0,
+      "id": "receipt-cross-device-recovery",
+      "log_path": "logs/receipt-recovery.log",
+      "log_sha256": "90fadda0184268a9c3689043ca930cae105fe447b4d7053a6240238479dcecbb",
+      "python_version": "3.14.6",
+      "started_at_utc": "2026-07-26T19:33:24.359551+00:00",
+      "timestamp_note": "receipt prepared before final same-filesystem atomic rename"
+    }
+  ],
+  "schema_version": 1
+}

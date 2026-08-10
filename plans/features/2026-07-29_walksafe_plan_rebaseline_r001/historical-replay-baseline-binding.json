@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-HISTORICAL-REPLAY-BASELINE-BINDING-20260729-R001",
+  "prepared_on": "2026-07-29",
+  "status": "PLAN_ONLY_OBSERVATION_SNAPSHOT",
+  "source_snapshot": {
+    "path": "daylog/2026-07-29.md",
+    "snapshot_timing": "BEFORE_PLAN_REBASELINE_DAYLOG_APPEND",
+    "file_sha256": "00f6d488391c3976206c3e1799ec59bde9a9155d6f5c5184fc8ac0df14bf0459",
+    "bytes": 8589,
+    "source_line": 85,
+    "source_line_with_lf_sha256": "a3710cffa732bab7e864c484827e3f22ac3d7a81c35933ef883fe9a0d49c8b70"
+  },
+  "baseline": {
+    "passed": 458,
+    "skipped": 1,
+    "failed": 35,
+    "seq38_residual_count": 233,
+    "seq39_residual_count": 233,
+    "ordered_residual_digest": "df20bb768b73049f3580fd795a95ddb2f32282233decb8237e3c08d84c4e4436",
+    "seq39_new_regression_count": 0
+  },
+  "interpretation": {
+    "root_cause_candidate": "FROZEN_WRAPPER_CURRENT_LIVE_BYTE_DRIFT",
+    "formal_product_credit": 0,
+    "canonical_goal_credit": 0,
+    "artifact_credit": 0,
+    "release_credit": 0,
+    "replay_lane_blocking_product_plan": false
+  },
+  "limitations": [
+    "This binds the prior observation recorded in the daylog; it does not rerun the wrapper.",
+    "The whole-file source hash is a pre-append snapshot. Later add-only daylog entries may change the current whole-file hash while the bound source-line bytes remain unchanged.",
+    "The baseline must be re-observed before any future execution-phase closure claim."
+  ]
+}

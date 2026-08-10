@@ -1,0 +1,569 @@
+{
+  "schema_version": "walksafe.data-model-missing-path-inventory.v1",
+  "inventory_id": "WS-DATA-MODEL-MISSING-PATH-INVENTORY-20260727-001",
+  "checked_at": "2026-07-27T19:08:16+09:00",
+  "repository_root": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+  "inspection_boundary": {
+    "expected_path_count": 5,
+    "expected_paths_only": true,
+    "sensitive_data_payload_read": false,
+    "recursive_directory_walk": false,
+    "parent_inventory_scope": "nearest existing parent direct entries only"
+  },
+  "records": [
+    {
+      "record_id": "MISSING-PATH-001",
+      "checked_at": "2026-07-27T19:08:16+09:00",
+      "expected_path": "reports/walksafe_best_eval_20260708/training_reference_index_20260708.md",
+      "exists": false,
+      "nearest_existing_parent": ".",
+      "first_missing_component_from_parent": "reports",
+      "parent_direct_entry_inventory": {
+        "scope": "DIRECT_ENTRIES_ONLY_NO_RECURSION_NO_FILE_CONTENT_READ",
+        "ordering": "UNICODE_CODEPOINT_ASCENDING_BY_NAME",
+        "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+        "entry_count": 27,
+        "entries": [
+          {
+            "name": ".git",
+            "type": "FILE",
+            "byte_length": 94
+          },
+          {
+            "name": ".github",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".gitignore",
+            "type": "FILE",
+            "byte_length": 2746
+          },
+          {
+            "name": ".playwright-cli",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".pytest_cache",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "AGENTS.md",
+            "type": "FILE",
+            "byte_length": 4225
+          },
+          {
+            "name": "README.md",
+            "type": "FILE",
+            "byte_length": 4944
+          },
+          {
+            "name": "ai_tasks",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "apps",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "artifacts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "backend",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "configs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "contracts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "data_sources",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "daylog",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "deploy",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "docker-compose.yml",
+            "type": "FILE",
+            "byte_length": 731
+          },
+          {
+            "name": "docs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "model",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "outputs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "plans",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "product",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "samples",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "scripts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "templates",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "tests",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "voice",
+            "type": "DIRECTORY"
+          }
+        ],
+        "sha256": "f86dd3734aff8fdfbc973532c0e14f0632c0b54a1653001fce465271fdab6a4f"
+      }
+    },
+    {
+      "record_id": "MISSING-PATH-002",
+      "checked_at": "2026-07-27T19:08:16+09:00",
+      "expected_path": "data_sources/manifests/walksafe_aihub_source_usage_20260628.md",
+      "exists": false,
+      "nearest_existing_parent": "data_sources/manifests",
+      "first_missing_component_from_parent": "walksafe_aihub_source_usage_20260628.md",
+      "parent_direct_entry_inventory": {
+        "scope": "DIRECT_ENTRIES_ONLY_NO_RECURSION_NO_FILE_CONTENT_READ",
+        "ordering": "UNICODE_CODEPOINT_ASCENDING_BY_NAME",
+        "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+        "entry_count": 8,
+        "entries": [
+          {
+            "name": "korean_dataset_candidates.md",
+            "type": "FILE",
+            "byte_length": 6020
+          },
+          {
+            "name": "walksafe_kr_v3_candidate_index_2026-05-19.csv",
+            "type": "FILE",
+            "byte_length": 47179
+          },
+          {
+            "name": "walksafe_kr_v3_candidate_index_summary_2026-05-19.json",
+            "type": "FILE",
+            "byte_length": 1102
+          },
+          {
+            "name": "walksafe_kr_v3_curation_manifest_2026-05-18.csv",
+            "type": "FILE",
+            "byte_length": 27823
+          },
+          {
+            "name": "walksafe_kr_v3_curation_summary_2026-05-18.json",
+            "type": "FILE",
+            "byte_length": 1799
+          },
+          {
+            "name": "walksafe_kr_v3_hard_negative_fp_review_2026-05-18.csv",
+            "type": "FILE",
+            "byte_length": 13312
+          },
+          {
+            "name": "walksafe_kr_v3_policy_2026-05-19.md",
+            "type": "FILE",
+            "byte_length": 1785
+          },
+          {
+            "name": "walksafe_v1_sources.md",
+            "type": "FILE",
+            "byte_length": 1482
+          }
+        ],
+        "sha256": "e894057b67cd593ce088f4302f7b788fc33bf73b9eb27b35e7187e8b54a465c0"
+      }
+    },
+    {
+      "record_id": "MISSING-PATH-003",
+      "checked_at": "2026-07-27T19:08:16+09:00",
+      "expected_path": "docs/model-data/walksafe_13class_dataset_source_contract_20260619.md",
+      "exists": false,
+      "nearest_existing_parent": "docs",
+      "first_missing_component_from_parent": "model-data",
+      "parent_direct_entry_inventory": {
+        "scope": "DIRECT_ENTRIES_ONLY_NO_RECURSION_NO_FILE_CONTENT_READ",
+        "ordering": "UNICODE_CODEPOINT_ASCENDING_BY_NAME",
+        "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+        "entry_count": 15,
+        "entries": [
+          {
+            "name": "README.md",
+            "type": "FILE",
+            "byte_length": 17976
+          },
+          {
+            "name": "android",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "backend",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "control",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "deliverables",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "design",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "evidence",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "execution",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "operations",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "release",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "review",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "status",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "submission",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "testing",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "walksafe-v2",
+            "type": "DIRECTORY"
+          }
+        ],
+        "sha256": "60f656e6d9f7d8289b70d287ab0cbe6b0ad548c5f8656353f3aa6b55061f0d0e"
+      }
+    },
+    {
+      "record_id": "MISSING-PATH-004",
+      "checked_at": "2026-07-27T19:08:16+09:00",
+      "expected_path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml",
+      "exists": false,
+      "nearest_existing_parent": ".",
+      "first_missing_component_from_parent": "datasets",
+      "parent_direct_entry_inventory": {
+        "scope": "DIRECT_ENTRIES_ONLY_NO_RECURSION_NO_FILE_CONTENT_READ",
+        "ordering": "UNICODE_CODEPOINT_ASCENDING_BY_NAME",
+        "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+        "entry_count": 27,
+        "entries": [
+          {
+            "name": ".git",
+            "type": "FILE",
+            "byte_length": 94
+          },
+          {
+            "name": ".github",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".gitignore",
+            "type": "FILE",
+            "byte_length": 2746
+          },
+          {
+            "name": ".playwright-cli",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".pytest_cache",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "AGENTS.md",
+            "type": "FILE",
+            "byte_length": 4225
+          },
+          {
+            "name": "README.md",
+            "type": "FILE",
+            "byte_length": 4944
+          },
+          {
+            "name": "ai_tasks",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "apps",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "artifacts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "backend",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "configs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "contracts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "data_sources",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "daylog",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "deploy",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "docker-compose.yml",
+            "type": "FILE",
+            "byte_length": 731
+          },
+          {
+            "name": "docs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "model",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "outputs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "plans",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "product",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "samples",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "scripts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "templates",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "tests",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "voice",
+            "type": "DIRECTORY"
+          }
+        ],
+        "sha256": "f86dd3734aff8fdfbc973532c0e14f0632c0b54a1653001fce465271fdab6a4f"
+      }
+    },
+    {
+      "record_id": "MISSING-PATH-005",
+      "checked_at": "2026-07-27T19:08:16+09:00",
+      "expected_path": "datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/materialized_manifest.csv",
+      "exists": false,
+      "nearest_existing_parent": ".",
+      "first_missing_component_from_parent": "datasets",
+      "parent_direct_entry_inventory": {
+        "scope": "DIRECT_ENTRIES_ONLY_NO_RECURSION_NO_FILE_CONTENT_READ",
+        "ordering": "UNICODE_CODEPOINT_ASCENDING_BY_NAME",
+        "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+        "entry_count": 27,
+        "entries": [
+          {
+            "name": ".git",
+            "type": "FILE",
+            "byte_length": 94
+          },
+          {
+            "name": ".github",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".gitignore",
+            "type": "FILE",
+            "byte_length": 2746
+          },
+          {
+            "name": ".playwright-cli",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": ".pytest_cache",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "AGENTS.md",
+            "type": "FILE",
+            "byte_length": 4225
+          },
+          {
+            "name": "README.md",
+            "type": "FILE",
+            "byte_length": 4944
+          },
+          {
+            "name": "ai_tasks",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "apps",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "artifacts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "backend",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "configs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "contracts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "data_sources",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "daylog",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "deploy",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "docker-compose.yml",
+            "type": "FILE",
+            "byte_length": 731
+          },
+          {
+            "name": "docs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "model",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "outputs",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "plans",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "product",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "samples",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "scripts",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "templates",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "tests",
+            "type": "DIRECTORY"
+          },
+          {
+            "name": "voice",
+            "type": "DIRECTORY"
+          }
+        ],
+        "sha256": "f86dd3734aff8fdfbc973532c0e14f0632c0b54a1653001fce465271fdab6a4f"
+      }
+    }
+  ],
+  "filesystem_state_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON projection, sorted object keys, compact separators",
+    "scope": "record_id, expected_path, exists, nearest parent, first missing component, parent listing SHA-256; excludes checked_at",
+    "sha256": "f828481a8950ace025b1fb8d54ae9e1f3f2594a7fd8095190426582cf1f968ea"
+  },
+  "downstream_binding_contract": {
+    "exact_output_hash_location": "docs/control/execution/artifact-closure/run-20260727-001/packets/data-model-source-inventory/evidence.json",
+    "consumers": [
+      {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json",
+        "role": "STRUCTURED_MISSING_ASSERTION_CONSUMER"
+      },
+      {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.md",
+        "role": "HUMAN_READABLE_MISSING_ASSERTION_CONSUMER"
+      },
+      {
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/data-model-source-inventory/evidence.json",
+        "role": "EXACT_OUTPUT_AND_INVENTORY_BINDING_PACKET"
+      }
+    ]
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "scope": "ENTIRE_INVENTORY_EXCLUDING_TOP_LEVEL_CONTENT_FINGERPRINT",
+    "sha256": "1d3e37be9b53e276fca12e7768fd272532fe3cacdb1f32a82776c3a1e89eb22d"
+  }
+}

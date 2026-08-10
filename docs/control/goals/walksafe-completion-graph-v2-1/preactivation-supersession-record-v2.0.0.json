@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "record_id": "WS-GOAL-PREACTIVATION-SUPERSESSION-20260724-001",
+  "recorded_at": "2026-07-24T01:33:28+09:00",
+  "superseded_package": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2",
+    "plan_version": "2.0.0",
+    "activation_status": "READY_NOT_ACTIVATED",
+    "manifest_path": "docs/control/goals/walksafe-completion-graph-v2/static-plan-manifest-v2.0.0.json",
+    "manifest_sha256": "ce542aeec040431cdfd473bff54a393a178649b770e0f20e14f3417bfce15847",
+    "initial_transition_event_path": "docs/control/goals/walksafe-completion-graph-v2-1/superseded-v2.0.0-package-prepared-event.json",
+    "initial_transition_event_sha256": "fd028de110ecb233255ecd535757bf97bc180e0d62bfc8d4bd1446acd9e2dc21",
+    "protected_file_count": 18,
+    "managed_path_count": 19,
+    "path_set_sha256": "7854ff69413cde16b6b73a8868be3e7b005e1d052981231e956e1ce9fe571ea2",
+    "content_set_sha256": "bd76332410a740a3f74e11f34c6bfbf0779e60f7f7ee9b7ea2eb066eae620080"
+  },
+  "successor_package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-1",
+  "successor_plan_version": "2.1.0",
+  "reason": "PACKAGE_PREPARED 이후 발견된 산출물 materialization liveness, 저장소 자율 완료 경계, DAG 문구·증거 role·선택 규칙, 실행 gate currentness 결함을 v2.0 불변 파일과 event를 보존한 versioned successor에서 보완한다.",
+  "execution_effect": "NO_PRODUCT_WORK_EXECUTED_BY_V2_0; NO_ACTIVATION_EVENT_RECORDED; V2_0_RETAINED_BYTE_EXACT_FOR_AUDIT_ONLY"
+}

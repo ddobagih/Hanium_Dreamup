@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP016-CAMERA-CENTERED-BUTTONLESS-SCREEN-IMPLEMENTATION-20260726-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-016-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-26T07:48:39+09:00",
+  "implementation_content_set_sha256": "ff9f07c1b811d11bda64a0b52fbc58844c917197f6b0e8d82b0c11847f662fd6",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/build.gradle.kts",
+      "before_sha256": "90b98f8b7d2393d20031ffa25a3b1df9d2ca211a762e2fd5f908eac55faf7309",
+      "after_sha256": "cbc884f8c17f21748c028afee38ffb7e8151ca9404655906d76b7cb9de3de160",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/gradle.lockfile",
+      "before_sha256": "0e290c9324929620ac17315d45b1d728befd8a39fef97cbb1473be149b5d4748",
+      "after_sha256": "9f62f9279f66c03e58ec07193f56fc6b30209906cc3fabc9db52756c037b3aae",
+      "before_source": "GATE_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/gradle/verification-metadata.xml",
+      "before_sha256": "a25f3c7b6a4c83ed30828b4aa62411f72ad9e8f451ff5ad2c370d87b34239bbe",
+      "after_sha256": "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084",
+      "before_source": "GATE_PINNED_HEAD",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "before_sha256": "b4d4c203e597a733b8aaf58ec7278daf40e0ad79b469b85d38c2d6d91a65b89f",
+      "after_sha256": "6fc96495fb2a8e33f67f1c479b5d24fbeb29cb1a61e08207c3b03adff5fbd5e6",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/res/values/strings.xml",
+      "before_sha256": "29faadaea5d56a7017610206af3013b38d0678219bcaea3dd70155ce42f3ccf5",
+      "after_sha256": "0ad4c251442380d72b8adc2519fcffbc0027a562308a7e9c87b3238d2cfa8e64",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "1adfa0cf064c0cec0d0e41a3da88478cc633e88e3e3923c1cc510ba48ad0977f",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+      "before_sha256": "167360607687607a30bd94fbc9a2e3efa6971a7d6b7b68a9f161341141700f83",
+      "after_sha256": "1adf6b795861e18e2344419b7b73190d06946cf543a107cf3028619630bc6141",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "before_sha256": "f59b11159e0a3c4aef3864a6be50bd6c4652dfe9894a206ec7b9da7914292e45",
+      "after_sha256": "00343190f9b2145303e375405bc41f23d19ae79aafef98940ac0b236943e9d87",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+      "before_sha256": "47a2a22c8c25e68a2bf80b9fe88a3ba8700f94c7899c27c80f450e0bcfef7e3b",
+      "after_sha256": "69dda0142eb25a63a00f93ac95dd4ba68eaf560c48dd8e8afde1d5aca0f6efbd",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "before_sha256": "d1a21313f73dd8b18418cf06bf5a985f6c71566978d3f01163a418e9f8202f05",
+      "after_sha256": "16cb64f6028e9996c14550c7b05a804f0e4ffb40e31977de3872b2b57bf84151",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp016_camera_centered_buttonless_screen_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "f40d6e4d97b6e1721661fef4e735e17f81d24e46b40d2e807bd31d8068bae11f",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp016_camera_centered_buttonless_screen_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "e8f58d8bf2da67a3c6d7d44ca85dc7709483e3e5eb4c57ba49e1abcf191dfff9",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "before_sha256": "129368142df38b5ddf9ddde55853db21a030e07a738a885a04509d544a4ea1ed",
+      "after_sha256": "be5c434f35ce5fc9b673f67ef05309280a06a9fcb272dcd2f6aef5db10043ca3",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "release ACTIVE and PAUSED walk surfaces are camera-centered and contain no general control buttons",
+    "Gateway URL, token, coordinates, capture, upload and field-log controls are debug-only",
+    "CameraX fallback binds Preview and ImageAnalysis to the same lifecycle",
+    "system back pauses first, invalidates stale readiness and output authority, then opens an accessible exit confirmation",
+    "canceling exit confirmation remains paused and requires the existing explicit resume contract",
+    "persistent camera or required-voice failure transitions the walk session to SAFE_STOP",
+    "high-frequency state is excluded from accessibility live regions",
+    "a low-frequency polite TalkBack safety summary remains available",
+    "dependency locks and verification metadata bind CameraX view and AndroidX activity dependencies",
+    "focused Android regressions cover release surface, CameraX, accessibility, lifecycle and startup capability",
+    "the trace binds exact product-ten and tooling-three scopes as one canonical exact-thirteen content set"
+  ],
+  "remaining_implementation_boundaries": [
+    "TC-FP-016-01 through TC-FP-016-04 and the 279 formal tests were not run",
+    "actual users, TalkBack users and Android devices were not tested",
+    "Android platform review was not performed",
+    "the operational screen contract was not approved",
+    "production credentials, networks and deployment were not used",
+    "the five release gates were not run or waived"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-016-01",
+      "TC-FP-016-02",
+      "TC-FP-016-03",
+      "TC-FP-016-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "android_platform_review_status": "NOT_RUN",
+    "operational_permission_profile_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

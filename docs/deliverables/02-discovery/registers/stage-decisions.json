@@ -1,0 +1,98 @@
+{
+  "schema_version": "walksafe.stage-decision-register.v1",
+  "metadata": {
+    "title": "WalkSafe 착수·계속·중단 판단",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "DSC-15"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "decisions": [
+    {
+      "decision_owner_role": "프로젝트·제품책임자",
+      "decision_owner_person": "김민호",
+      "recorded_at": "2026-07-22",
+      "supersedes": null,
+      "dissent_or_exception": "NONE_RECORDED",
+      "stage_decision_id": "STG-20260721-001",
+      "stage": "FORMAL_DELIVERABLE_AUTHORING_0_TO_6",
+      "decision": "START_AND_CONTINUE",
+      "basis": "정책 기준선 1.0.0 승인과 135개 결정 정렬",
+      "scope": "0~6 Draft 작성·구조검증·사람 검토 준비",
+      "alternatives": [
+        "작성 보류",
+        "정책을 다시 질문",
+        "현행 구현을 정답으로 복사"
+      ],
+      "reason": "승인 답변을 구현보다 상위 기준으로 삼아 formal 산출물을 만들도록 이미 승인됨",
+      "entry_condition": "정책 승인 receipt·manifest와 결정 정렬 검증 통과",
+      "exit_condition": "0~6 산출물 내용·추적·상태 검사와 사람 검토 준비 완료",
+      "next_review_condition": "각 bundle 내용검사 완료 또는 기준 입력 변경",
+      "does_not_authorize": [
+        "구현 완료 주장",
+        "시험 완료 주장",
+        "gate 면제",
+        "출시"
+      ],
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "decision_owner_role": "프로젝트·제품책임자",
+      "decision_owner_person": "김민호",
+      "recorded_at": "2026-07-22",
+      "supersedes": null,
+      "dissent_or_exception": "NONE_RECORDED",
+      "stage_decision_id": "STG-20260721-002",
+      "stage": "RELEASE",
+      "decision": "DO_NOT_START_RELEASE_REVIEW",
+      "basis": "5개 gate NOT_RUN, formal 승인·시험 증거·외부 선행조건 미완료",
+      "scope": "TST-22 진입 차단",
+      "alternatives": [
+        "gate 면제",
+        "시연을 출시증거로 사용",
+        "근거 없이 Conditional Go"
+      ],
+      "reason": "안전·개인정보·복구·비용 실행증거가 없으므로 출시 적격성을 판단할 수 없음",
+      "entry_condition": "현재 상태 관측",
+      "exit_condition": "5개 gate 5/5와 필요한 formal·시험·외부 증거 완료",
+      "next_review_condition": "마지막 차단 gate와 TST-22 진입조건이 모두 종결됨",
+      "does_not_authorize": [],
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "decision_owner_role": "프로젝트·제품책임자",
+      "decision_owner_person": "김민호",
+      "recorded_at": "2026-07-22",
+      "supersedes": null,
+      "dissent_or_exception": "NONE_RECORDED",
+      "stage_decision_id": "STG-20260722-003",
+      "stage": "CONTROLLED_INTEGRATED_DEMO",
+      "decision": "PREPARE_FOR_2026_07_26",
+      "basis": "사용자가 2026-07-26 한이음 드림업 최종 통합 시연일을 확정",
+      "scope": "통제환경의 대표 위험안내·길안내·신고 흐름과 제한사항 시연",
+      "alternatives": [
+        "정식 공개 배포",
+        "모든 54개 기능 완료로 표시"
+      ],
+      "reason": "확정 마일스톤을 준비하되 시연과 제품 출시·안전검증을 분리해야 함",
+      "entry_condition": "시연 build·기기·데이터·체크리스트·안전 제한 식별",
+      "exit_condition": "시연 실행기록·결과·알려진 제한을 남기거나 미실행 사유 기록",
+      "next_review_condition": "시연 직전과 실행 직후",
+      "does_not_authorize": [
+        "공개 출시",
+        "현장안전 합격",
+        "5개 gate 면제"
+      ],
+      "release_status": "NOT_ELIGIBLE"
+    }
+  ],
+  "append_only_rule": "판단이 바뀌면 기존 행을 덮어쓰지 않고 새 결정 ID·근거·영향·supersedes를 추가한다."
+}

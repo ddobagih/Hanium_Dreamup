@@ -1,0 +1,221 @@
+{
+  "schema_version": "walksafe.phase1-ai-data-workflow-evidence.v1",
+  "packet_id": "WS-PHASE1-AI-DATA-WORKFLOW-EVIDENCE-20260727-001",
+  "prepared_on": "2026-07-27",
+  "materialized_at": "2026-07-27T20:54:34+09:00",
+  "scope": "GAP_043_AUTHORABLE_DOCUMENTATION_AND_REGISTER_CONTROL_ONLY",
+  "traceability": {
+    "gap_ids": [
+      "GAP-043"
+    ],
+    "requirement_ids": [
+      "RQ-FP-034-001"
+    ],
+    "policy_feature_ids": [
+      "FP-034"
+    ],
+    "artifact_type_ids": [
+      "AIML-01",
+      "AIML-02",
+      "AIML-03",
+      "AIML-04"
+    ],
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "policy_manifest_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+    "current_state_snapshot_id": "WS-DATA-MODEL-SOURCE-CURRENT-STATE-20260727-001",
+    "current_state_snapshot_path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json"
+  },
+  "policy_state": {
+    "baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "baseline_status": "BASELINED",
+    "effective_status": "EFFECTIVE_BY_BUNDLED_OWNER_APPROVAL",
+    "fp034_raw_collection_release_gate": "NOT_RUN_NOT_WAIVED",
+    "release_status": "NOT_ELIGIBLE",
+    "historical_pre_activation_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "historical_pre_activation_candidate_id": "WS-FEATURE-POLICY-FP035-CORRECTION-CANDIDATE-20260722-001",
+    "historical_pre_activation_status": "HISTORICAL_PRE_ACTIVATION_ONLY",
+    "current_fp035_overlay_status": "APPROVED_EFFECTIVE_COMMITTED",
+    "implementation_alignment_status": "OPEN_REVALIDATION_REQUIRED",
+    "network_and_phone_queue_status": "OPEN_NOT_RUN",
+    "related_tests_and_gates_status": "OPEN_NOT_RUN_NOT_WAIVED"
+  },
+  "source_bindings": [
+    {
+      "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+      "byte_length": 8054,
+      "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+      "role": "EFFECTIVE_POLICY_BASELINE_MANIFEST"
+    },
+    {
+      "path": "docs/control/decision-interview/walksafe-feature-policy-comprehensive-draft.json",
+      "byte_length": 1437541,
+      "sha256": "5741749fd6f3a361eb5a43f3dbca48e6f5ec1a0f786e3169007327ceca5ce6ac",
+      "role": "BASE_POLICY_FP034_NORMATIVE_SOURCE"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state.json",
+      "byte_length": 20365,
+      "sha256": "ca56b1d373ed09035c4b0968d6461045e50455a484515c82c4ac1dbcd617e766",
+      "role": "AUTHORITATIVE_CURRENT_DATA_MODEL_SOURCE_STATE"
+    }
+  ],
+  "output_bindings": [
+    {
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "byte_length": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+      "role": "AIML_DATA_MANAGEMENT_WORKFLOW_CONTROL"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/data-source-register.json",
+      "byte_length": 16154,
+      "sha256": "097784fad0abac6fcf78e3f1a593056a97cb14ded0b88eb26bcb0254469271d7",
+      "role": "CURRENT_SOURCE_AND_RIGHTS_CONTROL_REGISTER"
+    },
+    {
+      "path": "docs/deliverables/08-ai-ml-data/registers/dataset-register.json",
+      "byte_length": 36912,
+      "sha256": "c43ad6e6e14437d650560e9828838a860244384c5cf8cdf33bcdebae6c03a799",
+      "role": "CURRENT_DATASET_FAIL_CLOSED_CONTROL_REGISTER"
+    }
+  ],
+  "current_fact_assertions": {
+    "declared_source_entry_count": 6,
+    "declared_unique_provider_dataset_pair_count": 5,
+    "rights_verified_unique_pair_count": 0,
+    "privacy_reviewed_unique_pair_count": 0,
+    "directly_captured_source_inclusion": "UNKNOWN",
+    "user_provided_source_inclusion": "UNKNOWN",
+    "materialized_manifest_exists": false,
+    "data_yaml_exists": false,
+    "dataset_materialization_verified": false,
+    "quality_split_or_test_completed": false
+  },
+  "workflow_stage_ids": [
+    "FP034-WF-01",
+    "FP034-WF-02",
+    "FP034-WF-03",
+    "FP034-WF-04",
+    "FP034-WF-05",
+    "FP034-WF-06"
+  ],
+  "owner_due_predicates": [
+    {
+      "predicate_id": "FP034-OWNER-DUE-01",
+      "owner_role": "DATA_OWNER",
+      "due_predicate": "BEFORE_NEXT_SOURCE_ACQUISITION_OR_DATASET_MATERIALIZATION",
+      "completion_predicate": "현재 학습·검증 source 목록의 완전성, 6개 entry와 5개 고유 provider/dataset pair, 직접촬영·사용자제공 포함 여부를 증거 ID로 확정한다.",
+      "status": "OPEN_EVIDENCE_FACT_REQUIRED"
+    },
+    {
+      "predicate_id": "FP034-OWNER-DUE-02",
+      "owner_role": "LEGAL_AND_PRIVACY_REVIEWER",
+      "due_predicate": "BEFORE_ANY_SOURCE_PROMOTION_OR_DATASET_MATERIALIZATION",
+      "completion_predicate": "실제 사용 source마다 취득 근거, 공식 URL·약관 또는 license, 학습·재배포 권한, 개인정보·동의 적용성과 철회 영향을 검토한다.",
+      "status": "OPEN_ZERO_OF_FIVE_UNIQUE_PAIRS_VERIFIED"
+    },
+    {
+      "predicate_id": "FP034-OWNER-DUE-03",
+      "owner_role": "DATA_ENGINEER_AND_QA_OWNER",
+      "due_predicate": "BEFORE_ANY_TRAINING_OR_INDEPENDENT_EVALUATION_COMMAND",
+      "completion_predicate": "불변 materialized manifest와 data.yaml을 만들고 content hash, 품질·라벨 검사, capture-group sequence-safe split과 누수 검사를 실행해 증거를 등록한다.",
+      "status": "OPEN_MANIFEST_AND_DATA_YAML_MISSING"
+    },
+    {
+      "predicate_id": "FP034-OWNER-DUE-04",
+      "owner_role": "PRODUCT_OWNER_AND_INDEPENDENT_REVIEWER",
+      "due_predicate": "BEFORE_TST_22_RELEASE_READINESS_OR_REL_02_APPROVAL",
+      "completion_predicate": "GATE-RAW-COLLECTION-RELEASE-REVIEW를 실행하고 고지·동의·권리행사 절차와 잔여 위험을 승인한다.",
+      "status": "OPEN_GATE_NOT_RUN_NOT_WAIVED"
+    }
+  ],
+  "coverage": [
+    {
+      "id": "GAP-043",
+      "predicate": "FP-034 workflow 단계·허용·금지·fail-closed·owner/due predicate를 current evidence에 결속",
+      "result": "AUTHORABLE_CONTROL_SCOPE_COMPLETED"
+    },
+    {
+      "id": "AIML-01",
+      "predicate": "데이터 생명주기와 수집·검역·승격 경계 작성",
+      "result": "DRAFT_CONTROL_AUTHORED_NOT_APPROVED"
+    },
+    {
+      "id": "AIML-02",
+      "predicate": "current dataset·manifest·수량·split 결손을 재현 주장 없이 기록",
+      "result": "DRAFT_CURRENT_STATE_BOUND_MANIFEST_MISSING"
+    },
+    {
+      "id": "AIML-03",
+      "predicate": "6 source entry·5 unique pair와 권리·privacy 0건, 직접촬영·사용자제공 UNKNOWN 기록",
+      "result": "DRAFT_SOURCE_CONTROL_AUTHORED_FACTS_PENDING"
+    },
+    {
+      "id": "AIML-04",
+      "predicate": "dataset schema와 materialization·split gate의 fail-closed 경계 유지",
+      "result": "DRAFT_SCHEMA_CONTROL_RETAINED_EXECUTION_NOT_RUN"
+    }
+  ],
+  "boundaries": {
+    "source_acquisition_completed": false,
+    "source_list_completeness_verified": false,
+    "license_or_training_permission_verified": false,
+    "consent_or_privacy_verified": false,
+    "dataset_materialization_completed": false,
+    "data_quality_or_label_quality_completed": false,
+    "split_or_leakage_check_completed": false,
+    "independent_test_completed": false,
+    "training_performed": false,
+    "build_performed": false,
+    "test_performed": false,
+    "approval_or_release_claimed": false
+  },
+  "verification": {
+    "allowed_scope": [
+      "JSON_DETERMINISM",
+      "PHYSICAL_FILE_HASHES",
+      "PACKET_CONTENT_FINGERPRINT"
+    ],
+    "json_determinism": "PASS_AT_MATERIALIZATION",
+    "physical_file_hashes": "REFRESHED_FROM_CURRENT_BYTES",
+    "packet_fingerprint": "REFRESHED_NON_SELF_REFERENTIAL",
+    "external_lookup_performed": false,
+    "learning_build_or_test_performed": false,
+    "policy_consistency_scan": "PASS_DISALLOWED_ZERO",
+    "binding_manifest_fingerprint": "REFRESHED"
+  },
+  "result": "GAP_043_AUTHORABLE_DOCUMENTATION_AND_REGISTER_SCOPE_COMPLETE_EXECUTION_EVIDENCE_PENDING",
+  "binding_manifest_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "scope": "SOURCE_BINDINGS_AND_OUTPUT_BINDINGS",
+    "sha256": "cd83a8325268ce4df58e44d1d98d02f20203f0990fd58383f5fcad246b319304"
+  },
+  "policy_consistency_scan": {
+    "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+    "scope": "FULL_DOCUMENT_FP035_POLICY_ACTIVATION_STATE",
+    "disallowed_count": 0,
+    "disallowed_rules": [
+      "UNQUALIFIED_POLICY_1_0_0_CURRENT_STATE",
+      "UNQUALIFIED_FP035_CANDIDATE_CURRENT_STATE",
+      "PRE_ACTIVATION_DIRECTIVE_WORDING",
+      "POLICY_AND_IMPLEMENTATION_OPEN_STATE_CONFLATED",
+      "STALE_FP035_ACTIVATION_STATUS"
+    ],
+    "required_current_overlay_status": "APPROVED_EFFECTIVE_COMMITTED",
+    "preserved_open_boundaries": [
+      "IMPLEMENTATION_ALIGNMENT_REVALIDATION",
+      "NETWORK_BRANCH_INTEGRATION",
+      "GATE_PHONE_QUEUE_BYTE_LIMIT",
+      "RELATED_TESTS",
+      "GATE_RAW_COLLECTION_RELEASE_REVIEW"
+    ],
+    "result": "PASS"
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8 JSON, sorted object keys, compact separators",
+    "scope": "ENTIRE_PACKET_EXCLUDING_TOP_LEVEL_CONTENT_FINGERPRINT",
+    "sha256": "4faee17717dd570188d16e9c62ccb9f1bf18ac3af6c85f39e868ada3a816b4d7"
+  }
+}

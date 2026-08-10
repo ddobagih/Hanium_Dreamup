@@ -1,0 +1,112 @@
+{
+  "schema_version": "walksafe.security-verification-evidence-register.v1",
+  "metadata": {
+    "register_id": "WS-SECURITY-VERIFICATION-EVIDENCE-001",
+    "title": "WalkSafe 보안검증 증거 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_sec_ws_20260721.py"
+  },
+  "planned_artifact_type_ids": [
+    "SEC-10",
+    "SEC-11",
+    "SEC-12",
+    "SEC-13",
+    "SEC-14"
+  ],
+  "raw_evidence_policy": "Git에는 원본 report를 저장하지 않고 통제 저장소 ID·hash·최소 판정만 기록",
+  "items": [
+    {
+      "artifact_type_id": "SEC-10",
+      "title": "SAST 결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_condition": "Android 사용자·관리자 앱과 backend의 이름 붙인 source commit 및 분석 구성이 준비될 때 실행",
+      "input_generation_id": null,
+      "tool_or_examiner": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "민감정보 노출·권한 우회·안전 위해 차단 항목 0, 그 밖의 미해결 high/critical은 SEC-16 승인 없이 0",
+      "blocker": "실행하지 않았으므로 현재 결과는 NOT_RUN"
+    },
+    {
+      "artifact_type_id": "SEC-11",
+      "title": "SCA·의존성 취약점 결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_condition": "실제 lock file·SBOM·Android/backend build가 같은 release candidate에 묶일 때 실행",
+      "input_generation_id": null,
+      "tool_or_examiner": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "출시 차단 취약점 0, 나머지는 기한·소유자 또는 승인 예외 연결",
+      "blocker": "이 Draft에서 SCA를 실행하지 않음"
+    },
+    {
+      "artifact_type_id": "SEC-12",
+      "title": "secret scan 결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_condition": "전체 Git history와 release source 범위가 확정될 때 실행",
+      "input_generation_id": null,
+      "tool_or_examiner": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "검증된 활성 secret 0, 발견 secret은 모두 폐기·회전·영향조사 완료",
+      "blocker": "이 Draft에서 secret scan을 실행하지 않음"
+    },
+    {
+      "artifact_type_id": "SEC-13",
+      "title": "DAST 결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_condition": "원격 접근 가능한 staging API·관리자 접점과 test account가 준비된 경우에만 활성",
+      "input_generation_id": null,
+      "tool_or_examiner": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "민감정보 노출·권한 우회·안전 위해 결함 0, 활성 범위 전체 coverage",
+      "blocker": "조건부 적용 평가와 실행환경이 아직 없음"
+    },
+    {
+      "artifact_type_id": "SEC-14",
+      "title": "침투 테스트 결과",
+      "evidence_instance_id": null,
+      "lifecycle_status": "PLANNED",
+      "execution_status": "NOT_RUN",
+      "activation_condition": "이름 붙인 release candidate와 독립 시험자·범위·허가가 정해진 경우에만 활성",
+      "input_generation_id": null,
+      "tool_or_examiner": null,
+      "executed_at": null,
+      "result": null,
+      "external_original_record_id": null,
+      "sha256": null,
+      "completion_criteria": "독립 시험 범위 완료, 출시 차단 finding 0, 잔여위험은 명시적 수용",
+      "blocker": "독립 시험자·release candidate·외부 원본이 없음"
+    }
+  ],
+  "summary": {
+    "planned": 5,
+    "not_run": 5,
+    "passed": 0,
+    "failed": 0,
+    "waived": 0
+  }
+}

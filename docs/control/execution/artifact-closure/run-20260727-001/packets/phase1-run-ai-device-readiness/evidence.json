@@ -1,0 +1,1052 @@
+{
+  "schema_version": "walksafe.phase1-run-ai-device-readiness-evidence.v1",
+  "packet_id": "WS-PHASE1-RUN-AI-DEVICE-READINESS-20260727-001",
+  "run_id": "run-20260727-001",
+  "captured_at": "2026-07-27T22:54:35+09:00",
+  "policy_state": {
+    "current_effective_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "policy_reopen_claimed": false
+  },
+  "scope": {
+    "W4": [
+      "DLV-AIML-05",
+      "DLV-AIML-09",
+      "DLV-AIML-10",
+      "DLV-AIML-21",
+      "DLV-WS-10"
+    ],
+    "W5": [
+      "DLV-TST-09",
+      "DLV-TST-14"
+    ],
+    "exact7": [
+      "DLV-AIML-05",
+      "DLV-AIML-09",
+      "DLV-AIML-10",
+      "DLV-AIML-21",
+      "DLV-WS-10",
+      "DLV-TST-09",
+      "DLV-TST-14"
+    ],
+    "canonical_documents_modified": false,
+    "actual_execution_scope": "NONE"
+  },
+  "counts": {
+    "W4": 5,
+    "W5": 2,
+    "EXACT7": 7,
+    "BLOCKED_INPUT_PENDING": 7,
+    "PROTOCOL_READY_NOT_RUN": 0,
+    "ACTUAL_RUN": 0,
+    "ACTUAL_PASS": 0
+  },
+  "authoritative_queue_binding": {
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-artifact-action-queue.json",
+    "bytes": 1111436,
+    "sha256": "75a718d23b81e234c7542426301b36a3cf1e9b406fb2348ceee928e18bdb043b",
+    "content_fingerprint_sha256": "cad7814c2dda898bc7a87d15754df8d48fef0c9521335254223e67072eb46d92",
+    "selection": "artifact_type_code in exact7 AND current_state == INTERNAL_RUN_REQUIRED"
+  },
+  "source_bindings": [
+    {
+      "role": "AI_DATA_WORKFLOW_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+      "bytes": 9351,
+      "sha256": "73fe94a384b104c56f3d0b836683205e052ad2661556d3a5c0d49bbd6fcfa912",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "AI_MODEL_RUNTIME_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+      "bytes": 13658,
+      "sha256": "f96033881989c07b90cddbbe3756bbe0c61c6cf4fade4728aad322037d5d0699",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "EXTERNAL_INPUT_READINESS_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+      "bytes": 393682,
+      "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "READY_AI_AUTHORING_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+      "bytes": 31529,
+      "sha256": "3c0dcede032c4d34993fc5b7b43cc55072669c24d4164eafb6cff643c720d807",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "WALKSAFE_SAFETY_AUTHORING_PACKET",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-walksafe-safety-authoring/evidence.json",
+      "bytes": 11577,
+      "sha256": "12112429c5693c76fda83b17285f6e7a4437f1852ff4abcffd0176bf9fbbf0fd",
+      "parse_status": "PASS"
+    },
+    {
+      "role": "TEST_EVIDENCE_CANONICAL_NO_OP",
+      "path": "docs/deliverables/06-testing/test-evidence.md",
+      "bytes": 6636,
+      "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "AI_DATA_CANONICAL_NO_OP",
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "AI_MODEL_EVALUATION_CANONICAL_NO_OP",
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "bytes": 29227,
+      "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    },
+    {
+      "role": "WALKSAFE_ACCEPTANCE_CANONICAL_NO_OP",
+      "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+      "bytes": 53428,
+      "sha256": "5b0efdced1b9a17ecdf73311c78b83c55643521a671289c7fd18c1aa0a9e54cc",
+      "parse_status": "NOT_APPLICABLE_MARKDOWN"
+    }
+  ],
+  "artifact_records": [
+    {
+      "artifact_id": "DLV-AIML-05",
+      "wave": "W4",
+      "title": "고정 dataset 실제 품질검사 raw evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "bytes": 45923,
+        "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+        "anchor": "aiml-05",
+        "full_locator": "docs/deliverables/08-ai-ml-data/data-management.md#aiml-05",
+        "base_path_exists": true
+      },
+      "owner_role": "MODEL_VALIDATION_OWNER_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "approved dataset purpose/class policy",
+        "complete source and rights receipt",
+        "materialized immutable dataset manifest",
+        "approved quality dimensions and sampling method"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "CANONICAL_PROTOCOL",
+            "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+            "bytes": 45923,
+            "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+          },
+          {
+            "kind": "CURRENT_DATA_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+            "bytes": 9351,
+            "sha256": "73fe94a384b104c56f3d0b836683205e052ad2661556d3a5c0d49bbd6fcfa912"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "fact": "dataset_id",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "materialized_manifest_sha256",
+            "status": "UNBOUND_NOT_MATERIALIZED"
+          },
+          {
+            "fact": "source_rights_and_consent",
+            "status": "NOT_VERIFIED"
+          },
+          {
+            "fact": "quality_thresholds_and_sampling",
+            "status": "UNFROZEN"
+          },
+          {
+            "file": "raw_quality_result",
+            "status": "MISSING"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze dataset ID, immutable manifest, file hashes, quality dimensions and sample method.",
+          "Using one named tool version, inspect completeness, corruption, format, duplicates, class/source distribution, privacy and rights flags.",
+          "Preserve raw logs, statistics, exclusion list and remediation decisions.",
+          "Re-run failed checks after remediation and retain both generations append-only."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "dataset_id",
+        "dataset_manifest_sha256",
+        "sample_manifest_and_seed",
+        "quality_dimensions_and_thresholds",
+        "defect_counts_by_category",
+        "excluded_sample_ids_and_reasons",
+        "recheck_result"
+      ],
+      "block_reasons": [
+        "DATASET_SOURCE_RIGHTS_PENDING",
+        "DATASET_NOT_MATERIALIZED",
+        "QUALITY_CONTRACT_UNFROZEN",
+        "EXACT_COMMAND_AND_EVIDENCE_DESTINATION_UNBOUND"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW"
+      ],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md"
+      ],
+      "queue_row_sha256": "62d59773da4695fe893cf0b8a58a37c3417b1817a763ee730e137d83a3d52a4c",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-09",
+      "wave": "W4",
+      "title": "sequence-safe train/validation/test split manifest evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "bytes": 45923,
+        "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+        "anchor": "aiml-09",
+        "full_locator": "docs/deliverables/08-ai-ml-data/data-management.md#aiml-09",
+        "base_path_exists": true
+      },
+      "owner_role": "MODEL_VALIDATION_OWNER_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "AIML-04 class schema",
+        "AIML-06 refinement decisions",
+        "materialized dataset manifest",
+        "immutable sample_id/capture_group/source_id"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "CANONICAL_PROTOCOL",
+            "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+            "bytes": 45923,
+            "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+          },
+          {
+            "kind": "CURRENT_DATA_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+            "bytes": 9351,
+            "sha256": "73fe94a384b104c56f3d0b836683205e052ad2661556d3a5c0d49bbd6fcfa912"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "fact": "dataset_content_manifest",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "split_ratio_seed",
+            "status": "UNFROZEN"
+          },
+          {
+            "file": "train_validation_test_manifests",
+            "status": "MISSING"
+          },
+          {
+            "fact": "test_split_lock",
+            "status": "NOT_ESTABLISHED"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze sample_id, capture_group, source_id, ratios, seed and test-lock rule.",
+          "Assign whole capture groups to one split only.",
+          "Emit train, validation and test manifests with separate SHA-256 values.",
+          "Verify capture-group overlap is zero and preserve class/source distributions."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "dataset_manifest_sha256",
+        "split_seed_and_algorithm",
+        "train_manifest_sha256",
+        "validation_manifest_sha256",
+        "test_manifest_sha256",
+        "capture_group_overlap_count",
+        "class_and_source_distribution",
+        "test_lock_attestation"
+      ],
+      "block_reasons": [
+        "DATASET_NOT_MATERIALIZED",
+        "SPLIT_INPUT_FACTS_UNBOUND",
+        "SPLIT_AND_LEAKAGE_CRITERIA_UNFROZEN",
+        "EXACT_COMMAND_UNBOUND"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md"
+      ],
+      "queue_row_sha256": "130d3e85de426624299ba16f0d5d22b15ced63a64594fe01aad4a2aeb2c89bf5",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-10",
+      "wave": "W4",
+      "title": "exact/perceptual/group leakage 검사 raw evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+        "bytes": 45923,
+        "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe",
+        "anchor": "aiml-10",
+        "full_locator": "docs/deliverables/08-ai-ml-data/data-management.md#aiml-10",
+        "base_path_exists": true
+      },
+      "owner_role": "MODEL_VALIDATION_OWNER_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "AIML-03 source inventory",
+        "AIML-09 frozen split manifests",
+        "content/perceptual/group keys"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "CANONICAL_PROTOCOL",
+            "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+            "bytes": 45923,
+            "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+          },
+          {
+            "kind": "CURRENT_DATA_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+            "bytes": 9351,
+            "sha256": "73fe94a384b104c56f3d0b836683205e052ad2661556d3a5c0d49bbd6fcfa912"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "file": "AIML-09 split manifests",
+            "status": "MISSING"
+          },
+          {
+            "fact": "content_and_group_keys",
+            "status": "UNBOUND"
+          },
+          {
+            "file": "leakage_candidate_pairs_and_dispositions",
+            "status": "MISSING"
+          },
+          {
+            "file": "post-remediation_recheck",
+            "status": "MISSING"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze AIML-09 manifests and content/perceptual/group key definitions.",
+          "Run exact hash, perceptual hash, sequence/path and metadata comparisons across splits.",
+          "Review every candidate pair and record disposition.",
+          "When leakage is confirmed, re-split the complete original group and run the full check again."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "input_split_manifest_sha256",
+        "hash_and_group_key_definition",
+        "candidate_pair_list_and_sha256",
+        "review_dispositions",
+        "confirmed_leakage_count",
+        "resplit_manifest_sha256",
+        "recheck_result"
+      ],
+      "block_reasons": [
+        "AIML-09_OUTPUT_MISSING",
+        "LEAKAGE_KEYS_UNBOUND",
+        "EXACT_COMMAND_UNBOUND",
+        "RAW_RESULT_MISSING"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-data-workflow/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "docs/deliverables/08-ai-ml-data/data-management.md"
+      ],
+      "queue_row_sha256": "3e5d8da8172d90ba271eac96d073c179524197631c6ea78950364103d606a672",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-AIML-21",
+      "wave": "W4",
+      "title": "source PT↔deployed TFLite 동일 corpus 예측 동등성 evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+        "bytes": 29227,
+        "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd",
+        "anchor": "aiml-21",
+        "full_locator": "docs/deliverables/08-ai-ml-data/model-evaluation.md#aiml-21",
+        "base_path_exists": true
+      },
+      "owner_role": "MODEL_VALIDATION_OWNER_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "AIML-16 exact PT/TFLite hashes",
+        "AIML-17 evaluation protocol",
+        "frozen equivalence corpus",
+        "exact preprocessing/postprocessing",
+        "approved numeric tolerance"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "MODEL_RUNTIME_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+            "bytes": 13658,
+            "sha256": "f96033881989c07b90cddbbe3756bbe0c61c6cf4fade4728aad322037d5d0699"
+          },
+          {
+            "kind": "MODEL_EVALUATION_PROTOCOL",
+            "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+            "bytes": 29227,
+            "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd"
+          },
+          {
+            "kind": "RUNTIME_CONFIG",
+            "path": "apps/android/app/src/main/assets/model-config/two_model_runtime.json",
+            "bytes": 5508,
+            "sha256": "756acb36b1af081ae5a3e484e4f07a158600c9707c058005969b98c91d9add73"
+          },
+          {
+            "kind": "UNIFIED_PT",
+            "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+            "bytes": 5411845,
+            "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669"
+          },
+          {
+            "kind": "UNIFIED_TFLITE",
+            "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+            "bytes": 9984493,
+            "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "file": "equivalence_corpus_manifest",
+            "status": "MISSING"
+          },
+          {
+            "fact": "pre_postprocessing_contract",
+            "status": "UNFROZEN"
+          },
+          {
+            "fact": "approved_tolerance",
+            "status": "UNBOUND"
+          },
+          {
+            "file": "raw_parity_results",
+            "status": "MISSING"
+          },
+          {
+            "fact": "pt_tflite_parity",
+            "status": "NOT_RUN"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze source/deployed hashes, corpus, preprocessing, postprocessing, conversion/runtime options and tolerance.",
+          "Run identical samples through PT and TFLite paths.",
+          "Compare class, score, boxes, NMS outputs and aggregate metrics.",
+          "Record every mismatch and verify zero safety-critical decision mismatch under the approved contract."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "source_model_sha256",
+        "deployed_model_sha256",
+        "corpus_manifest_sha256",
+        "pre_postprocessing_version",
+        "conversion_and_runtime_versions",
+        "per_sample_prediction_pairs",
+        "aggregate_deltas",
+        "safety_critical_mismatch_count",
+        "tolerance_result"
+      ],
+      "block_reasons": [
+        "EQUIVALENCE_CORPUS_MISSING",
+        "TOLERANCE_NOT_APPROVED",
+        "PARITY_NOT_RUN",
+        "EXACT_COMMAND_UNBOUND"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+        "docs/deliverables/08-ai-ml-data/model-evaluation.md"
+      ],
+      "queue_row_sha256": "ab8c87694beba675899ac8b9a42d3d41297b641b828b3402f7a1d1e344eb6991",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-TST-09",
+      "wave": "W5",
+      "title": "지원 실기기·실서비스 전체 사용자 시나리오 E2E evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/06-testing/test-evidence.md",
+        "bytes": 6636,
+        "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+        "anchor": "tst-09",
+        "full_locator": "docs/deliverables/06-testing/test-evidence.md#tst-09",
+        "base_path_exists": true
+      },
+      "owner_role": "QA책임자_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "approved requirements/acceptance criteria/risk priority",
+        "named source/build/model/config baseline",
+        "supported Android device inventory",
+        "physical device and actual service configuration",
+        "permission/consent/state preparation"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "TEST_EVIDENCE_PROTOCOL",
+            "path": "docs/deliverables/06-testing/test-evidence.md",
+            "bytes": 6636,
+            "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71"
+          },
+          {
+            "kind": "EXTERNAL_INPUT_READINESS_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+            "bytes": 393682,
+            "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "fact": "supported_device_inventory",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "physical_device_available",
+            "status": "NOT_ESTABLISHED"
+          },
+          {
+            "fact": "device_model_os_serial",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "actual_service_configuration",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "approved_execution_protocol_and_frozen_inputs",
+            "status": "MISSING"
+          },
+          {
+            "file": "raw_e2e_receipt",
+            "status": "MISSING"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze supported device inventory, exact build/model/config hashes, actual service endpoints, permissions/consent/state and scenario pass criteria.",
+          "Execute the named end-to-end scenario on each required physical device/service configuration.",
+          "Preserve device and service logs, screen/media evidence, timestamps and result.",
+          "Review every failure/deviation and obtain independent disposition."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "supported_device_inventory_receipt",
+        "device_make_model_identifier_os_api",
+        "app_build_model_config_sha256",
+        "service_endpoint_and_version",
+        "permission_consent_state",
+        "scenario_step_results",
+        "device_service_logs_and_sha256",
+        "media_evidence_and_sha256",
+        "deviations_and_incidents"
+      ],
+      "block_reasons": [
+        "SUPPORTED_DEVICE_INVENTORY_MISSING",
+        "PHYSICAL_DEVICE_UNAVAILABLE",
+        "ACTUAL_SERVICE_FACTS_UNBOUND",
+        "APPROVED_PROTOCOL_AND_FROZEN_INPUTS_MISSING"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [
+        "DLV-TST-13_SUPPORTED_DEVICE_INVENTORY_FACT"
+      ],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "docs/deliverables/06-testing/test-evidence.md"
+      ],
+      "queue_row_sha256": "dfa9867671945ae9b72ef6dbaf988fef3cf050e0101ed9cd6d4050ec3cbaaaa4",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-TST-14",
+      "wave": "W5",
+      "title": "두 Android 앱 접근성 suite·실기기 보조기기 evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/06-testing/test-evidence.md",
+        "bytes": 6636,
+        "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71",
+        "anchor": "tst-14",
+        "full_locator": "docs/deliverables/06-testing/test-evidence.md#tst-14",
+        "base_path_exists": true
+      },
+      "owner_role": "QA책임자_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "named builds for both Android apps",
+        "supported Android device inventory",
+        "OS/API and TalkBack/screen-reader/keyboard versions/settings",
+        "approved accessibility procedure and pass criteria"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "TEST_EVIDENCE_PROTOCOL",
+            "path": "docs/deliverables/06-testing/test-evidence.md",
+            "bytes": 6636,
+            "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71"
+          },
+          {
+            "kind": "EXTERNAL_INPUT_READINESS_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+            "bytes": 393682,
+            "sha256": "02f34544e7e51dd8029a4c15c89e46f6cca1c3a4f5c52c4d0af978ca32c6f3b4"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "fact": "supported_device_inventory",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "physical_device_available",
+            "status": "NOT_ESTABLISHED"
+          },
+          {
+            "fact": "two_app_build_hashes",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "accessibility_technology_versions_settings",
+            "status": "UNBOUND"
+          },
+          {
+            "fact": "approved_execution_protocol_and_frozen_inputs",
+            "status": "MISSING"
+          },
+          {
+            "file": "raw_accessibility_receipt",
+            "status": "MISSING"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Freeze both app build hashes, supported devices, OS/API, TalkBack/screen-reader/keyboard versions and settings, rule set and pass criteria.",
+          "Run automated accessibility rules for both apps.",
+          "Run keyboard-only and TalkBack/screen-reader flows on required physical devices.",
+          "Preserve raw suite output, device logs/media, violations, remediation status and independent review."
+        ],
+        "non_qualifying_reference_command": null
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "supported_device_inventory_receipt",
+        "device_os_api_and_identifier",
+        "two_app_build_sha256",
+        "talkback_screen_reader_keyboard_versions_settings",
+        "automated_rule_output_and_sha256",
+        "keyboard_flow_results",
+        "talkback_screen_reader_flow_results",
+        "violations_and_remediation",
+        "device_logs_media_sha256"
+      ],
+      "block_reasons": [
+        "SUPPORTED_DEVICE_INVENTORY_MISSING",
+        "PHYSICAL_DEVICE_UNAVAILABLE",
+        "ACCESSIBILITY_ENVIRONMENT_UNBOUND",
+        "APPROVED_PROTOCOL_AND_FROZEN_INPUTS_MISSING"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [
+        "DLV-TST-13_SUPPORTED_DEVICE_INVENTORY_FACT"
+      ],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-external-input-readiness/evidence.json",
+        "docs/deliverables/06-testing/test-evidence.md"
+      ],
+      "queue_row_sha256": "18a9f8ddb9c34efd2abf2297ae09e024b9d74b41bffb01a884a6a820f3ea46de",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    },
+    {
+      "artifact_id": "DLV-WS-10",
+      "wave": "W4",
+      "title": "Android 배포 후보 source↔TFLite acceptance parity evidence",
+      "queue_current_state": "INTERNAL_RUN_REQUIRED",
+      "readiness_state": "BLOCKED_INPUT_PENDING",
+      "protocol_state": "DRAFT_PROTOCOL_PRESENT_EXACT_COMMAND_AND_FROZEN_INPUTS_NOT_BOUND",
+      "primary_locator": {
+        "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+        "bytes": 53428,
+        "sha256": "5b0efdced1b9a17ecdf73311c78b83c55643521a671289c7fd18c1aa0a9e54cc",
+        "anchor": "ws-10",
+        "full_locator": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md#ws-10",
+        "base_path_exists": true
+      },
+      "owner_role": "QA책임자_AND_QA_OWNER",
+      "predecessor_inputs": [
+        "approved candidate model ID and SHA",
+        "approved conversion/runtime/delegate contract",
+        "frozen sample manifest",
+        "approved numeric tolerance and evidence destination"
+      ],
+      "current_assets_and_facts": {
+        "present": [
+          {
+            "kind": "WALKSAFE_AUTHORING_PACKET",
+            "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-walksafe-safety-authoring/evidence.json",
+            "bytes": 11577,
+            "sha256": "12112429c5693c76fda83b17285f6e7a4437f1852ff4abcffd0176bf9fbbf0fd"
+          },
+          {
+            "kind": "ACCEPTANCE_PROTOCOL",
+            "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+            "bytes": 53428,
+            "sha256": "5b0efdced1b9a17ecdf73311c78b83c55643521a671289c7fd18c1aa0a9e54cc"
+          },
+          {
+            "kind": "REFERENCE_ZIP_DECLARED_SHA256",
+            "sha256": "f02358a0e1e784671d8de01aea94048b457a948bedf6b45596c01b24f03dea03",
+            "status": "REFERENCE_ONLY_NOT_PARITY_SUBJECT"
+          },
+          {
+            "kind": "REFERENCE_RUN_FRAME_COUNT",
+            "value": 2461,
+            "status": "REFERENCE_ONLY"
+          }
+        ],
+        "missing_or_unverified": [
+          {
+            "fact": "candidate_model_id",
+            "status": "UNKNOWN_NOT_BOUND"
+          },
+          {
+            "fact": "candidate_model_sha256",
+            "status": "UNKNOWN_NOT_BOUND"
+          },
+          {
+            "fact": "numeric_tolerance",
+            "status": "UNKNOWN_REQUIRES_APPROVED_RUN_CONTRACT"
+          },
+          {
+            "fact": "parity_evidence_destination",
+            "status": "UNKNOWN_NOT_BOUND"
+          },
+          {
+            "file": "raw_acceptance_parity_result",
+            "status": "MISSING"
+          }
+        ]
+      },
+      "execution_interface": {
+        "kind": "PROTOCOL",
+        "exact_shell_command": null,
+        "exact_shell_command_status": "UNBOUND_DO_NOT_INVENT",
+        "protocol_steps": [
+          "Approve source/TFLite IDs and hashes, conversion/quantization/runtime/delegate, sample manifest, disp16 scale, confidence direction, numeric tolerance and evidence destination.",
+          "Run identical samples and preprocessing/postprocessing through both paths.",
+          "Compare distance_m, step_count, risk_bucket and safety decisions.",
+          "Record defects and obtain independent review."
+        ],
+        "non_qualifying_reference_command": {
+          "command": ".venv/bin/python scripts/evaluate_aihub189_depthprediction_offline.py --outer-zip \"/home/ddobagi/Downloads/한이음 드림업 데이터셋/인도보행 영상/뎁스프리딕션/Depth_001~005.zip\" --output-dir reports/runs/aihub189_depthprediction_original_full_20260702 --full-original-zip-run",
+          "status": "OFFLINE_REFERENCE_ONLY_NOT_WS10_PARITY_COMMAND"
+        }
+      },
+      "required_raw_receipt_fields": [
+        "artifact_id",
+        "controlled_subject_locator",
+        "named_command_or_procedure",
+        "frozen_input_locators_and_sha256",
+        "environment_and_runtime",
+        "expected_result_and_pass_criteria",
+        "evidence_destination",
+        "started_at",
+        "ended_at",
+        "raw_stdout_stderr_or_result_locator",
+        "raw_evidence_sha256",
+        "exit_code_or_result",
+        "tool_and_platform_versions",
+        "reviewer_identity",
+        "reviewer_disposition",
+        "independent_review_locator",
+        "candidate_source_and_tflite_sha256",
+        "sample_manifest_sha256",
+        "conversion_runtime_delegate_versions",
+        "disp16_scale_and_confidence_direction",
+        "approved_numeric_tolerance",
+        "per_sample_distance_step_risk_deltas",
+        "safety_decision_mismatch_count",
+        "defect_log",
+        "independent_review"
+      ],
+      "block_reasons": [
+        "CANDIDATE_ID_AND_SHA_UNBOUND",
+        "TOLERANCE_NOT_APPROVED",
+        "EVIDENCE_DESTINATION_UNBOUND",
+        "PARITY_NOT_RUN"
+      ],
+      "state_exit_predicate": "Run an approved named procedure against frozen bound inputs/environment, preserve raw output, timestamps, exit/result, tool/platform versions and hashes, satisfy frozen pass criteria, and complete independent review.",
+      "related_gates": [],
+      "source_refs": [
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-walksafe-safety-authoring/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ai-model-runtime/evidence.json",
+        "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-ready-ai-authoring/evidence.json",
+        "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md"
+      ],
+      "queue_row_sha256": "e8ef2a9a64a9fbfc8e595d3dd68e1712fd74519ac6a204367c91cadc05046447",
+      "actual_run_count": 0,
+      "actual_pass_count": 0,
+      "completion_claimed": false
+    }
+  ],
+  "locator_manifest": [
+    {
+      "artifact_id": "DLV-AIML-05",
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "anchor": "aiml-05",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+    },
+    {
+      "artifact_id": "DLV-AIML-09",
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "anchor": "aiml-09",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+    },
+    {
+      "artifact_id": "DLV-AIML-10",
+      "path": "docs/deliverables/08-ai-ml-data/data-management.md",
+      "anchor": "aiml-10",
+      "bytes": 45923,
+      "sha256": "892369e0844924599a7b76a49a17fa1c2ec0a8fbeb44aed1fffe61b0e82a62fe"
+    },
+    {
+      "artifact_id": "DLV-AIML-21",
+      "path": "docs/deliverables/08-ai-ml-data/model-evaluation.md",
+      "anchor": "aiml-21",
+      "bytes": 29227,
+      "sha256": "6f97ff7c6c454e93bd83473d79f01354c1d6f85e5ba03e3903d771b5e2d6fbcd"
+    },
+    {
+      "artifact_id": "DLV-TST-09",
+      "path": "docs/deliverables/06-testing/test-evidence.md",
+      "anchor": "tst-09",
+      "bytes": 6636,
+      "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71"
+    },
+    {
+      "artifact_id": "DLV-TST-14",
+      "path": "docs/deliverables/06-testing/test-evidence.md",
+      "anchor": "tst-14",
+      "bytes": 6636,
+      "sha256": "adfc4a36134fce8563e8d23ff7aa4d8817f73396bc2c77ab3a6a973725519a71"
+    },
+    {
+      "artifact_id": "DLV-WS-10",
+      "path": "docs/deliverables/11-walksafe/walksafe-acceptance-matrix.md",
+      "anchor": "ws-10",
+      "bytes": 53428,
+      "sha256": "5b0efdced1b9a17ecdf73311c78b83c55643521a671289c7fd18c1aa0a9e54cc"
+    }
+  ],
+  "shared_execution_boundary": {
+    "exact_command_may_be_null_when_source_has_no_command": true,
+    "invented_command_forbidden": true,
+    "protocol_text_is_not_execution": true,
+    "raw_receipt_required_for_state_exit": true,
+    "actual_run_count": 0,
+    "actual_pass_count": 0
+  },
+  "prohibited_claims": {
+    "dataset_rights_source_materialized": false,
+    "split_created_or_locked": false,
+    "leakage_checked": false,
+    "pt_tflite_parity_passed": false,
+    "ws10_candidate_and_tolerance_approved": false,
+    "supported_device_inventory_bound": false,
+    "physical_device_test_run": false,
+    "artifact_passed": false,
+    "release_or_deployment_eligible": false
+  },
+  "manifests": {
+    "exact7_set_sha256": "eb7a5b1eda8989c684d00b2be91860a0cabb8df9a0698d56eb451ac70ad0e7ef",
+    "source_bindings_sha256": "f39e5b9b3e9d0fa19fc5baa2e4cf2b0a21ffaa38a1a182cf4255ee1bf755a077",
+    "artifact_records_sha256": "af63664f225750fa6fd9fcfdd454d27c37ace6d1808dbcfb7bad1196836e05bb",
+    "locator_manifest_sha256": "591c3aa2f61fec6c1f98795a358db0f4098b81fc335512e6318659ae9f4ddf8a"
+  },
+  "content_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonicalization": "UTF-8_JSON_SORT_KEYS_COMPACT_WITH_CONTENT_FINGERPRINT_ENVELOPE_OMITTED",
+    "sha256": "2bae22f58beffa6641e757ce83d9e2a73ad5f7a57a5aad66f9eaf814470e4e0a"
+  }
+}

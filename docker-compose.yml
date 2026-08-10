@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4
+    platform: linux/amd64
+    container_name: walksafe-postgis
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB explicitly}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER explicitly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD explicitly}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - walksafe-postgis-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  walksafe-postgis-data:

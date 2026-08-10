@@ -1,0 +1,123 @@
+{
+  "schema_version": "walksafe.action-register.v1",
+  "metadata": {
+    "title": "WalkSafe Action Item",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-18"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "meeting_record_policy": {
+    "actual_meeting_records_created": 0,
+    "required_fields": [
+      "회의·대화 ID",
+      "일시",
+      "참여자",
+      "논의",
+      "결정 ID",
+      "action ID",
+      "담당자",
+      "기한",
+      "이월 또는 종결 근거"
+    ],
+    "carry_forward_rule": "미완료 action은 삭제하지 않고 다음 검토의 carried_from에 연결"
+  },
+  "actions": [
+    {
+      "action_id": "ACT-001",
+      "action": "0~6 Draft 128개 유형의 정본 경로·장 위치 확인",
+      "owner_role": "문서통제담당",
+      "status": "AUTOMATED_CHECK_IN_PROGRESS",
+      "due_condition": "사람 검토 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-002",
+      "action": "14개 조건부 적용성 판정",
+      "owner_role": "프로젝트책임자",
+      "status": "OPEN",
+      "due_condition": "각 bundle 승인 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-003",
+      "action": "관리·요구·설계·시험계획 검토자 배정",
+      "owner_role": "프로젝트책임자",
+      "status": "OPEN",
+      "due_condition": "In Review 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-004",
+      "action": "현재 구현 후보의 재사용·수정·폐기·legacy 판정",
+      "owner_role": "기술책임자",
+      "status": "OPEN",
+      "due_condition": "build 기준선 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-005",
+      "action": "5개 gate protocol 승인·실행",
+      "owner_role": "관련 전문책임자",
+      "status": "OPEN",
+      "due_condition": "연결된 차단 단계 전",
+      "assigned_person": null,
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-006",
+      "action": "SEC/WS/REL 외부 선행 산출물 개설",
+      "owner_role": "프로젝트책임자",
+      "status": "OPEN",
+      "due_condition": "시험·출시 gate 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-007",
+      "action": "앞으로 기준선마다 입력 산출물 목록의 정확한 파일 사본 보존",
+      "owner_role": "문서통제담당",
+      "status": "OPEN",
+      "due_condition": "다음 정책·산출물 기준선 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    },
+    {
+      "action_id": "ACT-008",
+      "action": "포착된 FP-035 전송망 지시를 요구·설계·시험에 일관되게 반영하고 새 산출물 묶음으로 승인",
+      "owner_role": "제품책임자",
+      "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "due_condition": "RQ-FP-035-001·관련 설계 승인 또는 구현 전",
+      "assigned_person": "김민호",
+      "opened_at": "2026-07-22",
+      "completed_at": null,
+      "carried_from": null
+    }
+  ]
+}

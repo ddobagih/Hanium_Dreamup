@@ -1,0 +1,35 @@
+[Unit]
+Description=WalkSafe Voice API (single replica)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=walksafe-voice
+Group=walksafe-voice
+WorkingDirectory=/srv/walksafe/voice
+Environment=PYTHONPATH=/srv/walksafe/voice
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/voice.env
+RuntimeDirectory=walksafe-voice
+RuntimeDirectoryMode=0700
+CacheDirectory=walksafe/voice
+CacheDirectoryMode=0700
+StateDirectory=walksafe/voice-model-cache
+StateDirectoryMode=0700
+ExecStart=/srv/walksafe/voice/.venv/bin/python -m uvicorn voice.server:app --host 127.0.0.1 --port 9001 --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadOnlyPaths=/var/lib/walksafe/voice-model-cache
+ReadWritePaths=/var/cache/walksafe/voice /run/walksafe-voice
+
+[Install]
+WantedBy=multi-user.target

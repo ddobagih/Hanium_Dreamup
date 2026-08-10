@@ -1,0 +1,80 @@
+{
+  "schema_version": "walksafe.fp048-internal-lane-receipt.v1",
+  "document_id": "WS-FP048-HTTPS_NO_DOWNGRADE-RECEIPT-20260802-001",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "lane_id": "HTTPS_NO_DOWNGRADE",
+  "status": "PASS",
+  "command_execution": {
+    "lane_id": "HTTPS_NO_DOWNGRADE",
+    "name": "Android and Gateway HTTPS/no-downgrade boundary",
+    "status": "PASS",
+    "command": "cd apps/android && ./gradlew :app:testDebugUnitTest --offline --no-daemon --rerun-tasks --tests 'kr.co.hanium.dreamup.walksafe.network.UserNetworkSecurityBoundaryStaticTest' && cd ../android-gateway && npm run typecheck && npm test",
+    "command_sha256": "32d311ae0f2fe03c2fd0e31f71852cdb79acdb3cd5aef6bb5cd21e050de08456",
+    "run_id": "fp048-https-no-downgrade-2d3ca48809758d4b",
+    "exit_code": 0,
+    "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/https-no-downgrade.log",
+    "output_sha256": "b9585755c2a0c6c0b53b7f9b05d75a778946d8241776cead4172a85f24e4def3",
+    "started_at": "2026-08-03T01:35:01.491462+09:00",
+    "executed_at": "2026-08-03T01:35:27.383808+09:00",
+    "execution_event_sequence": 42,
+    "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+    "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+    "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+    "binding_markers_exact_once": true,
+    "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+    "observed_assertions": {
+      "WALKSAFE_ANDROID_HTTPS_STATIC_STATUS": "PASS",
+      "WALKSAFE_GATEWAY_TESTS": "77",
+      "WALKSAFE_GATEWAY_PASS": "77",
+      "WALKSAFE_GATEWAY_FAIL": "0",
+      "WALKSAFE_GATEWAY_TYPECHECK_STATUS": "PASS"
+    }
+  },
+  "start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP048-20260802-005",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/implementation-start-gate-receipt.json",
+    "sha256": "faba570d1e8d24651272b52e6ca0190ac43ff97c57bead00bcd5fd60e06951fd"
+  },
+  "repository_state_binding": {
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/19-REPOSITORY_STATE.log",
+    "sha256": "6516933756c6cca92aa34ad05c63fc1ae912151453304dfaa49007beec3e6f5d",
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d"
+  },
+  "verification_input_manifest": [
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "byte_count": 18873,
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+    }
+  ],
+  "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "receipt_content_sha256": "58b90d377f9479364e256f6243bfe1f0dcb08ca6364a4d6183a29eaf2564f437"
+}

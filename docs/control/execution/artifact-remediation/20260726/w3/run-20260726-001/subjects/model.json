@@ -1,0 +1,108 @@
+{
+  "claim_boundary": {
+    "build_or_test_result_claimed": false,
+    "release_or_approval_claimed": false
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "aba1ac710790f598dee871e1f58831674bac46df7b06d4ee7859fdffeaa3a728"
+    }
+  },
+  "paths": [
+    {
+      "bytes": 10343256,
+      "path": "apps/android/app/src/main/assets/models/coco_yolo26n_float32.tflite",
+      "sha256": "776cafdaf1e0bc585a076d4ee3dd71d62f653e0bc2f8504f287e7b5a76c689e1"
+    },
+    {
+      "bytes": 38460640,
+      "path": "apps/android/app/src/main/assets/models/custom_tactile_yolo26s_float32.tflite",
+      "sha256": "3336a4411eda461a3159cca80c046d52a5dadfd6a91f3831490bb5574a160780"
+    },
+    {
+      "bytes": 9984493,
+      "path": "apps/android/app/src/main/assets/models/walksafe_unified_yolo26n_768_float32.tflite",
+      "sha256": "92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19"
+    },
+    {
+      "bytes": 7627,
+      "path": "model/README.md",
+      "sha256": "f8c30578f42811987e3f6e51c1ef230760d7a41f301412be5154a1faa6d87ce6"
+    },
+    {
+      "bytes": 1327,
+      "path": "model/artifacts/README.md",
+      "sha256": "c5fa9b10c22a7a77ecb24a44a1749af1e920dfdfae192be15bd1ea6b246de9fa"
+    },
+    {
+      "bytes": 5411845,
+      "path": "model/artifacts/candidates/walksafe_13cls_yolo26n_img768_20260708/walksafe_13cls_yolo26n_img768_best_epoch270.pt",
+      "sha256": "a38857e999e1dc1981fffe4c08e5a4bcb1f05be0c7241e9297d6150e913a5669"
+    },
+    {
+      "bytes": 941,
+      "path": "model/deployments/README.md",
+      "sha256": "d9f39feb180a0f6a9acb32f5a5b5f5719b77008eec1ccaed3540062879bc00f6"
+    },
+    {
+      "bytes": 1348,
+      "path": "model/deployments/local-deployment.json",
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    {
+      "bytes": 701,
+      "path": "model/registry/README.md",
+      "sha256": "73dd8619fea273d7d411e3092da068d60b0df41c177c4a00a07dac30a627169c"
+    },
+    {
+      "bytes": 2293,
+      "path": "model/registry/walksafe-model-registry.json",
+      "sha256": "3768cb39c44c13dc03c827288eabdbf9ec9fb244b7750d5252c0685db5a70b3a"
+    },
+    {
+      "bytes": 77,
+      "path": "model/requirements.txt",
+      "sha256": "f1ed492e19e1a98827b2c32756862f980ca84ef19263d6158af9b000d138e310"
+    },
+    {
+      "bytes": 15621,
+      "path": "model/sample_yolo_failures.py",
+      "sha256": "916f5edeebf07247e77da2a5cda3e1407bab70b2fbc938399357f68224824e33"
+    },
+    {
+      "bytes": 6674,
+      "path": "model/test_two_model_runtime.py",
+      "sha256": "0c709a5f6a04f0d0117ce3c9f720f05fe8af8352b7504109b8e3dd3fc02ccc48"
+    },
+    {
+      "bytes": 2511,
+      "path": "model/train_yolo.py",
+      "sha256": "a2a6cc2cb88051de9c20dc40c6d616471effe39e4f89f81b5add9a7788cddbad"
+    },
+    {
+      "bytes": 19487,
+      "path": "model/two_model_runtime.py",
+      "sha256": "3350ab18b138956214b6db664adb9505757e66a898e44aee2cae78b10c8638a4"
+    },
+    {
+      "bytes": 5482,
+      "path": "model/validate_yolo_dataset.py",
+      "sha256": "7af225818426977d08044335794dc5614d3fc976f7d550cbdb48cc5c38140ea7"
+    }
+  ],
+  "roots": [
+    "model",
+    "apps/android/app/src/main/assets/models"
+  ],
+  "schema_version": "walksafe.w3-engineering-evidence.source-subject.v1",
+  "source_commit": null,
+  "source_identity_basis": "FILESYSTEM_TRAVERSAL_NOT_GIT",
+  "subject_id": "model",
+  "summary": {
+    "content_set_sha256": "59ba4343c88257f027c1b1c6c1e034b7725779cb17440206a6c63972ed3b71b4",
+    "path_count": 16,
+    "path_set_sha256": "609d527b160cc5afc71a26e9dab6e0405a6a411db87e360baf12a96837896b62"
+  }
+}

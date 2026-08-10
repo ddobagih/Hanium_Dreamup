@@ -1,0 +1,256 @@
+{
+  "schema_version": "walksafe.w4-source-drift-successor.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W4-SOURCE-DRIFT-SUCCESSOR-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "CURRENT_FRESHNESS_SUCCESSOR_PASS",
+  "authority": {
+    "current_freshness_authority": "W4_SOURCE_DRIFT_SUCCESSOR",
+    "w3_historical_authority": "SEALED_HISTORICAL_ONLY",
+    "w3_sealed_historical_integrity": "NO_IMPACT",
+    "w3_historical_files_mutated": false,
+    "statement": "W3 historical SHA는 당시 sealed generation의 사실로 유지하며, regenerated canonical file의 현재 freshness는 이 W4 successor가 권위 근거다."
+  },
+  "document_family": {
+    "json_path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.json",
+    "markdown_path": "docs/control/execution/artifact-remediation/20260726/w4/source-drift-successor.md",
+    "binding_order": [
+      "source-drift-successor.json",
+      "source-drift-successor.md"
+    ],
+    "json_forward_reference": "PATH_ONLY",
+    "cycle_status": "ACYCLIC"
+  },
+  "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES",
+  "historical_source_binding": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+    "sha256": "9db28f43297b961a0e7290c1f85f706d2ca34b84c95879e71293f32a4266e103",
+    "generation": "evidence-20260726-003",
+    "meaning": "7개 historical path/SHA/byte observation source; file itself is not modified by W4."
+  },
+  "review_context": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+    "role": "W3_INDEPENDENT_REVIEW_CONTEXT",
+    "mutation": "NONE"
+  },
+  "validation_lineage": {
+    "failed_predecessor": {
+      "run_id": "W4-VALIDATION-20260726-001",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-001/execution-summary.json",
+      "sha256": "dc5f8c9d96f1570a402f516a44eb0d83d8f27a26f012d688540ea355ee3d9901",
+      "byte_count": 1174,
+      "result": "FAIL_PRESERVED",
+      "stale_lineage_status": "FAILED_STALE_GENERATED_LINEAGE_PRESERVED",
+      "command_count": 3,
+      "nonzero_exit_count": 3,
+      "authority": "APPEND_ONLY_PREDECESSOR_NOT_CURRENT"
+    },
+    "current_successor": {
+      "run_id": "W4-VALIDATION-20260726-002",
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/validation-run-20260726-002/execution-summary.json",
+      "sha256": "8ce367c99f138d074c978297897b57d37e1fe7fcd3e331c10b3f3afaa8b6b507",
+      "byte_count": 3229,
+      "result": "PASS",
+      "supersedes_failed_run": "W4-VALIDATION-20260726-001",
+      "command_count": 5,
+      "zero_exit_count": 5,
+      "subject_binding_count": 7,
+      "authority": "CURRENT_W4_FRESHNESS_VALIDATION"
+    }
+  },
+  "drift_rows": [
+    {
+      "path": "docs/deliverables/05-implementation/implementation-configuration.md",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "7a4ef90d472af5d5bd308fa894c6acce33d804553c1ba1cdead57c68602aa61e",
+        "byte_count": 6221,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "1a5edbf72e1256a09949cec88c22db053fccc9e3062da593c2024a287c34e595",
+        "byte_count": 6221,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "4d824ec239e73262348b6cca24dfe8b95809d9f3c137820089027c019be1863e",
+        "byte_count": 250897,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "df1ac6dbbbd9f24e2fef08c58b4de8def742830c3ae260d930dd09ec0cf5b6dc",
+        "byte_count": 248944,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+        "byte_count": 62222,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48",
+        "byte_count": 62222,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/quality-evidence-register.json",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "eb37b2293f47009a228f7f405bcceb27b12a6825485581b026ac99a7c27c05bf",
+        "byte_count": 52836,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "cca58df18d82bb0e8c404309867ac1cbc454ba655d04182ecf6631be61304e65",
+        "byte_count": 52836,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/manifests/dev-test-draft-20260721-r001.json",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "1702f3fb7d21446a14087cc4adf4b6eaec05872ef341c6d4b77084f365ea6f76",
+        "byte_count": 15004,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "6969dd85f8cd1270296380bc6a6669fe80f3cd2e832c06613aa1cff29debd1e9",
+        "byte_count": 15004,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/traceability/README.md",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "81a00ab1aa59b9e49a48ad13a751e8eae825ad5a5c55030b9b6298a34fee7aab",
+        "byte_count": 5170,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "f6036c8d2601e338543aa2043976b3e2e5911440358eb51c4c807425135ebf1f",
+        "byte_count": 4453,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    },
+    {
+      "path": "docs/deliverables/traceability/req-des-tst-integration-report-20260721-r001.json",
+      "w3_historical": {
+        "generation": "evidence-20260726-003",
+        "source_snapshot_path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/source-snapshot.json",
+        "sha256": "d74dcd2a5bd7e65c44f2ab9d1baedb20ac63efc413b5f00ccead6459543b1203",
+        "byte_count": 306664,
+        "authority": "SEALED_HISTORICAL_OBSERVATION"
+      },
+      "w4_current": {
+        "generation": "validation-run-20260726-002",
+        "sha256": "477faf31e04bbdc5fc7d4d795e58391e915165acae2e7f5961525cf80b743610",
+        "byte_count": 306664,
+        "declared_and_actual_match": true,
+        "authority": "CURRENT_FRESHNESS_SUCCESSOR"
+      },
+      "sha_changed": true,
+      "change_reason": "DETERMINISTIC_FORMAL_AND_TRACE_REGENERATION_AFTER_W1_W3_SOURCE_CHANGES"
+    }
+  ],
+  "current_file_set": {
+    "count": 7,
+    "unique_path_count": 7,
+    "path_set_sha256": "4dc6eefdddcb8c845eaf5d923449dae737818910cafd7031da0e22c40e63544a",
+    "file_set_sha256": "d4d777f350f80ec2ed28127e9df09dfc99334befa89b29aadf751a2a58b91594",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "sorted list of {path,sha256}, UTF-8 canonical JSON with trailing LF",
+      "value": "0a817f815f4cd2d8ef4750be9ae0d6752cab040ee2b589d53ae4a78a90c20baa"
+    },
+    "all_run002_declared_sha_match_current_bytes": true
+  },
+  "historical_file_set": {
+    "count": 7,
+    "file_set_sha256": "128e5806d6de6bec8c71a09a1eb5e658234419d0827d56ef806983170c2599ef"
+  },
+  "code_source_set_freshness": {
+    "app": "NOT_RECHECKED",
+    "adminapp": "NOT_RECHECKED",
+    "android_gateway": "NOT_RECHECKED",
+    "backend": "NOT_RECHECKED",
+    "unchanged_claim_made": false,
+    "reason": "W4 run002는 7개 generated canonical subject만 결속하며 W3 current-source-binding과 4개 code source set의 exact current 비교를 수행하지 않았다."
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_test_status": "NOT_RUN",
+    "formal_pass_claimed": false,
+    "automated_results_do_not_change_formal_status": true,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "claims_not_made": [
+    "W3_HISTORICAL_EVIDENCE_REWRITTEN",
+    "APP_SOURCE_SET_UNCHANGED",
+    "ADMINAPP_SOURCE_SET_UNCHANGED",
+    "ANDROID_GATEWAY_SOURCE_SET_UNCHANGED",
+    "BACKEND_SOURCE_SET_UNCHANGED",
+    "FORMAL_279_PASS",
+    "RELEASE_ELIGIBLE"
+  ],
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "08b47a53563fbd214290dfc3502f2ce0c926efabfeda1cd87a8cb5426254fbd5"
+  },
+  "integrity": {
+    "drift_row_count": 7,
+    "unique_path_count": 7,
+    "changed_sha_count": 7,
+    "run001_failure_preserved": true,
+    "run002_current_pass_bound": true,
+    "current_file_set_sha256": "d4d777f350f80ec2ed28127e9df09dfc99334befa89b29aadf751a2a58b91594",
+    "current_content_fingerprint": "0a817f815f4cd2d8ef4750be9ae0d6752cab040ee2b589d53ae4a78a90c20baa",
+    "common_fingerprint": "08b47a53563fbd214290dfc3502f2ce0c926efabfeda1cd87a8cb5426254fbd5",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "f74b4a4e7f46d5ee868b1accd9dfcd6879f5b84d9e2f14bcfc812cd97df19039"
+    }
+  }
+}

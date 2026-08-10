@@ -1,0 +1,402 @@
+{
+  "schema_version": "walksafe.w5.security-scan-execution.v1",
+  "run_id": "W5-SECURITY-SCAN-20260727-003",
+  "append_only_predecessors": [
+    {
+      "run_id": "W5-SECURITY-SCAN-20260727-001",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/execution-summary.json",
+      "sha256": "88c16018d88c5d5983d531c62b4908eea9ee1d1cbccd58841767668132f12455",
+      "status": "HISTORICAL_PREDECESSOR"
+    },
+    {
+      "run_id": "W5-SECURITY-SCAN-20260727-002",
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+      "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a",
+      "status": "HISTORICAL_PREDECESSOR"
+    }
+  ],
+  "subject": {
+    "bindings": [
+      {
+        "path": "backend/requirements.txt",
+        "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24",
+        "byte_length": 256
+      },
+      {
+        "path": "backend/requirements.lock",
+        "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700",
+        "byte_length": 148063
+      },
+      {
+        "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa",
+        "byte_length": 141132
+      },
+      {
+        "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+        "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7",
+        "byte_length": 15539
+      },
+      {
+        "path": "tests/test_walksafe_full_rc_tooling.py",
+        "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874",
+        "byte_length": 132303
+      }
+    ],
+    "backend_lock_sbom_sha256": "d84105bf71d7e4c0e76bd4738159745a0d4ddfcb393698ac8c4bfb0896495958",
+    "semgrep_rules_sha256": "fdc7027973176abe71f6b1fc8739ef88a4c411735c380cfce4f731df9644e47a"
+  },
+  "tools": {
+    "cyclonedx_bom": "7.3.0",
+    "osv_scanner": "2.4.0",
+    "semgrep": "1.164.0"
+  },
+  "commands": [
+    {
+      "command_id": "cyclonedx-backend-lock-generate-1",
+      "argv": [
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "cyclonedx-bom==7.3.0",
+        "cyclonedx-py",
+        "requirements",
+        "--spec-version",
+        "1.6",
+        "--output-reproducible",
+        "--output-format",
+        "JSON",
+        "--validate",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock.cdx.json",
+        "backend/requirements.lock"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-1.resource.txt",
+        "--",
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "cyclonedx-bom==7.3.0",
+        "cyclonedx-py",
+        "requirements",
+        "--spec-version",
+        "1.6",
+        "--output-reproducible",
+        "--output-format",
+        "JSON",
+        "--validate",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock.cdx.json",
+        "backend/requirements.lock"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:46:19+09:00",
+      "ended_at": "2026-07-27T04:46:20+09:00",
+      "duration_seconds": 1.457645,
+      "exit_code": 0,
+      "expected_exit_codes": [
+        0
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-1.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-1.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-1.resource.txt",
+        "sha256": "e599c609fa686266805745d1b241c62223b10f23320384b0089adff7c47c567c",
+        "byte_length": 1122
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock.cdx.json",
+        "sha256": "d84105bf71d7e4c0e76bd4738159745a0d4ddfcb393698ac8c4bfb0896495958",
+        "byte_length": 431064
+      }
+    },
+    {
+      "command_id": "cyclonedx-backend-lock-generate-2",
+      "argv": [
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "cyclonedx-bom==7.3.0",
+        "cyclonedx-py",
+        "requirements",
+        "--spec-version",
+        "1.6",
+        "--output-reproducible",
+        "--output-format",
+        "JSON",
+        "--validate",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock-repeat.cdx.json",
+        "backend/requirements.lock"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-2.resource.txt",
+        "--",
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "cyclonedx-bom==7.3.0",
+        "cyclonedx-py",
+        "requirements",
+        "--spec-version",
+        "1.6",
+        "--output-reproducible",
+        "--output-format",
+        "JSON",
+        "--validate",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock-repeat.cdx.json",
+        "backend/requirements.lock"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:46:20+09:00",
+      "ended_at": "2026-07-27T04:46:22+09:00",
+      "duration_seconds": 1.310329,
+      "exit_code": 0,
+      "expected_exit_codes": [
+        0
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-2.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-2.stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/cyclonedx-backend-lock-generate-2.resource.txt",
+        "sha256": "e8c81498cd8e59ca3d5282c0df252a411b5b8c48b0ab1e045d9fdb8adf97b13b",
+        "byte_length": 1124
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock-repeat.cdx.json",
+        "sha256": "d84105bf71d7e4c0e76bd4738159745a0d4ddfcb393698ac8c4bfb0896495958",
+        "byte_length": 431064
+      }
+    },
+    {
+      "command_id": "osv-backend-current-lock",
+      "argv": [
+        "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64",
+        "scan",
+        "source",
+        "--format",
+        "json",
+        "--all-packages",
+        "--verbosity",
+        "info",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock-report.json",
+        "--sbom",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock.cdx.json"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock.resource.txt",
+        "--",
+        "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64",
+        "scan",
+        "source",
+        "--format",
+        "json",
+        "--all-packages",
+        "--verbosity",
+        "info",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock-report.json",
+        "--sbom",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/backend-current-lock.cdx.json"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:46:22+09:00",
+      "ended_at": "2026-07-27T04:46:23+09:00",
+      "duration_seconds": 1.753379,
+      "exit_code": 1,
+      "expected_exit_codes": [
+        0,
+        1
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock.stderr.log",
+        "sha256": "3c0ac8a83ab5334e714fa259eeea2afb70956c8de6f1a17aecc001e5828f1bed",
+        "byte_length": 410
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock.resource.txt",
+        "sha256": "c8b3d719840dcd171c93fb52de104e977d2764b9db2a36b4e4ad6d7c133c9fd7",
+        "byte_length": 1270
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/osv-backend-current-lock-report.json",
+        "sha256": "a594e4d80b0efc5831ca560fc6ceb7a21249ac7e7bac2823476e3c260d72275b",
+        "byte_length": 184105
+      }
+    },
+    {
+      "command_id": "semgrep-sast-hygiene",
+      "argv": [
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-security-audit-rules.yaml",
+        "--metrics=off",
+        "--no-git-ignore",
+        "--jobs",
+        "1",
+        "--max-memory",
+        "2048",
+        "--timeout",
+        "10",
+        "--timeout-threshold",
+        "1",
+        "--exclude",
+        "**/__pycache__/**",
+        "--exclude",
+        "*.pyc",
+        "--json-output",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene-report.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/app",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/alembic",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/adminapp/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android-gateway/src",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/model",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/scripts"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene.resource.txt",
+        "--",
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-security-audit-rules.yaml",
+        "--metrics=off",
+        "--no-git-ignore",
+        "--jobs",
+        "1",
+        "--max-memory",
+        "2048",
+        "--timeout",
+        "10",
+        "--timeout-threshold",
+        "1",
+        "--exclude",
+        "**/__pycache__/**",
+        "--exclude",
+        "*.pyc",
+        "--json-output",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene-report.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/app",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/alembic",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/adminapp/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android-gateway/src",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/model",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/scripts"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:46:23+09:00",
+      "ended_at": "2026-07-27T04:47:04+09:00",
+      "duration_seconds": 40.416272,
+      "exit_code": 0,
+      "expected_exit_codes": [
+        0
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene.stdout.log",
+        "sha256": "8e43e2942f47bc0bfa219303f598c8a74e66e9278e06fc2453ced96172a493e0",
+        "byte_length": 35139
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene.stderr.log",
+        "sha256": "cd88d516360ec36da7d261628ad9ababaee1d87736de4d7f33b26c9e9d19ade2",
+        "byte_length": 2215
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene.resource.txt",
+        "sha256": "945ebe4b082b966338b19ae89e855f1c18ac904a688a9365419b114131cb9f6e",
+        "byte_length": 1863
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/semgrep-sast-hygiene-report.json",
+        "sha256": "a13d2f1b78d08c7739ce950382f6ac1e819b3fb8ae9d0e2255bddd932b02f67c",
+        "byte_length": 108225
+      }
+    }
+  ],
+  "counts": {
+    "backend_sbom": {
+      "components": 85,
+      "dependencies": 85,
+      "spec_version": "1.6",
+      "serial_number_present": false,
+      "byte_identical_repeat": true
+    },
+    "osv_current_lock": {
+      "packages": 85,
+      "affected_packages": 4,
+      "unique_primary_ids": 15
+    },
+    "semgrep_hygiene": {
+      "findings": 34,
+      "errors": 1,
+      "scanned_paths": 366,
+      "skipped_paths": 0
+    }
+  },
+  "execution_result": "PASS_CURRENT_LOCK_SCA_AND_SAST_HYGIENE_WITH_DECLARED_PARTIAL_KOTLIN_LIMITATION",
+  "claim_boundary": {
+    "current_backend_lock_sca": "EXECUTED",
+    "semgrep": "EXECUTED_WITH_PARTIAL_KOTLIN_PARSE_LIMITATION",
+    "secret_current_tree": "REUSE_RUN002_ZERO_FINDINGS_SAME_SELECTED_SOURCE",
+    "secret_history": "NOT_RUN",
+    "formal_279": "NOT_RUN",
+    "release": "NOT_ELIGIBLE"
+  }
+}

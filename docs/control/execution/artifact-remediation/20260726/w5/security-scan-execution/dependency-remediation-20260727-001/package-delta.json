@@ -1,0 +1,193 @@
+{
+  "approved_targets": {
+    "idna": "3.15",
+    "pillow": "12.3.0",
+    "python-dotenv": "1.2.2",
+    "python-multipart": "0.0.31"
+  },
+  "backend": {
+    "idna": {
+      "new": "3.15",
+      "old": "3.14"
+    },
+    "pillow": {
+      "new": "12.3.0",
+      "old": "12.2.0"
+    },
+    "python-dotenv": {
+      "new": "1.2.2",
+      "old": "1.2.1"
+    },
+    "python-multipart": {
+      "new": "0.0.31",
+      "old": "0.0.20"
+    }
+  },
+  "backend_text_block_delta": {
+    "changed_blocks": [
+      "idna",
+      "pillow",
+      "python-dotenv",
+      "python-multipart",
+      "typing-extensions"
+    ],
+    "details": {
+      "idna": {
+        "added_annotations": [
+          "#   -r backend/requirements.txt"
+        ],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "idna==3.15 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 2,
+        "removed_version_lines": [
+          "idna==3.14 \\"
+        ]
+      },
+      "pillow": {
+        "added_annotations": [],
+        "added_hash_count": 87,
+        "added_version_lines": [
+          "pillow==12.3.0 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 91,
+        "removed_version_lines": [
+          "pillow==12.2.0 \\"
+        ]
+      },
+      "python-dotenv": {
+        "added_annotations": [],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "python-dotenv==1.2.2 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 2,
+        "removed_version_lines": [
+          "python-dotenv==1.2.1 \\"
+        ]
+      },
+      "python-multipart": {
+        "added_annotations": [],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "python-multipart==0.0.31 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 2,
+        "removed_version_lines": [
+          "python-multipart==0.0.20 \\"
+        ]
+      },
+      "typing-extensions": {
+        "added_annotations": [
+          "#   anyio",
+          "#   psycopg",
+          "#   starlette"
+        ],
+        "added_hash_count": 0,
+        "added_version_lines": [],
+        "change_class": "annotation-only",
+        "removed_annotations": [],
+        "removed_hash_count": 0,
+        "removed_version_lines": []
+      }
+    },
+    "non_target_payload_changes": [],
+    "old_order_equals_new_order": true
+  },
+  "general_quality_cp312": {
+    "idna": {
+      "new": "3.15",
+      "old": "3.14"
+    },
+    "pillow": {
+      "new": "12.3.0",
+      "old": "12.2.0"
+    },
+    "python-dotenv": {
+      "new": "1.2.2",
+      "old": "1.2.1"
+    },
+    "python-multipart": {
+      "new": "0.0.31",
+      "old": "0.0.20"
+    }
+  },
+  "general_quality_text_block_delta": {
+    "changed_blocks": [
+      "idna",
+      "pillow",
+      "python-dotenv",
+      "python-multipart"
+    ],
+    "details": {
+      "idna": {
+        "added_annotations": [
+          "#   -r backend/requirements.txt"
+        ],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "idna==3.15 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 1,
+        "removed_version_lines": [
+          "idna==3.14 \\"
+        ]
+      },
+      "pillow": {
+        "added_annotations": [],
+        "added_hash_count": 87,
+        "added_version_lines": [
+          "pillow==12.3.0 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 90,
+        "removed_version_lines": [
+          "pillow==12.2.0 \\"
+        ]
+      },
+      "python-dotenv": {
+        "added_annotations": [],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "python-dotenv==1.2.2 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 1,
+        "removed_version_lines": [
+          "python-dotenv==1.2.1 \\"
+        ]
+      },
+      "python-multipart": {
+        "added_annotations": [],
+        "added_hash_count": 2,
+        "added_version_lines": [
+          "python-multipart==0.0.31 \\"
+        ],
+        "change_class": "target-version-hash-annotation",
+        "removed_annotations": [],
+        "removed_hash_count": 1,
+        "removed_version_lines": [
+          "python-multipart==0.0.20 \\"
+        ]
+      }
+    },
+    "non_target_payload_changes": [],
+    "old_order_equals_new_order": true
+  },
+  "policy": "Only the four approved package versions may change; package sets and every other version must remain identical.",
+  "projection_gate": "PASS",
+  "schema_version": 1
+}

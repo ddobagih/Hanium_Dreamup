@@ -1,0 +1,265 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "INTERNAL_REVIEW_SUBJECT",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "1990e550ffaab170dded19d4db9ac35fcff13594efd9c553e563fc76ee35fb39",
+    "VERIFICATION_RESULT": "499b2dd4651b7efa73a2d8904daa4aaea0eca6ac94e6734d4c6660fe0dc3160c",
+    "SUCCESSOR_TRACE": "5a3e4f2202bd5e83356fdc0886fbda9e3689d282f30bab08130208a20eb2231b"
+  },
+  "implementation_scope": {
+    "scope_kind": "EXACT_ORDERED_FP048_IMPLEMENTATION_PATH_SET",
+    "exact_path_count": 106,
+    "paths": [
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinator.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/LocalAead.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAead.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStore.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/README.md",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+      "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "apps/android/app/src/main/AndroidManifest.xml",
+      "apps/android/app/src/debug/AndroidManifest.xml",
+      "apps/android/app/src/main/res/xml/data_extraction_rules.xml",
+      "apps/android/app/src/debug/res/xml/debug_network_security_config.xml",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/LocalAeadTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/UserNetworkSecurityBoundaryStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/TestFieldAead.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/BuildProvenanceStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionCryptoLifecycleTest.kt",
+      "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadInstrumentedTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+      "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "scripts/pull_android_field_sessions_20260710.py",
+      "scripts/summarize_android_field_sessions_20260710.py",
+      "tests/test_android_field_session_summary.py",
+      "tests/test_release_evidence_gate.py",
+      "apps/android-gateway/README.md",
+      "apps/android-gateway/package.json",
+      "apps/android-gateway/server.ts",
+      "apps/android-gateway/src/encrypted-json-store.ts",
+      "apps/android-gateway/src/state-encryption-maintenance.ts",
+      "apps/android-gateway/src/auth.ts",
+      "apps/android-gateway/src/field-long-session.ts",
+      "apps/android-gateway/src/field-walk-ledger.ts",
+      "apps/android-gateway/src/integrated-consent.ts",
+      "apps/android-gateway/src/privacy-rights.ts",
+      "apps/android-gateway/src/config.ts",
+      "apps/android-gateway/src/exclusive-file-lock.ts",
+      "apps/android-gateway/test/state-encryption-fixture.ts",
+      "apps/android-gateway/test/encrypted-json-store.test.ts",
+      "apps/android-gateway/test/state-encryption-maintenance.test.ts",
+      "apps/android-gateway/test/field-long-session.test.ts",
+      "apps/android-gateway/test/field-walk-ledger.test.ts",
+      "apps/android-gateway/test/integrated-consent.test.ts",
+      "apps/android-gateway/test/privacy-rights.test.ts",
+      "apps/android-gateway/test/gateway-contract.test.ts",
+      "apps/android-gateway/test/node-adapter.test.ts",
+      "deploy/config/walksafe-android-gateway.env.example",
+      "deploy/systemd/walksafe-android-gateway.service",
+      "backend/.env.example",
+      "backend/README.md",
+      "backend/alembic/versions/202608020001_report_image_encryption.py",
+      "backend/app/config.py",
+      "backend/app/main.py",
+      "backend/app/models.py",
+      "backend/app/openapi_contract.py",
+      "backend/app/schemas.py",
+      "backend/app/field_test_security.py",
+      "backend/app/api/health.py",
+      "backend/app/api/reports.py",
+      "backend/app/api/uploads.py",
+      "backend/app/services/report_image_crypto.py",
+      "backend/app/services/report_image_keys.py",
+      "backend/app/services/report_original_access.py",
+      "backend/app/services/report_storage.py",
+      "backend/app/services/admin_security.py",
+      "backend/requirements.txt",
+      "backend/requirements.lock",
+      "backend/tests/conftest.py",
+      "backend/tests/test_field_test_security.py",
+      "backend/tests/test_health_readiness.py",
+      "backend/tests/test_openapi_contract.py",
+      "backend/tests/test_report_image_crypto.py",
+      "backend/tests/test_report_image_keyring.py",
+      "backend/tests/test_report_original_access.py",
+      "backend/tests/test_report_policy.py",
+      "backend/tests/test_report_storage_reconciliation.py",
+      "backend/tests/test_reports.py",
+      "backend/tests/test_reports_v2.py",
+      "backend/tests/test_uploads.py",
+      "backend/tests/test_admin_security.py",
+      "contracts/walksafe.openapi.json",
+      "scripts/generate_walksafe_openapi.py",
+      "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+      "deploy/config/walksafe-backend.env.example",
+      "deploy/systemd/walksafe-backend.service",
+      "scripts/check_walksafe_backup_source_20260713.py",
+      "backend/tests/test_backup_source.py",
+      "scripts/check_report_retention_dry_run.py",
+      "backend/tests/test_report_retention.py",
+      "tests/test_report_retention_encrypted_objects.py",
+      "scripts/backup_walksafe_data_20260711.sh",
+      "scripts/prune_walksafe_backups_20260711.py",
+      "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "scripts/walksafe_backup_integrity.py",
+      "tests/test_walksafe_backup_integrity.py",
+      "tests/test_walksafe_backup_prune.py",
+      "scripts/build_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py",
+      "tests/test_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py"
+    ],
+    "content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048"
+  },
+  "verification_receipts": [
+    {
+      "lane_id": "ANDROID_PROTECTED_STORAGE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/android-protected-storage-receipt.json",
+      "sha256": "b3c053cd1f13c8cdbe2d98b236158c41da52166419111b51bee90d33fc06fe47",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/android-protected-storage.log",
+      "log_sha256": "bdb1dba28f3cf72219e4f8590433d4a7cb5ba01f6805828a0887c60103d38280"
+    },
+    {
+      "lane_id": "HTTPS_NO_DOWNGRADE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/https-no-downgrade-receipt.json",
+      "sha256": "3be93f9ce630a60489d0f722ba9784dbeb256cbca127ef3fb37d9aba659b822e",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/https-no-downgrade.log",
+      "log_sha256": "b9585755c2a0c6c0b53b7f9b05d75a778946d8241776cead4172a85f24e4def3"
+    },
+    {
+      "lane_id": "SERVER_ORIGINAL_DB_BACKUP_BOUNDARY",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/server-original-db-backup-boundary-receipt.json",
+      "sha256": "f4d442651baeeaff00251eb97b22a410ed1962608f31ec7ae4e2cad8ce039bad",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/server-original-db-backup-boundary.log",
+      "log_sha256": "a708576421c7d1faa2418bac4eaf90be9cab9eb022bafe4d648dbbcfdbe042f3"
+    },
+    {
+      "lane_id": "KEY_LIFECYCLE_ORIGINAL_ACCESS",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/key-lifecycle-original-access-receipt.json",
+      "sha256": "b0431e16561bd83904b7273613b91c3da1ab056baa8b4404dd9bb593b16436d6",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/key-lifecycle-original-access.log",
+      "log_sha256": "9a0e9847bfdad5b3a613b48b40a978fe4394940d5d668559ff23103f246328c9"
+    },
+    {
+      "lane_id": "INCIDENT_STATE_NOTICE_DECISION",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/evidence/incident-state-notice-decision-receipt.json",
+      "sha256": "c6423d247edf95da2ca14bc7f80182726f02363510954c59ad6b8fec0e8f3ce9",
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/incident-state-notice-decision.log",
+      "log_sha256": "6825802268a54c9934c592bac15465a7acc50fe7c4573726b6685fbb80b6ec3a"
+    }
+  ],
+  "verification_check_count": 5,
+  "verification_input_manifest": [
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "byte_count": 18873,
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+    }
+  ],
+  "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+  "downstream_consumer_contracts": [
+    {
+      "role": "GAP_R023",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260802-r023.json",
+      "expected_schema_version": "walksafe.implementation-gap-analysis.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "BACKLOG_R023",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.json",
+      "expected_schema_version": "walksafe.implementation-remediation-backlog.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "ARTIFACT_CHANGE_LOG",
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "expected_schema_version": "walksafe.artifact-change-log.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "ARTIFACT_REGISTER",
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "expected_schema_version": "walksafe.artifact-register.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "REQUIREMENTS_TRACEABILITY",
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "expected_schema_version": "walksafe.requirements-traceability-draft.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "DESIGN_TRACEABILITY",
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "expected_schema_version": "walksafe.design-traceability-register.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "IMPLEMENTATION_MANIFEST",
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "expected_schema_version": "walksafe.implementation-manifest.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "MODULE_REGISTER",
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "expected_schema_version": "walksafe.dev-module-register.v1",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "EXACT257_R012_LEDGER",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/phase1-exact257-successor-ledger-r012.json",
+      "expected_schema_version": "walksafe.phase1-exact257-successor-ledger.v12",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "EXACT257_R012_EVIDENCE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/evidence.json",
+      "expected_schema_version": "walksafe.phase1-exact257-successor-evidence.v12",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    },
+    {
+      "role": "EXACT257_R012_CHECK_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r012/phase1-exact257-successor-check-receipt-r012.json",
+      "expected_schema_version": "walksafe.phase1-exact257-successor-check-receipt.v12",
+      "binding_stage": "OPTIONAL_LATER_POST_REVIEW_INPUT"
+    }
+  ],
+  "consumer_physical_hashes_bound": false,
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATION-QUICK-GATE-20260724-001",
+  "evidence_type": "PACKAGE_ACTIVATION_QUICK_GATE",
+  "status": "PASS",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001",
+  "static_plan_manifest_sha256": "dfa615686b0223826497fae424c1f3c41538b271102879a9497a33b81f66329c",
+  "authorization_receipt_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATION-AUTHORIZATION-20260724-001",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001/authorization.json",
+    "file_sha256": "dd5502cafea63a9a73be86898b2cf09a67a896e2a2818306caf6fea8b778b385"
+  },
+  "check_command_contract_version": "2026-07-24.3",
+  "check_command_contract_sha256": "1608a4d72bfb775313abab3b2e414f14994b573e7f8c631f8500ecd4af7a639c",
+  "execution_window": {
+    "started_at": "2026-07-24T19:23:30.255763+09:00",
+    "ended_at": "2026-07-24T19:23:31.690985+09:00"
+  },
+  "check_runs": [
+    {
+      "check_id": "CONTINUATION_QUICK",
+      "command": "python3 -B scripts/check_walksafe_project_continuation_v2_3.py",
+      "executed_at": "2026-07-24T19:23:30.484522+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001/01-CONTINUATION_QUICK.log",
+      "output_sha256": "7450d8c47091b7ed43279eb747cf42252be1cb7b561597cf8263af89fd33754c"
+    },
+    {
+      "check_id": "GOAL_GRAPH_QUICK",
+      "command": "python3 -B scripts/check_walksafe_goal_graph_v2_3.py",
+      "executed_at": "2026-07-24T19:23:31.690897+09:00",
+      "exit_code": 0,
+      "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001/02-GOAL_GRAPH_QUICK.log",
+      "output_sha256": "7136b807a142caeff25efcd9995de28352dccd6afd72beda3deb0a1b13cf4813"
+    }
+  ],
+  "repository_snapshot": {
+    "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "managed_path_count": 417,
+    "path_set_sha256": "2b6ec43e8fa900e9f43d24b6ed29c0523084003e1509ba6413c29b70f4b7d815",
+    "content_set_sha256": "4679194b9e3d1cfde837b79ca5b29a99262bc4eb065457c34b4ed4fcb9d0ea76"
+  },
+  "generated_at": "2026-07-24T19:23:31.691102+09:00"
+}

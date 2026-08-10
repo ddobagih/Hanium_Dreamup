@@ -1,0 +1,1546 @@
+{
+  "claim_boundary": {
+    "actual_device_event_count": 0,
+    "attestation_approval_count": 0,
+    "current_scope_closure_delta_count": 2,
+    "formal279_pass_count": 0,
+    "global_artifact_completion_claim_count": 0,
+    "open_artifact_count": 131,
+    "owner_approval_count": 0,
+    "policy_reopened": false,
+    "real_event_count": 0,
+    "release_eligible_count": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "verified_rights_or_external_fact_count": 0
+  },
+  "claim_semantics": {
+    "alias_mapping": [
+      {
+        "canonical_path": "/records/*/claim_boundary/global_artifact_completion_claimed",
+        "legacy_path": "/records/*/claim_boundary/artifact_completion_claimed",
+        "required_equality": true,
+        "semantics": "GLOBAL_UNQUALIFIED_ARTIFACT_COMPLETION"
+      },
+      {
+        "canonical_path": "/records/*/artifact_closure/current_scope_n_a_closure_claimed",
+        "legacy_path": "/records/*/artifact_closure/completion_claimed",
+        "required_equality_when_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "semantics": "CURRENT_SCOPE_N_A_CLOSURE_ONLY"
+      }
+    ],
+    "definitions": {
+      "artifact_closure.completion_claimed": "Legacy current-scope alias. It MUST equal current_scope_n_a_closure_claimed only for status CLOSED_N_A_FOR_CURRENT_SCOPE and MUST NOT be interpreted as global completion.",
+      "artifact_completion_claimed": "Legacy claim_boundary field with global/unqualified semantics; it MUST equal global_artifact_completion_claimed.",
+      "current_scope_n_a_closure_claimed": "True only when the artifact is approved N/A for the currently controlled scope. It is not global artifact completion or release credit.",
+      "global_artifact_completion_claimed": "Unqualified/global artifact completion across applicable scopes. Current value is false for all 257 records."
+    },
+    "schema_id": "walksafe.exact257.claim-semantics.v2"
+  },
+  "exact2_status_alignment": {
+    "canonical_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+    "exact_id_set_equality": true,
+    "r006_ledger_exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "row_field_consistency": {
+      "current_scope_n_a_closure_claimed": true,
+      "global_artifact_completion_claimed": false,
+      "legacy_artifact_closure_completion_claimed_current_scope": true,
+      "legacy_artifact_completion_claimed_global": false
+    },
+    "status": "PASS",
+    "status_equality": true,
+    "transition_application_binding_id": "TRANSITION-APPLICATION",
+    "transition_application_exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ]
+  },
+  "exact_set_fingerprints": {
+    "exact257_order": {
+      "algorithm": "SHA-256",
+      "byte_length": 3347,
+      "item_count": 257,
+      "serialization": "UTF-8 compact JSON array, order preserved, final LF",
+      "sha256": "dfde91a77d6010aa16131ac7bfa02b60e453beecaaa025d3dc7ae9d9d2b108a1"
+    },
+    "exact257_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 2831,
+      "item_count": 257,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "f85c9d17a6b7b401ff086434fed88653bee35cd66f2033b2ac8bdf313d9a17dc"
+    },
+    "in_scope43_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 477,
+      "item_count": 43,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "5540403c86bc240732596365b9af9c327a29565e2381f82cfbe02b533d03759b"
+    },
+    "scope45_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 498,
+      "item_count": 45,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+    },
+    "scope_n_a2_set": {
+      "algorithm": "SHA-256",
+      "byte_length": 21,
+      "item_count": 2,
+      "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+      "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+    }
+  },
+  "explicit_source_mapping": {
+    "DATA_MODEL_SOURCE_CHECK_R002": "R005-SRC-004",
+    "DATA_MODEL_SOURCE_R002": "R005-SRC-006",
+    "DATA_MODEL_SOURCE_REVIEW_R002": "R005-SRC-005",
+    "IMPLEMENTATION_BASELINE_CHECK_R002": "R005-SRC-001",
+    "IMPLEMENTATION_BASELINE_R002": "R005-SRC-003",
+    "IMPLEMENTATION_BASELINE_REVIEW_R002": "R005-SRC-002",
+    "OPENAPI_R002_LOG": "R005-SRC-017",
+    "OPENAPI_R002_RECEIPT": "R005-SRC-018",
+    "R001_SUCCESSOR_LEDGER": "R005-SRC-010",
+    "R004_CHECK": "R005-SRC-008",
+    "R004_PACKAGE": "R005-SRC-007",
+    "R004_REVIEW": "R005-SRC-009",
+    "SCOPE45_APPLICATION": "R005-SRC-011",
+    "SCOPE45_CHECK": "R005-SRC-012",
+    "SCOPE45_REVIEW": "R005-SRC-013",
+    "SCOPE_CAPTURE": "R005-SRC-016",
+    "SCOPE_CAPTURE_CHECK": "R005-SRC-014",
+    "SCOPE_CAPTURE_REVIEW": "R005-SRC-015"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "0a4c57f7ca5db77e6e25a0d56ca8929425f8615eca6d719ed20d517ad39d7526",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 42947,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/nonself_digest_check/canonical_length",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r006/evidence.json"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_length": 42947,
+    "content_sha256": "0a4c57f7ca5db77e6e25a0d56ca8929425f8615eca6d719ed20d517ad39d7526",
+    "projection_path": "/",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r006/evidence.json"
+  },
+  "packet_id": "WS-PHASE1-EXACT257-SUCCESSOR-EVIDENCE-20260728-R006",
+  "predecessor_r004_closure_register": {
+    "all_closed": true,
+    "claim_boundary": "FINDING_CLOSURE_ONLY_NO_ARTIFACT_EXECUTION_APPROVAL_RELEASE_CREDIT",
+    "entries": [
+      {
+        "evidence_binding_ids": [
+          "PRE-R003-EVIDENCE"
+        ],
+        "evidence_pointers": [
+          "/review_exact_coverage_audit",
+          "/r002_corrections/minor_findings/0"
+        ],
+        "finding_id": "R001-MINOR-001",
+        "ledger_credit_delta": 0,
+        "origin": "R001_INDEPENDENT_REVIEW",
+        "origin_detail": "SRC-030 expected exact11 is a strict subset of actual DLV token13; two extra IDs have zero ledger credit.",
+        "status": "CLOSED"
+      },
+      {
+        "evidence_binding_ids": [
+          "PRE-R003-EVIDENCE",
+          "PRE-R003-RECEIPT"
+        ],
+        "evidence_pointers": [
+          "/r003_corrections/ordered_id_array_check",
+          "/checks/R003-CHK-005"
+        ],
+        "finding_id": "R001-MINOR-002",
+        "ledger_credit_delta": 0,
+        "origin": "R001_INDEPENDENT_REVIEW",
+        "origin_detail": "Ledger, predecessor ledger, and phase1 queue ordered 257-ID arrays are explicitly equal.",
+        "status": "CLOSED"
+      },
+      {
+        "evidence_binding_ids": [
+          "PRE-R003-EVIDENCE",
+          "PRE-R003-RECEIPT"
+        ],
+        "evidence_pointers": [
+          "/r003_corrections/ledger_subject_role_alignment",
+          "/checks/R003-CHK-001"
+        ],
+        "finding_id": "R002-MINOR-ROLE-001",
+        "ledger_credit_delta": 0,
+        "origin": "R002_INDEPENDENT_REVIEW",
+        "origin_detail": "Ledger expected and observed subject_role are aligned to the canonical value.",
+        "status": "CLOSED"
+      },
+      {
+        "evidence_binding_ids": [
+          "PRE-R003-EVIDENCE",
+          "PRE-R003-RECEIPT",
+          "CURRENT-R004-EVIDENCE"
+        ],
+        "evidence_pointers": [
+          "/r004_closure_register",
+          "/checks/R004-CHK-009"
+        ],
+        "finding_id": "R003-MINOR-CLOSURE-REGISTER-001",
+        "ledger_credit_delta": 0,
+        "origin": "R003_INDEPENDENT_REVIEW_MESSAGE_CONTROLLED_ID",
+        "origin_detail": "The R003 review message did not provide a different exact finding ID; the parent directive supplied this controlled closure ID. R004 adds the missing current consolidated closure register and receipt checks.",
+        "status": "CLOSED"
+      }
+    ],
+    "entry_count": 4,
+    "ledger_credit_delta": 0,
+    "register_id": "WS-PHASE1-EXACT257-SUCCESSOR-R004-CLOSURE-REGISTER-001",
+    "status": "COMPLETE"
+  },
+  "predecessor_r005_preservation": {
+    "order_counts_routes_sources_integrity_credits_preserved": true,
+    "physical_bindings": [
+      {
+        "binding_id": "PRE-R005-LEDGER",
+        "byte_length": 2529885,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json",
+        "sha256": "748790e4dbee3bd2a0718546e83f3815941f6e028ccfea22cb97950ac486a001",
+        "subject_role": "R005_LEDGER_PREDECESSOR"
+      },
+      {
+        "binding_id": "PRE-R005-EVIDENCE",
+        "byte_length": 24193,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r005/evidence.json",
+        "sha256": "5d44db7359ae9be39f057091e82e9a6771b89e1f75254eec332190cd85ea4cc6",
+        "subject_role": "R005_EVIDENCE_PREDECESSOR"
+      },
+      {
+        "binding_id": "PRE-R005-RECEIPT",
+        "byte_length": 19757,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json",
+        "sha256": "afa82a68b378b3b99566d8d16ffd2499382aaa3d99213179051ea875fe09f85e",
+        "subject_role": "R005_CHECK_RECEIPT_PREDECESSOR"
+      },
+      {
+        "binding_id": "TRANSITION-APPLICATION",
+        "byte_length": 169355,
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+        "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+        "subject_role": "SCOPE45_TRANSITION_APPLICATION_CANONICAL"
+      }
+    ],
+    "r005_checks": [
+      {
+        "check_id": "R005-CHK-001",
+        "expected": {
+          "binding_count": 18,
+          "mapping_count": 18
+        },
+        "name": "INPUT_SOURCE_PHYSICAL_BINDINGS_AND_EXPLICIT_MAPPING",
+        "observed": {
+          "binding_count": 18,
+          "mapping_count": 18
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-002",
+        "expected": {
+          "order_fingerprint": {
+            "algorithm": "SHA-256",
+            "byte_length": 3347,
+            "item_count": 257,
+            "serialization": "UTF-8 compact JSON array, order preserved, final LF",
+            "sha256": "dfde91a77d6010aa16131ac7bfa02b60e453beecaaa025d3dc7ae9d9d2b108a1"
+          },
+          "record_count": 257,
+          "unique_count": 257
+        },
+        "name": "EXACT257_RECORD_COUNT_UNIQUE_ORDER_PRESERVED",
+        "observed": {
+          "order_fingerprint": {
+            "algorithm": "SHA-256",
+            "byte_length": 3347,
+            "item_count": 257,
+            "serialization": "UTF-8 compact JSON array, order preserved, final LF",
+            "sha256": "dfde91a77d6010aa16131ac7bfa02b60e453beecaaa025d3dc7ae9d9d2b108a1"
+          },
+          "record_count": 257,
+          "unique_count": 257
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-003",
+        "expected": true,
+        "name": "PREDECESSOR_CANONICAL_SOURCE_SNAPSHOT_ACCEPTANCE_CONTRACTS_PRESERVED",
+        "observed": true,
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-004",
+        "expected": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "name": "CANONICAL_STATUS_COUNTS_UNCHANGED",
+        "observed": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-005",
+        "expected": {
+          "count": 45,
+          "fingerprint": {
+            "algorithm": "SHA-256",
+            "byte_length": 498,
+            "item_count": 45,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+          }
+        },
+        "name": "SCOPE45_CAPTURED_AND_EXACT_SET_EQUAL",
+        "observed": {
+          "count": 45,
+          "fingerprint": {
+            "algorithm": "SHA-256",
+            "byte_length": 498,
+            "item_count": 45,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+          }
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-006",
+        "expected": {
+          "IN_SCOPE": 43,
+          "OUT_OF_SCOPE_N_A": 2
+        },
+        "name": "SCOPE_DECISION_COUNTS",
+        "observed": {
+          "IN_SCOPE": 43,
+          "OUT_OF_SCOPE_N_A": 2
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-007",
+        "expected": {
+          "INTERNAL_READY": 25,
+          "INTERNAL_RUN_REQUIRED": 8,
+          "REAL_EVENT_PENDING": 10,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "name": "SCOPE45_TARGET_ROUTE_COUNTS",
+        "observed": {
+          "INTERNAL_READY": 25,
+          "INTERNAL_RUN_REQUIRED": 8,
+          "REAL_EVENT_PENDING": 10,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-008",
+        "expected": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "name": "CURRENT_QUEUE_ROUTE_COUNTS",
+        "observed": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 62,
+          "INTERNAL_RUN_REQUIRED": 24,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 21,
+          "SCOPE_DECISION_PENDING": 0,
+          "SCOPE_N_A_APPROVED": 2
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-009",
+        "expected": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "name": "SCOPE_N_A_APPROVED_EXACT2",
+        "observed": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-010",
+        "expected": {
+          "closure_delta": 2,
+          "open": 131
+        },
+        "name": "CURRENT_SCOPE_CLOSURE_DELTA2_OPEN131",
+        "observed": {
+          "closure_delta": 2,
+          "open": 131
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-011",
+        "expected": 0,
+        "name": "IN_SCOPE43_SUBSTANTIVE_CREDIT_ZERO",
+        "observed": 0,
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-012",
+        "expected": [
+          {
+            "binding_ids": [
+              "R005-SRC-003",
+              "R005-SRC-001",
+              "R005-SRC-002"
+            ],
+            "device_event_credit": false,
+            "evidence_kind": "IMPLEMENTATION_BASELINE_PHASE1_R002",
+            "formal279_credit": false,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE"
+          },
+          {
+            "binding_ids": [
+              "R005-SRC-006",
+              "R005-SRC-004",
+              "R005-SRC-005"
+            ],
+            "evidence_kind": "DATA_MODEL_SOURCE_CURRENT_STATE_R002",
+            "formal279_credit": false,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE",
+            "verified_rights_or_external_fact_credit": 0
+          },
+          {
+            "artifact_closure_credit": 0,
+            "binding_ids": [
+              "R005-SRC-018",
+              "R005-SRC-017"
+            ],
+            "evidence_kind": "OPENAPI_R002",
+            "formal279_credit": false,
+            "per_id_crosswalk_credit": 0,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE"
+          }
+        ],
+        "name": "PROGRESS_EVIDENCE_BOUND_WITHOUT_FORMAL_RELEASE_CREDIT",
+        "observed": [
+          {
+            "binding_ids": [
+              "R005-SRC-003",
+              "R005-SRC-001",
+              "R005-SRC-002"
+            ],
+            "device_event_credit": false,
+            "evidence_kind": "IMPLEMENTATION_BASELINE_PHASE1_R002",
+            "formal279_credit": false,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE"
+          },
+          {
+            "binding_ids": [
+              "R005-SRC-006",
+              "R005-SRC-004",
+              "R005-SRC-005"
+            ],
+            "evidence_kind": "DATA_MODEL_SOURCE_CURRENT_STATE_R002",
+            "formal279_credit": false,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE",
+            "verified_rights_or_external_fact_credit": 0
+          },
+          {
+            "artifact_closure_credit": 0,
+            "binding_ids": [
+              "R005-SRC-018",
+              "R005-SRC-017"
+            ],
+            "evidence_kind": "OPENAPI_R002",
+            "formal279_credit": false,
+            "per_id_crosswalk_credit": 0,
+            "release_credit": false,
+            "status": "BOUND_AS_PROGRESS_EVIDENCE"
+          }
+        ],
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-013",
+        "expected": {
+          "actual_device_event_count": 0,
+          "attestation_approval_count": 0,
+          "formal279_pass_count": 0,
+          "in_scope_substantive_credit_count": 0,
+          "owner_approval_count": 0,
+          "real_event_count": 0,
+          "release_eligible_count": 0,
+          "verified_rights_or_external_fact_count": 0
+        },
+        "name": "ZERO_CREDITS_AND_RELEASE_NOT_ELIGIBLE",
+        "observed": {
+          "actual_device_event_count": 0,
+          "attestation_approval_count": 0,
+          "formal279_pass_count": 0,
+          "in_scope_substantive_credit_count": 0,
+          "owner_approval_count": 0,
+          "real_event_count": 0,
+          "release_eligible_count": 0,
+          "verified_rights_or_external_fact_count": 0
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-014",
+        "expected": false,
+        "name": "NO_POLICY_REOPEN",
+        "observed": false,
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-015",
+        "expected": {
+          "exact257_order": {
+            "algorithm": "SHA-256",
+            "byte_length": 3347,
+            "item_count": 257,
+            "serialization": "UTF-8 compact JSON array, order preserved, final LF",
+            "sha256": "dfde91a77d6010aa16131ac7bfa02b60e453beecaaa025d3dc7ae9d9d2b108a1"
+          },
+          "exact257_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 2831,
+            "item_count": 257,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "f85c9d17a6b7b401ff086434fed88653bee35cd66f2033b2ac8bdf313d9a17dc"
+          },
+          "in_scope43_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 477,
+            "item_count": 43,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "5540403c86bc240732596365b9af9c327a29565e2381f82cfbe02b533d03759b"
+          },
+          "scope45_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 498,
+            "item_count": 45,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+          },
+          "scope_n_a2_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 21,
+            "item_count": 2,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+          }
+        },
+        "name": "EXACT_SET_FINGERPRINTS",
+        "observed": {
+          "exact257_order": {
+            "algorithm": "SHA-256",
+            "byte_length": 3347,
+            "item_count": 257,
+            "serialization": "UTF-8 compact JSON array, order preserved, final LF",
+            "sha256": "dfde91a77d6010aa16131ac7bfa02b60e453beecaaa025d3dc7ae9d9d2b108a1"
+          },
+          "exact257_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 2831,
+            "item_count": 257,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "f85c9d17a6b7b401ff086434fed88653bee35cd66f2033b2ac8bdf313d9a17dc"
+          },
+          "in_scope43_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 477,
+            "item_count": 43,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "5540403c86bc240732596365b9af9c327a29565e2381f82cfbe02b533d03759b"
+          },
+          "scope45_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 498,
+            "item_count": 45,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "9aac23a34d5037a00f528e2054726de4b0e2cc4069b7c4a6a15a6a60f9dcdfed"
+          },
+          "scope_n_a2_set": {
+            "algorithm": "SHA-256",
+            "byte_length": 21,
+            "item_count": 2,
+            "serialization": "UTF-8 lexicographically sorted IDs, one per line, final LF",
+            "sha256": "b7e4e34cd9887094d87407d43d9935788097e77ca8d6d6b4ec88ae69ce289c2b"
+          }
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-016",
+        "expected": {
+          "algorithm": "SHA-256",
+          "canonical_byte_length": 4750,
+          "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+          "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+          "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+          "tuple_count": 18,
+          "tuple_fields": [
+            "path",
+            "byte_length",
+            "sha256",
+            "subject_role"
+          ]
+        },
+        "name": "SOURCE_PHYSICAL_TUPLE_FINGERPRINT",
+        "observed": {
+          "algorithm": "SHA-256",
+          "canonical_byte_length": 4750,
+          "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+          "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+          "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+          "tuple_count": 18,
+          "tuple_fields": [
+            "path",
+            "byte_length",
+            "sha256",
+            "subject_role"
+          ]
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-017",
+        "expected": {
+          "algorithm": "SHA-256",
+          "content_sha256": "f0bef83ffa18302519e12a11e62ca3446a770b7b74bbbbf089a47d322e49b20e",
+          "encoding": "UTF-8",
+          "ensure_ascii": false,
+          "excluded_field": "/integrity/content_sha256",
+          "final_lf": true,
+          "json_separators": [
+            ",",
+            ":"
+          ],
+          "line_ending": "LF",
+          "projection_byte_length": 1756487,
+          "projection_null_paths": [
+            "/integrity/content_sha256",
+            "/integrity/projection_byte_length"
+          ],
+          "projection_path": "/",
+          "recursive_key_order": "LEXICOGRAPHIC",
+          "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json"
+        },
+        "name": "R005_LEDGER_NONSELF_INTEGRITY",
+        "observed": {
+          "algorithm": "SHA-256",
+          "content_sha256": "f0bef83ffa18302519e12a11e62ca3446a770b7b74bbbbf089a47d322e49b20e",
+          "encoding": "UTF-8",
+          "ensure_ascii": false,
+          "excluded_field": "/integrity/content_sha256",
+          "final_lf": true,
+          "json_separators": [
+            ",",
+            ":"
+          ],
+          "line_ending": "LF",
+          "projection_byte_length": 1756487,
+          "projection_null_paths": [
+            "/integrity/content_sha256",
+            "/integrity/projection_byte_length"
+          ],
+          "projection_path": "/",
+          "recursive_key_order": "LEXICOGRAPHIC",
+          "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json"
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-018",
+        "expected": {
+          "canonical_length": 18726,
+          "sha256": "dc298250ee598e4c838257a23e2c2ab25f08b2dc3977ebfdeb530c818e4fdc95"
+        },
+        "name": "R005_EVIDENCE_NONSELF_INTEGRITY",
+        "observed": {
+          "canonical_length": 18726,
+          "sha256": "dc298250ee598e4c838257a23e2c2ab25f08b2dc3977ebfdeb530c818e4fdc95"
+        },
+        "status": "PASS"
+      },
+      {
+        "check_id": "R005-CHK-019",
+        "detail_path": "/receipt_self_integrity_check",
+        "name": "R005_RECEIPT_NONSELF_INTEGRITY",
+        "status": "PASS"
+      }
+    ],
+    "r005_evidence_integrity": {
+      "algorithm": "SHA-256",
+      "content_sha256": "dc298250ee598e4c838257a23e2c2ab25f08b2dc3977ebfdeb530c818e4fdc95",
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "excluded_field": "/integrity/content_sha256",
+      "final_lf": true,
+      "json_separators": [
+        ",",
+        ":"
+      ],
+      "line_ending": "LF",
+      "projection_byte_length": 18726,
+      "projection_null_paths": [
+        "/integrity/content_sha256",
+        "/integrity/projection_byte_length",
+        "/nonself_digest_check/canonical_length",
+        "/nonself_digest_check/content_sha256"
+      ],
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r005/evidence.json"
+    },
+    "r005_ledger_integrity": {
+      "algorithm": "SHA-256",
+      "content_sha256": "f0bef83ffa18302519e12a11e62ca3446a770b7b74bbbbf089a47d322e49b20e",
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "excluded_field": "/integrity/content_sha256",
+      "final_lf": true,
+      "json_separators": [
+        ",",
+        ":"
+      ],
+      "line_ending": "LF",
+      "projection_byte_length": 1756487,
+      "projection_null_paths": [
+        "/integrity/content_sha256",
+        "/integrity/projection_byte_length"
+      ],
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r005.json"
+    },
+    "r005_receipt_integrity": {
+      "algorithm": "SHA-256",
+      "content_sha256": "3272f36266928baf7be23a3f539e933c8b1194f4a7e3c56440010576e7c911b4",
+      "encoding": "UTF-8",
+      "ensure_ascii": false,
+      "excluded_field": "/integrity/content_sha256",
+      "final_lf": true,
+      "json_separators": [
+        ",",
+        ":"
+      ],
+      "line_ending": "LF",
+      "projection_byte_length": 14315,
+      "projection_null_paths": [
+        "/integrity/content_sha256",
+        "/integrity/projection_byte_length",
+        "/receipt_self_integrity_check/canonical_length",
+        "/receipt_self_integrity_check/content_sha256"
+      ],
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json"
+    },
+    "r005_receipt_self_integrity_check": {
+      "algorithm": "SHA-256",
+      "canonical_length": 14315,
+      "content_sha256": "3272f36266928baf7be23a3f539e933c8b1194f4a7e3c56440010576e7c911b4",
+      "encoding": "UTF-8",
+      "line_ending": "LF",
+      "projection_path": "/",
+      "recursive_key_order": "LEXICOGRAPHIC",
+      "status": "PASS",
+      "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r005.json"
+    },
+    "r005_source_bindings": [
+      {
+        "binding_id": "R005-SRC-001",
+        "byte_length": 4511,
+        "logical_name": "IMPLEMENTATION_BASELINE_CHECK_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-check-receipt-r002.json",
+        "sha256": "ba9868c717abee22df2e699c81886a66797521bda7c9dd89df16373ac1431721",
+        "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_CHECK"
+      },
+      {
+        "binding_id": "R005-SRC-002",
+        "byte_length": 4976,
+        "logical_name": "IMPLEMENTATION_BASELINE_REVIEW_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-independent-review-r002.md",
+        "sha256": "b7d15ea8959b9fd8cf81ae81136bf5ab0f24d217ac195ce7111ee315c2dc9c60",
+        "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_REVIEW"
+      },
+      {
+        "binding_id": "R005-SRC-003",
+        "byte_length": 25164,
+        "logical_name": "IMPLEMENTATION_BASELINE_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-r002.json",
+        "sha256": "a59e5796fd5653488b82ea91d69e9894aedd0c91c02dcac83bb0deb115ce3041",
+        "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_EVIDENCE"
+      },
+      {
+        "binding_id": "R005-SRC-004",
+        "byte_length": 3091,
+        "logical_name": "DATA_MODEL_SOURCE_CHECK_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-check-receipt-r002.json",
+        "sha256": "535826176c47a5914a4863b2de1abbfeac19e9ab7365d92dbceaed8dbaec54dd",
+        "subject_role": "DATA_MODEL_SOURCE_PROGRESS_CHECK"
+      },
+      {
+        "binding_id": "R005-SRC-005",
+        "byte_length": 4443,
+        "logical_name": "DATA_MODEL_SOURCE_REVIEW_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-independent-review-r002.md",
+        "sha256": "eb40cf1a443a769c95d3d7f13c92a9ddd6b8ad445e27fd372205e575427b1f7b",
+        "subject_role": "DATA_MODEL_SOURCE_PROGRESS_REVIEW"
+      },
+      {
+        "binding_id": "R005-SRC-006",
+        "byte_length": 6982,
+        "logical_name": "DATA_MODEL_SOURCE_R002",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-r002.json",
+        "sha256": "2bbaefb26e73414cb61e69f4871775e879cc2b6c4a405776033cfbd3c56d4c86",
+        "subject_role": "DATA_MODEL_SOURCE_PROGRESS_EVIDENCE"
+      },
+      {
+        "binding_id": "R005-SRC-007",
+        "byte_length": 110612,
+        "logical_name": "R004_PACKAGE",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+        "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1",
+        "subject_role": "R004_PACKAGE_PREDECESSOR"
+      },
+      {
+        "binding_id": "R005-SRC-008",
+        "byte_length": 11706,
+        "logical_name": "R004_CHECK",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json",
+        "sha256": "feb497f54b0a52c16e259fa5c4d3ee23c8094df048bfc686e9e42a25e8ef7aa6",
+        "subject_role": "R004_CHECK_PREDECESSOR"
+      },
+      {
+        "binding_id": "R005-SRC-009",
+        "byte_length": 4309,
+        "logical_name": "R004_REVIEW",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-independent-review-r004.md",
+        "sha256": "9a20b05c98fdd1ca885fa8374cbf81626ce718a078de29c22d9b41aee6374c4d",
+        "subject_role": "R004_INDEPENDENT_REVIEW"
+      },
+      {
+        "binding_id": "R005-SRC-010",
+        "byte_length": 2498803,
+        "logical_name": "R001_SUCCESSOR_LEDGER",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+        "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+        "subject_role": "CANONICAL_SUCCESSOR_LEDGER_PREDECESSOR"
+      },
+      {
+        "binding_id": "R005-SRC-011",
+        "byte_length": 169355,
+        "logical_name": "SCOPE45_APPLICATION",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+        "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+        "subject_role": "SCOPE45_TRANSITION_APPLICATION"
+      },
+      {
+        "binding_id": "R005-SRC-012",
+        "byte_length": 13573,
+        "logical_name": "SCOPE45_CHECK",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json",
+        "sha256": "7015c81effdaab52dc83168484a36bd7a4fbdee6f8a405ab819d691bfa7810ad",
+        "subject_role": "SCOPE45_TRANSITION_CHECK"
+      },
+      {
+        "binding_id": "R005-SRC-013",
+        "byte_length": 8326,
+        "logical_name": "SCOPE45_REVIEW",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-independent-review-r001.md",
+        "sha256": "e9848904f73dd058d17b27ea96d43b474806b8d1cc4137d0106b59a9ce94dd8b",
+        "subject_role": "SCOPE45_TRANSITION_INDEPENDENT_REVIEW"
+      },
+      {
+        "binding_id": "R005-SRC-014",
+        "byte_length": 15672,
+        "logical_name": "SCOPE_CAPTURE_CHECK",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json",
+        "sha256": "46107c77d4edee70c8181f815b97281c50a0b0752b10c07d28241d3686b3d629",
+        "subject_role": "SCOPE_DECISION_CAPTURE_CHECK"
+      },
+      {
+        "binding_id": "R005-SRC-015",
+        "byte_length": 6065,
+        "logical_name": "SCOPE_CAPTURE_REVIEW",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-independent-review-r001.md",
+        "sha256": "b5b1f2be1d79e44e3e17ace9900ebbd1d5f3d19c230cf9fddf76b996b9da7ca7",
+        "subject_role": "SCOPE_DECISION_CAPTURE_INDEPENDENT_REVIEW"
+      },
+      {
+        "binding_id": "R005-SRC-016",
+        "byte_length": 90089,
+        "logical_name": "SCOPE_CAPTURE",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+        "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+        "subject_role": "SCOPE_DECISION_CAPTURE"
+      },
+      {
+        "binding_id": "R005-SRC-017",
+        "byte_length": 56,
+        "logical_name": "OPENAPI_R002_LOG",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-r002.log",
+        "sha256": "a1652c64ca8bff87adcb7d6146e4ec6e7d38de143ad4a5410d48c65be25c8aaf",
+        "subject_role": "OPENAPI_PROGRESS_LOG"
+      },
+      {
+        "binding_id": "R005-SRC-018",
+        "byte_length": 1515,
+        "logical_name": "OPENAPI_R002_RECEIPT",
+        "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-receipt-r002.json",
+        "sha256": "ec6c92306e8f987823f4670ebb1f8ce083ac4398ddfc13f0bfdc3daebe1bacca",
+        "subject_role": "OPENAPI_PROGRESS_RECEIPT"
+      }
+    ],
+    "r005_source_physical_tuple_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonical_byte_length": 4750,
+      "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+      "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+      "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+      "tuple_count": 18,
+      "tuple_fields": [
+        "path",
+        "byte_length",
+        "sha256",
+        "subject_role"
+      ]
+    },
+    "r005_summary": {
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "canonical_status_counts": {
+        "EXTERNAL": 49,
+        "INTERNAL_GAP": 48,
+        "N_A_CANDIDATE": 36,
+        "OK": 124
+      },
+      "check_count": 19,
+      "current_queue_route_counts": {
+        "ATTESTATION_REVIEW_PENDING": 4,
+        "EVIDENCE_FACT_PENDING": 6,
+        "INTERNAL_READY": 62,
+        "INTERNAL_RUN_REQUIRED": 24,
+        "OK_BASELINE": 124,
+        "OWNER_APPROVAL_PENDING": 14,
+        "REAL_EVENT_PENDING": 21,
+        "SCOPE_DECISION_PENDING": 0,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "current_scope_closed_exact_ids": [
+        "DLV-DSC-04",
+        "DLV-WS-16"
+      ],
+      "current_scope_closure_delta_count": 2,
+      "fail_count": 0,
+      "formal279_pass_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "open_artifact_count": 131,
+      "owner_approval_count": 0,
+      "pass_count": 19,
+      "policy_reopened": false,
+      "real_event_count": 0,
+      "record_count": 257,
+      "release_eligible_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "scope_decision_counts": {
+        "IN_SCOPE": 43,
+        "OUT_OF_SCOPE_N_A": 2
+      },
+      "scope_transition_route_counts": {
+        "INTERNAL_READY": 25,
+        "INTERNAL_RUN_REQUIRED": 8,
+        "REAL_EVENT_PENDING": 10,
+        "SCOPE_N_A_APPROVED": 2
+      },
+      "verified_rights_or_external_fact_count": 0
+    },
+    "status": "PASS"
+  },
+  "prepared_on": "2026-07-28",
+  "progress_evidence": [
+    {
+      "binding_ids": [
+        "R005-SRC-003",
+        "R005-SRC-001",
+        "R005-SRC-002"
+      ],
+      "device_event_credit": false,
+      "evidence_kind": "IMPLEMENTATION_BASELINE_PHASE1_R002",
+      "formal279_credit": false,
+      "release_credit": false,
+      "status": "BOUND_AS_PROGRESS_EVIDENCE"
+    },
+    {
+      "binding_ids": [
+        "R005-SRC-006",
+        "R005-SRC-004",
+        "R005-SRC-005"
+      ],
+      "evidence_kind": "DATA_MODEL_SOURCE_CURRENT_STATE_R002",
+      "formal279_credit": false,
+      "release_credit": false,
+      "status": "BOUND_AS_PROGRESS_EVIDENCE",
+      "verified_rights_or_external_fact_credit": 0
+    },
+    {
+      "artifact_closure_credit": 0,
+      "binding_ids": [
+        "R005-SRC-018",
+        "R005-SRC-017"
+      ],
+      "evidence_kind": "OPENAPI_R002",
+      "formal279_credit": false,
+      "per_id_crosswalk_credit": 0,
+      "release_credit": false,
+      "status": "BOUND_AS_PROGRESS_EVIDENCE"
+    }
+  ],
+  "r006_minor_closure_register": {
+    "all_closed": true,
+    "entries": [
+      {
+        "canonical_transition_status": "CLOSED_N_A_FOR_CURRENT_SCOPE",
+        "evidence_binding_ids": [
+          "PRE-R005-LEDGER",
+          "PRE-R005-EVIDENCE",
+          "PRE-R005-RECEIPT",
+          "TRANSITION-APPLICATION",
+          "CURRENT-R006-LEDGER"
+        ],
+        "exact_artifact_ids": [
+          "DLV-DSC-04",
+          "DLV-WS-16"
+        ],
+        "finding_id": "R005-MINOR-EXACT2-STATUS-CLAIM-SEMANTICS-001",
+        "ledger_credit_delta": 0,
+        "origin": "R005_INDEPENDENT_REVIEW_MESSAGE_CONTROLLED_ID",
+        "origin_detail": "No repository R005 independent-review file or exact finding ID was available. This controlled ID records the reported MINOR: exact2 closure status and ambiguous completion claim semantics.",
+        "release_credit_delta": 0,
+        "status": "CLOSED"
+      }
+    ],
+    "entry_count": 1,
+    "register_id": "WS-PHASE1-EXACT257-SUCCESSOR-R006-MINOR-CLOSURE-REGISTER-001",
+    "status": "COMPLETE"
+  },
+  "schema_version": "walksafe.phase1-exact257-successor-evidence.v6",
+  "scope45_transition_application": {
+    "decision_counts": {
+      "IN_SCOPE": 43,
+      "OUT_OF_SCOPE_N_A": 2
+    },
+    "in_scope_substantive_credit_count": 0,
+    "scope_n_a_approved_exact_ids": [
+      "DLV-DSC-04",
+      "DLV-WS-16"
+    ],
+    "source_binding_ids": [
+      "R005-SRC-016",
+      "R005-SRC-014",
+      "R005-SRC-015",
+      "R005-SRC-011",
+      "R005-SRC-012",
+      "R005-SRC-013"
+    ],
+    "status": "APPLIED",
+    "target_route_counts": {
+      "INTERNAL_READY": 25,
+      "INTERNAL_RUN_REQUIRED": 8,
+      "REAL_EVENT_PENDING": 10,
+      "SCOPE_N_A_APPROVED": 2
+    },
+    "transition_count": 45,
+    "transitions": [
+      {
+        "artifact_type_code": "DLV-AIML-18",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-AIML-19",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-AIML-20",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-AIML-25",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-AIML-26",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-02",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-04",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-08",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-10",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-11",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-14",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-15",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-CLS-16",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-DEV-10",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-DEV-11",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-DEV-13",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-DEV-15",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-DSC-04",
+        "decision": "OUT_OF_SCOPE_N_A",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "SCOPE_N_A_APPROVED"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-06",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-07",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-11",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-13",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-18",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-OPS-22",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-REL-03",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-REL-04",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-REL-05",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-REL-06",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-REL-07",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-REL-08",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-REL-09",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-REL-13",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-REL-14",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-REL-20",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-REL-21",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-SEC-14",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-SEC-18",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_READY"
+      },
+      {
+        "artifact_type_code": "DLV-TST-10",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-TST-12",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-TST-15",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-TST-16",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-TST-17",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "INTERNAL_RUN_REQUIRED"
+      },
+      {
+        "artifact_type_code": "DLV-TST-23",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      },
+      {
+        "artifact_type_code": "DLV-WS-16",
+        "decision": "OUT_OF_SCOPE_N_A",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "SCOPE_N_A_APPROVED"
+      },
+      {
+        "artifact_type_code": "DLV-WS-21",
+        "decision": "IN_SCOPE",
+        "from_route": "SCOPE_DECISION_PENDING",
+        "to_route": "REAL_EVENT_PENDING"
+      }
+    ]
+  },
+  "source_bindings": [
+    {
+      "binding_id": "R005-SRC-001",
+      "byte_length": 4511,
+      "logical_name": "IMPLEMENTATION_BASELINE_CHECK_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-check-receipt-r002.json",
+      "sha256": "ba9868c717abee22df2e699c81886a66797521bda7c9dd89df16373ac1431721",
+      "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_CHECK"
+    },
+    {
+      "binding_id": "R005-SRC-002",
+      "byte_length": 4976,
+      "logical_name": "IMPLEMENTATION_BASELINE_REVIEW_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-independent-review-r002.md",
+      "sha256": "b7d15ea8959b9fd8cf81ae81136bf5ab0f24d217ac195ce7111ee315c2dc9c60",
+      "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_REVIEW"
+    },
+    {
+      "binding_id": "R005-SRC-003",
+      "byte_length": 25164,
+      "logical_name": "IMPLEMENTATION_BASELINE_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/current-implementation-baseline-phase1-r002.json",
+      "sha256": "a59e5796fd5653488b82ea91d69e9894aedd0c91c02dcac83bb0deb115ce3041",
+      "subject_role": "IMPLEMENTATION_BASELINE_PROGRESS_EVIDENCE"
+    },
+    {
+      "binding_id": "R005-SRC-004",
+      "byte_length": 3091,
+      "logical_name": "DATA_MODEL_SOURCE_CHECK_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-check-receipt-r002.json",
+      "sha256": "535826176c47a5914a4863b2de1abbfeac19e9ab7365d92dbceaed8dbaec54dd",
+      "subject_role": "DATA_MODEL_SOURCE_PROGRESS_CHECK"
+    },
+    {
+      "binding_id": "R005-SRC-005",
+      "byte_length": 4443,
+      "logical_name": "DATA_MODEL_SOURCE_REVIEW_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-independent-review-r002.md",
+      "sha256": "eb40cf1a443a769c95d3d7f13c92a9ddd6b8ad445e27fd372205e575427b1f7b",
+      "subject_role": "DATA_MODEL_SOURCE_PROGRESS_REVIEW"
+    },
+    {
+      "binding_id": "R005-SRC-006",
+      "byte_length": 6982,
+      "logical_name": "DATA_MODEL_SOURCE_R002",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/data-model-source-current-state-r002.json",
+      "sha256": "2bbaefb26e73414cb61e69f4871775e879cc2b6c4a405776033cfbd3c56d4c86",
+      "subject_role": "DATA_MODEL_SOURCE_PROGRESS_EVIDENCE"
+    },
+    {
+      "binding_id": "R005-SRC-007",
+      "byte_length": 110612,
+      "logical_name": "R004_PACKAGE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+      "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1",
+      "subject_role": "R004_PACKAGE_PREDECESSOR"
+    },
+    {
+      "binding_id": "R005-SRC-008",
+      "byte_length": 11706,
+      "logical_name": "R004_CHECK",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json",
+      "sha256": "feb497f54b0a52c16e259fa5c4d3ee23c8094df048bfc686e9e42a25e8ef7aa6",
+      "subject_role": "R004_CHECK_PREDECESSOR"
+    },
+    {
+      "binding_id": "R005-SRC-009",
+      "byte_length": 4309,
+      "logical_name": "R004_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-independent-review-r004.md",
+      "sha256": "9a20b05c98fdd1ca885fa8374cbf81626ce718a078de29c22d9b41aee6374c4d",
+      "subject_role": "R004_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "R005-SRC-010",
+      "byte_length": 2498803,
+      "logical_name": "R001_SUCCESSOR_LEDGER",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "CANONICAL_SUCCESSOR_LEDGER_PREDECESSOR"
+    },
+    {
+      "binding_id": "R005-SRC-011",
+      "byte_length": 169355,
+      "logical_name": "SCOPE45_APPLICATION",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-application-r001.json",
+      "sha256": "c4c665c07d3701296d6c47badc23c41da355bac2811db66653e79d426909d4ae",
+      "subject_role": "SCOPE45_TRANSITION_APPLICATION"
+    },
+    {
+      "binding_id": "R005-SRC-012",
+      "byte_length": 13573,
+      "logical_name": "SCOPE45_CHECK",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-check-receipt-r001.json",
+      "sha256": "7015c81effdaab52dc83168484a36bd7a4fbdee6f8a405ab819d691bfa7810ad",
+      "subject_role": "SCOPE45_TRANSITION_CHECK"
+    },
+    {
+      "binding_id": "R005-SRC-013",
+      "byte_length": 8326,
+      "logical_name": "SCOPE45_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-scope45-transition-independent-review-r001.md",
+      "sha256": "e9848904f73dd058d17b27ea96d43b474806b8d1cc4137d0106b59a9ce94dd8b",
+      "subject_role": "SCOPE45_TRANSITION_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "R005-SRC-014",
+      "byte_length": 15672,
+      "logical_name": "SCOPE_CAPTURE_CHECK",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-check-r001.json",
+      "sha256": "46107c77d4edee70c8181f815b97281c50a0b0752b10c07d28241d3686b3d629",
+      "subject_role": "SCOPE_DECISION_CAPTURE_CHECK"
+    },
+    {
+      "binding_id": "R005-SRC-015",
+      "byte_length": 6065,
+      "logical_name": "SCOPE_CAPTURE_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-independent-review-r001.md",
+      "sha256": "b5b1f2be1d79e44e3e17ace9900ebbd1d5f3d19c230cf9fddf76b996b9da7ca7",
+      "subject_role": "SCOPE_DECISION_CAPTURE_INDEPENDENT_REVIEW"
+    },
+    {
+      "binding_id": "R005-SRC-016",
+      "byte_length": 90089,
+      "logical_name": "SCOPE_CAPTURE",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-user-scope-decision-capture-r001.json",
+      "sha256": "825832c96902c4da0bb762f43c18e704f59449370100ccc4ca46051bc0d6a424",
+      "subject_role": "SCOPE_DECISION_CAPTURE"
+    },
+    {
+      "binding_id": "R005-SRC-017",
+      "byte_length": 56,
+      "logical_name": "OPENAPI_R002_LOG",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-r002.log",
+      "sha256": "a1652c64ca8bff87adcb7d6146e4ec6e7d38de143ad4a5410d48c65be25c8aaf",
+      "subject_role": "OPENAPI_PROGRESS_LOG"
+    },
+    {
+      "binding_id": "R005-SRC-018",
+      "byte_length": 1515,
+      "logical_name": "OPENAPI_R002_RECEIPT",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-validation/openapi-check-receipt-r002.json",
+      "sha256": "ec6c92306e8f987823f4670ebb1f8ce083ac4398ddfc13f0bfdc3daebe1bacca",
+      "subject_role": "OPENAPI_PROGRESS_RECEIPT"
+    }
+  ],
+  "source_physical_tuple_fingerprint": {
+    "algorithm": "SHA-256",
+    "canonical_byte_length": 4750,
+    "serialization": "UTF-8 JSON array, recursive lexicographic keys, compact separators, final LF",
+    "sha256": "8a90cd4dd43bbc4be87147432269998109effb363b8bc43e637536f14ea30b07",
+    "sort_order": "path UTF-8 bytewise, byte_length, sha256, subject_role UTF-8 bytewise",
+    "tuple_count": 18,
+    "tuple_fields": [
+      "path",
+      "byte_length",
+      "sha256",
+      "subject_role"
+    ]
+  },
+  "successor_ledger_binding": {
+    "binding_id": "CURRENT-R006-LEDGER",
+    "byte_length": 2588324,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger-r006.json",
+    "sha256": "b6df12ff338bdab823858d14adc3ba84c057a9dadc5a380ce82e4f4010e72244",
+    "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_R006_OUTPUT"
+  }
+}

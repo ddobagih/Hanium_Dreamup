@@ -1,0 +1,508 @@
+{
+  "schema_version": "walksafe.epic-implementation-record.v1",
+  "metadata": {
+    "record_id": "WS-EPIC-01-PHASE-D-LEGACY-WEB-CLOSURE-IMPLEMENTATION-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-01 Phase D Legacy Web 공식 실행·출시·배포 경로 기술 폐쇄 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_approved_baseline_or_phase_c": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_implementation_ready": false,
+    "claims_bff_extraction_complete": false,
+    "claims_arbitrary_manual_next_blocked": false,
+    "claims_historical_external_urls_decommissioned": false,
+    "claims_previously_installed_or_cached_pwa_disabled": false,
+    "claims_formal_test_pass": false,
+    "claims_actual_device_test_pass": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "artifact_application_receipt_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+    "phase_c_record_id": "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260722-003",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260722-003",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "policy_baseline",
+        "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+        "bytes": 8054,
+        "sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "artifact_application_receipt",
+        "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+        "bytes": 4812,
+        "sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_builder",
+        "path": "scripts/build_walksafe_epic01_phase_c_trace_20260722.py",
+        "bytes": 68164,
+        "sha256": "a759eb97813f6335b6b9431b3ffe384cb165ef69cb5b1fac878b04d4f24d039e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_c_trace_20260722.py",
+        "bytes": 19334,
+        "sha256": "20cb319c3b3ebf3ab8fd1003494f64b0cc10d4ddf141b3d60ee3b97d9893339d",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.json",
+        "bytes": 19670,
+        "sha256": "2f38315c2856028d56f29d824d0fcb232a6f0c94b2cd2f801482468befe9ad14",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.md",
+        "bytes": 3435,
+        "sha256": "222c8be5b553cec5f8556582fcaa5c0c46c3b23d32994e583598f1225ff0cf09",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r003",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r003.json",
+        "bytes": 391373,
+        "sha256": "4b407eeb28b163abc9dd85d04ce98568b066d899eb8fd4cb62c4f11fe6990b0c",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r003_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260722-r003.md",
+        "bytes": 2315,
+        "sha256": "089bc5f90ebb7225eeabab3d5e511c1c287e496d049a91175c85caa591aa2f1b",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r003",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r003.json",
+        "bytes": 54203,
+        "sha256": "dd2382d81b05d729bd46dac7e80c682c6f40f01ead4fb6d0ee03815a6a6725bf",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r003_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r003.md",
+        "bytes": 781,
+        "sha256": "16f01825a9ad215fafc5e8b36b2d35c4f02506b8a2b8339a8dd2f33db3c69c0d",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_active_overlay",
+        "path": "docs/control/execution/walksafe-epic-01-phase-c-active-ledger-overlay-20260722-r001.json",
+        "bytes": 12198,
+        "sha256": "bc03cbe29556d860511e4f1a53e91c5c4096e0a2d84ffd60cf5d8580dfcb808e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_c_active_overlay_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-c-active-ledger-overlay-20260722-r001.md",
+        "bytes": 2412,
+        "sha256": "b600ef464946e6a5593e31cd23359d0ca889a1afc5b8b085a07f1647ebfb8301",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py",
+        "bytes": 67824,
+        "sha256": "10c18b5487f3d2046e72eab1d6004ea0ef372e5af055c099f20e8c65473ccfbe"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py",
+        "bytes": 16431,
+        "sha256": "6a00340373022311dda91544e85212161950c06a2677eecc4e1d1ff1b8abccaf"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-01",
+    "epic_title": "제품 경계와 Web 앱 오염 제거",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_D_LEGACY_WEB_EXTERNAL_CLOSURE",
+    "reassessed_policy_ids": [
+      "FP-007",
+      "FP-009"
+    ],
+    "gap_ids": [
+      "GAP-016",
+      "GAP-018"
+    ],
+    "requirement_ids": [
+      "RQ-FP-007-001",
+      "RQ-FP-009-001"
+    ],
+    "planned_test_ids": [
+      "TC-FP-007-01",
+      "TC-FP-007-02",
+      "TC-FP-007-03",
+      "TC-FP-007-04",
+      "TC-FP-009-01",
+      "TC-FP-009-02",
+      "TC-FP-009-03",
+      "TC-FP-009-04"
+    ],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_01_PHASE_D_LEGACY_WEB_REPOSITORY_CLOSURE_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "excluded_from_scope": [
+      "unrelated dirty-tree paths",
+      "checkpoint, runbook, and daylog",
+      "Phase A/B/C Android and backend implementation paths",
+      "Phase D generated trace outputs"
+    ],
+    "file_count": 34,
+    "path_set_sha256": "32b899e88bc19a0a418da0bb0e7c846bff3e2381c9772c1e65119b89f763383e",
+    "content_set_sha256": "14734645d277e705795cc77984d68d1b161008e527d1456df06108b133e3e711",
+    "files": [
+      {
+        "path": ".github/workflows/quality.yml",
+        "bytes": 3518,
+        "sha256": "4afac159b0c4aa9c656f287df08a7bb30b9250e542272f8464dda595295b1f44"
+      },
+      {
+        "path": "apps/web/README.md",
+        "bytes": 4160,
+        "sha256": "f56d8ba85d0daf52e6c26e7a9bec2fc5a48310a57eb48f61a4b9f27cbc65da89"
+      },
+      {
+        "path": "apps/web/package.json",
+        "bytes": 978,
+        "sha256": "323527f9f8c6a97a534b0fae495ac57a91db6d1e1e4b03edc5b18d066fe8c513"
+      },
+      {
+        "path": "apps/web/legacy-runtime-boundary.ts",
+        "bytes": 389,
+        "sha256": "128a6e5053cbaedbc48be1142fbe4306d15164cfd5e3c7b083ceb0c52369c530"
+      },
+      {
+        "path": "apps/web/proxy.ts",
+        "bytes": 569,
+        "sha256": "698072a5b23a21469b8f2ccdaba16c3c43942c29f931ed975428fa638aaefc29"
+      },
+      {
+        "path": "apps/web/tests/field-test-gateway-policy.test.ts",
+        "bytes": 53548,
+        "sha256": "3f30eed826fee6a134a2b97cd46d687f8adb3ed2a10b24e84603e7cbb414b653"
+      },
+      {
+        "path": "configs/walksafe_product_boundary_20260722.json",
+        "bytes": 10580,
+        "sha256": "494feedf94c8e6d8e4c5f27bd1c521fcf3e8945a070f2164f0bda288b8e94b5d"
+      },
+      {
+        "path": "deploy/README.md",
+        "bytes": 1608,
+        "sha256": "6c16b9084b9eb32e00dff3f6213f09c3daf4d7543aa3ea7afa9d59f8f986dbfd"
+      },
+      {
+        "path": "deploy/config/walksafe-web.env.example",
+        "bytes": 1414,
+        "sha256": "443dfcb27779b3cb5b6b2608a9ddada373050d9566774dcc6bc7ea42833d766f"
+      },
+      {
+        "path": "deploy/nginx/walksafe-web.conf.example",
+        "bytes": 2268,
+        "sha256": "1ae093927b4c7836e52a8bbf36c23df62dfba4bbf58b3c5fc03e928a93b28931"
+      },
+      {
+        "path": "deploy/systemd/walksafe-web.service",
+        "bytes": 1242,
+        "sha256": "8e5303c8cea39149a90c84046c061d03c314439c50e4bd49ede78653c79312d3"
+      },
+      {
+        "path": "docs/release/walksafe_full_rc_20260713.md",
+        "bytes": 31193,
+        "sha256": "8b525582a73c2b3802a4d49b17330b51d20ec05ce8c0eba609b8e763c314548b"
+      },
+      {
+        "path": "docs/testing/web_remote_field_test_20260711.md",
+        "bytes": 12121,
+        "sha256": "65bf62fb053b0ffd54271d44ff822eed62fff5dc528ada846f3405d27169d18c"
+      },
+      {
+        "path": "docs/testing/README.md",
+        "bytes": 12993,
+        "sha256": "826ce0c3edb153d3183f8a0089f11b67962163a8f824e3c9594608f187e901a1"
+      },
+      {
+        "path": "scripts/README.md",
+        "bytes": 21154,
+        "sha256": "e74909f60264758f8ba0be6b13bd9d68175fb85e075495d3ffba206bc12d20d9"
+      },
+      {
+        "path": "scripts/build_walksafe_web_release_20260711.sh",
+        "bytes": 10446,
+        "sha256": "5e624d8b8354ad5104955b562a4d1830e6d7460701df546a2c8276f56be94fbe"
+      },
+      {
+        "path": "scripts/build_walksafe_full_rc_20260713.py",
+        "bytes": 82745,
+        "sha256": "f6f6ed87f27a147221d4e8a93133c39950c30d796ecd46c4c2683a2add64236c"
+      },
+      {
+        "path": "scripts/validate_walksafe_full_rc_20260713.py",
+        "bytes": 141977,
+        "sha256": "9a0c24f682c3ff932bae6816da89924a046f4488842a80af30e709c26238ab5f"
+      },
+      {
+        "path": "scripts/run_cloudflare_field_test_services_20260711.sh",
+        "bytes": 22535,
+        "sha256": "9587702fe51131ec34954f1a5efe6a50f6412b07a371d1ab0c39066e10ae6051"
+      },
+      {
+        "path": "scripts/run_walksafe_remote_field_stack_20260711.sh",
+        "bytes": 2494,
+        "sha256": "84b14dd1b73a431f0a5a738d552122e48fa1043c2f07b30db0cb53642d64e443"
+      },
+      {
+        "path": "scripts/run_walksafe_product_quality_20260713.py",
+        "bytes": 72429,
+        "sha256": "f5aa033fd4538d40de56041cd8dc18f68fa9c9908c4d06a78ff060054a873099"
+      },
+      {
+        "path": "scripts/run_walksafe_web_single_instance_20260713.py",
+        "bytes": 4149,
+        "sha256": "05dd001b07e0f54f771595c17cc89c3e3eb8782da55bd25699d69cf434842e3a"
+      },
+      {
+        "path": "scripts/check_frontend_field_test_gateway_20260711.sh",
+        "bytes": 4362,
+        "sha256": "693c369ac30a176dc5bb6dffbea8c8a40c399232e332b90073f88a3a1c82ef4a"
+      },
+      {
+        "path": "scripts/check_walksafe_legacy_web_boundary_20260722.py",
+        "bytes": 23837,
+        "sha256": "855d8077dfc7e664cfa7a60730b8bb5b5ad62e54b072002b471ecb778cd4d65e"
+      },
+      {
+        "path": "scripts/check_walksafe_release_evidence_20260711.py",
+        "bytes": 245195,
+        "sha256": "04572019302570f7cb5953ace4404c6c3bc6bb94e86b973eeade43feb9237703"
+      },
+      {
+        "path": "scripts/run_walksafe_test_layers_20260711.sh",
+        "bytes": 13300,
+        "sha256": "dd83243efe9646ea6f98802b893b1b312b0489389467539873e7971996b02eec"
+      },
+      {
+        "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "bytes": 141096,
+        "sha256": "f16102d14af2dd05eace27c5b04ce60718ebcb9cd670514b691ce75241c89ba3"
+      },
+      {
+        "path": "tests/test_walksafe_android_product_boundary.py",
+        "bytes": 13109,
+        "sha256": "778bddf1101ab9e5382c983b29aa3796ab943bc62e709f43b80d35fc6be98733"
+      },
+      {
+        "path": "tests/test_release_evidence_gate.py",
+        "bytes": 170163,
+        "sha256": "736b9b51aa3ee362dd2709daeb4f597534e2148a5f1f77ab2d2e24b9af1119dc"
+      },
+      {
+        "path": "tests/test_cloudflare_field_runner.py",
+        "bytes": 18407,
+        "sha256": "70ba02657abb02966c9b42503615fbb128df4e0398b4cdea8acb96534fae0834"
+      },
+      {
+        "path": "tests/test_walksafe_legacy_web_boundary_20260722.py",
+        "bytes": 15051,
+        "sha256": "7dac23b108724ee1f14633d10b86d2ec3317e1ec807318b4defc11b541632773"
+      },
+      {
+        "path": "tests/test_web_build_manifest.py",
+        "bytes": 21380,
+        "sha256": "fae5f7b0ed4c6e5dd8729417e2669488e13bb31a56d52a042bec67e546204d64"
+      },
+      {
+        "path": "tests/test_walksafe_isolated_python_bootstrap.py",
+        "bytes": 40811,
+        "sha256": "741f024510e3a28b2471050ff49aa49f7ed20917d4ccfb9b80ff40577cba39df"
+      },
+      {
+        "path": "tests/test_walksafe_full_rc_tooling.py",
+        "bytes": 129423,
+        "sha256": "9d6b0215700b2cb3a65a4e0acd0aeee938c06dafdf524d0445d2ee5239231b91"
+      }
+    ],
+    "snapshot_sha256": "cba9aac5ce788263c4b74d71d69bc14151e96806c03977faf9e276b0a70de79d"
+  },
+  "legacy_web_closure_contract": {
+    "scope": "OFFICIAL_REPOSITORY_OWNED_LEGACY_WEB_PRODUCT_RELEASE_DEPLOY_AND_PUBLIC_LAUNCH_PATHS",
+    "technical_closure_status": "COMPLETE_WITH_TRANSITIONAL_ANDROID_BFF_EXCEPTION",
+    "official_repository_paths_closed": true,
+    "external_user_runtime_allowed": false,
+    "formal_release_component_allowed": false,
+    "legacy_ui_response_status": 410,
+    "official_runtime_bind": "127.0.0.1:3000",
+    "transitional_android_bff": {
+      "state": "TEMPORARY_GATEWAY_DEPENDENCY",
+      "runtime_allowlist": [
+        "/api/field-session",
+        "/api/navigation/walking",
+        "/api/navigation/destinations/search",
+        "/api/reports/v2"
+      ],
+      "extraction_status": "NOT_COMPLETED"
+    },
+    "not_claimed_or_not_verified": [
+      "ARBITRARY_MANUAL_NEXT_INVOCATION_TECHNICALLY_IMPOSSIBLE",
+      "HISTORICAL_EXTERNAL_URLS_DECOMMISSIONED_OR_UNREACHABLE",
+      "PREVIOUSLY_INSTALLED_OR_CACHED_PWA_DISABLED",
+      "TRANSITIONAL_ANDROID_BFF_EXTRACTED",
+      "LEGACY_SOURCE_ARCHIVED_OR_REMOVED",
+      "FORMAL_OR_ACTUAL_DEVICE_TEST_COMPLETED",
+      "RELEASE_ELIGIBLE"
+    ],
+    "checker": {
+      "path": "scripts/check_walksafe_legacy_web_boundary_20260722.py",
+      "sha256": "855d8077dfc7e664cfa7a60730b8bb5b5ad62e54b072002b471ecb778cd4d65e",
+      "result": "PASS_INTERNAL"
+    },
+    "contract_sha256": "902582bb50c7e8b29804d3a4a536e447ce1d435e3059132c861ae0837f3b85ba"
+  },
+  "implemented_controls": [
+    {
+      "control": "LEGACY_UI_RUNTIME_GONE_WITH_EXACT_BFF_ALLOWLIST",
+      "result": "공식 npm dev/start는 127.0.0.1:3000에만 결속되고 Next 요청 경계는 Android가 사용하는 정확한 4개 API 외 모든 UI·PWA·관리자·과거 API 경로를 410 no-store로 닫는다.",
+      "paths": [
+        "apps/web/package.json",
+        "apps/web/legacy-runtime-boundary.ts",
+        "apps/web/proxy.ts",
+        "scripts/run_walksafe_web_single_instance_20260713.py"
+      ]
+    },
+    {
+      "control": "WEB_RELEASE_AND_FULL_RC_ENTRYPOINTS_FAIL_CLOSED",
+      "result": "CI의 Web release 생성·업로드를 제거하고 과거 Web release/full-RC build·validate·Web product-quality CLI는 산출물이나 다른 부작용 전에 코드 78로 종료한다.",
+      "paths": [
+        ".github/workflows/quality.yml",
+        "scripts/build_walksafe_web_release_20260711.sh",
+        "scripts/build_walksafe_full_rc_20260713.py",
+        "scripts/validate_walksafe_full_rc_20260713.py",
+        "scripts/run_walksafe_product_quality_20260713.py"
+      ]
+    },
+    {
+      "control": "PUBLIC_LAUNCHERS_AND_DEPLOY_INPUTS_FAIL_CLOSED",
+      "result": "두 Cloudflare/field launcher는 부작용 전에 코드 78로 종료하고 systemd·nginx·환경 예시는 활성 지시문이 전혀 없는 DO NOT INSTALL 주석 자료로 남긴다.",
+      "paths": [
+        "scripts/run_cloudflare_field_test_services_20260711.sh",
+        "scripts/run_walksafe_remote_field_stack_20260711.sh",
+        "deploy/config/walksafe-web.env.example",
+        "deploy/nginx/walksafe-web.conf.example",
+        "deploy/systemd/walksafe-web.service"
+      ]
+    },
+    {
+      "control": "TRANSITIONAL_ANDROID_BFF_EXCEPTION_EXPLICIT",
+      "result": "Android가 실제 참조하는 4개 route만 loopback 회귀·전환형 BFF 예외로 유지하며 독립 Android API gateway 추출은 완료로 주장하지 않는다.",
+      "paths": [
+        "apps/web/README.md",
+        "apps/web/legacy-runtime-boundary.ts",
+        "apps/web/tests/field-test-gateway-policy.test.ts",
+        "scripts/check_frontend_field_test_gateway_20260711.sh"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "actual_device_execution": "NOT_RUN",
+    "historical_external_url_probe_execution": "NOT_RUN",
+    "previously_installed_or_cached_pwa_check": "NOT_RUN",
+    "commands": [
+      {
+        "scope": "공식 Legacy Web 경계 정적·부작용 전 차단 계약",
+        "command": "python3 -B scripts/check_walksafe_legacy_web_boundary_20260722.py",
+        "status": "PASS_INTERNAL"
+      },
+      {
+        "scope": "경계 변조·CLI 부작용·allowlist 회귀",
+        "command": "python -m pytest tests/test_walksafe_legacy_web_boundary_20260722.py -q",
+        "status": "PASS_INTERNAL"
+      }
+    ],
+    "interpretation": "저장소가 제공하는 공식 경로의 내부 회귀검사다. 임의 수동 Next 실행을 운영체제 수준에서 불가능하게 만들었다는 증거, 과거 외부 URL 폐기나 기존 설치·캐시 PWA 비활성 확인, 실제 기기 또는 279개 정식 시험 증거가 아니다."
+  },
+  "open_issues": [
+    {
+      "id": "EPIC-01-NEXT-BFF-EXTRACTION",
+      "status": "OPEN_NEXT",
+      "description": "Android가 사용하는 4개 Next API route를 독립 Android API gateway로 추출하고 Android endpoint를 전환해야 한다."
+    },
+    {
+      "id": "PHASE-D-ARBITRARY-MANUAL-NEXT-BYPASS",
+      "status": "LIMITATION_OPEN",
+      "description": "공식 npm/runner는 loopback으로 제한했지만 저장소 코드를 임의 명령으로 직접 실행하는 행위 자체를 운영체제 수준에서 금지했다는 주장은 하지 않는다."
+    },
+    {
+      "id": "PHASE-D-HISTORICAL-EXTERNAL-URL-DECOMMISSION",
+      "status": "NOT_RUN",
+      "description": "과거 외부 URL·DNS·Cloudflare 자원이 실제로 폐기되거나 접근 불가인지 외부 probe를 실행하지 않았다."
+    },
+    {
+      "id": "PHASE-D-CACHED-PWA-DEACTIVATION",
+      "status": "NOT_RUN",
+      "description": "과거에 설치됐거나 브라우저 캐시에 남은 PWA가 실제 사용자 기기에서 비활성화됐는지 확인하지 않았다."
+    },
+    {
+      "id": "PHASE-C-PRODUCTION-PROFILE-EMPTY",
+      "status": "OPEN",
+      "description": "운영 승인 지정 기기 프로필은 여전히 0개다."
+    },
+    {
+      "id": "PHASE-C-ACTUAL-DEVICE-NOT-RUN",
+      "status": "NOT_RUN",
+      "description": "실제 지정 휴대전화 검증을 실행하지 않았다."
+    },
+    {
+      "id": "PHASE-C-FORMAL-TESTS-NOT-RUN",
+      "status": "NOT_RUN",
+      "description": "정식 시험 279개는 모두 미실행이다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "actual_device_test_status": "NOT_RUN",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-01",
+    "work_item_id": "EPIC-01-NEXT-BFF-EXTRACTION",
+    "status": "PLANNED_NEXT_WITHIN_IN_PROGRESS_EPIC",
+    "action": "전환형 Next BFF 4개 route를 독립 Android API gateway로 추출하고 Android endpoint를 전환한다."
+  },
+  "record_content_sha256": "d0a3bb442613b3a66ace4cbac00f624674c6c26d7e49b74742c160b1af139d79"
+}

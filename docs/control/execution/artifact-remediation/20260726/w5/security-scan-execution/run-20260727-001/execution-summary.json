@@ -1,0 +1,366 @@
+{
+  "schema_version": "walksafe.w5.security-scan-execution.v1",
+  "run_id": "W5-SECURITY-SCAN-20260727-001",
+  "subject": {
+    "selected_file_count": 528,
+    "selected_file_set_sha256": "7e7078b898d6fedfd4293e65496ff5056c592136e8b8181157e0687b1f67cde2",
+    "manifest_path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/selected-source-manifest.json",
+    "w3_sbom_source": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/sbom.cyclonedx.json",
+      "sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce",
+      "scan_copy_sha256": "cdad7be21efe592c5d3ae429b3718a2561f475c3bccc7a98e3430beaf876cfce"
+    }
+  },
+  "tools": [
+    {
+      "tool": "osv-scanner",
+      "version": "2.4.0",
+      "path": "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64",
+      "sha256": "15314940c10d26af9c6649f150b8a47c1262e8fc7e17b1d1029b0e479e8ed8a0",
+      "byte_length": 56676514,
+      "release_url": "https://github.com/google/osv-scanner/releases/tag/v2.4.0",
+      "published_checksum_verified": true
+    },
+    {
+      "tool": "gitleaks",
+      "version": "8.30.1",
+      "path": "/tmp/walksafe-security-tools-20260727/gitleaks",
+      "sha256": "88f91962aa2f93ac6ab281d553b9e125f5197bbbce38f9f2437f7299c32e5509",
+      "byte_length": 21958840,
+      "release_url": "https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1",
+      "published_checksum_verified": true
+    },
+    {
+      "tool": "semgrep",
+      "version": "1.164.0",
+      "package_spec": "semgrep==1.164.0",
+      "executor": "/home/ddobagi/.npm-global/bin/uvx",
+      "rules_url_requested": "https://semgrep.dev/c/p/security-audit",
+      "rules_url_resolved": "https://semgrep.dev/c/p/security-audit",
+      "rules_sha256": "fdc7027973176abe71f6b1fc8739ef88a4c411735c380cfce4f731df9644e47a",
+      "rules_byte_length": 473426,
+      "metrics": "off",
+      "git_integration": "disabled_by_--no-git-ignore"
+    }
+  ],
+  "commands": [
+    {
+      "command_id": "semgrep-rules-validate",
+      "argv": [
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-security-audit-rules.yaml",
+        "--validate",
+        "--metrics=off"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-rules-validate.resource.txt",
+        "--",
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-security-audit-rules.yaml",
+        "--validate",
+        "--metrics=off"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:02:40+09:00",
+      "ended_at": "2026-07-27T04:02:42+09:00",
+      "duration_seconds": 2.088766,
+      "exit_code": 0,
+      "expected_exit_codes": [
+        0
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-rules-validate.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-rules-validate.stderr.log",
+        "sha256": "52d71abf592b0060e5cac22b239bfba58feb3aed484d538bd8caeae13bbd59af",
+        "byte_length": 278
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-rules-validate.resource.txt",
+        "sha256": "d871a4e12377c2caf1cf17b8600d5d5d58eadbc5f990ed567b4a00c040e98330",
+        "byte_length": 1027
+      }
+    },
+    {
+      "command_id": "semgrep-sast",
+      "argv": [
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-security-audit-rules.yaml",
+        "--metrics=off",
+        "--no-git-ignore",
+        "--jobs",
+        "1",
+        "--max-memory",
+        "2048",
+        "--timeout",
+        "10",
+        "--timeout-threshold",
+        "1",
+        "--json-output",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast-report.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/app",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/alembic",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/adminapp/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android-gateway/src",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/model",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/scripts"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast.resource.txt",
+        "--",
+        "/home/ddobagi/.npm-global/bin/uvx",
+        "--python",
+        "3.12",
+        "--from",
+        "semgrep==1.164.0",
+        "semgrep",
+        "scan",
+        "--config",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-security-audit-rules.yaml",
+        "--metrics=off",
+        "--no-git-ignore",
+        "--jobs",
+        "1",
+        "--max-memory",
+        "2048",
+        "--timeout",
+        "10",
+        "--timeout-threshold",
+        "1",
+        "--json-output",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast-report.json",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/app",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/backend/alembic",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/adminapp/src/main",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android-gateway/src",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/model",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/scripts"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:02:42+09:00",
+      "ended_at": "2026-07-27T04:03:22+09:00",
+      "duration_seconds": 39.986288,
+      "exit_code": 0,
+      "expected_exit_codes": [
+        0
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast.stdout.log",
+        "sha256": "f8324a196ef6839a541426753d9351b5c548f0e846fea4778e300fb5d513a074",
+        "byte_length": 35422
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast.stderr.log",
+        "sha256": "54aa9c002258feac6e1cb863385b9187a83fc8eafeed612c7ee146c1b2d5c987",
+        "byte_length": 2175
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast.resource.txt",
+        "sha256": "b68269dac9f1136299f5e9cfa994b4edcc94f1d45aa2a1bbeb9133c86831a579",
+        "byte_length": 1811
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/semgrep-sast-report.json",
+        "sha256": "ce5c4ca9dcdeaa9b26ce42aced2e451fadb83664e19814052e5990e54451952c",
+        "byte_length": 147016
+      }
+    },
+    {
+      "command_id": "osv-sca",
+      "argv": [
+        "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64",
+        "scan",
+        "source",
+        "--format",
+        "json",
+        "--all-packages",
+        "--verbosity",
+        "info",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca-report.json",
+        "--sbom",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/walksafe.cdx.json"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca.resource.txt",
+        "--",
+        "/tmp/walksafe-security-tools-20260727/osv-scanner_linux_amd64",
+        "scan",
+        "source",
+        "--format",
+        "json",
+        "--all-packages",
+        "--verbosity",
+        "info",
+        "--output-file",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca-report.json",
+        "--sbom",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/walksafe.cdx.json"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:03:22+09:00",
+      "ended_at": "2026-07-27T04:03:25+09:00",
+      "duration_seconds": 2.394415,
+      "exit_code": 1,
+      "expected_exit_codes": [
+        0,
+        1
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca.stderr.log",
+        "sha256": "91eba1d7955ca7310a5713c1a23fb3b15bc7187335f927001c72ddf21ec116b1",
+        "byte_length": 3479
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca.resource.txt",
+        "sha256": "209772d8fabcc42e30210a39c69258313acb23e4d71865b6b230b4376251f1c2",
+        "byte_length": 1244
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/osv-sca-report.json",
+        "sha256": "4a43cef50763ff8bc86c90830b57a4fd9dc8d6e161eeb821dae3dce4f9e787b1",
+        "byte_length": 1724861
+      }
+    },
+    {
+      "command_id": "gitleaks-current-tree",
+      "argv": [
+        "/tmp/walksafe-security-tools-20260727/gitleaks",
+        "dir",
+        "--no-banner",
+        "--redact=100",
+        "--report-format",
+        "json",
+        "--report-path",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-report.json",
+        "--exit-code",
+        "1",
+        "--max-target-megabytes",
+        "5",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input"
+      ],
+      "wrapper_argv": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree.resource.txt",
+        "--",
+        "/tmp/walksafe-security-tools-20260727/gitleaks",
+        "dir",
+        "--no-banner",
+        "--redact=100",
+        "--report-format",
+        "json",
+        "--report-path",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-report.json",
+        "--exit-code",
+        "1",
+        "--max-target-megabytes",
+        "5",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-input"
+      ],
+      "cwd": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "started_at": "2026-07-27T04:03:25+09:00",
+      "ended_at": "2026-07-27T04:03:26+09:00",
+      "duration_seconds": 0.862434,
+      "exit_code": 1,
+      "expected_exit_codes": [
+        0,
+        1
+      ],
+      "execution_completed": true,
+      "stdout": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree.stdout.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "byte_length": 0
+      },
+      "stderr": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree.stderr.log",
+        "sha256": "61e2e72560055015eca7e6a1b773b1c5e46f1f90665030fde16f80bb6de5f0d0",
+        "byte_length": 81
+      },
+      "resource": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree.resource.txt",
+        "sha256": "177eb644501c4703e3355c0b0e7eba5af752422c7fc0db314f733fcbb767db54",
+        "byte_length": 1281
+      },
+      "report": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/gitleaks-current-tree-report.json",
+        "sha256": "0fa4e28be3503f6f30269fe04e9d6ec296cdcff88d848f26ad9ee3449358b99f",
+        "byte_length": 1883
+      }
+    }
+  ],
+  "counts": {
+    "semgrep": {
+      "findings": 35,
+      "errors": 1,
+      "scanned_paths": 653,
+      "skipped_paths": 0
+    },
+    "osv": {
+      "packages": 349,
+      "affected_packages": 24,
+      "unique_vulnerability_ids": 100
+    },
+    "gitleaks": {
+      "findings": 2,
+      "redaction_percent": 100,
+      "scope": "CURRENT_SELECTED_TREE_ONLY",
+      "history_scan": "NOT_RUN"
+    }
+  },
+  "execution_result": "COMPLETED_WITH_FINDINGS_PENDING_TRIAGE",
+  "claim_boundary": {
+    "sast_scan_completed": true,
+    "sca_scan_completed": true,
+    "current_tree_secret_scan_completed": true,
+    "git_history_secret_scan": "NOT_RUN",
+    "legal_review": "NOT_RUN",
+    "formal_279": "NOT_RUN",
+    "release": "NOT_ELIGIBLE"
+  }
+}

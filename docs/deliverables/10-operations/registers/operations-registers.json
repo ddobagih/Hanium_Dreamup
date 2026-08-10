@@ -1,0 +1,786 @@
+{
+  "schema_version": "walksafe.operations-registers.v1",
+  "metadata": {
+    "title": "WalkSafe 운영 지속 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "OPS-02",
+      "OPS-09",
+      "OPS-14",
+      "OPS-17",
+      "OPS-19",
+      "OPS-20",
+      "OPS-21",
+      "OPS-23",
+      "OPS-24"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "register_mode": "PREOPENED_APPEND_ONLY",
+  "w9_as_of": "2026-07-27",
+  "w9_source_bindings": {
+    "implementation_gap_analysis_r020": {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json",
+      "sha256": "6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7"
+    },
+    "remediation_backlog_r020": {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+      "sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f"
+    },
+    "data_retention_policy": {
+      "path": "docs/operations/data_retention_policy.md",
+      "sha256": "92bf94b3ecaa03b0d53749be5b7c2fce8b20b7c39aa1033ca369b20d497b0deb"
+    },
+    "navigation_integration_policy": {
+      "path": "docs/walksafe-v2/navigation_integration_policy.md",
+      "sha256": "af9a05935a3f54a7f06e6dfcba4a39a6d57ef94879cf1c3afa0288ca050a63a8"
+    },
+    "development_deployment_descriptor": {
+      "path": "model/deployments/local-deployment.json",
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    "android_user_guide": {
+      "path": "apps/android/USER_GUIDE.md",
+      "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+    }
+  },
+  "w9_content_contracts": {
+    "OPS-17": {
+      "artifact_type_id": "OPS-17",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "PREOPENED_INCIDENT_REGISTER",
+      "record_fields": [
+        "incident_id",
+        "severity",
+        "started_at",
+        "detected_at",
+        "ended_at",
+        "user_and_data_impact",
+        "timeline",
+        "containment",
+        "recovery",
+        "owner_role",
+        "evidence_refs",
+        "postmortem_status",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "operations_started=false",
+        "incidents=[]",
+        "opening snapshot의 0건은 무사건·무장애 증명이 아님"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "OPS-19": {
+      "artifact_type_id": "OPS-19",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "PREOPENED_OPERATION_CHANGE_REGISTER",
+      "record_fields": [
+        "change_id",
+        "requested_at",
+        "requester_role",
+        "risk_assessment",
+        "target_scope",
+        "release_or_config_ref",
+        "approval_status",
+        "execution_window",
+        "rollback_plan_ref",
+        "verification_result",
+        "operator_identity",
+        "evidence_refs",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "operations_started=false",
+        "operation_changes=[]",
+        "opening snapshot의 0건은 무변경 증명이 아님"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "OPS-20": {
+      "artifact_type_id": "OPS-20",
+      "content_outcome": "OK_CANDIDATE_CONTENT_COMPLETENESS",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "ACTIVE_MAINTENANCE_BACKLOG_SCHEMA_READY",
+      "record_fields": [
+        "backlog_id",
+        "source_type",
+        "source_ref",
+        "title",
+        "status",
+        "priority",
+        "owner_role",
+        "due_condition",
+        "risk_if_open",
+        "completion_criteria",
+        "evidence_refs",
+        "waiver_status",
+        "approval_status",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "r020 audit/backlog에 hash 결속",
+        "5개 gate와 FP-035 항목은 OPEN/NOT_RUN",
+        "waiver와 completion receipt 없음"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "OPS-21": {
+      "artifact_type_id": "OPS-21",
+      "content_outcome": "OK_CANDIDATE_CONTENT_COMPLETENESS",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "ACTIVE_TECHNICAL_DEBT_SCHEMA_READY",
+      "record_fields": [
+        "debt_id",
+        "source_ref",
+        "title",
+        "impact",
+        "priority",
+        "owner_role",
+        "due_condition",
+        "closure_criteria",
+        "evidence_refs",
+        "risk_acceptance_status",
+        "acceptance_receipt_ref"
+      ],
+      "current_boundary": [
+        "측정·dashboard·비상대응자·복구훈련 debt OPEN",
+        "risk_acceptance_status=NOT_APPROVED",
+        "acceptance receipt 없음"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "OPS-24": {
+      "artifact_type_id": "OPS-24",
+      "content_outcome": "OK_CANDIDATE_CONTENT_COMPLETENESS",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "EXTERNAL_DEPENDENCY_SCHEMA_READY",
+      "record_fields": [
+        "dependency_id",
+        "name",
+        "data_boundary",
+        "owner_role",
+        "quota_status",
+        "cost_status",
+        "support_status",
+        "review_due_condition",
+        "monitoring_signals",
+        "failure_fallback",
+        "provider_exit_status",
+        "alternate_validation_status",
+        "evidence_refs",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "TMAP quota/cost/support=NOT_ESTABLISHED",
+        "live/deployment/provider-exit/alternate validation=NOT_RUN",
+        "contract·receipt 원본 없음"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    }
+  },
+  "external_execution_contracts": [
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-OPS-17",
+      "artifact_type_id": "OPS-17",
+      "catalog_artifact_id": "DLV-OPS-17",
+      "responsible_role": "운영책임자",
+      "approver_role": "서비스소유자",
+      "external_trigger": "운영 준비 시 장애 원장 구조를 사전 개설하고, 사용자·데이터·SLO에 영향을 준 장애가 발생할 때마다 실행 행을 추가",
+      "external_authority": "REAL_INCIDENT_EVENT_AND_SERVICE_OWNER_POSTMORTEM_APPROVAL",
+      "required_inputs": [
+        "승인된 릴리스·배포 아키텍처·SLO",
+        "운영 환경·계정·외부 서비스·관측성 현황",
+        "지원·보안·복구 책임과 연락 체계"
+      ],
+      "internal_action": "Keep the preopened register empty until a real incident occurs; then add one complete real incident row and approved postmortem receipt.",
+      "procedure": [
+        "실제 incident가 발생하기 전에는 opening register를 비워 둔다.",
+        "발생 시 timeline·impact·containment·recovery·owner·evidence lifecycle field를 실제 값으로 기록한다.",
+        "서비스소유자가 exact incident scope와 postmortem을 승인한다.",
+        "실제 incident event, operator와 postmortem receipt를 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "incident ID·severity",
+          "탐지·시작·종료 시간",
+          "사용자·데이터 영향",
+          "조치 timeline·담당",
+          "원인 후보·증거",
+          "복구·후속·통지"
+        ],
+        "lifecycle_fields": [
+          "incident_id",
+          "severity",
+          "started_at",
+          "detected_at",
+          "ended_at",
+          "user_and_data_impact",
+          "timeline",
+          "containment",
+          "recovery",
+          "owner_role",
+          "evidence_refs",
+          "postmortem_status",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: incident ID·severity, 탐지·시작·종료 시간.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "ON_EACH_REAL_INCIDENT_BEFORE_INCIDENT_CLOSURE",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "실제 incident가 발생하면 승인된 postmortem receipt 전까지 운영·관련 release 판정을 닫을 수 없으며 현재 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    },
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-OPS-19",
+      "artifact_type_id": "OPS-19",
+      "catalog_artifact_id": "DLV-OPS-19",
+      "responsible_role": "운영책임자",
+      "approver_role": "서비스소유자",
+      "external_trigger": "운영 준비 시 변경 원장 구조를 사전 개설하고, 코드 외 설정·권한·인프라 변경 때마다 실행 행을 추가",
+      "external_authority": "SERVICE_OWNER_AUTHORIZED_REAL_OPERATIONAL_CHANGE",
+      "required_inputs": [
+        "승인된 릴리스·배포 아키텍처·SLO",
+        "운영 환경·계정·외부 서비스·관측성 현황",
+        "지원·보안·복구 책임과 연락 체계"
+      ],
+      "internal_action": "Keep the preopened register empty until a real operational change occurs; then add one authorized change row with rollback, verification and receipt.",
+      "procedure": [
+        "실제 operational change 전에는 opening register를 비워 둔다.",
+        "change 대상·위험·승인·window·rollback·verification lifecycle field를 채운다.",
+        "서비스소유자가 실행 전 exact scope와 effective window를 승인한다.",
+        "실제 change event, operator와 execution receipt를 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "변경 ID·대상·전후",
+          "사유·위험·영향",
+          "승인·window·담당",
+          "실행 commit·명령",
+          "검증·관찰",
+          "rollback·incident 연결"
+        ],
+        "lifecycle_fields": [
+          "change_id",
+          "requested_at",
+          "requester_role",
+          "risk_assessment",
+          "target_scope",
+          "release_or_config_ref",
+          "approval_status",
+          "execution_window",
+          "rollback_plan_ref",
+          "verification_result",
+          "operator_identity",
+          "evidence_refs",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 변경 ID·대상·전후, 사유·위험·영향.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_EACH_REAL_OPERATIONAL_CHANGE_EXECUTION",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "승인·rollback·검증·실제 receipt 없는 운영 변경은 실행할 수 없고 관련 배포·release는 차단되며 현재 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    }
+  ],
+  "opening_snapshot": {
+    "as_of": "2026-07-27",
+    "operations_started": false,
+    "incident_record_count": 0,
+    "operation_change_record_count": 0,
+    "proves_no_incidents": false,
+    "proves_no_changes": false,
+    "interpretation": "운영 개시 전 빈 원장 구조이며 무사건·무장애·무변경 증거가 아니다."
+  },
+  "service_ownership": {
+    "operating_model": "SINGLE_ADMIN",
+    "administrator_and_final_approver_are_one_person": true,
+    "assigned_person": null,
+    "assigned_role": "PROJECT_OWNER_SINGLE_ADMIN",
+    "source_answer_id": "Q-OPS-001",
+    "assignment_status": "ROLE_CONFIRMED_IDENTITY_NOT_STORED",
+    "authentication": "MFA_OR_PASSKEY_REQUIRED",
+    "recovery_material_location": "SEPARATE_FROM_ADMIN_PHONE",
+    "shared_password_allowed": false,
+    "high_risk_work_when_access_lost": "FROZEN_UNTIL_RECOVERY"
+  },
+  "support_contract": {
+    "regular_hours": "WEEKDAYS_09:00_TO_18:00_ASIA_SEOUL",
+    "outside_hours": [
+      "자동 신규 보행 차단",
+      "활성 사용자 안전안내",
+      "민감자료 접근차단",
+      "증거보존",
+      "사전 지정 제한권한 비상 대응자 연락"
+    ],
+    "assigned_emergency_responder": null,
+    "production_operation_allowed_without_responder": false
+  },
+  "server_capacity_policy": {
+    "scope": "SERVER_ONLY",
+    "primary_original_capacity_gib": 300,
+    "separate_backup_capacity_gib": 300,
+    "monthly_storage_cost_limit_krw": 30000,
+    "thresholds": [
+      {
+        "percent": 70,
+        "action": "ADMIN_ONLY_WARNING"
+      },
+      {
+        "percent": 85,
+        "action": "PAUSE_NEW_FIELD_TEST_PARTICIPANTS"
+      },
+      {
+        "percent": 95,
+        "action": "CLEAN_EXPIRED_THEN_HOLD_NEW_RAW_COLLECTION_SESSIONS"
+      },
+      {
+        "percent": 100,
+        "action": "QUIETLY_HOLD_NEW_TRAINING_DATA_AND_AUTO_REPORT_CANDIDATES"
+      }
+    ],
+    "preserve_at_all_thresholds": [
+      "기존 암호화 자료",
+      "실시간 객체 탐지",
+      "실시간 길안내"
+    ],
+    "automatic_resume_when_capacity_available": true,
+    "delete_unexpired_originals_for_cost": false,
+    "user_notification_for_data_flow_only": false,
+    "admin_record_required": true
+  },
+  "phone_queue_policy": {
+    "scope": "PHONE_ONLY_SEPARATE_FROM_SERVER_PERCENTAGES",
+    "byte_limit": null,
+    "limit_gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+    "limit_status": "NOT_RUN",
+    "deletion_order": [
+      "다시 만들 수 있는 임시 cache",
+      "서버 수신 확인된 로컬 사본",
+      "보존기간이 끝난 선택적 학습자료",
+      "보존기간이 끝난 낮은 신뢰도의 미전송 신고 후보",
+      "그래도 부족하면 새 학습자료·자동신고 후보 생성 보류"
+    ],
+    "quiet_data_flow_pause": true,
+    "user_notification_only_if_realtime_safety_unreliable": true
+  },
+  "backup_policy": {
+    "retention_days": 35,
+    "separate_access_boundary": true,
+    "backup_instances": [],
+    "restore_executions": [],
+    "restore_execution_count": 0
+  },
+  "operations_checklist_executions": [],
+  "access_review_executions": [],
+  "incidents": [],
+  "operation_changes": [],
+  "data_disposition_executions": [],
+  "maintenance_backlog": [
+    {
+      "backlog_id": "OPS-BL-GATE-01",
+      "source_type": "REMAINING_GATE",
+      "source_gate_id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "source_ref": "policy.remaining_gates[GATE-PHONE-QUEUE-BYTE-LIMIT]",
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "status": "NOT_RUN",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "release remains NOT_ELIGIBLE",
+      "completion_criteria": "gate의 요구 증거·판정·승인이 같은 instance에 결속되어야 한다.",
+      "evidence_refs": [],
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    },
+    {
+      "backlog_id": "OPS-BL-GATE-02",
+      "source_type": "REMAINING_GATE",
+      "source_gate_id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "source_ref": "policy.remaining_gates[GATE-SERVER-CAPACITY-STATE-CONTRACT]",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "status": "NOT_RUN",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "release remains NOT_ELIGIBLE",
+      "completion_criteria": "gate의 요구 증거·판정·승인이 같은 instance에 결속되어야 한다.",
+      "evidence_refs": [],
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    },
+    {
+      "backlog_id": "OPS-BL-GATE-03",
+      "source_type": "REMAINING_GATE",
+      "source_gate_id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "source_ref": "policy.remaining_gates[GATE-RAW-COLLECTION-RELEASE-REVIEW]",
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "status": "NOT_RUN",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "release remains NOT_ELIGIBLE",
+      "completion_criteria": "gate의 요구 증거·판정·승인이 같은 instance에 결속되어야 한다.",
+      "evidence_refs": [],
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    },
+    {
+      "backlog_id": "OPS-BL-GATE-04",
+      "source_type": "REMAINING_GATE",
+      "source_gate_id": "GATE-CLOUD-COST-MEASUREMENT",
+      "source_ref": "policy.remaining_gates[GATE-CLOUD-COST-MEASUREMENT]",
+      "title": "실제 클라우드 저장비 측정",
+      "status": "NOT_RUN",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "release remains NOT_ELIGIBLE",
+      "completion_criteria": "gate의 요구 증거·판정·승인이 같은 instance에 결속되어야 한다.",
+      "evidence_refs": [],
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    },
+    {
+      "backlog_id": "OPS-BL-GATE-05",
+      "source_type": "REMAINING_GATE",
+      "source_gate_id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "source_ref": "policy.remaining_gates[GATE-SINGLE-ADMIN-RECOVERY-DRILL]",
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "status": "NOT_RUN",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "release remains NOT_ELIGIBLE",
+      "completion_criteria": "gate의 요구 증거·판정·승인이 같은 instance에 결속되어야 한다.",
+      "evidence_refs": [],
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    },
+    {
+      "backlog_id": "OPS-BL-FP035-001",
+      "source_type": "OPEN_POLICY_ISSUE",
+      "source_issue_id": "ISS-POLICY-FP035-NETWORK-001",
+      "source_ref": "docs/control/decision-interview/walksafe-feature-policy-fp035-correction-candidate-20260722-r001.json",
+      "title": "FP-035 정규화 지시를 새 산출물 묶음 승인에 결속",
+      "status": "OWNER_DIRECTIVE_CAPTURED_PENDING_BUNDLED_APPROVAL",
+      "priority": "P0_RELEASE_BLOCKING",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "risk_if_open": "후보 정책은 NOT_EFFECTIVE이며 관련 release 시험을 시작할 수 없다.",
+      "completion_criteria": "새 묶음 승인과 관련 시험 증거가 동일 정책 generation에 결속되어야 한다.",
+      "evidence_refs": [],
+      "normalized_policy": {
+        "walking": "일반 활동원본은 보행 중 휴대전화에 암호화해 저장하고 서버로 전송하지 않는다.",
+        "stopped_mobile_opted_in": "사용자가 이동통신망 전송을 명시적으로 선택한 경우에만 정지 판정 뒤 이동통신망 전송을 허용한다.",
+        "stopped_mobile_not_opted_in": "이동통신망 전송을 선택하지 않은 사용자는 정지 뒤에도 Wi-Fi에서만 전송한다."
+      },
+      "waived": false,
+      "waiver_status": "NOT_APPROVED",
+      "approval_status": "NOT_APPROVED",
+      "receipt_ref": null
+    }
+  ],
+  "technical_debt": [
+    {
+      "debt_id": "OPS-TD-001",
+      "source_ref": "OPS-04",
+      "title": "SLI·SLO·error budget 수치 미측정",
+      "status": "OPEN",
+      "impact": "운영 품질 목표와 error-budget 판정을 수치로 할 수 없다.",
+      "priority": "P0_BEFORE_PRODUCTION",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "closure_criteria": "실측 SLI와 승인된 SLO/error budget 및 산출 근거를 결속한다.",
+      "evidence_refs": [],
+      "risk_acceptance_status": "NOT_APPROVED",
+      "acceptance_receipt_ref": null
+    },
+    {
+      "debt_id": "OPS-TD-002",
+      "source_ref": "OPS-06",
+      "title": "운영 dashboard 실제 구현·검증 전",
+      "status": "OPEN",
+      "impact": "운영자가 지연·오류·안전 경보 상태를 검증된 화면에서 확인할 수 없다.",
+      "priority": "P0_BEFORE_PRODUCTION",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "closure_criteria": "실환경 dashboard 권한·data freshness·alert 연결을 검증한다.",
+      "evidence_refs": [],
+      "risk_acceptance_status": "NOT_APPROVED",
+      "acceptance_receipt_ref": null
+    },
+    {
+      "debt_id": "OPS-TD-003",
+      "source_ref": "OPS-03",
+      "title": "비상 대응자 실명·대기표 미배정",
+      "status": "OPEN",
+      "impact": "단일 관리자 연락 불가 시 제한권한 안전 대응을 개시할 수 없다.",
+      "priority": "P0_BEFORE_PRODUCTION",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "closure_criteria": "지정·연락·최소권한·대체 연락경로를 실제로 검증한다.",
+      "evidence_refs": [],
+      "risk_acceptance_status": "NOT_APPROVED",
+      "acceptance_receipt_ref": null
+    },
+    {
+      "debt_id": "OPS-TD-004",
+      "source_ref": "OPS-11,OPS-13",
+      "title": "복원·재해복구·관리자 분실 훈련 미실행",
+      "status": "OPEN",
+      "impact": "backup 복원성과 단일 관리자 복구 가능성이 입증되지 않았다.",
+      "priority": "P0_BEFORE_PRODUCTION",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "closure_criteria": "격리 복원·DR·관리자 접근상실 훈련 결과와 결함을 기록한다.",
+      "evidence_refs": [],
+      "risk_acceptance_status": "NOT_APPROVED",
+      "acceptance_receipt_ref": null
+    }
+  ],
+  "external_dependencies": [
+    {
+      "dependency_id": "EXT-TMAP",
+      "name": "TMAP route/map API",
+      "data_boundary": "route request/response only; approved proxy boundary",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "quota_status": "NOT_ESTABLISHED",
+      "cost_status": "NOT_ESTABLISHED",
+      "support_status": "NOT_ESTABLISHED",
+      "review_due_condition": "BEFORE_LIVE_TMAP_OR_NAMED_RELEASE",
+      "monitoring_signals": [
+        "error taxonomy별 count",
+        "4-second timeout count",
+        "quota rejection count"
+      ],
+      "quota_and_failure_validation": "NOT_RUN",
+      "failure_fallback": "새 경로 요청 중지·stale route 금지·사용자 안전행동 안내",
+      "provider_exit_status": "NOT_RUN",
+      "alternate_validation_status": "NOT_RUN",
+      "evidence_refs": [],
+      "receipt_ref": null
+    },
+    {
+      "dependency_id": "EXT-OBJECT-STORAGE",
+      "name": "서울 리전 원본·backup object storage",
+      "data_boundary": "암호화 원본과 최소 metadata",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "quota_status": "NOT_ESTABLISHED",
+      "cost_status": "PROJECT_LIMIT_30000_KRW_NOT_PROVIDER_CONTRACT",
+      "support_status": "NOT_ESTABLISHED",
+      "review_due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "monitoring_signals": [
+        "primary capacity percent",
+        "backup age",
+        "deletion reconciliation lag"
+      ],
+      "quota_and_failure_validation": "NOT_RUN",
+      "failure_fallback": "새 수집 단계별 보류; 기존 암호화 자료·실시간 기능 유지",
+      "provider_exit_status": "NOT_RUN",
+      "alternate_validation_status": "NOT_RUN",
+      "evidence_refs": [],
+      "receipt_ref": null
+    },
+    {
+      "dependency_id": "EXT-ALERT-PATHS",
+      "name": "관리자·비상대응자 경보 경로",
+      "data_boundary": "민감 원본·인증증명 없는 최소 장애정보",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "quota_status": "NOT_ESTABLISHED",
+      "cost_status": "NOT_ESTABLISHED",
+      "support_status": "NOT_ESTABLISHED",
+      "review_due_condition": "BEFORE_PRODUCTION_OPERATION",
+      "monitoring_signals": [
+        "delivery failure",
+        "acknowledgment delay",
+        "alternate path failure"
+      ],
+      "quota_and_failure_validation": "NOT_RUN",
+      "failure_fallback": "서로 다른 대체 연락경로와 자동 신규세션 차단",
+      "provider_exit_status": "NOT_RUN",
+      "alternate_validation_status": "NOT_RUN",
+      "evidence_refs": [],
+      "receipt_ref": null
+    },
+    {
+      "dependency_id": "EXT-ANDROID-DISTRIBUTION",
+      "name": "Android build·distribution path",
+      "data_boundary": "signed release artifact와 최소 배포 metadata",
+      "owner_role": "PROJECT_OWNER_SINGLE_ADMIN",
+      "quota_status": "NOT_ESTABLISHED",
+      "cost_status": "NOT_ESTABLISHED",
+      "support_status": "NOT_ESTABLISHED",
+      "review_due_condition": "BEFORE_NAMED_RELEASE_CANDIDATE",
+      "monitoring_signals": [
+        "artifact hash mismatch",
+        "installation failure",
+        "rollout halt"
+      ],
+      "quota_and_failure_validation": "NOT_RUN",
+      "failure_fallback": "배포 중단; unsigned APK나 Web/PWA로 대체하지 않음",
+      "provider_exit_status": "NOT_RUN",
+      "alternate_validation_status": "NOT_RUN",
+      "deployment_descriptor_ref": "model/deployments/local-deployment.json",
+      "evidence_refs": [],
+      "receipt_ref": null
+    }
+  ],
+  "remaining_gates": [
+    {
+      "id": "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "title": "휴대전화 대기자료의 실제 용량 한도",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "지원 기기별 저장공간과 대기자료 크기를 실측해 휴대폰 바이트 상한을 정한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "title": "서버 용량상태를 휴대전화에 전달하는 규칙",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "서버 부하·상태변화 지연·오프라인 시간을 측정해 온라인 조회주기와 TTL을 정하고, 버전·관측시각·오프라인 동작을 API와 단말 상태기계로 명세해 시험한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "title": "무가림 원본 수집의 출시 전 독립 검토",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "출시 전 독립 검토와 고지·동의·권리행사 절차를 완료한다. 검토 결과가 수집 범위나 절차 변경을 요구하면 변경요청을 만들고 영향분석과 제품책임자 재승인을 거친다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-CLOUD-COST-MEASUREMENT",
+      "title": "실제 클라우드 저장비 측정",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "정책 가정과 실제 저장량·요청·복원 비용을 비교해 월 30,000원 상한 충족을 확인한다.",
+      "evidence_ids": []
+    },
+    {
+      "id": "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
+      "title": "관리자 휴대전화 분실 복구훈련",
+      "status": "NOT_RUN",
+      "waived": false,
+      "closure": "실제 사용자시험 또는 배포 전에 관리자 휴대전화 분실을 가정해 외부 복구수단 사용, 기기 세션 폐기, 고위험 작업 동결과 복구를 한 번 실행하고 증거를 남긴다.",
+      "evidence_ids": []
+    }
+  ],
+  "approval_boundary": {
+    "registers_preopened": true,
+    "operations_started": false,
+    "incident_count": 0,
+    "operation_change_count": 0,
+    "restore_execution_count": 0,
+    "postmortem_count": 0,
+    "actual_execution_receipt_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

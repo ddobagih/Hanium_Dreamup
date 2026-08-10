@@ -1,0 +1,1103 @@
+{
+  "schema_version": "walksafe.validation-summary.v9",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W9-VALIDATION-SUMMARY-20260727-002",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "PARTIAL_WAVE_COMPLETED_WITH_1_OPEN_INTERNAL_GAP_AND_7_EXTERNAL_BOUNDARIES",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "23f9bbae0eab485345952a3de58c425ba87db06fca58a33a88e62651fc4dd4a1"
+  },
+  "scope": {
+    "wave_id": "W9",
+    "artifact_count": 15,
+    "exact_artifact_ids": [
+      "DLV-CLS-07",
+      "DLV-CLS-08",
+      "DLV-CLS-09",
+      "DLV-CLS-10",
+      "DLV-CLS-14",
+      "DLV-CLS-15",
+      "DLV-CLS-16",
+      "DLV-OPS-17",
+      "DLV-OPS-19",
+      "DLV-OPS-20",
+      "DLV-OPS-21",
+      "DLV-OPS-24",
+      "DLV-WS-08",
+      "DLV-WS-10",
+      "DLV-WS-18"
+    ]
+  },
+  "transition_authority": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+    "sha256": "6fa36d970aa84e558d5c67547c41465412224cdd2ccea8424e790b3f4daffa2d",
+    "byte_count": 11799,
+    "status": "GO_STATUS_DELTA_ALLOWED",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "sole_transition_authority": true,
+    "subject_set_sha256": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0",
+    "subject_count": 17,
+    "subject_preimage_byte_length": 2335,
+    "subject_digest_reproduced": true,
+    "historical_review": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+      "sha256": "6063f27a9563022dc523fd41ec4c40e79a7c20a5d72c20f3da03c99b1f8011ea",
+      "byte_count": 12809,
+      "status": "NO_GO",
+      "findings": {
+        "blocking": 0,
+        "major": 2,
+        "minor": 1
+      },
+      "authority": "HISTORICAL_ONLY"
+    },
+    "central_sealing_review": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+      "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+      "byte_count": 9392,
+      "verdict": "NO_GO",
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 1
+      },
+      "authority": "REMEDIATION_HISTORY_NOT_TRANSITION_AUTHORITY",
+      "finding_id": "MINOR-01",
+      "finding": "Required final-review forward path was not explicitly resolved.",
+      "resolution": "forward_reference_resolution now explicitly maps the expected path to the actual sole GO authority without creating a synthetic alias.",
+      "resolution_status": "REMEDIATED_PENDING_NEW_INDEPENDENT_SEALING_REVIEW"
+    }
+  },
+  "forward_reference_resolution": {
+    "expected_path": "docs/control/execution/artifact-remediation/20260726/w9/independent-final-review.md",
+    "expected_binding_kind": "PATH_ONLY_FORWARD_REFERENCE",
+    "expected_current_status": "NOT_YET_BOUND",
+    "expected_path_exists": false,
+    "actual_path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+    "actual_raw_sha256": "6fa36d970aa84e558d5c67547c41465412224cdd2ccea8424e790b3f4daffa2d",
+    "actual_byte_count": 11799,
+    "actual_verdict": {
+      "status": "GO_STATUS_DELTA_ALLOWED",
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 0
+      }
+    },
+    "actual_subject_set_sha256": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0",
+    "actual_subject_count": 17,
+    "actual_subject_preimage_byte_length": 2335,
+    "actual_subject_digest_reproduced": true,
+    "resolution_status": "RESOLVED_BY_ACTUAL_GO_AUTHORITY",
+    "resolution_reason": "Review authority is determined by the verified review contract, explicit reproducible subject, verdict, and raw binding rather than by the filename.",
+    "synthetic_alias_file_created": false,
+    "stale_reference_count": 0,
+    "path_ambiguity_count": 0
+  },
+  "central_sealing_remediation_history": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+    "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+    "byte_count": 9392,
+    "verdict": "NO_GO",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 1
+    },
+    "authority": "REMEDIATION_HISTORY_NOT_TRANSITION_AUTHORITY",
+    "finding_id": "MINOR-01",
+    "finding": "Required final-review forward path was not explicitly resolved.",
+    "resolution": "forward_reference_resolution now explicitly maps the expected path to the actual sole GO authority without creating a synthetic alias.",
+    "resolution_status": "REMEDIATED_PENDING_NEW_INDEPENDENT_SEALING_REVIEW"
+  },
+  "latest_pair_and_source_fingerprints": {
+    "current_pair": {
+      "json": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+        "raw_sha256": "1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda",
+        "byte_count": 237532
+      },
+      "markdown": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.md",
+        "raw_sha256": "635154e9ffad89c702d01f4a7ba1558b1170daefdd627b4ae1036bb09c5b20a7",
+        "byte_count": 151385
+      }
+    },
+    "content": "312dd10dcae5147ba0bddf6f2f380c07019320fbb83a70e3300c2227a7525cb1",
+    "direct_evidence": "82104b6ad52e82dcae304afaacb082a4ab19e24f6c2b827892dff262bb53d58b",
+    "logical_input_set": "61e40326e93b0efa97da283cfddce96522a4b7b12f0b3622867a2febd6e0f69e",
+    "semantic_projection": "5b5dd16aad3e41b7e742bcd217841d3a9462f8c1d09239783f5dc47e3b69279a",
+    "semantic_projection_schema": "walksafe.w9.closure-operations-walksafe.semantic.v1",
+    "direct_source_count": 14,
+    "direct_source_stale_count": 0,
+    "exact_disposition_parity": "15/15",
+    "stable_id_parity": "47/47_UNIQUE_47",
+    "external7_generated_object_parity": "7/7",
+    "all_reproduced": true
+  },
+  "external_action_registry": [
+    {
+      "artifact_type_code": "DLV-CLS-08",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-CLS-10",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-CLS-14",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-CLS-15",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-CLS-16",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-OPS-17",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    },
+    {
+      "artifact_type_code": "DLV-OPS-19",
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "canonical_contract_bound": true,
+      "named_trigger_and_authority_bound_in_source": true,
+      "actual_authority_identity": null,
+      "actual_event_count": 0,
+      "actual_evidence_count": 0,
+      "actual_receipt_count": 0,
+      "execution_status": "NOT_RUN",
+      "approval_status": "NOT_APPROVED",
+      "acceptance_status": "NOT_APPROVED",
+      "operator_state": "UNASSIGNED",
+      "recipient_state": "UNASSIGNED",
+      "fake_event_or_receipt_allowed": false,
+      "release_status": "NOT_ELIGIBLE"
+    }
+  ],
+  "verification_boundary": {
+    "ws10_same_input_pt_tflite_comparison_status": "NOT_RUN",
+    "ws10_tolerance_status": "NOT_ESTABLISHED",
+    "formal_test_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "global_product_execution_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "ws08_quantitative_validation_status": "NOT_RUN",
+    "live_provider_status": "NOT_RUN",
+    "quota_validation_status": "NOT_RUN",
+    "provider_deployment_status": "NOT_RUN",
+    "provider_exit_test_status": "NOT_RUN",
+    "alternate_provider_validation_status": "NOT_RUN",
+    "signing_execution_status": "NOT_RUN",
+    "signing_assessment_status": "NOT_ASSESSED",
+    "deployment_execution_status": "NOT_RUN",
+    "external7_execution_status": "NOT_RUN",
+    "global_acceptance_status": "NOT_RUN",
+    "closure_approval_status": "NOT_APPROVED",
+    "release_approval_status": "NOT_APPROVED",
+    "remaining_release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "fake_event_or_receipt_count": 0
+  },
+  "evidence_exclusion_boundary": {
+    "raw_secret_material_included": false,
+    "raw_advisory_dump_included": false,
+    "fake_event_or_receipt_included": false,
+    "synthetic_authority_alias_file_created": false,
+    "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+  },
+  "validation_result": "PASS",
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+    "upstream": {
+      "input_set_sha256": "046a1d72f01f1d0450b5282654de536bcef92f678ebafe1df1a0f54e833f9919",
+      "artifact_status_delta": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json",
+        "sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427",
+        "byte_count": 58451
+      }
+    },
+    "downstream": [
+      "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json"
+    ],
+    "forward_references": "PATH_ONLY",
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS"
+  },
+  "state_transition": {
+    "before": {
+      "OK": 117,
+      "INTERNAL_GAP": 62,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "delta": {
+      "OK": 7,
+      "INTERNAL_GAP": -14,
+      "EXTERNAL": 7,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    },
+    "after": {
+      "OK": 124,
+      "INTERNAL_GAP": 48,
+      "EXTERNAL": 49,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "OK": {
+      "count": 7,
+      "artifact_ids": [
+        "DLV-CLS-07",
+        "DLV-CLS-09",
+        "DLV-OPS-20",
+        "DLV-OPS-21",
+        "DLV-OPS-24",
+        "DLV-WS-08",
+        "DLV-WS-18"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 1,
+      "artifact_ids": [
+        "DLV-WS-10"
+      ]
+    },
+    "EXTERNAL": {
+      "count": 7,
+      "artifact_ids": [
+        "DLV-CLS-08",
+        "DLV-CLS-10",
+        "DLV-CLS-14",
+        "DLV-CLS-15",
+        "DLV-CLS-16",
+        "DLV-OPS-17",
+        "DLV-OPS-19"
+      ]
+    }
+  },
+  "validation_matrix": [
+    {
+      "check_id": "W9-CORR-01-SCHEMA",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-02-EXACT15",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-03-FINAL_AUTHORITY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-04-SUBJECT17",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-05-FORWARD_EXPECTED_CAPTURED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-06-FORWARD_ACTUAL_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-07-FORWARD_RESOLVED",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-08-SYNTHETIC_ALIAS_FALSE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-09-STALE_REFERENCE_ZERO",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-10-PATH_AMBIGUITY_ZERO",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-11-SEALING_NO_GO_HISTORY_BOUND",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-12-SEALING_REVIEW_NOT_AUTHORITY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-13-W8_PREDECESSOR",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-14-INPUT20",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-15-INPUT_DIGEST",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-16-COMMON_DIGEST",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-17-SELF_CONTRACT",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-18-DAG",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-19-COUNTS",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-20-CLASSIFICATION_7_1_7",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-21-SOURCE14",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-22-PARITY",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-23-EXTERNAL7",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-24-WS10",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-25-FORMAL_DEVICE_PROVIDER",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-26-SIGN_DEPLOY_CLOSURE_RELEASE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-27-NO_SECRET_ADVISORY_FAKE",
+      "result": "PASS"
+    },
+    {
+      "check_id": "W9-CORR-28-STATUS",
+      "result": "PASS"
+    }
+  ],
+  "validation_totals": {
+    "check_count": 28,
+    "passed": 28,
+    "failed": 0,
+    "result": "PASS"
+  },
+  "validation_statement": "W9 MINOR-01 forward reference is explicitly resolved to the actual sole GO authority; stale reference and path ambiguity counts are zero. All prior exact15, counts, source and conservative boundaries remain unchanged.",
+  "integrity": {
+    "input_count": 20,
+    "input_set_sha256": "046a1d72f01f1d0450b5282654de536bcef92f678ebafe1df1a0f54e833f9919",
+    "delta_sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427",
+    "check_count": 28,
+    "passed_check_count": 28,
+    "failed_check_count": 0,
+    "stale_reference_count": 0,
+    "path_ambiguity_count": 0,
+    "common_fingerprint": "23f9bbae0eab485345952a3de58c425ba87db06fca58a33a88e62651fc4dd4a1",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "fbcfed033f3ce4826ca99ba98c44732a9653cf7bdd9bdfa3393895667b189547"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact physical input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "role_excluded": true
+      },
+      "preimage": [
+        {
+          "byte_count": 479137,
+          "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json",
+          "sha256": "6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7"
+        },
+        {
+          "byte_count": 59125,
+          "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+          "sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f"
+        },
+        {
+          "byte_count": 29777,
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+          "sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05"
+        },
+        {
+          "byte_count": 9392,
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+          "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30"
+        },
+        {
+          "byte_count": 237532,
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+          "sha256": "1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda"
+        },
+        {
+          "byte_count": 151385,
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.md",
+          "sha256": "635154e9ffad89c702d01f4a7ba1558b1170daefdd627b4ae1036bb09c5b20a7"
+        },
+        {
+          "byte_count": 11799,
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+          "sha256": "6fa36d970aa84e558d5c67547c41465412224cdd2ccea8424e790b3f4daffa2d"
+        },
+        {
+          "byte_count": 12809,
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+          "sha256": "6063f27a9563022dc523fd41ec4c40e79a7c20a5d72c20f3da03c99b1f8011ea"
+        },
+        {
+          "byte_count": 57361,
+          "path": "docs/deliverables/10-operations/operations-control-registers.md",
+          "sha256": "e5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2"
+        },
+        {
+          "byte_count": 32049,
+          "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+          "sha256": "8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a"
+        },
+        {
+          "byte_count": 68326,
+          "path": "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+          "sha256": "dfa1a5d817bf41b2ff81a14f76a559d04076e7e393f0eed4336eb2aa8b686ce5"
+        },
+        {
+          "byte_count": 35094,
+          "path": "docs/deliverables/12-closure/closure-handover-register.md",
+          "sha256": "35ae3e98cb563f7e23046c5e5f26ddd152334d320f4182b90cf8c34904f80fcd"
+        },
+        {
+          "byte_count": 33318,
+          "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+          "sha256": "1cbebd3daec7b862874af8705f5a92d13f770f847cd5a39838a764ee7d67e3ce"
+        },
+        {
+          "byte_count": 35802,
+          "path": "docs/deliverables/12-closure/registers/closure-readiness-register.json",
+          "sha256": "566ec31ed9d405604e914d4f8ed02f3875a420f9f9f7458376851d921d2daf46"
+        },
+        {
+          "byte_count": 125261,
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a"
+        },
+        {
+          "byte_count": 31302,
+          "path": "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+          "sha256": "4c73dbd4df8356b0ccba3de6b4193d6d693be801e887021a8a6964bc0b6e316f"
+        },
+        {
+          "byte_count": 132367,
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6"
+        },
+        {
+          "byte_count": 130667,
+          "path": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+          "sha256": "1b22bad59dda622e53ac910ace405c59e1d31aea47136894b3c187eed8faca5d"
+        },
+        {
+          "byte_count": 28178,
+          "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+          "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12"
+        },
+        {
+          "byte_count": 19703,
+          "path": "tests/test_walksafe_formal_sec_ws.py",
+          "sha256": "39c475e3f56d7c4d867cf1f85ab2742c6970876fb58e13892de7d2908c27b83e"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "046a1d72f01f1d0450b5282654de536bcef92f678ebafe1df1a0f54e833f9919"
+    },
+    "final_review_subject_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "17 unique physical files explicitly enumerated by the final independent rereview",
+      "record_serialization": "<path><TAB><sha256><TAB><byte_length><LF>",
+      "record_count": 17,
+      "preimage_byte_length": 2335,
+      "preimage_records": [
+        {
+          "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json",
+          "sha256": "6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7",
+          "byte_length": 479137
+        },
+        {
+          "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+          "sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f",
+          "byte_length": 59125
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+          "sha256": "1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda",
+          "byte_length": 237532
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.md",
+          "sha256": "635154e9ffad89c702d01f4a7ba1558b1170daefdd627b4ae1036bb09c5b20a7",
+          "byte_length": 151385
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+          "sha256": "6063f27a9563022dc523fd41ec4c40e79a7c20a5d72c20f3da03c99b1f8011ea",
+          "byte_length": 12809
+        },
+        {
+          "path": "docs/deliverables/10-operations/operations-control-registers.md",
+          "sha256": "e5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2",
+          "byte_length": 57361
+        },
+        {
+          "path": "docs/deliverables/10-operations/registers/operations-registers.json",
+          "sha256": "8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a",
+          "byte_length": 32049
+        },
+        {
+          "path": "docs/deliverables/11-walksafe/walksafe-safety-and-policy.md",
+          "sha256": "dfa1a5d817bf41b2ff81a14f76a559d04076e7e393f0eed4336eb2aa8b686ce5",
+          "byte_length": 68326
+        },
+        {
+          "path": "docs/deliverables/12-closure/closure-handover-register.md",
+          "sha256": "35ae3e98cb563f7e23046c5e5f26ddd152334d320f4182b90cf8c34904f80fcd",
+          "byte_length": 35094
+        },
+        {
+          "path": "docs/deliverables/12-closure/decommissioning-plan.md",
+          "sha256": "1cbebd3daec7b862874af8705f5a92d13f770f847cd5a39838a764ee7d67e3ce",
+          "byte_length": 33318
+        },
+        {
+          "path": "docs/deliverables/12-closure/registers/closure-readiness-register.json",
+          "sha256": "566ec31ed9d405604e914d4f8ed02f3875a420f9f9f7458376851d921d2daf46",
+          "byte_length": 35802
+        },
+        {
+          "path": "docs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json",
+          "sha256": "c02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a",
+          "byte_length": 125261
+        },
+        {
+          "path": "docs/deliverables/manifests/sec-ws-draft-20260721-r001.json",
+          "sha256": "4c73dbd4df8356b0ccba3de6b4193d6d693be801e887021a8a6964bc0b6e316f",
+          "byte_length": 31302
+        },
+        {
+          "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+          "sha256": "3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6",
+          "byte_length": 132367
+        },
+        {
+          "path": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+          "sha256": "1b22bad59dda622e53ac910ace405c59e1d31aea47136894b3c187eed8faca5d",
+          "byte_length": 130667
+        },
+        {
+          "path": "tests/test_walksafe_formal_rel_ops_cls.py",
+          "sha256": "78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12",
+          "byte_length": 28178
+        },
+        {
+          "path": "tests/test_walksafe_formal_sec_ws.py",
+          "sha256": "39c475e3f56d7c4d867cf1f85ab2742c6970876fb58e13892de7d2908c27b83e",
+          "byte_length": 19703
+        }
+      ],
+      "preimage_utf8_text": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json\t6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7\t479137\ndocs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json\t20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f\t59125\ndocs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json\t1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda\t237532\ndocs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.md\t635154e9ffad89c702d01f4a7ba1558b1170daefdd627b4ae1036bb09c5b20a7\t151385\ndocs/control/execution/artifact-remediation/20260726/w9/independent-review.md\t6063f27a9563022dc523fd41ec4c40e79a7c20a5d72c20f3da03c99b1f8011ea\t12809\ndocs/deliverables/10-operations/operations-control-registers.md\te5f67afa7aa1a238f58624d80038443461ddecec1d821bc66216b774e00237b2\t57361\ndocs/deliverables/10-operations/registers/operations-registers.json\t8cdf279aebb020a94161414d75a219cc0f9dd926ce86235402185e3ab920fa2a\t32049\ndocs/deliverables/11-walksafe/walksafe-safety-and-policy.md\tdfa1a5d817bf41b2ff81a14f76a559d04076e7e393f0eed4336eb2aa8b686ce5\t68326\ndocs/deliverables/12-closure/closure-handover-register.md\t35ae3e98cb563f7e23046c5e5f26ddd152334d320f4182b90cf8c34904f80fcd\t35094\ndocs/deliverables/12-closure/decommissioning-plan.md\t1cbebd3daec7b862874af8705f5a92d13f770f847cd5a39838a764ee7d67e3ce\t33318\ndocs/deliverables/12-closure/registers/closure-readiness-register.json\t566ec31ed9d405604e914d4f8ed02f3875a420f9f9f7458376851d921d2daf46\t35802\ndocs/deliverables/manifests/rel-ops-cls-draft-20260721-r001.json\tc02986f83e36140903f5d001cfb32fe36902dad28753d37d6ffe7f98e70c4c1a\t125261\ndocs/deliverables/manifests/sec-ws-draft-20260721-r001.json\t4c73dbd4df8356b0ccba3de6b4193d6d693be801e887021a8a6964bc0b6e316f\t31302\nscripts/build_walksafe_formal_rel_ops_cls_20260721.py\t3bf8c8b918b8c23d7da9ff111bfd3318593c60798447a10adef248effba92cd6\t132367\nscripts/build_walksafe_formal_sec_ws_20260721.py\t1b22bad59dda622e53ac910ace405c59e1d31aea47136894b3c187eed8faca5d\t130667\ntests/test_walksafe_formal_rel_ops_cls.py\t78d627a79202decdbadf81051b4700280b0c06056eebd8dacec359be64d75c12\t28178\ntests/test_walksafe_formal_sec_ws.py\t39c475e3f56d7c4d867cf1f85ab2742c6970876fb58e13892de7d2908c27b83e\t19703\n",
+      "ordering": "path ascending by UTF-8 byte order",
+      "encoding": "UTF-8",
+      "trailing_newline": "one LF after every record including the final record",
+      "digest": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact W9 central state including explicit final-review forward-reference resolution and sealing-review remediation history",
+      "basis_fields": [
+        "schema",
+        "wave_id",
+        "predecessor",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "EXTERNAL",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "final_review_subject_set_sha256",
+        "transition_authority",
+        "forward_reference_resolution",
+        "central_sealing_remediation_history",
+        "latest_pair_and_source_fingerprints",
+        "external7_boundary",
+        "boundary",
+        "evidence_exclusion_boundary"
+      ],
+      "preimage": {
+        "schema": "walksafe.w9-central-common.v2",
+        "wave_id": "W9",
+        "predecessor": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+          "sha256": "d05e7ebcc2be943f9d9d35d3eb9f163327ba387e694fc6366e439c4dc7aabd05",
+          "byte_count": 29777
+        },
+        "exact": [
+          "DLV-CLS-07",
+          "DLV-CLS-08",
+          "DLV-CLS-09",
+          "DLV-CLS-10",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-OPS-17",
+          "DLV-OPS-19",
+          "DLV-OPS-20",
+          "DLV-OPS-21",
+          "DLV-OPS-24",
+          "DLV-WS-08",
+          "DLV-WS-10",
+          "DLV-WS-18"
+        ],
+        "OK": [
+          "DLV-CLS-07",
+          "DLV-CLS-09",
+          "DLV-OPS-20",
+          "DLV-OPS-21",
+          "DLV-OPS-24",
+          "DLV-WS-08",
+          "DLV-WS-18"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-WS-10"
+        ],
+        "EXTERNAL": [
+          "DLV-CLS-08",
+          "DLV-CLS-10",
+          "DLV-CLS-14",
+          "DLV-CLS-15",
+          "DLV-CLS-16",
+          "DLV-OPS-17",
+          "DLV-OPS-19"
+        ],
+        "pre": {
+          "OK": 117,
+          "INTERNAL_GAP": 62,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 124,
+          "INTERNAL_GAP": 48,
+          "EXTERNAL": 49,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "046a1d72f01f1d0450b5282654de536bcef92f678ebafe1df1a0f54e833f9919",
+        "final_review_subject_set_sha256": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0",
+        "transition_authority": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+          "sha256": "6fa36d970aa84e558d5c67547c41465412224cdd2ccea8424e790b3f4daffa2d",
+          "byte_count": 11799,
+          "status": "GO_STATUS_DELTA_ALLOWED",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 0
+          },
+          "sole_transition_authority": true,
+          "subject_set_sha256": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0",
+          "subject_count": 17,
+          "subject_preimage_byte_length": 2335,
+          "subject_digest_reproduced": true
+        },
+        "forward_reference_resolution": {
+          "expected_path": "docs/control/execution/artifact-remediation/20260726/w9/independent-final-review.md",
+          "expected_binding_kind": "PATH_ONLY_FORWARD_REFERENCE",
+          "expected_current_status": "NOT_YET_BOUND",
+          "expected_path_exists": false,
+          "actual_path": "docs/control/execution/artifact-remediation/20260726/w9/independent-rereview.md",
+          "actual_raw_sha256": "6fa36d970aa84e558d5c67547c41465412224cdd2ccea8424e790b3f4daffa2d",
+          "actual_byte_count": 11799,
+          "actual_verdict": {
+            "status": "GO_STATUS_DELTA_ALLOWED",
+            "findings": {
+              "blocking": 0,
+              "major": 0,
+              "minor": 0
+            }
+          },
+          "actual_subject_set_sha256": "e568f64c536c00d44c6768d124f89c1a5ca9c38bb07da7f5c7b68b8253221cc0",
+          "actual_subject_count": 17,
+          "actual_subject_preimage_byte_length": 2335,
+          "actual_subject_digest_reproduced": true,
+          "resolution_status": "RESOLVED_BY_ACTUAL_GO_AUTHORITY",
+          "resolution_reason": "Review authority is determined by the verified review contract, explicit reproducible subject, verdict, and raw binding rather than by the filename.",
+          "synthetic_alias_file_created": false,
+          "stale_reference_count": 0,
+          "path_ambiguity_count": 0
+        },
+        "central_sealing_remediation_history": {
+          "path": "docs/control/execution/artifact-remediation/20260726/w9/central-sealing-review.md",
+          "sha256": "410c25430df668a208885f1ddf29921d0e28c18942ff97ea33f1bb3db9daef30",
+          "byte_count": 9392,
+          "verdict": "NO_GO",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 1
+          },
+          "authority": "REMEDIATION_HISTORY_NOT_TRANSITION_AUTHORITY",
+          "finding_id": "MINOR-01",
+          "finding": "Required final-review forward path was not explicitly resolved.",
+          "resolution": "forward_reference_resolution now explicitly maps the expected path to the actual sole GO authority without creating a synthetic alias.",
+          "resolution_status": "REMEDIATED_PENDING_NEW_INDEPENDENT_SEALING_REVIEW"
+        },
+        "latest_pair_and_source_fingerprints": {
+          "current_pair": {
+            "json": {
+              "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.json",
+              "raw_sha256": "1304b855d73b62ecb8f9f5ddd5aa7c6c9d42343d7f6e8b4b189c239d7323efda",
+              "byte_count": 237532
+            },
+            "markdown": {
+              "path": "docs/control/execution/artifact-remediation/20260726/w9/closure-operations-walksafe-current-state.md",
+              "raw_sha256": "635154e9ffad89c702d01f4a7ba1558b1170daefdd627b4ae1036bb09c5b20a7",
+              "byte_count": 151385
+            }
+          },
+          "content": "312dd10dcae5147ba0bddf6f2f380c07019320fbb83a70e3300c2227a7525cb1",
+          "direct_evidence": "82104b6ad52e82dcae304afaacb082a4ab19e24f6c2b827892dff262bb53d58b",
+          "logical_input_set": "61e40326e93b0efa97da283cfddce96522a4b7b12f0b3622867a2febd6e0f69e",
+          "semantic_projection": "5b5dd16aad3e41b7e742bcd217841d3a9462f8c1d09239783f5dc47e3b69279a",
+          "semantic_projection_schema": "walksafe.w9.closure-operations-walksafe.semantic.v1",
+          "direct_source_count": 14,
+          "direct_source_stale_count": 0,
+          "exact_disposition_parity": "15/15",
+          "stable_id_parity": "47/47_UNIQUE_47",
+          "external7_generated_object_parity": "7/7",
+          "all_reproduced": true
+        },
+        "external7_boundary": [
+          {
+            "artifact_type_code": "DLV-CLS-08",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-10",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-14",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-15",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-CLS-16",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-17",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          },
+          {
+            "artifact_type_code": "DLV-OPS-19",
+            "contract_schema": "walksafe.w9.external-execution-contract.v1",
+            "canonical_contract_bound": true,
+            "named_trigger_and_authority_bound_in_source": true,
+            "actual_authority_identity": null,
+            "actual_event_count": 0,
+            "actual_evidence_count": 0,
+            "actual_receipt_count": 0,
+            "execution_status": "NOT_RUN",
+            "approval_status": "NOT_APPROVED",
+            "acceptance_status": "NOT_APPROVED",
+            "operator_state": "UNASSIGNED",
+            "recipient_state": "UNASSIGNED",
+            "fake_event_or_receipt_allowed": false,
+            "release_status": "NOT_ELIGIBLE"
+          }
+        ],
+        "boundary": {
+          "ws10_same_input_pt_tflite_comparison_status": "NOT_RUN",
+          "ws10_tolerance_status": "NOT_ESTABLISHED",
+          "formal_test_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "global_product_execution_status": "NOT_RUN",
+          "actual_device_status": "NOT_RUN",
+          "ws08_quantitative_validation_status": "NOT_RUN",
+          "live_provider_status": "NOT_RUN",
+          "quota_validation_status": "NOT_RUN",
+          "provider_deployment_status": "NOT_RUN",
+          "provider_exit_test_status": "NOT_RUN",
+          "alternate_provider_validation_status": "NOT_RUN",
+          "signing_execution_status": "NOT_RUN",
+          "signing_assessment_status": "NOT_ASSESSED",
+          "deployment_execution_status": "NOT_RUN",
+          "external7_execution_status": "NOT_RUN",
+          "global_acceptance_status": "NOT_RUN",
+          "closure_approval_status": "NOT_APPROVED",
+          "release_approval_status": "NOT_APPROVED",
+          "remaining_release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "release_status": "NOT_ELIGIBLE",
+          "fake_event_or_receipt_count": 0
+        },
+        "evidence_exclusion_boundary": {
+          "raw_secret_material_included": false,
+          "raw_advisory_dump_included": false,
+          "fake_event_or_receipt_included": false,
+          "synthetic_authority_alias_file_created": false,
+          "permitted_evidence_form": "PATH_SHA256_BYTE_COUNT_AND_NON_SECRET_SUMMARY_ONLY"
+        }
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "arrays": "preserve declared semantic order"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "all central raw output SHA-256 values",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "23f9bbae0eab485345952a3de58c425ba87db06fca58a33a88e62651fc4dd4a1"
+    }
+  },
+  "digest_contract_validation": {
+    "input_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "final_review_subject_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "common_fingerprint": "PASS_INDEPENDENT_RECOMPUTE",
+    "artifact_status_delta_sha256": "ba13eeb5f61e7314d2e1127f5e0b40ab2e01a179c12e925f0641969aaab5e427"
+  }
+}

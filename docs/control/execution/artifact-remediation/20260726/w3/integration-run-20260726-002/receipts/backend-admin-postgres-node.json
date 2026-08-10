@@ -1,0 +1,92 @@
+{
+  "argv": [
+    "env",
+    "-u",
+    "DATABASE_URL",
+    "WALKSAFE_TEST_DATABASE_URL=<REDACTED_EPHEMERAL_LOOPBACK>",
+    "WALKSAFE_ENVIRONMENT=test",
+    "PYTHONPATH=<REPO>",
+    "uv",
+    "run",
+    "--no-project",
+    "<EXACT_UV_ADMIN_RUNTIME>",
+    "python",
+    "-m",
+    "pytest",
+    "-p",
+    "no:cacheprovider",
+    "-q",
+    "backend/tests/test_admin_security.py::test_postgres_admin_security_full_recovery_and_high_risk_path"
+  ],
+  "command_id": "backend-admin-postgres-node",
+  "cwd": ".",
+  "end": "2026-07-26T16:38:56.711819692Z",
+  "environment_constraints": {
+    "DATABASE_URL": "UNSET",
+    "WALKSAFE_ENVIRONMENT": "test",
+    "WALKSAFE_TEST_DATABASE_URL": "REDACTED_EPHEMERAL_LOOPBACK",
+    "selector_count": 1,
+    "single_use_database": true
+  },
+  "exit_code": 1,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "ab72e8d1547bf21dd88357e2e7f44a1f32792065cd0ba8564ce8b47c2d39ae5c"
+    }
+  },
+  "log_path": "logs/backend-admin-postgres-node.log",
+  "log_sha256": "7c51c88d82a3aeb41d9b90caa9ff0c8b81a79d9feeb287fb9a170c02e944b770",
+  "pytest_counts": {
+    "deselected": 0,
+    "errors": 0,
+    "failed": 1,
+    "passed": 0,
+    "skipped": 0
+  },
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 122728,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "runtime_packages": [
+    "alembic==1.16.5",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.13.0",
+    "certifi==2026.4.22",
+    "fastapi==0.128.8",
+    "geoalchemy2==0.17.1",
+    "greenlet==3.5.0",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.14",
+    "iniconfig==2.3.0",
+    "mako==1.3.12",
+    "markupsafe==3.0.3",
+    "packaging==26.2",
+    "pluggy==1.6.0",
+    "psycopg[binary]==3.2.13",
+    "psycopg-binary==3.2.13",
+    "pydantic==2.13.4",
+    "pydantic-core==2.46.4",
+    "pygments==2.20.0",
+    "pyotp==2.10.0",
+    "pytest==8.4.2",
+    "python-dotenv==1.2.1",
+    "python-multipart==0.0.20",
+    "sqlalchemy==2.0.49",
+    "starlette==0.52.1",
+    "typing-extensions==4.15.0",
+    "typing-inspection==0.4.2"
+  ],
+  "schema_version": "walksafe.w3-dev21-command-receipt.v2",
+  "start": "2026-07-26T16:38:55.861099769Z",
+  "status": "FAIL_REPORTED_NO_RETRY",
+  "time_log_path": "logs/backend-admin-postgres-node.time",
+  "time_log_sha256": "714760e4b041ccda48b5439629ab1e4679c467aca4fa555663444512569401e2",
+  "tool": {
+    "runtime": "UV_ADMIN_RUNTIME"
+  }
+}

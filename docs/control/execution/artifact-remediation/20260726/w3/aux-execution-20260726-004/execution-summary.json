@@ -1,0 +1,122 @@
+{
+  "auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-004",
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "approval_status": "NOT_CLAIMED",
+    "deployment_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "cleanup_actions": [
+    {
+      "action": "REMOVE_TEMP_VALIDATOR_HELPER",
+      "status": "PASS",
+      "target": "/tmp/w3-schema-validation-004.py"
+    },
+    {
+      "action": "REMOVE_TEMP_RAW_RESULT",
+      "status": "PASS",
+      "target": "/tmp/w3-schema-validation-004-raw.json"
+    }
+  ],
+  "command": {
+    "argv": [
+      "uv",
+      "run",
+      "--no-project",
+      "--with",
+      "jsonschema==4.25.1",
+      "python",
+      "/tmp/w3-schema-validation-004.py",
+      "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+      "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002",
+      "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas",
+      "/tmp/w3-schema-validation-004-raw.json"
+    ],
+    "cleanup": [],
+    "command_id": "official-schema-validation-jsonschema-4.25.1",
+    "cwd": ".",
+    "end": "2026-07-26T16:15:01.279093Z",
+    "environment_constraints": {
+      "full_backend_install_allowed": false,
+      "gpu_dependencies_allowed": false,
+      "schema_ref_network_allowed": false,
+      "uv_concurrent_downloads": 1,
+      "uv_http_timeout_seconds": 20
+    },
+    "exit_code": 0,
+    "log_path": "logs/official-schema-validation.log",
+    "log_sha256": "9a4e68c972b910f8e9be06b97250793a2cc09af3f64519d47690bd84178f1d48",
+    "output_paths": [
+      "sbom-validation-result.json",
+      "execution-summary.json"
+    ],
+    "role": "OFFICIAL_LOCAL_SCHEMA_VALIDATION",
+    "start": "2026-07-26T16:15:00.496301Z",
+    "status": "PASS",
+    "tool_version": "jsonschema 4.25.1 via uv run --no-project"
+  },
+  "common_subject_fingerprint": {
+    "algorithm": "SHA-256",
+    "basis": "canonical aux004 inputs + command log + exact validator",
+    "value": "da1bc02dcbec6a7421bb969829bf08b8382ef22c1a6b57b9282de2688fb2ab9d"
+  },
+  "document_id": "WALKSAFE-W3-SCHEMA-EXECUTION-SUMMARY-20260726-004",
+  "helper_sha256": "1bf57f7ce8cb7aa54f7316aa89b5b54292e3b8a88df22b35342ae0944d58ec94",
+  "input_bindings": {
+    "aux003_not_run_result": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/sbom-validation-result.json",
+      "sha256": "806472d069165f8ce7c0c1b939d2f282acfe428f6f36f5d98aca9a001acbfc79",
+      "supersession": "SUPERSEDED_BY_AUX004_EXACT_VALIDATOR_WITHOUT_REWRITE"
+    },
+    "cyclonedx_document": {
+      "bytes": 815731,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/sbom.cyclonedx.json",
+      "sha256": "c152aaf20d30cde286ddbb68a5778005ae96d44681fe6e00d8923f3a1a991cd4"
+    },
+    "cyclonedx_jsf_schema": {
+      "bytes": 8058,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-jsf-0.82.schema.json",
+      "sha256": "8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae"
+    },
+    "cyclonedx_schema": {
+      "bytes": 252625,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-1.6.schema.json",
+      "sha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93"
+    },
+    "spdx_document": {
+      "bytes": 907864,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/sbom.spdx.json",
+      "sha256": "5214f86e9d55aa434852c43fddefbab345f6186b9a550799e3bfb9fbb40490d8"
+    },
+    "spdx_schema": {
+      "bytes": 45312,
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/spdx-2.3.schema.json",
+      "sha256": "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
+    }
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "4eead0f164137b1bf5d5432b1b1456bc3a232d2bfdd131f1d5a65f904de5ad7d"
+    }
+  },
+  "output_binding": {
+    "content_fingerprint": "9031b95af43f7e6b00bee115055f6b42f6fd6ca13873d6d8f881d1effea8c698",
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-004/sbom-validation-result.json",
+    "sha256": "d9911aa5054e1350f55fb933aa1245600d75823dc17e47b0c6c2d00f3a69abbb"
+  },
+  "prepared_on": "2026-07-27",
+  "results": {
+    "aux003_not_run_superseded": true,
+    "cyclonedx_1_6_official_schema_validation": "PASS",
+    "overall_status": "PASS",
+    "spdx_2_3_official_schema_validation": "PASS"
+  },
+  "schema_version": "walksafe.w3-aux-execution-summary.v1",
+  "source_commit": null
+}

@@ -1,0 +1,67 @@
+.............................F.......................................... [ 14%]
+........................................................................ [ 28%]
+........................................................................ [ 42%]
+........................................................................ [ 56%]
+........................................................................ [ 71%]
+........................................................................ [ 85%]
+........................................................................ [ 99%]
+..                                                                       [100%]
+=================================== FAILURES ===================================
+_ WalkSafeProjectContinuationV24Test.test_sequence1_is_prepared_from_exact_v23_tail _
+
+self = <test_walksafe_project_continuation_v2_4.WalkSafeProjectContinuationV24Test testMethod=test_sequence1_is_prepared_from_exact_v23_tail>
+
+    def test_sequence1_is_prepared_from_exact_v23_tail(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        prepared = history[0]
+        runtime = prepared["runtime_after"]
+        predecessor = prepared["active_predecessor_import"]
+    
+        self.assertEqual(state["package_id"], V24_PACKAGE_ID)
+        self.assertEqual(state["static_plan_version"], V24_PLAN_VERSION)
+        self.assertGreaterEqual(len(history), 1)
+        self.assertEqual(prepared["sequence"], 1)
+        self.assertEqual(prepared["event_type"], "PACKAGE_PREPARED")
+        self.assertEqual(prepared["previous_event_sha256"], "")
+        self.assertEqual(
+            prepared["supersedes_event_sha256"],
+            EXPECTED_V23_TAIL_SHA256,
+        )
+        self.assertEqual(prepared["focus_goal_id"], FP011_GOAL_ID)
+        self.assertEqual(prepared["to_status"], "READY")
+        self.assertEqual(
+            prepared["static_plan_manifest_sha256"],
+            sha256_file(V24_MANIFEST),
+        )
+        self.assertEqual(
+            predecessor["source_checkpoint_raw_sha256"],
+            EXPECTED_V23_CHECKPOINT_RAW_SHA256,
+        )
+        self.assertEqual(
+            predecessor["source_transition_event_count"],
+            EXPECTED_V23_EVENT_COUNT,
+        )
+        self.assertEqual(
+            predecessor["source_transition_history_anchor_sha256"],
+            EXPECTED_V23_TAIL_SHA256,
+        )
+        self.assertEqual(runtime["focus_goal_id"], FP011_GOAL_ID)
+        self.assertEqual(
+            runtime["activation_status"],
+            "READY_NOT_ACTIVATED",
+        )
+        self.assertEqual(
+            runtime["package_status"],
+            "PREPARED_NOT_ACTIVATED",
+        )
+>       self.assertEqual(state["status_by_goal"][FP011_GOAL_ID], "READY")
+E       AssertionError: 'IN_PROGRESS' != 'READY'
+E       - IN_PROGRESS
+E       + READY
+
+tests/test_walksafe_project_continuation_v2_4.py:225: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_walksafe_project_continuation_v2_4.py::WalkSafeProjectContinuationV24Test::test_sequence1_is_prepared_from_exact_v23_tail
+1 failed, 505 passed in 164.48s (0:02:44)

@@ -1,0 +1,70 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :adminapp:preBuild UP-TO-DATE
+> Task :adminapp:preDebugBuild UP-TO-DATE
+> Task :adminapp:generateDebugBuildConfig
+> Task :adminapp:generateDebugResources
+> Task :adminapp:packageDebugResources
+> Task :adminapp:processDebugNavigationResources
+> Task :adminapp:parseDebugLocalResources
+> Task :adminapp:generateDebugRFile
+> Task :adminapp:compileDebugKotlin NO-SOURCE
+> Task :adminapp:javaPreCompileDebug
+> Task :adminapp:compileDebugJavaWithJavac
+> Task :adminapp:checkDebugAarMetadata
+> Task :adminapp:mapDebugSourceSetPaths
+> Task :adminapp:compileDebugNavigationResources
+> Task :adminapp:mergeDebugResources
+> Task :adminapp:createDebugCompatibleScreenManifests
+> Task :adminapp:extractDeepLinksDebug
+> Task :adminapp:processDebugMainManifest
+> Task :adminapp:processDebugManifest
+> Task :adminapp:processDebugManifestForPackage
+> Task :adminapp:processDebugResources
+> Task :adminapp:bundleDebugClassesToRuntimeJar
+> Task :adminapp:bundleDebugClassesToCompileJar
+> Task :adminapp:preDebugUnitTestBuild UP-TO-DATE
+> Task :adminapp:compileDebugUnitTestKotlin NO-SOURCE
+> Task :adminapp:javaPreCompileDebugUnitTest
+> Task :adminapp:compileDebugUnitTestJavaWithJavac
+> Task :adminapp:processDebugJavaRes NO-SOURCE
+> Task :adminapp:processDebugUnitTestJavaRes NO-SOURCE
+> Task :adminapp:testDebugUnitTest
+> Task :adminapp:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :adminapp:generateDebugAssets UP-TO-DATE
+> Task :adminapp:mergeDebugAssets
+> Task :adminapp:compressDebugAssets
+> Task :adminapp:desugarDebugFileDependencies
+> Task :adminapp:dexBuilderDebug
+> Task :adminapp:mergeDebugGlobalSynthetics
+> Task :adminapp:mergeDebugJavaResource
+> Task :adminapp:checkDebugDuplicateClasses
+> Task :adminapp:mergeExtDexDebug
+> Task :adminapp:mergeLibDexDebug
+> Task :adminapp:mergeProjectDexDebug
+> Task :adminapp:mergeDebugJniLibFolders
+> Task :adminapp:mergeDebugNativeLibs NO-SOURCE
+> Task :adminapp:stripDebugDebugSymbols NO-SOURCE
+> Task :adminapp:validateSigningDebug
+> Task :adminapp:writeDebugAppMetadata
+> Task :adminapp:writeDebugSigningConfigVersions
+> Task :adminapp:packageDebug
+> Task :adminapp:createDebugApkListingFileRedirect
+> Task :adminapp:assembleDebug
+> Task :adminapp:preDebugAndroidTestBuild SKIPPED
+> Task :adminapp:generateDebugAndroidTestLintModel
+> Task :adminapp:extractProguardFiles
+> Task :adminapp:generateDebugLintReportModel
+> Task :adminapp:generateDebugUnitTestLintModel
+> Task :adminapp:lintAnalyzeDebug
+> Task :adminapp:lintAnalyzeDebugAndroidTest
+> Task :adminapp:lintAnalyzeDebugUnitTest
+
+> Task :adminapp:lintReportDebug
+Wrote HTML report to file:///tmp/walksafe-fp008-authority-rurk7t3m/snapshots/repository-q7zub94j/repository/apps/android/adminapp/build/reports/lint-results-debug.html
+
+> Task :adminapp:lintDebug
+
+BUILD SUCCESSFUL in 10s
+48 actionable tasks: 48 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html

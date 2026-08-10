@@ -1,0 +1,442 @@
+{
+  "schema_version": "walksafe.product-quality-policy.v2",
+  "receipt_schema_version": "walksafe.product-quality-receipt.v3",
+  "ambient_environment_allowlist": [
+    "ANDROID_HOME",
+    "ANDROID_SDK_ROOT",
+    "CHROME_BIN",
+    "JAVA_HOME",
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "TMPDIR",
+    "TZ"
+  ],
+  "products": {
+    "web": {
+      "tested_environment_lock": null,
+      "tested_tool_lock": "apps/web/quality-requirements.lock",
+      "tested_site_packages": {
+        "format": "walksafe.record-claimed-site-closure.v2",
+        "closure": {
+          "count": 609,
+          "sha256": "3c4af3938cf097949d992257ba9716b28a026ef627f1480e98b79087f8a30a55"
+        }
+      },
+      "trusted_tool_distributions": {
+        "pip": "26.1.1"
+      },
+      "required_arguments": [
+        "web_release_archive"
+      ],
+      "steps": [
+        {
+          "id": "npm-ci",
+          "argv": [
+            "npm",
+            "ci"
+          ],
+          "cwd": "apps/web"
+        },
+        {
+          "id": "npm-audit",
+          "argv": [
+            "npm",
+            "audit",
+            "--audit-level=moderate"
+          ],
+          "cwd": "apps/web"
+        },
+        {
+          "id": "npm-lint",
+          "argv": [
+            "npm",
+            "run",
+            "lint"
+          ],
+          "cwd": "apps/web"
+        },
+        {
+          "id": "npm-typecheck",
+          "argv": [
+            "npm",
+            "run",
+            "typecheck"
+          ],
+          "cwd": "apps/web"
+        },
+        {
+          "id": "npm-test",
+          "argv": [
+            "npm",
+            "test"
+          ],
+          "cwd": "apps/web"
+        },
+        {
+          "id": "npm-build",
+          "argv": [
+            "npm",
+            "run",
+            "build"
+          ],
+          "cwd": "apps/web",
+          "fixed_environment": {
+            "NEXT_PUBLIC_DETECTOR_MODE": "server-v2",
+            "NEXT_PUBLIC_WALKSAFE_PWA_ENABLED": "true",
+            "NEXT_PUBLIC_WALKSAFE_SUPERVISED_TACTILE_LOCAL_STEERING": "false",
+            "NEXT_PUBLIC_WALKSAFE_TEST_CAPTURE_PANEL": "false",
+            "WALKSAFE_SOURCE_COMMIT": "{source_commit}"
+          }
+        },
+        {
+          "id": "runtime-trace",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "web",
+            "--",
+            "scripts/check_web_runtime_trace_scope_20260713.py"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        },
+        {
+          "id": "browser-lifecycle",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "web",
+            "--",
+            "scripts/check_pwa_browser_lifecycle_20260711.py",
+            "--existing-build-dir",
+            ".next"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "WALKSAFE_SOURCE_COMMIT": "{source_commit}"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "web_release_archive",
+          "path_argument": "web_release_archive",
+          "verification_step": "npm-build",
+          "verification": "fresh-next-standalone-content-with-validated-build-variance-v2"
+        }
+      ]
+    },
+    "android": {
+      "tested_environment_lock": null,
+      "tested_tool_lock": null,
+      "tested_site_packages": null,
+      "trusted_tool_distributions": {},
+      "required_arguments": [
+        "android_gateway_origin"
+      ],
+      "steps": [
+        {
+          "id": "unit-test",
+          "argv": [
+            "./gradlew",
+            "testDebugUnitTest",
+            "--no-daemon"
+          ],
+          "cwd": "apps/android"
+        },
+        {
+          "id": "lint-release",
+          "argv": [
+            "./gradlew",
+            "lintRelease",
+            "--no-daemon"
+          ],
+          "cwd": "apps/android",
+          "fixed_environment": {
+            "WALKSAFE_GATEWAY_ORIGIN": "{android_gateway_origin}",
+            "WALKSAFE_SOURCE_COMMIT": "{source_commit}"
+          }
+        },
+        {
+          "id": "assemble-release",
+          "argv": [
+            "./gradlew",
+            "assembleRelease",
+            "--no-daemon"
+          ],
+          "cwd": "apps/android",
+          "fixed_environment": {
+            "WALKSAFE_GATEWAY_ORIGIN": "{android_gateway_origin}",
+            "WALKSAFE_SOURCE_COMMIT": "{source_commit}"
+          }
+        },
+        {
+          "id": "apk-model-asset",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "android",
+            "--",
+            "scripts/check_android_apk_model_asset_20260713.py",
+            "--apk",
+            "apps/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "unsigned_apk",
+          "path": "apps/android/app/build/outputs/apk/release/app-release-unsigned.apk",
+          "producer_step": "assemble-release",
+          "verification": "fresh-gradle-assemble-output-v1"
+        }
+      ]
+    },
+    "backend": {
+      "tested_environment_lock": "backend/requirements.lock",
+      "tested_tool_lock": null,
+      "tested_site_packages": {
+        "format": "walksafe.record-claimed-site-closure.v2",
+        "closure": {
+          "count": 24430,
+          "sha256": "59df88d6a09919f130735e476c830a811169dde681d9684a3bc8f97bdaf8e43a"
+        }
+      },
+      "trusted_tool_distributions": {
+        "pip": "26.1.1"
+      },
+      "required_arguments": [],
+      "steps": [
+        {
+          "id": "database-preflight",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "backend",
+            "--",
+            "scripts/check_walksafe_test_database_20260713.py"
+          ],
+          "cwd": ".",
+          "ambient_environment": [
+            "WALKSAFE_TEST_DATABASE_URL"
+          ],
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        },
+        {
+          "id": "migrate-test-database",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "backend",
+            "--",
+            "-m",
+            "alembic",
+            "-c",
+            "backend/alembic.ini",
+            "upgrade",
+            "head"
+          ],
+          "cwd": ".",
+          "derived_environment": {
+            "DATABASE_URL": "WALKSAFE_TEST_DATABASE_URL"
+          },
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        },
+        {
+          "id": "backend-pytest",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "backend",
+            "--",
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            "backend/tests"
+          ],
+          "cwd": ".",
+          "ambient_environment": [
+            "WALKSAFE_TEST_DATABASE_URL"
+          ],
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+          }
+        },
+        {
+          "id": "openapi-check",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "backend",
+            "--",
+            "scripts/generate_walksafe_openapi.py",
+            "--check"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        },
+        {
+          "id": "pip-check",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "backend",
+            "--",
+            "-m",
+            "pip",
+            "check"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "openapi_contract",
+          "path": "contracts/walksafe.openapi.json"
+        },
+        {
+          "name": "walking_route_fixture",
+          "path": "contracts/fixtures/walking-route-v1.json"
+        }
+      ]
+    },
+    "voice": {
+      "tested_environment_lock": "voice/requirements.lock",
+      "tested_tool_lock": "voice/quality-requirements.lock",
+      "tested_site_packages": {
+        "format": "walksafe.record-claimed-site-closure.v2",
+        "closure": {
+          "count": 32932,
+          "sha256": "fd3e5048bb5b3edb11e24659048f2776ab0d2e7b179c8bed860239fba6f2cfc3"
+        }
+      },
+      "trusted_tool_distributions": {
+        "pip": "26.1.1"
+      },
+      "required_arguments": [],
+      "steps": [
+        {
+          "id": "voice-pytest",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "voice",
+            "--",
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            "tests/test_voice_intents.py",
+            "tests/test_voice_model_integrity.py",
+            "tests/test_voice_stt_policy.py",
+            "tests/test_voice_stt_server.py",
+            "tests/test_voice_tts.py"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"
+          }
+        },
+        {
+          "id": "pip-check",
+          "argv": [
+            "{python}",
+            "-I",
+            "-S",
+            "-B",
+            "scripts/run_walksafe_isolated_python_20260713.py",
+            "--repo-root",
+            ".",
+            "--product",
+            "voice",
+            "--",
+            "-m",
+            "pip",
+            "check"
+          ],
+          "cwd": ".",
+          "fixed_environment": {
+            "PYTHONDONTWRITEBYTECODE": "1"
+          }
+        }
+      ],
+      "outputs": []
+    }
+  }
+}

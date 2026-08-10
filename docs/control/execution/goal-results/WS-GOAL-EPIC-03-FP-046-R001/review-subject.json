@@ -1,0 +1,84 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_personal_data_deletion_status": "NOT_RUN",
+    "actual_rights_request_status": "NOT_RUN",
+    "actual_user_or_guardian_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_processor_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_backup_restore_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-046-01",
+      "TC-FP-046-02",
+      "TC-FP-046-03",
+      "TC-FP-046-04",
+      "TC-FP-046-05"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP046_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-REVIEW-SUBJECT-20260810-001",
+  "final_content_manifest": {
+    "content_set_sha256": "534b7a1badec395c3653181658b2a21e381121cc12787e8d23a97c282ac8d76f",
+    "exact_path_count": 103,
+    "manifest_content_sha256": "34dfb56d6048990ee7d1fac9f4a8d05a5b2f7776ee89fa961478bda645ffbe30",
+    "path_set_sha256": "094d2c5086fff40907608a63ab681dd3aa2a468c17e6847241a96f3c49da58e3",
+    "scope_kind": "EXACT_ORDERED_FP046_FINAL_CONTENT_MANIFEST"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+  "kind": "INTERNAL_REVIEW_SUBJECT",
+  "observed_at": "2026-08-10T06:54:21+09:00",
+  "review_subject_content_sha256": "2a0899e98d9ec67fe1015545739a3a6d9ce7647d5ddae2c105ca7014628f9ac8",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6",
+    "SUCCESSOR_TRACE": "971244da8be15d8e2fb388716bb459a15dcd4bec3442a093767fcd9d96441f78",
+    "VERIFICATION_RESULT": "98d66bba03ea49eae53fb212ba30ccb7f2d301e75d62f0f600f50fe5a61f7f84"
+  },
+  "reviewer_must_be_independent_of_executor": true,
+  "schema_version": "walksafe.fp046-review-subject.v1",
+  "status": "REVIEW_PENDING",
+  "verification_receipts": [
+    {
+      "lane_id": "ANDROID_CONSENT_DELETION",
+      "log_byte_length": 372,
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/logs/android-consent-deletion.log",
+      "log_sha256": "d27b086545facd639bac087acdd08157be9cfe0c49bcd4a544f7fd6f766fad63",
+      "receipt_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/evidence/android-consent-deletion-receipt.json",
+      "receipt_sha256": "8e99ca81ce535551942c8f46fe0bee6b732ad68bd2be5a18658ebdb9299dcc09"
+    },
+    {
+      "lane_id": "GATEWAY_PRIVACY_LEDGER",
+      "log_byte_length": 327,
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/logs/gateway-privacy-ledger.log",
+      "log_sha256": "c9542f27c42dac50f0d0cdf4fc35fdd585af9fce1bca9bbc99a0e55343c96c2a",
+      "receipt_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/evidence/gateway-privacy-ledger-receipt.json",
+      "receipt_sha256": "c34e08393eda14c4391a3d618f56d59a0bd705884e2e88f5880fd8297fd459a0"
+    },
+    {
+      "lane_id": "BACKEND_PRIVACY_POSTGRES",
+      "log_byte_length": 584,
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/logs/backend-privacy-postgres.log",
+      "log_sha256": "4271e7361ce48a188af41821ec1b567b136538ed06ab5be803009fedc9b485de",
+      "receipt_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/evidence/backend-privacy-postgres-receipt.json",
+      "receipt_sha256": "529af3dae42be3f8839a3498140a1eb83757c5deda36fc2386ae00d769b9d1ab"
+    },
+    {
+      "lane_id": "RETENTION_BACKUP_DELETION",
+      "log_byte_length": 421,
+      "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/logs/retention-backup-deletion.log",
+      "log_sha256": "d180f97a6cdc87306f7b320556802ee9f81529c78ab8070c3c370ef744771c85",
+      "receipt_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/evidence/retention-backup-deletion-receipt.json",
+      "receipt_sha256": "930f7f917cdc9d543cdd7fe53f1a9ea9eaaf0acdbb4569da459fa3418130c1f7"
+    }
+  ]
+}

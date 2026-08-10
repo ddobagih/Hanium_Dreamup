@@ -1,0 +1,161 @@
+{
+  "schema_version": "walksafe.wbs.v1",
+  "metadata": {
+    "title": "WalkSafe 작업분해구조",
+    "version": "0.3.0",
+    "as_of": "2026-07-22",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "STRUCTURE_CHECKED_CONTENT_REVIEW_PENDING",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "MGT-06"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_management_discovery_20260721.py"
+  },
+  "work_packages": [
+    {
+      "wbs_id": "WBS-0",
+      "name": "통제 기반",
+      "artifact_scope": "DOC-01~05",
+      "depends_on": [],
+      "relative_effort": "S",
+      "delivery_class": "BASELINE_CONTROL",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "통제 규칙과 대장 구조 검토",
+      "milestone_id": "MS-02",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-1",
+      "name": "관리·제품기획",
+      "artifact_scope": "MGT-01~18, DSC-01~15",
+      "depends_on": [
+        "WBS-0"
+      ],
+      "relative_effort": "L",
+      "delivery_class": "MVP_FOUNDATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "헌장·제품범위·우선순위 Draft 검토",
+      "milestone_id": "MS-02",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-2",
+      "name": "요구 기준선 준비",
+      "artifact_scope": "REQ-01~19",
+      "depends_on": [
+        "WBS-1"
+      ],
+      "relative_effort": "XL",
+      "delivery_class": "MVP_FOUNDATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "68개 정책/gate 요구와 인수조건·RTM 검토",
+      "milestone_id": "MS-02",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-3",
+      "name": "시험계획 선행",
+      "artifact_scope": "TST-01~05, TST-18",
+      "depends_on": [
+        "WBS-2"
+      ],
+      "relative_effort": "L",
+      "delivery_class": "MVP_FOUNDATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "요구별 case·환경·결함원장 검토",
+      "milestone_id": "MS-02",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-4",
+      "name": "설계",
+      "artifact_scope": "DES-01~27",
+      "depends_on": [
+        "WBS-2",
+        "WBS-3"
+      ],
+      "relative_effort": "XL",
+      "delivery_class": "MVP_FOUNDATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "Android 중심 설계와 데이터·보안·장애 경계 검토",
+      "milestone_id": "MS-02",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-5",
+      "name": "구현 정렬",
+      "artifact_scope": "DEV-01~21",
+      "depends_on": [
+        "WBS-4"
+      ],
+      "relative_effort": "XL",
+      "delivery_class": "MVP_IMPLEMENTATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "현재 후보를 재사용·수정·폐기·legacy로 판정",
+      "milestone_id": "MS-04",
+      "status": "IN_PROGRESS",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-6",
+      "name": "시험 실행",
+      "artifact_scope": "TST-06~21",
+      "depends_on": [
+        "WBS-5"
+      ],
+      "relative_effort": "XL",
+      "delivery_class": "MVP_VERIFICATION",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "이름 붙인 build에서 증거·결함·잔여위험 생성",
+      "milestone_id": "MS-05",
+      "status": "PLANNED",
+      "completion_claimed": false
+    },
+    {
+      "wbs_id": "WBS-7",
+      "name": "출시 준비도·인수",
+      "artifact_scope": "TST-22~23 + SEC/REL/WS 입력",
+      "depends_on": [
+        "WBS-6"
+      ],
+      "relative_effort": "L",
+      "delivery_class": "RELEASE",
+      "owner_role": "프로젝트·실무책임자",
+      "assigned_person": "김민호",
+      "reviewer_role": "프로젝트책임자",
+      "exit_condition": "5 gate 종결 뒤 사람의 Go/인수 결정",
+      "milestone_id": "MS-07",
+      "status": "PLANNED",
+      "completion_claimed": false
+    }
+  ],
+  "effort_scale": {
+    "S": "작음",
+    "L": "큼",
+    "XL": "매우 큼"
+  },
+  "planning_note": "1인 프로젝트의 상대 공수이며 시간·비용 실적이 아니다. 요구·설계 기준선 뒤 김민호가 다시 추정한다."
+}

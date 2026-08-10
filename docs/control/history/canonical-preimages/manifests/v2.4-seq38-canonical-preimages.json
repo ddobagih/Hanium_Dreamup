@@ -1,0 +1,115 @@
+{
+  "schema_version": "walksafe.canonical-preimage-archive.v1",
+  "archive_id": "WS-CANONICAL-PREIMAGE-ARCHIVE-V2-4-SEQ38-20260729-001",
+  "created_on": "2026-07-29",
+  "status": "PREIMAGE_BYTES_PRESERVED_NO_CANONICAL_UPDATE_AUTHORITY",
+  "source_checkpoint": {
+    "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "schema_version": "1.24.0",
+    "observed_file_sha256": "e61d919b3995f364760007c43c7bc462f1fd64f401b30d2f1f7ceeda86ab7e72",
+    "observed_byte_count": 1291260
+  },
+  "source_event": {
+    "sequence": 38,
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP047-20260726-001",
+    "event_sha256": "aca93931b1cd8dcc06508f4078a7983d729df43f6a6690fceb1b3e875090152f",
+    "occurred_at": "2026-07-26T19:22:41+09:00"
+  },
+  "recovery_provenance": {
+    "source_kind": "LOCAL_VALIDATION_COPY",
+    "source_root": "/home/ddobagi/.cache/walksafe-v24-synth2-source.eCmu8k",
+    "selection_rule": "EXACT_LIVE_PATH_AND_SOURCE_EVENT_SHA256_MATCH",
+    "source_is_canonical": false
+  },
+  "entries": [
+    {
+      "role": "ARTIFACT_CHANGE_LOG",
+      "document_id": "ART-DOC-05-001",
+      "live_path": "docs/deliverables/00-control/artifact-change-log.json",
+      "historical_sha256": "c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c",
+      "historical_byte_count": 96734,
+      "identity_json_path": "metadata.register_id",
+      "identity_match": "EXACT_STRING",
+      "identity_expected": "ART-DOC-05-001",
+      "blob_path": "docs/control/history/canonical-preimages/sha256/c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c.json",
+      "blob_sha256": "c4b63a01c3ae30efecb0f08c21678057626af10ed8cfef258ddf90136d0aca1c",
+      "successor_observed_sha256": "cea8b58fc5afa527614522481df56d69618c6fd1015c10b63d6cc8b6e0678c67"
+    },
+    {
+      "role": "ARTIFACT_REGISTER",
+      "document_id": "ART-DOC-01-001",
+      "live_path": "docs/deliverables/00-control/artifact-register.json",
+      "historical_sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+      "historical_byte_count": 3499550,
+      "identity_json_path": "metadata.register_id",
+      "identity_match": "EXACT_STRING",
+      "identity_expected": "ART-DOC-01-001",
+      "blob_path": "docs/control/history/canonical-preimages/sha256/c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6.json",
+      "blob_sha256": "c4a5259744febc9cc442785be1748a0e0da88dbc86ef6459f1f6ee74fcaf62b6",
+      "successor_observed_sha256": "a0c993257c1b80211c2e8e4db5aa464708ac4aba9d47ed9b434eda277ee6547f"
+    },
+    {
+      "role": "DESIGN_TRACEABILITY",
+      "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+      "live_path": "docs/deliverables/04-design/design-traceability-register.json",
+      "historical_sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+      "historical_byte_count": 459175,
+      "identity_json_path": "metadata.register_id",
+      "identity_match": "EXACT_STRING",
+      "identity_expected": "WS-DESIGN-TRACEABILITY-20260721-001",
+      "blob_path": "docs/control/history/canonical-preimages/sha256/1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa.json",
+      "blob_sha256": "1ffb5861887d8edb26efbf0019cd4547baa6a24d8a73a576c3a5e9adf1e892aa",
+      "successor_observed_sha256": "18775a3f4d5d1faf0ae692b27888613c3d43f0b276d5a71dfbb08aad47c6b4ae"
+    },
+    {
+      "role": "MODULE_REGISTER",
+      "document_id": "DEV-18",
+      "live_path": "docs/deliverables/05-implementation/module-register.json",
+      "historical_sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+      "historical_byte_count": 62222,
+      "identity_json_path": "metadata.artifact_type_ids",
+      "identity_match": "STRING_LIST_CONTAINS_EXACT",
+      "identity_expected": "DEV-18",
+      "blob_path": "docs/control/history/canonical-preimages/sha256/54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49.json",
+      "blob_sha256": "54f2119ccb8598f06261590f8855c8d4c442cd662c4502501b62164a2cc0fe49",
+      "successor_observed_sha256": "c0727ae24e53ce3142aa5c55db7d6273628655069c3ac0821fa7d03ad8f08b48"
+    },
+    {
+      "role": "PLANNED_TEST_CASES",
+      "document_id": "TST-05",
+      "live_path": "docs/deliverables/06-testing/registers/test-cases.json",
+      "historical_sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+      "historical_byte_count": 2590342,
+      "identity_json_path": "metadata.artifact_type_ids",
+      "identity_match": "STRING_LIST_CONTAINS_EXACT",
+      "identity_expected": "TST-05",
+      "blob_path": "docs/control/history/canonical-preimages/sha256/19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee.json",
+      "blob_sha256": "19a6b425bf3a0ee880f1c9229a42b96845ab4c3a1f99037783fe872426e0deee",
+      "successor_observed_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e"
+    }
+  ],
+  "integrity": {
+    "entry_count": 5,
+    "historical_total_byte_count": 6708023,
+    "role_order": [
+      "ARTIFACT_CHANGE_LOG",
+      "ARTIFACT_REGISTER",
+      "DESIGN_TRACEABILITY",
+      "MODULE_REGISTER",
+      "PLANNED_TEST_CASES"
+    ],
+    "blob_naming": "LOWERCASE_SHA256_DOT_JSON",
+    "blob_content_contract": "BYTE_IDENTICAL_TO_SOURCE_EVENT_LIVE_PATH"
+  },
+  "claim_boundary": {
+    "canonical_binding_update_authorized": false,
+    "canonical_checkpoint_modified": false,
+    "historical_content_approved": false,
+    "artifact_completion_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "test_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "intended_use": "HISTORICAL_REPLAY_AND_PREIMAGE_PRESERVATION_ONLY"
+  }
+}

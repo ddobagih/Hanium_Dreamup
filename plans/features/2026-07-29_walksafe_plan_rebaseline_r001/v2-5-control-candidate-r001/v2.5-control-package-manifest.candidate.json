@@ -1,0 +1,579 @@
+{
+  "schema_version": "walksafe.v2.5-control-package-manifest.candidate.v1",
+  "metadata": {
+    "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R001",
+    "prepared_at": "2026-07-30T05:00:00+09:00",
+    "status": "NON_EFFECTIVE_NOT_APPROVED_NOT_APPLIED"
+  },
+  "effective": false,
+  "approved": false,
+  "applied": false,
+  "post_commit_receipt_created": false,
+  "active_discovery_registered": false,
+  "source_bindings": [
+    {
+      "role": "V2_4_STATIC_PLAN",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/static-plan-manifest-v2.4.0.json",
+      "sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+      "bytes": 39534,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "V2_4_SEQ39_CHECKPOINT",
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+      "bytes": 1329415,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r021.json",
+      "sha256": "f2e304679c5c3dfd3d7331340039e7222ab9e3915ede30de673f60f1b2aca97a",
+      "bytes": 488160,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R021_IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+      "sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+      "bytes": 59266,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_EXACT68_LEDGER",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/exact68-reassessment-ledger.json",
+      "sha256": "82ecdfbfc9a35d39f1f8648971df62c18faf861745ccc9a28f5b24d8d354493f",
+      "bytes": 189900,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_IMPLEMENTATION_GAP",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-gap-r022.candidate.json",
+      "sha256": "3dee2cccad7fb264077dc8858ac3940821af6b4cda0e7664c3e8809b69dc8595",
+      "bytes": 535938,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_IMPLEMENTATION_BACKLOG",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-backlog-r022.candidate.json",
+      "sha256": "8e2c9cc565ffdd1039f7e03fbfefed348e568d8b62a7750ff06f989a0b20f098",
+      "bytes": 58007,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_PAIR_MANIFEST",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/gap-backlog-pair-manifest.json",
+      "sha256": "7d1e5c0488342e62d3ee37db657cd3257ba7631a16a29bca676f9b858a9c5b08",
+      "bytes": 12972,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R002_INDEPENDENT_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/INDEPENDENT-REVIEW-R001.md",
+      "sha256": "f390c653e73646d68b94d5e9b96c81684eb32f0802d1ae98a5a3d7d5d2d75fb7",
+      "bytes": 2366,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_CONTROL_MIGRATION_DESIGN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/R022-CONTROL-MIGRATION-CANDIDATE-R001.md",
+      "sha256": "eacc7f529e9b2dbfabece9bf2bb01bb6a33a745baa2b9da521364bdb6c505295",
+      "bytes": 17312,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R022_CONTROL_MIGRATION_DESIGN_REVIEW",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/R022-CONTROL-MIGRATION-CANDIDATE-R001-independent-review-r001.md",
+      "sha256": "ea38e10d99debbc6def323b3abd4173e7df5b9627433f3b2f03592334d75993e",
+      "bytes": 1967,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_EXECUTION_ROADMAP",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016.md",
+      "sha256": "49ca08d423dd6ec648de4907e81dc671980d9e0ee6f1bb8acff6f68f7175d8c2",
+      "bytes": 12690,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_STRUCTURAL_PASS_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016-independent-structural-review-r001.md",
+      "sha256": "eced95aa2343427b24f80f8865e2fa8e9e3f320ad48c74fab7970d646a1fac87",
+      "bytes": 3758,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    },
+    {
+      "role": "R016_SKEPTICAL_PASS_REVIEW",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/WALKSAFE-AUTONOMOUS-EXECUTION-ROADMAP-20260802-R016-independent-skeptical-review-r001.md",
+      "sha256": "9bae362ad4c1f0c4b2567b534197938f77d825b5d73d76dbd3a184542649bc0e",
+      "bytes": 5354,
+      "immutability": "PINNED_INPUT_NOT_MODIFIED"
+    }
+  ],
+  "generator_bindings": [
+    {
+      "path": "scripts/build_walksafe_v2_5_control_candidate_20260730.py",
+      "sha256": "d4fa8039adc30a5305aad0de0db8f11dbc669eb9f2f1f15537e0ca7ba003e175",
+      "bytes": 51153
+    },
+    {
+      "path": "scripts/walksafe_v2_5_candidate_validation.py",
+      "sha256": "e8daf70a870c81fa5d9aaa10a57bcf575423a6f35fdfc325d02cd24d7266ab5f",
+      "bytes": 180432
+    },
+    {
+      "path": "scripts/check_walksafe_project_continuation_v2_5_candidate.py",
+      "sha256": "1a2dc4f1d8c28c5163cae8306a160e8f942f962ea2ec190a625b64dc688ece5c",
+      "bytes": 2513
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_5_candidate.py",
+      "sha256": "98d656e8c3c54e122a419eee9d2c3b3285f2594f4abd3abbb5597d8e9470feda",
+      "bytes": 2434
+    },
+    {
+      "path": "tests/test_walksafe_v2_5_control_candidate_20260730.py",
+      "sha256": "5f1e80f3a22018191a753957bcefbcf620960017f47ccab55a00f031d8d46459",
+      "bytes": 68995
+    }
+  ],
+  "outputs": [
+    {
+      "role": "STATIC_PLAN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/static-plan-manifest-v2.5.0.candidate.json",
+      "sha256": "213cdea4f061d77f587211b3c315f5fb27eb5a2f39dbe7a9382e2c34e7a29a68",
+      "bytes": 34117,
+      "content_sha256": "326b1aad0c4ba87158c696feb5581169f7545f6afca36c90006ffd269b28bca3"
+    },
+    {
+      "role": "APPLICATION_TRANSACTION_PLAN",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-application-transaction-plan.candidate.json",
+      "sha256": "bb7819d4c3cc27878685fea3d4764ef7d55d511674eb078fc0cce8bfc0840275",
+      "bytes": 659092,
+      "content_sha256": "8374dbafde573694b8742254e5f2d343f54129b1724df445e283b227a3cd243f"
+    },
+    {
+      "role": "TRANSITION_HISTORY",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/transition-history-v2.5.candidate.json",
+      "sha256": "1b859617a6cc7a007a9cdca61f10d5b040ba743bbd90bd5f7183163a8a1f494e",
+      "bytes": 2676,
+      "content_sha256": "e79c698407b0c80f54fcad264e4d2bfe3b1730ff54119c39f650280808637b0f"
+    },
+    {
+      "role": "CHECKPOINT_AFTER_PROJECTION",
+      "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+      "sha256": "273b320645ee17737d452af263d45b45058cd7ed012f0bf32c6a9345ae894864",
+      "bytes": 218564,
+      "content_sha256": "ac46f03cd82413de34ce923ca4025ac160aafc200426f06a89cb25fe7b9b9aa5"
+    }
+  ],
+  "package_manifest_self_binding": {
+    "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-control-package-manifest.candidate.json",
+    "hash_kind": "LOGICAL_SELF_SEAL_ONLY",
+    "excluded_from_physical_output_bindings": true
+  },
+  "byte_exact_promotion_mapping": [
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-gap-r022.candidate.json",
+      "final_path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r022.json",
+      "sha256": "3dee2cccad7fb264077dc8858ac3940821af6b4cda0e7664c3e8809b69dc8595",
+      "bytes": 535938,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/r022-candidate-r002/implementation-backlog-r022.candidate.json",
+      "final_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r022.json",
+      "sha256": "8e2c9cc565ffdd1039f7e03fbfefed348e568d8b62a7750ff06f989a0b20f098",
+      "bytes": 58007,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/superseded-v2.4.0-active-checkpoint.json",
+      "sha256": "6ec0e4f1771a414989c254eefdb754b2fa384ac1b335ff48197898e31ebd698c",
+      "bytes": 1329415,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/static-plan-manifest-v2.5.0.candidate.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/static-plan-manifest-v2.5.0.json",
+      "sha256": "213cdea4f061d77f587211b3c315f5fb27eb5a2f39dbe7a9382e2c34e7a29a68",
+      "bytes": 34117,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-application-transaction-plan.candidate.json",
+      "final_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-001/application-transaction-plan.json",
+      "sha256": "bb7819d4c3cc27878685fea3d4764ef7d55d511674eb078fc0cce8bfc0840275",
+      "bytes": 659092,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/transition-history-v2.5.candidate.json",
+      "final_path": "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-seq1-prefix-v2.5.json",
+      "sha256": "1b859617a6cc7a007a9cdca61f10d5b040ba743bbd90bd5f7183163a8a1f494e",
+      "bytes": 2676,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/walksafe_v2_5_candidate_validation.py",
+      "final_path": "scripts/walksafe_v2_5_validation.py",
+      "sha256": "e8daf70a870c81fa5d9aaa10a57bcf575423a6f35fdfc325d02cd24d7266ab5f",
+      "bytes": 180432,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/check_walksafe_project_continuation_v2_5_candidate.py",
+      "final_path": "scripts/check_walksafe_project_continuation_v2_5.py",
+      "sha256": "1a2dc4f1d8c28c5163cae8306a160e8f942f962ea2ec190a625b64dc688ece5c",
+      "bytes": 2513,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    },
+    {
+      "candidate_path": "scripts/check_walksafe_goal_graph_v2_5_candidate.py",
+      "final_path": "scripts/check_walksafe_goal_graph_v2_5.py",
+      "sha256": "98d656e8c3c54e122a419eee9d2c3b3285f2594f4abd3abbb5597d8e9470feda",
+      "bytes": 2434,
+      "promotion_mode": "BYTE_EXACT_COPY"
+    }
+  ],
+  "sealed_deterministic_transforms": [
+    {
+      "transform_id": "WS-V25-R022-AUTHORIZED-FINAL-TRANSFORM-20260730-R001",
+      "promotion_mode": "SEALED_DETERMINISTIC_TRANSFORM",
+      "input_candidate_checkpoint_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+      "input_candidate_checkpoint_sha256": "273b320645ee17737d452af263d45b45058cd7ed012f0bf32c6a9345ae894864",
+      "input_candidate_checkpoint_bytes": 218564,
+      "input_history_prefix_path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/transition-history-v2.5.candidate.json",
+      "input_history_prefix_sha256": "1b859617a6cc7a007a9cdca61f10d5b040ba743bbd90bd5f7183163a8a1f494e",
+      "transform_spec": {
+        "transform_id": "WS-V25-R022-AUTHORIZED-FINAL-TRANSFORM-20260730-R001",
+        "function": "project_authorized_transition",
+        "core_binding": {
+          "path": "scripts/walksafe_v2_5_candidate_validation.py",
+          "sha256": "e8daf70a870c81fa5d9aaa10a57bcf575423a6f35fdfc325d02cd24d7266ab5f",
+          "bytes": 180432
+        },
+        "sealed_static_inputs": [
+          {
+            "role": "STATIC_PLAN_CANDIDATE",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/static-plan-manifest-v2.5.0.candidate.json",
+            "sha256": "213cdea4f061d77f587211b3c315f5fb27eb5a2f39dbe7a9382e2c34e7a29a68",
+            "bytes": 34117
+          },
+          {
+            "role": "SEQ1_CANDIDATE_CHECKPOINT",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/walksafe-project-continuation-checkpoint-v2.5.candidate.json",
+            "sha256": "273b320645ee17737d452af263d45b45058cd7ed012f0bf32c6a9345ae894864",
+            "bytes": 218564
+          },
+          {
+            "role": "SEQ1_HISTORY_PREFIX",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/transition-history-v2.5.candidate.json",
+            "sha256": "1b859617a6cc7a007a9cdca61f10d5b040ba743bbd90bd5f7183163a8a1f494e",
+            "bytes": 2676
+          },
+          {
+            "role": "APPLICATION_TRANSACTION_PLAN",
+            "path": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-application-transaction-plan.candidate.json",
+            "sha256": "bb7819d4c3cc27878685fea3d4764ef7d55d511674eb078fc0cce8bfc0840275",
+            "bytes": 659092
+          }
+        ],
+        "required_dynamic_input_roles": [
+          "CONTROL_CORE_INDEPENDENT_REVIEW_RECEIPT",
+          "CONTROL_TRANSITION_AUTHORIZATION_RECEIPT",
+          "FRESH_QUICK_GATE_RECEIPT"
+        ],
+        "source_cas_binding_sha256": "ee9690074910774db335130f3d013d26e8674ba48607137c879e7a0a65289ac9",
+        "output_paths": [
+          "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+          "docs/control/walksafe-project-continuation-checkpoint.json"
+        ],
+        "allowed_delta_source": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-application-transaction-plan.candidate.json",
+        "final_history_projection_contract": {
+          "chronology_contract": {
+            "strict_sequence_order": [
+              1,
+              2,
+              3
+            ],
+            "seq1_before_seq2_before_seq3": true,
+            "seq2_source": "FRESH_QUICK_GATE.checked_at",
+            "seq3_source": "CANONICAL_RFC3339_CHECKED_AT_PLUS_1_MICROSECOND",
+            "seq3_not_after": "FRESH_QUICK_GATE.valid_until"
+          },
+          "fixed_rows": [
+            {
+              "json_pointer": "/candidate_state",
+              "after": "TARGET_ACTIVE_ONLY_AT_AUTHORIZED_ATOMIC_CHECKPOINT_SWITCH"
+            },
+            {
+              "json_pointer": "/future_events_materialized",
+              "after": true
+            },
+            {
+              "json_pointer": "/effective_state_semantics",
+              "after": "ACTIVE_ONLY_WHEN_FINAL_HISTORY_AND_CHECKPOINT_BYTES_ARE_COMMITTED"
+            }
+          ],
+          "dynamic_rows": [
+            {
+              "json_pointer": "/events",
+              "source": "SEQ1_PREFIX_PLUS_FIXED_SEQ2_ACTIVATION_AND_SEQ3_R022"
+            },
+            {
+              "json_pointer": "/tail_event_sha256",
+              "source": "PROJECTED_SEQ3.event_sha256"
+            },
+            {
+              "json_pointer": "/authorization_binding",
+              "source": "AUTHORIZATION_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/fresh_quick_gate_binding",
+              "source": "FRESH_QUICK_GATE_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/history_content_sha256",
+              "source": "HISTORY_LOGICAL_SELF_SEAL"
+            }
+          ],
+          "delta_outside_fixed_and_dynamic_rows_allowed": false
+        },
+        "activation_envelope_projection_contract": {
+          "fixed_rows": [
+            {
+              "json_pointer": "/metadata/checkpoint_id",
+              "after": "WS-V25-R022-ACTIVE-CHECKPOINT-20260730-R001"
+            },
+            {
+              "json_pointer": "/metadata/version",
+              "after": "1.25.0"
+            },
+            {
+              "json_pointer": "/metadata/status",
+              "after": "TARGET_ACTIVE_AFTER_AUTHORIZED_ATOMIC_COMMIT"
+            },
+            {
+              "json_pointer": "/metadata/purpose",
+              "after": "승인된 v2.5 seq1~3 전환과 r022 canonical pair를 원자적으로 활성화한 checkpoint다."
+            },
+            {
+              "json_pointer": "/goal_execution/schema_version",
+              "after": "2.5"
+            },
+            {
+              "json_pointer": "/goal_execution/package_status",
+              "after": "ACTIVE"
+            },
+            {
+              "json_pointer": "/goal_execution/activation_status",
+              "after": "ACTIVE"
+            },
+            {
+              "json_pointer": "/goal_execution/transition_history_assurance",
+              "after": "PREDECESSOR_ANCHORED_AUTHORIZED_SEQ1_SEQ2_SEQ3_POSTCOMMIT_RECEIPT_PENDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/state",
+              "after": "R022_ACTIVE_SEQ3_POSTCOMMIT_RECEIPT_PENDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/effective",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/approved",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/applied",
+              "after": true
+            },
+            {
+              "json_pointer": "/candidate_control_projection/state_semantics",
+              "after": "TRUE_ONLY_WHEN_THESE_EXACT_BYTES_ARE_AT_THE_ACTIVE_CHECKPOINT_PATH"
+            }
+          ],
+          "dynamic_rows": [
+            {
+              "json_pointer": "/goal_execution/transition_history",
+              "source": "PROJECTED_FINAL_HISTORY.events"
+            },
+            {
+              "json_pointer": "/goal_execution/transition_history_anchor_sha256",
+              "source": "PROJECTED_FINAL_HISTORY.tail_event_sha256"
+            },
+            {
+              "json_pointer": "/goal_execution/validation_cutoff_at",
+              "source": "FRESH_QUICK_GATE.checked_at"
+            },
+            {
+              "json_pointer": "/goal_execution/verification_evidence_refs",
+              "source": "SEQ1_CANDIDATE_PLUS_AUTHORIZATION_AND_QUICK_GATE_IDS"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/history_binding",
+              "source": "PROJECTED_FINAL_HISTORY_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/authorization_binding",
+              "source": "AUTHORIZATION_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/candidate_control_projection/fresh_quick_gate_binding",
+              "source": "FRESH_QUICK_GATE_RECEIPT_PHYSICAL_BINDING"
+            },
+            {
+              "json_pointer": "/working_tree_snapshot",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/session_handoff/source_commit_or_snapshot",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/session_handoff/changed_files",
+              "source": "SEALED_WORKING_SNAPSHOT_TRANSFORM"
+            },
+            {
+              "json_pointer": "/checkpoint_content_sha256",
+              "source": "CHECKPOINT_LOGICAL_SELF_SEAL"
+            }
+          ],
+          "predecessor_goal_non_envelope_sha256": "03844e4ea34d00f4d4cf2ede085b1996e3586f66d7d8ac7720b6e6db3ebc1ab2",
+          "delta_outside_fixed_dynamic_r022_and_snapshot_contracts_allowed": false
+        },
+        "working_snapshot_transform_contract_sha256": "2a5e88276a23dac4383b60b07f5a2d62e22951117c2a7a846526d13d4c61e010",
+        "canonicalization": "UTF8_JSON_ENSURE_ASCII_FALSE_INDENT_2_LF_ALLOW_NAN_FALSE",
+        "final_hash_state": "DERIVED_AFTER_AUTHORIZATION"
+      },
+      "transform_spec_sha256": "e1276e9847b4972e446787c9652d3d6ec6bdf15e2705d42d322cc3fc86cd2c78",
+      "delegation_requirement_id": "WS-V25-R022-CURRENT-LIVE-SESSION-DELEGATION-20260802-R016",
+      "fresh_quick_gate_requirement_id": "WS-V25-R022-FRESH-QUICK-GATE-REQUIRED-20260730-R001",
+      "final_history_path": "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+      "final_checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "final_hash_state": "DERIVED_AFTER_AUTHORIZATION",
+      "final_hashes": null,
+      "allowed_delta_source": "plans/features/2026-07-29_walksafe_plan_rebaseline_r001/v2-5-control-candidate-r001/v2.5-application-transaction-plan.candidate.json"
+    }
+  ],
+  "candidate_specific_delegation_subject": {
+    "requirement_id": "WS-V25-R022-CURRENT-LIVE-SESSION-DELEGATION-20260802-R016",
+    "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R001",
+    "transaction_plan_id": "WS-V25-R022-APPLICATION-TRANSACTION-PLAN-20260730-R001",
+    "status": "SATISFIED_BY_CURRENT_LIVE_SESSION_DELEGATION_PENDING_LOCAL_RECORD",
+    "authority_kind": "CURRENT_LIVE_SESSION_USER_DELEGATION",
+    "authority_claim_boundary": "LOCAL_SESSION_CONTENT_DELEGATION_NOT_EXTERNAL_IDENTITY_OR_CRYPTOGRAPHIC_SIGNATURE",
+    "delegation_observed": true,
+    "local_receipt_recorded": false,
+    "authorized": false,
+    "promotion_mapping_sha256": "99be333ce43c02bd2d6e30f4a888610c6d89d0d253a60f3329cffd52bf82a8bf",
+    "transaction_plan_sha256": "bb7819d4c3cc27878685fea3d4764ef7d55d511674eb078fc0cce8bfc0840275",
+    "transaction_plan_content_sha256": "8374dbafde573694b8742254e5f2d343f54129b1724df445e283b227a3cd243f",
+    "prepared_event_sha256": "e3bbf5533d47a93f0c74b1d8da35992cb9bb49b7268c0e48b0b5e41a864e5ce7",
+    "normalized_execution_scope": {
+      "candidate_id": "WS-V25-CONTROL-CANDIDATE-20260730-R001",
+      "transaction_plan_id": "WS-V25-R022-APPLICATION-TRANSACTION-PLAN-20260730-R001",
+      "r002_pair_fingerprint_sha256": "09fcf9cba249a777946fc90a9ee903f2e70143a431e68d0fda2564a7ea8ba67f",
+      "goal_topology_delta": 0,
+      "goal_status_delta": 0,
+      "runtime_queue_delta": 0,
+      "goal_materialization_credit_delta": 0,
+      "goal_start_credit_delta": 0,
+      "goal_completion_credit_delta": 0,
+      "artifact_completion_credit_delta": 0,
+      "approval_credit_delta": 0,
+      "formal_test_credit_delta": 0,
+      "actual_device_credit_delta": 0,
+      "actual_event_credit_delta": 0,
+      "release_gate_credit_delta": 0,
+      "product_code_delta": 0,
+      "release_status_after": "NOT_ELIGIBLE"
+    }
+  },
+  "future_activation_attempt_contract": {
+    "monotonic_freshness": {
+      "clock": "time.monotonic_ns()",
+      "start": "PREPARE_START",
+      "end": "IMMEDIATELY_BEFORE_C1_CAS",
+      "same_process_required": true,
+      "same_lock_epoch_required": true,
+      "max_elapsed_seconds": 600,
+      "wall_clock_authoritative": false,
+      "enforced_by_future_supervisor": true
+    },
+    "partial_crash_recovery": {
+      "preexisting_final_allowed": false,
+      "partial_resume_allowed": false,
+      "overwrite_allowed": false,
+      "delete_allowed": false,
+      "repair_allowed": false,
+      "pre_c1_partial_terminal": "NEW_REVISION_REQUIRED_UNCOMMITTED_AUTHORITY_ZERO",
+      "v2_4_r021_remains_active": true
+    }
+  },
+  "publication_contract": {
+    "candidate_directory_add_only": true,
+    "all_output_bytes_built_and_validated_before_publication": true,
+    "single_atomic_directory_publish": true,
+    "rename_noreplace_required": true,
+    "partial_candidate_directory_allowed": false,
+    "canonical_paths_written": false
+  },
+  "resolved_output_manifest_contract": {
+    "created_by_candidate": false,
+    "created_after_authorization_and_fresh_quick_gate": true,
+    "created_before_any_final_write": true,
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-001/resolved-output-manifest.json",
+    "publication": [
+      "TEMP_O_EXCL",
+      "FILE_FSYNC",
+      "RENAME_NOREPLACE",
+      "PARENT_FSYNC"
+    ],
+    "binds": [
+      "TRANSACTION_ID",
+      "AUTHORIZATION_RECEIPT_SHA256",
+      "FRESH_QUICK_GATE_RECEIPT_SHA256",
+      "ALL_FINAL_PATH_SHA256_BYTES"
+    ],
+    "exact_member_paths": [
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r022.json",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r022.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/static-plan-manifest-v2.5.0.json",
+      "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-5-BULK-REBASELINE-20260730-001/application-transaction-plan.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-seq1-prefix-v2.5.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/control-package-manifest-v2.5.json",
+      "docs/control/goals/walksafe-completion-graph-v2-5/superseded-v2.4.0-active-checkpoint.json",
+      "scripts/walksafe_v2_5_validation.py",
+      "scripts/check_walksafe_project_continuation_v2_5.py",
+      "scripts/check_walksafe_goal_graph_v2_5.py",
+      "docs/control/goals/walksafe-completion-graph-v2-5/transition-history-v2.5.json",
+      "docs/control/walksafe-project-continuation-checkpoint.json"
+    ],
+    "excluded_member_kinds": [
+      "RESOLVED_MANIFEST_SELF",
+      "TEMPORARY_FILE",
+      "FAILURE_RECEIPT",
+      "INCIDENT_RECORD",
+      "POSTCHECK_OUTPUT",
+      "POST_COMMIT_RECEIPT"
+    ],
+    "preexisting_final_allowed": false,
+    "partial_resume_allowed": false,
+    "overwrite_allowed": false,
+    "pre_c1_partial_terminal": "NEW_REVISION_REQUIRED_UNCOMMITTED_AUTHORITY_ZERO",
+    "referenced_by_events": false,
+    "bound_one_way_by_post_commit_receipt": true
+  },
+  "hash_cycle_boundary": {
+    "package_manifest_self_reference": "LOGICAL_SELF_SEAL_ONLY",
+    "package_manifest_excluded_from_physical_output_bindings": true,
+    "transaction_plan_binds_final_checkpoint_hash": false,
+    "events_bind_post_commit_receipt": false,
+    "post_commit_receipt_present": false
+  },
+  "manifest_content_sha256": "681b9347ec8f70f55870234d9bd05906632e2ec521b7e6ce266779b54c7e60aa"
+}

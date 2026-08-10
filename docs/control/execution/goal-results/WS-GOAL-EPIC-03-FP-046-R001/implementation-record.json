@@ -1,0 +1,803 @@
+{
+  "authority_bindings": {
+    "goal": {
+      "byte_length": 4849,
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+      "role": "FP046_GOAL",
+      "sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79"
+    },
+    "start_gate": {
+      "byte_length": 11321,
+      "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005",
+      "event_sequence": 53,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005/implementation-start-gate-receipt.json",
+      "repository_state_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005/09-REPOSITORY_STATE.log",
+      "repository_state_sha256": "f46e42faf5e824322036713759954bb38277cdf9a3f66752e79459164f6e9087",
+      "role": "FP046_EXACT9_START_GATE",
+      "sha256": "ec17d2ad7f9a1216a9f0174588fe39e3411e9a9757c2dce6b3db48915978801e"
+    }
+  },
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_personal_data_deletion_status": "NOT_RUN",
+    "actual_rights_request_status": "NOT_RUN",
+    "actual_user_or_guardian_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "external_processor_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "operational_backup_restore_status": "NOT_RUN",
+    "operational_database_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-FP-046-01",
+      "TC-FP-046-02",
+      "TC-FP-046-03",
+      "TC-FP-046-04",
+      "TC-FP-046-05"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_FP046_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-IMPLEMENTATION-20260810-001",
+  "final_content_manifest": {
+    "content_set_sha256": "534b7a1badec395c3653181658b2a21e381121cc12787e8d23a97c282ac8d76f",
+    "exact_path_count": 103,
+    "files": [
+      {
+        "byte_length": 918382,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "fd4c89497f99f215a0ef7f057aaf9968698156e2c941160399b573c06645ea55"
+      },
+      {
+        "byte_length": 11621,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinator.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f058aa6c4e2d15ce5fa5fd0508d978ceae774092a29c225120a6cdeea072c262"
+      },
+      {
+        "byte_length": 18732,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "881871db30f41bd0c0217a6f643d5e889cbe7d2c3ddad195858e968246768cc9"
+      },
+      {
+        "byte_length": 80735,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "fb55fc401d368ff90f5e045f8b1db59012f4c63a648a37b0c7b87a12935b4b93"
+      },
+      {
+        "byte_length": 1328,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentFence.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "9a659d97e155a69494837a158b641b6816a153db79657906a3dcfa60cb4d9889"
+      },
+      {
+        "byte_length": 7428,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionDualAuthority.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "906d6d2f252fb54fe432ff1413d7a65e480b082169edf5ce3bcb64c5f067b944"
+      },
+      {
+        "byte_length": 23116,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentAuthority.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "9d16f7083bd1d4ccaf4c9cb21d0e90fafd75159b4898be61b1b585d6f6284d67"
+      },
+      {
+        "byte_length": 1059,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionCallExecution.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "a21d3a6c9a9fd8501190f29128cc44e1a1753cf1d19cf0333a47c89d93f035c6"
+      },
+      {
+        "byte_length": 10049,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionRev0RecoveryPolicy.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f51f482596782be685a16e148906a3522d8de010bac5da624d7e6bba3965a1c4"
+      },
+      {
+        "byte_length": 10862,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f95764d03352132e19d4bb39b23bd98182538d277722a7ce28606159b88bba3b"
+      },
+      {
+        "byte_length": 20253,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "52ed367849a96ce3b54a5140f22f82dfa5caeeb72b76a52013e7737e0f28aef0"
+      },
+      {
+        "byte_length": 12301,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinator.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "159c27032a85536aef86b4ad8c4fddfe17d6873ed06afb871ec269565c0a8369"
+      },
+      {
+        "byte_length": 43189,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "da4188391201d2bc41ffe38dee98aef8939eba8068b522b2d14b02d3073b0fb3"
+      },
+      {
+        "byte_length": 305,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicy.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "a72c9926533bd1c5a5bcf6a22b1ce292195b2a3e03a82790e3e023c498b80acf"
+      },
+      {
+        "byte_length": 36759,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarker.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "552e79498675ae997e4abf353e27350265447cf82aa414ef2d361b7c16773424"
+      },
+      {
+        "byte_length": 18483,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStore.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "47a4786428b4829c1d0b083ff6ef3930930a996e109da049f16f72cca16b435a"
+      },
+      {
+        "byte_length": 52160,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "019acc8700645b37cd0872d7ebaddf09be6e18e9140fd2c93bcf5921dbc4ea4f"
+      },
+      {
+        "byte_length": 59164,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "1528ccbf3996ea8f9575742d4381c63687336bbb8c402be1ced7ccd496c577b4"
+      },
+      {
+        "byte_length": 10110,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "d25568bd88c7957667686cd8ef09b860f0f7bfabadaf55447471d5f8cfeea820"
+      },
+      {
+        "byte_length": 4175,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "57fef7f0a979c706dec8fdc11095aa60b51b5f9294022245643f91e9ffbcb4e0"
+      },
+      {
+        "byte_length": 15845,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "abbf159f05bc21352e9bb5f6b842788423a9bb6f40bf15daa65b6473280f655f"
+      },
+      {
+        "byte_length": 16842,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "3bb534c89d088c23b3755c5573801ff6bf0f3a1cf57876be655e9158abedf62b"
+      },
+      {
+        "byte_length": 81446,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "044569e8d714a15eb0759ec9ba24466298621c53ab03c9429c018d8cd35fdcd6"
+      },
+      {
+        "byte_length": 15879,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "e5ace9dc4d2a04a2d1bede20c61209c1481a4fa6a07d33297f6edd41dde92b7d"
+      },
+      {
+        "byte_length": 4701,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentFenceTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "5483a48652bfd21772ffb161a387e3b62a999f2ab297631a5991bf014b662d13"
+      },
+      {
+        "byte_length": 2704,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionCallExecutionTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "4ce7ffcd73340c7893f1e57478d07cdf08b3a84b0f21162f9ee2efb9c374faed"
+      },
+      {
+        "byte_length": 22472,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionDualAuthorityTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "143feefcdf0c277497ec9e8da4c76397b6b0b4c3d6891270bd48fc640360915a"
+      },
+      {
+        "byte_length": 33040,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentAuthorityTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "724f1e4aaf0529d1519cdad26a653bfb505fe30230b349fea553402bfaf0b025"
+      },
+      {
+        "byte_length": 23254,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionAuthorityRestartTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "57a4afe303515a8307222cdb6deaae1d5cacce64b76913a5ea4ab4fea14efe1d"
+      },
+      {
+        "byte_length": 16369,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionRev0RecoveryPolicyTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "7a8abb06862872284c0eb288555b41a1cee7431a08f934123e0d135e8d6a549c"
+      },
+      {
+        "byte_length": 23182,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "4473942b731b283d3997a0f14c859c7996b06beb9edd0458d3fdfb53c8207227"
+      },
+      {
+        "byte_length": 5356,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "39e580756ada64963fdcd7a2abe9fdaa964db4b5f9f155d5d30e7fd1483eb317"
+      },
+      {
+        "byte_length": 16329,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinatorTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "fcb09ce8f278e6e936800366691e283f491cc9bd19bc37b558a0a1b300281f98"
+      },
+      {
+        "byte_length": 41210,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "a9b6c144d225d05fa2f80c70f0b455088e284a301a81d78666e294af448affa5"
+      },
+      {
+        "byte_length": 1414,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicyTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "e1649a6976f368cbc522844942cebd7e8046eb63585925be5c381adbbf6bc99d"
+      },
+      {
+        "byte_length": 30792,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "0d3f7c0c169093a94266497a8e70206b9171da17582639717da8d4197bbee3a6"
+      },
+      {
+        "byte_length": 17658,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "ef1b0144d1253729d69d47f4a0ea3da9e0ab6ab9b81ea8a93e000c9900e3fb50"
+      },
+      {
+        "byte_length": 6983,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "24e1559039980fd12d045c85c77c5a0122c8a83efc10f03c3423148ae82b893b"
+      },
+      {
+        "byte_length": 7218,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "8a59d7b118055da200e57a907718912723a92770954851b16278a41b3184759b"
+      },
+      {
+        "byte_length": 15240,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityLongLivedLoginStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "1eecb70cd6c01715449693aef12071f0b92508c1e59d67bacfec94d58adf6f3f"
+      },
+      {
+        "byte_length": 16337,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "2075a97642224dd4a554c1cb5846260104432a845cce12717ddecf1aab6726f7"
+      },
+      {
+        "byte_length": 20492,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "5d4f6eb776e51bc54c9ae2aad422c26ec31ac819309a0267c7263cbe91897b85"
+      },
+      {
+        "byte_length": 22699,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "5a75e52d9858faff0f98abcf8a5b935353a3d0aa5d0dfff015314fa0117b3535"
+      },
+      {
+        "byte_length": 17288,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "98484f9ecdf47d663803246afa0e4c22384059c0efcafed1b3b875bd1f58cff7"
+      },
+      {
+        "byte_length": 40009,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "665cdd9d6c4e5f6ab40b12a89e2d60518aab9fe5441f962b52c4bd7f28468348"
+      },
+      {
+        "byte_length": 17762,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "dd16b1f3471c60f5c4a2b436aa257a6955663b0e8083d8f1a4f05258d78a988b"
+      },
+      {
+        "byte_length": 10099,
+        "group_id": "ANDROID_USER_APP_PRIVACY",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "135be93137f46f04ae6853d8b68f048927a0749f4a741d77b4300353e6e8d3ab"
+      },
+      {
+        "byte_length": 15589,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/README.md",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "80597353e299cc5bf109240c3031646e76e09387573576dff67cc917ee953dff"
+      },
+      {
+        "byte_length": 2174,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/server.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "7001e4a12ed237663d32627aee456613a8afe0eb292ab4e0bfe83be2991f0e20"
+      },
+      {
+        "byte_length": 44898,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/integrated-consent.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "af25e39189f27119eaec4d6dccdaaafe063bd2b091d0c52498b877c3998ca7d1"
+      },
+      {
+        "byte_length": 45793,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/privacy-rights.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "8fcd87b40738450ed77743426bdd5a5038afdb64097b37e257593292805615e2"
+      },
+      {
+        "byte_length": 59158,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/privacy-deletion-v2.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f9f72adb639c9a395cb7fc4bebfe857f75a39aa0169bbc85cfd70f070da8c2c5"
+      },
+      {
+        "byte_length": 19438,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/integrated-consent.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "1b2d9842a19148acb8125a0a1881a007f6f73fb78101a95ff77c3616ea0e7aa4"
+      },
+      {
+        "byte_length": 19931,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/privacy-rights.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "fa49e585a2faf063250df8c88fa8fdad4dbe1f767c1d072d4c9d409d4cbc80a6"
+      },
+      {
+        "byte_length": 22911,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/privacy-deletion-v2.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "6dab2c36004da0a66dee6416af114cf836f0c6eef29bea2f0095e23a4c4bd5bd"
+      },
+      {
+        "byte_length": 2059,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/privacy-deletion-v2-crash.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "4d0a16c5193baec0b873ec083bc89263a4ec6ea3f6e2864d2df1a1d700d5072f"
+      },
+      {
+        "byte_length": 3046,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/privacy-deletion-v2-crash-worker.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "07088f2b52a4130a5f15800530fdb1a2592131785b78ceca609e6e7fe4c60e76"
+      },
+      {
+        "byte_length": 64835,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/openapi.json",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "be9f0758f7ae80bd7e1532b0e33cafedf157f9c213628bd61b4324da84f06ae8"
+      },
+      {
+        "byte_length": 32122,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/auth.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "8b2410a1fae8dd6b013cb5ffa20e690af3721ba5d5ba70279bf980f8dd389ed2"
+      },
+      {
+        "byte_length": 18504,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/backend.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "c2218bcd08001e43681ca4acc919f449c85bf403add7ebaf9a8b34c1b3e55b71"
+      },
+      {
+        "byte_length": 35272,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/field-long-session.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f7b86df929ffbfa3cfaf1409c7a95db78d35dbc9d39ec921aaf4930f44821d14"
+      },
+      {
+        "byte_length": 38187,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/src/routes.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "804705498f65983300782fa4549b11f700ca0a964ede32a90f620a66140bc407"
+      },
+      {
+        "byte_length": 31594,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/field-long-session.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "4e3c0bd978c41595e64323c9e1b92a0ef3ffef38cdf95c973b18c170e6b7cde2"
+      },
+      {
+        "byte_length": 47958,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/gateway-contract.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "b6e141da1a50fede21890dadcc6899646d92c044061975582c856338f6907fbe"
+      },
+      {
+        "byte_length": 5656,
+        "group_id": "ANDROID_GATEWAY_PRIVACY",
+        "path": "apps/android-gateway/test/node-adapter.test.ts",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "99d5e52d3d313d21e8a191700cd3cef67c000b401dd8f60ebcaa437ea757bccb"
+      },
+      {
+        "byte_length": 93636,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/alembic/versions/202608090001_fp046_privacy_lifecycle.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "c9355ebff4f00df13bbf0ddc159f07708da5d141fa3aba95f36828a025b7ae9a"
+      },
+      {
+        "byte_length": 6071,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/main.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "ea5b36b2d4e3c350f5e0c6c0b68c7ba794c09355f0c60b7b5c7b180430e6de34"
+      },
+      {
+        "byte_length": 61140,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/models.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "e9bcb568426f53ca55d6aa2e33a5e64887d66694fd4243b78a6e848b10ce1b8d"
+      },
+      {
+        "byte_length": 30813,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/schemas.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "a3c430bb17809a347d1e2cc6cc6572363e6a772c45acdd48c2109748a5077f50"
+      },
+      {
+        "byte_length": 17003,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/openapi_contract.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "3bfc0c703d7e80bc812a988dc8be2aaf422195c7f3123617d5c32651c6f62a99"
+      },
+      {
+        "byte_length": 13663,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/api/privacy.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "95e359ddca44b1cc5e35eba5db2ccf9e1f2ebeeb714ba9bacc4df13e07ea3f0b"
+      },
+      {
+        "byte_length": 61567,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/services/privacy_lifecycle.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "8043cf5c548b19d5258ba2abbf55dd33a37481acdc37d7f9156835026500ca32"
+      },
+      {
+        "byte_length": 14836,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_privacy_lifecycle.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "9379374339b867d43a0a9b3a7871e81c3c0fa3516bb1c49f9274388cdb649757"
+      },
+      {
+        "byte_length": 89130,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_fp046_postgres_integration.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "d3a05d37810a3b19dd67c71e4810ffb97ee8b23a579b3125df3cdea76449163d"
+      },
+      {
+        "byte_length": 206469,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "contracts/walksafe.openapi.json",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "4665cb039a5bd6ea7fb5c6ba43137b25ce6d2206753bbe3255d74c0898a67120"
+      },
+      {
+        "byte_length": 4413,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "deploy/config/walksafe-backend.env.example",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "f1a6e49e5fd5dc1b0d85aee619d3b9fdeaf69e71e549214bcc18eb799ae9a12f"
+      },
+      {
+        "byte_length": 5116,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/.env.example",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "b7354adea2c8fc2db481a1f61712ec1631f411dd6274e9cc6286070459edbbf8"
+      },
+      {
+        "byte_length": 17114,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/api/health.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "38003ebb36f2b1d7e2a72c417a9ccfe699525694d93237ca32670ca381443dd6"
+      },
+      {
+        "byte_length": 99900,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/api/reports.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "ec7d2fec00676fd54ee2278ba8b77dbc393e3d13cc68df9c060374445831b922"
+      },
+      {
+        "byte_length": 41463,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/config.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "643da32d5e1dfb0a5d2455917225fde41197599744efa1e5427627382ded5b6c"
+      },
+      {
+        "byte_length": 47738,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/field_test_security.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "fd21a5e9a1c7c7fc9e667192767fdb259c5afd35499c85b2fb3a20a88cf89a46"
+      },
+      {
+        "byte_length": 6124,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/request_limits.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "2115d37b3993c1222c03279352af1bb3940854e9b8e05c9eb58de1ebf9f804ce"
+      },
+      {
+        "byte_length": 5782,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/services/duplicates.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "c789c675073c36450ee8105c6fef8728a58eb62e7e75e87bf4833af1616a3025"
+      },
+      {
+        "byte_length": 4787,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/app/services/actor_rate_limit.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "14b5c6b5bc71103639d61755a14748e6fee53764e5db1217d28a6c01e763012d"
+      },
+      {
+        "byte_length": 9590,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/conftest.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "ec35c7eac2cfe443c70b409174389db5db241fa39c3f9d20bc967d5b252b638d"
+      },
+      {
+        "byte_length": 44779,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_field_test_security.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "634b275f328df2c66f1056eb583d3c6f44215034cc6cb431d4036ed0fbf705b0"
+      },
+      {
+        "byte_length": 25338,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_health_readiness.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "510a28701666a25bc6ade6e2b2adbbdfa1360b7315f9724ebca5f310394db84a"
+      },
+      {
+        "byte_length": 7279,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_openapi_contract.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "d6cf5a97f3deb1cd1431e1df933504c04b0730e25c76ecdb99a7efed3798ab6c"
+      },
+      {
+        "byte_length": 22330,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_reports.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "7ff10bb428fcfd5977b7c51076488c6bd6eec3152f2255f297a5b47c57e98a83"
+      },
+      {
+        "byte_length": 63833,
+        "group_id": "BACKEND_PRIVACY_LIFECYCLE",
+        "path": "backend/tests/test_reports_v2.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "ec767beba14fc4b54ff0c1f602f9e616cecf18ffafb193073fba6fd2c3edf607"
+      },
+      {
+        "byte_length": 37926,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/backup_walksafe_data_20260711.sh",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "e7f7b23667c3c5d461b4ee2fb91761c5bf451d33e20a062f3ea087fda56d5452"
+      },
+      {
+        "byte_length": 59894,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "6e3f9ff83d9e73e8330285940fb1cf973ce96b45ed11806430d3dfa46e61c1db"
+      },
+      {
+        "byte_length": 167511,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/walksafe_backup_integrity.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "54370dcf6df5ce1efdcc813d2300e6cf6ecb55889c5efdb8a67b0abc04b0188a"
+      },
+      {
+        "byte_length": 92321,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "tests/test_walksafe_backup_integrity.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "3d0aefc9cc315ae2d316ca5c78c37e0cbc38dc8a88a853299ebad26e4bb7f730"
+      },
+      {
+        "byte_length": 18873,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "tests/test_report_retention_operational_safety.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+      },
+      {
+        "byte_length": 30367,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "tests/test_report_retention_encrypted_objects.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "99bfdac46ffccb2dfb1d697d2f3756a12f33a706b04b3e00b6a0ffa736b2cbd1"
+      },
+      {
+        "byte_length": 64805,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/build_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "0c91a474e406571c219e167e3c221e094e053401bef10567f6367d5e4853a21a"
+      },
+      {
+        "byte_length": 23407,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "tests/test_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "775e939474aad61d9a825687d46d80ac09bec7e80a5f555e4436940d2fee2f3e"
+      },
+      {
+        "byte_length": 27508,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "20c92ecaea67361912ea78085711624dfa775e777edb142577d667267e197693"
+      },
+      {
+        "byte_length": 22083,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "tests/test_walksafe_fp046_gap_backlog_r025_20260810.py",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "8b9ae862ee376261c896821cd193360f1c3483be0e3900c8906b2745ef47339a"
+      },
+      {
+        "byte_length": 31809,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "docs/backend/api_reference.md",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "c1493a09fb5b219ec3bf575c9a2723fdc0983ba7c4ea74e33c05fae115f76188"
+      },
+      {
+        "byte_length": 15178,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "docs/backend/backend_environment.md",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "48f55f8263e9cb6c7eb23e82d4f13d16bc38ff7564e50a099db9f682810c638c"
+      },
+      {
+        "byte_length": 18016,
+        "group_id": "RETENTION_BACKUP_AND_TRACE_TOOLING",
+        "path": "scripts/run_walksafe_test_layers_20260711.sh",
+        "role": "FP046_FINAL_SOURCE_CONTENT",
+        "sha256": "63beea6b9aeb1f44fa4150f61cbfb017b441b43f235ee2d53311bc7e6cd7e79e"
+      }
+    ],
+    "group_order": [
+      "ANDROID_USER_APP_PRIVACY",
+      "ANDROID_GATEWAY_PRIVACY",
+      "BACKEND_PRIVACY_LIFECYCLE",
+      "RETENTION_BACKUP_AND_TRACE_TOOLING"
+    ],
+    "manifest_content_sha256": "34dfb56d6048990ee7d1fac9f4a8d05a5b2f7776ee89fa961478bda645ffbe30",
+    "path_set_sha256": "094d2c5086fff40907608a63ab681dd3aa2a468c17e6847241a96f3c49da58e3",
+    "schema_version": "walksafe.fp046-final-content-manifest.v1",
+    "scope_kind": "EXACT_ORDERED_FP046_FINAL_CONTENT_MANIFEST"
+  },
+  "gap_id": "GAP-055",
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+  "implementation_content_set_sha256": "534b7a1badec395c3653181658b2a21e381121cc12787e8d23a97c282ac8d76f",
+  "implementation_record_content_sha256": "773c3bd65cbd6ebc3c26838a8b819435d7b0be47cdaed5148728787fe02f3775",
+  "implemented_controls": [
+    "service consent and optional model-improvement consent remain purpose-separated",
+    "withdrawal and account deletion fail closed against new collection and transfer",
+    "device, server, derived-data and backup deletion states remain independently monotonic and retryable",
+    "restored backups reapply deletion tombstones before serving data",
+    "source-less deletion receipts retain only bounded pseudonymous evidence"
+  ],
+  "kind": "IMPLEMENTATION_RECORD",
+  "observed_at": "2026-08-10T06:54:21+09:00",
+  "policy_id": "FP-046",
+  "schema_version": "walksafe.fp046-implementation-record.v1",
+  "scope_kind": "EXACT_ORDERED_FP046_FINAL_CONTENT_MANIFEST",
+  "status": "PASS"
+}

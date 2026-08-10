@@ -1,0 +1,429 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "record_id": "WS-EPIC-02-PHASE-A-WALK-SESSION-LIFECYCLE-IMPLEMENTATION-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "INTERNAL_VERIFICATION_PASS_EPIC_IN_PROGRESS",
+    "title": "EPIC-02 Phase A FP-017 보행 세션 생명주기 구현 기록"
+  },
+  "authority_boundary": {
+    "record_kind": "APPEND_ONLY_IMPLEMENTATION_EVIDENCE",
+    "changes_approved_policy": false,
+    "changes_phase_g_or_approved_baseline": false,
+    "changes_formal_artifact_state": false,
+    "claims_epic_in_progress": true,
+    "claims_epic_implementation_ready": false,
+    "claims_epic_complete": false,
+    "claims_actual_device_pass": false,
+    "claims_formal_test_pass": false,
+    "claims_release_eligible": false
+  },
+  "source": {
+    "policy_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+    "phase_g_record_id": "WS-EPIC-01-PHASE-G-NO-DESTINATION-HAZARD-IMPLEMENTATION-20260723-001",
+    "gap_predecessor_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-007",
+    "backlog_predecessor_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-007",
+    "overlay_predecessor_id": "WS-EPIC-01-PHASE-G-ACTIVE-LEDGER-OVERLAY-20260723-001",
+    "phase_g_live_builder_currentness": "EXPECTED_STALE_AFTER_SUCCESSOR_IMPLEMENTATION",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "bindings": [
+      {
+        "name": "phase_g_builder_expected_stale",
+        "path": "scripts/build_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py",
+        "bytes": 70521,
+        "sha256": "808242a596bda62ea7567bd88d171eb5dcba2ead1153a427c90bee59aa17f9b0",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED",
+        "live_currentness": "EXPECTED_STALE_AFTER_SUCCESSOR_IMPLEMENTATION",
+        "execution_required": false
+      },
+      {
+        "name": "phase_g_builder_test",
+        "path": "tests/test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py",
+        "bytes": 19069,
+        "sha256": "8a176d9b6e51a6f21233595605f4cecd458befe88952f753f357117020e3b3a4",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_g_record",
+        "path": "docs/control/execution/walksafe-epic-01-phase-g-no-destination-hazard-implementation-record-20260723.json",
+        "bytes": 20612,
+        "sha256": "c1bbb54ffdefe6c5c2f958182b7aa49366def8eb2bdc36dac312d5ae5e2ce4fa",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_g_record_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-g-no-destination-hazard-implementation-record-20260723.md",
+        "bytes": 1866,
+        "sha256": "ff3499c38c189a8508c0f908c809da1ea7e85d63ebbb8425ca993d8ae1a53f3e",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r007",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r007.json",
+        "bytes": 424753,
+        "sha256": "cb9927b1bad6967e8242495fffda46fab6cbcbba87f05064e99689d9e3df0541",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "gap_r007_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r007.md",
+        "bytes": 619,
+        "sha256": "a597c8a61d09caea4a796d141646b6e85c575ce974b25215db40f8cef81652ed",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r007",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r007.json",
+        "bytes": 59465,
+        "sha256": "dcbe99112bbf09718833998d9c5676a0fabc1826e26e426a3cfc126b5fb21bd0",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "backlog_r007_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r007.md",
+        "bytes": 703,
+        "sha256": "ad47e1a7fa2eac8c0e9f31adb043287bfc241f48c028b911118920382d8dbac1",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_g_active_overlay",
+        "path": "docs/control/execution/walksafe-epic-01-phase-g-active-ledger-overlay-20260723-r001.json",
+        "bytes": 15595,
+        "sha256": "006e1d404200c959444d82acd880e52a876c426d1a51feac780b9dff8757f2f8",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "phase_g_active_overlay_markdown",
+        "path": "docs/control/execution/walksafe-epic-01-phase-g-active-ledger-overlay-20260723-r001.md",
+        "bytes": 800,
+        "sha256": "b29294ea2cf846cb6dbee441986ae7ecaff2ed361a20c8173279e6e85aa989f1",
+        "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+      },
+      {
+        "name": "trace_builder",
+        "path": "scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py",
+        "bytes": 58296,
+        "sha256": "9fd64218580d70ef081fb59f03fa574310810ee1c1e322bfc32cbd03bc7562cd"
+      },
+      {
+        "name": "trace_builder_test",
+        "path": "tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py",
+        "bytes": 19521,
+        "sha256": "30eaf84e4eb31485c91c551114bde12f91c61ac6457fe167f73684c436694e58"
+      }
+    ]
+  },
+  "trace": {
+    "epic_id": "EPIC-02",
+    "epic_title": "안전한 보행 상태와 권한",
+    "epic_status": "IN_PROGRESS",
+    "phase": "PHASE_A_FP017_WALK_SESSION_LIFECYCLE",
+    "directly_reassessed_policy_ids": [
+      "FP-017"
+    ],
+    "directly_reassessed_gap_ids": [
+      "GAP-026"
+    ],
+    "planned_test_ids": [
+      "TC-FP-017-01",
+      "TC-FP-017-02",
+      "TC-FP-017-03",
+      "TC-FP-017-04",
+      "TC-FP-017-05",
+      "TC-FP-017-06"
+    ],
+    "planned_test_execution_status": "NOT_RUN"
+  },
+  "implementation_snapshot": {
+    "scope_kind": "EPIC_02_PHASE_A_FP017_CONTROLLED_PATH_SET",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "dirty_worktree_expected": true,
+    "whole_repository_frozen": false,
+    "focused_scope_only": true,
+    "excluded_from_scope": [
+      "unrelated dirty-tree paths",
+      "checkpoint, runbook, indexes, test-layer registry, and daylog",
+      "Phase G immutable predecessors",
+      "this builder, its test, and its eight generated outputs"
+    ],
+    "file_count": 13,
+    "path_set_sha256": "0a88d730da6cc3efca36d02ee6eaa8c61ec31299458d7e880534453a4169e2af",
+    "content_set_sha256": "f9b445b4a801030185557d40a12aa8728403ff7765a3f91c554c95c646d8a68c",
+    "files": [
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "bytes": 337843,
+        "sha256": "15e896424a3154865a3e6a2f6ad034514089f9d62f7c52da69623aeebab75925"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+        "bytes": 7881,
+        "sha256": "734d08e8467683f4443b394cc7b5cb1f5bdd2a8098996f9991232f5923d928af"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "bytes": 2924,
+        "sha256": "299e18925a61e6429e3f152083f6c673981421690da61b0711c55defede4fb0c"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        "bytes": 3044,
+        "sha256": "c902db98e300fe34defead1df96334062847168b7e3b46d77ccaf99d8ea776d6"
+      },
+      {
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "bytes": 7469,
+        "sha256": "5565c6119df0883409359477e29e96ed6a0360bd5f5a4cc37cee104bbcf08c9a"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt",
+        "bytes": 12545,
+        "sha256": "7983b03fcea72027465fbbaa98c35230f5288e03c07f644e07274fb8c9259349"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AndroidSensorLifecycleStaticTest.kt",
+        "bytes": 1545,
+        "sha256": "159447ccecf0e1a0a32c6efc31e7a3ced696db458cbd8c17849f81087c355363"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+        "bytes": 11056,
+        "sha256": "22a27ba6d25caadd7c1d5bf539191efaa5ff4aaded37e243aa986dbc10d3c20e"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "bytes": 18097,
+        "sha256": "cbb5f5b52046be7d23dbe388d4c6e55ce6507da03522e5ba80d2d9446597c4e7"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "bytes": 16761,
+        "sha256": "5b6b622393cd6ed4b3bd555bd3e4d857e83843966166464459c9673d65947873"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "bytes": 10179,
+        "sha256": "0fd8ce50fa6dcf69bf3e8af9e2a259d1b99b7defa3ace911257d403fb8dd0244"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+        "bytes": 19998,
+        "sha256": "549edeb99ee572ac59dfdebbdf49ca41eb0494dbcaac4148ebac05954fe9ba59"
+      },
+      {
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt",
+        "bytes": 7175,
+        "sha256": "da7f1c604691ca541c8f7cfd3a679dc866cfafe0bdce5751d111b9e714cecee7"
+      }
+    ],
+    "snapshot_sha256": "98d28ae4398aa66ea9579ae8db047225dbc9ebb6b9ad83d4c1b2b19bf1f5e401"
+  },
+  "walk_session_lifecycle_contract": {
+    "contract_id": "WS-EPIC-02-PHASE-A-FP017-LIFECYCLE-CONTRACT-20260723-001",
+    "source_policy_id": "FP-017",
+    "scope_assessment": "PARTIAL_IMPLEMENTATION",
+    "states": [
+      "READY",
+      "ACTIVE",
+      "PAUSED",
+      "SAFE_STOP",
+      "ENDED"
+    ],
+    "recovery_stages": [
+      "RECHECK_REQUIRED",
+      "AWAITING_RESUME_CONFIRMATION"
+    ],
+    "initial_start": {
+      "rule": "필수 준비상태를 같은 시점에 확인한 뒤 초기 보행만 자동 시작한다.",
+      "implemented_boundary": "현재 Android 준비 확인과 선택 모드 gate에 연결됨",
+      "remaining_boundary": "가입·통합동의·운영 인증, 일반 원본수집 동의, 인증된 Gateway 로그인 readiness, 필수 서버, 저장공간·배터리·발열 aggregate와 실제 기기 검증은 후속 EPIC-02 범위이며 현재 초기 시작 gate가 완결됐다고 주장하지 않는다."
+    },
+    "background_pause": {
+      "rule": "앱이 보이지 않으면 상태를 먼저 PAUSED로 바꾸고 카메라·음성·길안내·신고 생성을 정지한다.",
+      "runtime_gate": "WalkSessionState.ACTIVE && foreground"
+    },
+    "foreground_recovery": {
+      "rule": "과거 준비 결과를 재사용하지 않고 재검사한 뒤 정확한 사용자 확인 전에는 재개하지 않는다.",
+      "prompt": "보행 안내를 다시 시작할까요? 시작 또는 취소라고 말해 주세요",
+      "accepted_exact_words": [
+        "시작",
+        "취소"
+      ],
+      "no_response_behavior": "PAUSED 유지",
+      "unrecognized_behavior": "PAUSED 유지"
+    },
+    "process_restart": {
+      "rule": "중단 표식이 있으면 ACTIVE를 복원하지 않고 PAUSED/RECHECK_REQUIRED에서 시작한다.",
+      "automatic_previous_walk_restore": false
+    },
+    "voice_channel_separation": {
+      "command": "COMMAND",
+      "recovery_confirmation": "WALK_SESSION_RESUME"
+    },
+    "mode_specific_readiness": {
+      "full_mode": "GPS·미터 거리·승인 기기 프로필과 전체 기능 권한을 요구한다.",
+      "distance_limited_mode": "GPS 또는 미터 거리 기능이 없으면 제한 안내 뒤 물체 종류 경고만 허용하고 위치·활동인식 권한은 시작 필수조건에서 제외한다.",
+      "gps_unavailable_result": "LIMITED"
+    },
+    "sensor_lifecycle": {
+      "stale_callback_behavior": "stop 뒤 이미 대기하던 센서 callback을 무시한다.",
+      "step_count_scope": "TYPE_STEP_COUNTER의 하드웨어 누계 기준을 활성 구간마다 다시 잡고 일시중지 중 걸음은 보행 세션 누계에 포함하지 않는다."
+    },
+    "asynchronous_result_boundary": {
+      "generation_tracked_jobs": "카메라·detector·ARCore·feedback처럼 generation을 가진 비동기 작업은 ACTIVE 상태와 해당 작업 generation이 모두 현재일 때만 적용한다.",
+      "ordinary_permission_callbacks": "일반 Android permission callback에는 별도 generation이 있다고 주장하지 않는다. 현재 lifecycle·foreground를 다시 확인하고 후속 시작 함수의 ACTIVE gate를 통과할 때만 runtime으로 이어진다.",
+      "late_result_behavior": "무시하고 runtime이나 사용자 출력을 다시 시작하지 않는다."
+    },
+    "approved_baseline_files_modified": false,
+    "new_product_policy_created": false
+  },
+  "implemented_controls": [
+    {
+      "control": "EXPLICIT_WALK_SESSION_STATE_MACHINE",
+      "result": "READY·ACTIVE·PAUSED·SAFE_STOP·ENDED와 재검사·재개확인 단계를 순수 상태기계로 분리했다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt"
+      ]
+    },
+    {
+      "control": "BACKGROUND_FAIL_CLOSED",
+      "result": "background 전환 시 PAUSED를 먼저 기록하고 runtime 생산자와 비동기 callback을 ACTIVE gate로 막는다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt"
+      ]
+    },
+    {
+      "control": "FRESH_RECHECK_AND_EXACT_CONFIRMATION",
+      "result": "복귀 뒤 재검사와 '보행 안내를 다시 시작할까요? 시작 또는 취소라고 말해 주세요'의 정확한 시작 확인 전 자동 재개를 차단한다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AndroidSensorLifecycleStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt"
+      ]
+    },
+    {
+      "control": "PROCESS_RESTART_NO_AUTO_RESTORE",
+      "result": "중단 표식이 있으면 이전 ACTIVE 보행을 복원하지 않고 사용자 시작이 필요한 PAUSED 상태로 연다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycle.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt"
+      ]
+    },
+    {
+      "control": "MODE_SPECIFIC_CAPABILITY_AND_PERMISSION_GATES",
+      "result": "GPS·미터 거리·승인 프로필 부재는 FULL을 막되 LIMITED 물체 종류 경고를 허용하고 모드별 권한을 분리했다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapability.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt"
+      ]
+    },
+    {
+      "control": "SENSOR_STALE_CALLBACK_AND_ACTIVE_WINDOW_STEPS",
+      "result": "stop 뒤 센서 callback을 무시하고 걸음 수 기준을 활성 구간마다 다시 잡아 일시중지 중 걸음을 제외했다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidEarthOrientationTracker.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AndroidSensorLifecycleStaticTest.kt"
+      ]
+    },
+    {
+      "control": "ASYNC_RUNTIME_GENERATION_AND_PERMISSION_LIFECYCLE_GATES",
+      "result": "generation을 가진 카메라·detector·ARCore·feedback 작업은 ACTIVE+현재 generation으로 차단하고, 일반 permission callback은 현재 lifecycle·foreground와 후속 ACTIVE 시작 gate로 runtime 재시작을 차단했다.",
+      "paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt"
+      ]
+    }
+  ],
+  "internal_verification": {
+    "status": "PASS_RECORDED_FOR_IMPLEMENTATION_SESSION",
+    "formal_evidence": false,
+    "actual_device_execution": "NOT_RUN",
+    "commands": [
+      {
+        "scope": "FP-017 상태기계와 MainActivity lifecycle 집중 JVM 회귀",
+        "command": "./gradlew :app:testDebugUnitTest --tests '*WalkSessionLifecycleTest' --tests '*MainActivityWalkSessionLifecycleStaticTest' --offline --no-daemon --rerun-tasks",
+        "status": "PASS_INTERNAL_FOCUSED"
+      },
+      {
+        "scope": "Android 사용자 앱 전체 JVM·assemble·lint",
+        "command": "./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline --no-daemon",
+        "status": "PASS_INTERNAL_SESSION_RECORDED"
+      }
+    ],
+    "interpretation": "저장소 내부 상태기계·구성·회귀 검증이다. 실제 잠금·홈·통화·앱 전환 기기 시험, 대상 사용자 접근성, 정식 시험 또는 출시 증거가 아니다."
+  },
+  "open_issues": [
+    {
+      "id": "EPIC-02-FP017-ACTUAL-DEVICE-LIFECYCLE",
+      "status": "NOT_RUN",
+      "description": "실제 Android 기기에서 잠금·홈·통화·앱 전환과 복귀를 실행하지 않았다."
+    },
+    {
+      "id": "EPIC-02-FP017-FORMAL",
+      "status": "NOT_RUN",
+      "description": "TC-FP-017-01~06을 포함한 정식 시험은 미실행이다."
+    },
+    {
+      "id": "EPIC-02-FP017-READINESS-AGGREGATE",
+      "status": "OPEN",
+      "description": "가입·통합동의·운영 인증, 일반 원본수집 동의, 인증된 Gateway 로그인 readiness, 필수 서버, 저장공간·배터리·발열 aggregate를 하나의 초기 시작 판단으로 완결하지 않았다."
+    },
+    {
+      "id": "EPIC-02-FP018-WALK-STATE-RECOVERY",
+      "status": "PLANNED_NEXT",
+      "description": "권한·센서·경로·음성안내·모델을 재검사한 뒤에만 사용자가 보행을 재개하게 하고 재부팅·강제종료 뒤 이전 보행 자동복원을 금지하는 FP-018 복구 흐름을 완성한다."
+    }
+  ],
+  "release_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "actual_device_test_status": "NOT_RUN",
+    "remaining_gates": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "next_single_action": {
+    "epic_id": "EPIC-02",
+    "work_item_id": "EPIC-02-FP018-WALK-STATE-RECOVERY",
+    "source_policy_id": "FP-018",
+    "gap_id": "GAP-027",
+    "status": "PLANNED_NEXT_WITHIN_EPIC",
+    "action": "권한·센서·경로·음성안내·모델을 재검사한 뒤에만 사용자가 보행을 재개하게 하고 재부팅·강제종료 뒤 이전 보행 자동복원을 금지하는 FP-018 복구 흐름을 완성한다."
+  },
+  "record_content_sha256": "bc5ba228ce953bca00dafe0de1659321bbbbb39b116ddea3cbd30a7d5f183dd1"
+}

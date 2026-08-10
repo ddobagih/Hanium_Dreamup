@@ -1,0 +1,782 @@
+{
+  "schema_version": "2.0",
+  "manifest_id": "WS-GOAL-GRAPH-STATIC-PLAN-MANIFEST-2.1.0",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-1",
+  "plan_version": "2.1.0",
+  "created_on": "2026-07-24",
+  "supersedes": {
+    "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2",
+    "plan_version": "2.0.0",
+    "activation_status": "READY_NOT_ACTIVATED",
+    "manifest_path": "docs/control/goals/walksafe-completion-graph-v2/static-plan-manifest-v2.0.0.json",
+    "manifest_sha256": "ce542aeec040431cdfd473bff54a393a178649b770e0f20e14f3417bfce15847",
+    "initial_transition_event_path": "docs/control/goals/walksafe-completion-graph-v2-1/superseded-v2.0.0-package-prepared-event.json",
+    "initial_transition_event_sha256": "fd028de110ecb233255ecd535757bf97bc180e0d62bfc8d4bd1446acd9e2dc21",
+    "supersession_record_path": "docs/control/goals/walksafe-completion-graph-v2-1/preactivation-supersession-record-v2.0.0.json"
+  },
+  "orchestration": {
+    "model": "DEPENDENCY_DAG_READY_FRONTIER",
+    "fixed_stage_count": false,
+    "single_focus_goal": true,
+    "dynamic_goal_materialization": true,
+    "standing_control_is_stage": false,
+    "selection_policy": "IN_PROGRESS_THEN_CANONICAL_NEXT_ACTION_THEN_RISK_UNLOCK_PRIORITY",
+    "tie_breaker": "PRIORITY_RANK_THEN_GOAL_ID",
+    "backlog_execution_order_semantics": "PRIORITY_TIE_BREAKER_ONLY_NOT_DEPENDENCY",
+    "transition_commit_policy": "PREPARE_VALIDATE_THEN_ATOMIC_CHECKPOINT_SWITCH"
+  },
+  "artifact_graph_contract": {
+    "canonical_role": "ARTIFACT_REGISTER",
+    "artifact_count": 257,
+    "dependency_edge_count": 698,
+    "cycle_count": 0,
+    "upstream_downstream_reverse_reference_required": true,
+    "duplicate_edge_prohibited": true,
+    "node_identity": "ARTIFACT_ID_PLUS_INSTANCE_OR_REVISION",
+    "bundle_file_count_is_not_goal_count": true,
+    "integration_candidate_required_artifact_codes": [
+      "DLV-AIML-14",
+      "DLV-AIML-16",
+      "DLV-AIML-21",
+      "DLV-AIML-24",
+      "DLV-DEV-01",
+      "DLV-DEV-07",
+      "DLV-DEV-08",
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-18",
+      "DLV-DEV-19",
+      "DLV-DEV-20"
+    ]
+  },
+  "artifact_work_scheduling_contract": {
+    "source_role": "ARTIFACT_REGISTER",
+    "queue_field": "artifact_work_queue",
+    "partition_statuses": [
+      "INACTIVE",
+      "LIVE_GOAL",
+      "STRUCTURALLY_DUE",
+      "TERMINAL",
+      "WAITING_APPLICABILITY",
+      "WAITING_TRIGGER",
+      "WAITING_UPSTREAM"
+    ],
+    "partition_covers_all_artifact_codes_exactly_once": true,
+    "one_artifact_code_per_work_item": true,
+    "live_output_subject_overlap_prohibited": true,
+    "structurally_due_requires_materialization": true,
+    "pending_evaluation_requires_explicit_disposition": true,
+    "recompute_after_artifact_register_update": true,
+    "selection_policy": "PRIORITY_THEN_UNLOCK_DESC_THEN_TOPO_RANK_THEN_ARTIFACT_CODE",
+    "allowed_work_reasons": [
+      "ACTIVE_EVENT_UPDATE",
+      "APPLICABILITY_DECISION",
+      "DRAFT_COMPLETION",
+      "PLANNED_EVIDENCE"
+    ]
+  },
+  "policy_gap_contract": {
+    "canonical_role": "IMPLEMENTATION_GAP",
+    "mapping_source": "assessments.source_policy_id_to_gap_id",
+    "expected_mapping_count": 68,
+    "expected_mapping_sha256": "3423815d07d130ab85c6729733b26c7061ae13f63b4f344dfecdc1c47c4f80b5",
+    "work_item_pair_cardinality": 1,
+    "effective_policy_subject_set_must_match_mapping": true,
+    "mapping_identity_changes_require_successor_package": true,
+    "gap_backlog_pair_is_atomic": true
+  },
+  "goal_graph": {
+    "root_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+    "initial_focus_goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+    "initial_ready_frontier_goal_ids": [
+      "WS-GOAL-EPIC-02-FP-018-R001",
+      "WS-GOAL-EPIC-03",
+      "WS-GOAL-EPIC-12"
+    ],
+    "static_nodes": [
+      {
+        "goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/00-master-goal.md",
+        "goal_kind": "MASTER",
+        "external_key": "WALKSAFE-COMPLETION",
+        "workstream_type": "PROJECT",
+        "parent_goal_id": "",
+        "priority_rank": 0,
+        "start_requires": [],
+        "completion_requires": [],
+        "target_completion_level": "PROJECT_ACCEPTED_AND_HANDOVER_OR_CLOSURE_COMPLETE"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-01",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-01-product-boundary.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-01",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 1,
+        "start_requires": [],
+        "completion_requires": [],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-02",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-02-safe-walk-state-and-permissions.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-02",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 2,
+        "start_requires": [
+          "WS-GOAL-EPIC-01"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-01"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-03",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-03-account-admin-security.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-03",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 3,
+        "start_requires": [
+          "WS-GOAL-EPIC-01"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-01"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-04",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-04-navigation-arrival-deviation.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-04",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 4,
+        "start_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-05",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-05-object-detection-safety.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-05",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 5,
+        "start_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-06",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-06-voice-haptic-accessibility.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-06",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 6,
+        "start_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-02"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-07",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-07-raw-data-lifecycle.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-07",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 7,
+        "start_requires": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-08",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-08-auto-report-queue.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-08",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 8,
+        "start_requires": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-07"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-07"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-10",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-10-ai-model-lifecycle.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-10",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 9,
+        "start_requires": [
+          "WS-GOAL-EPIC-05",
+          "WS-GOAL-EPIC-07"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-05",
+          "WS-GOAL-EPIC-07"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-09",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-09-server-capacity-resilience.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-09",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 10,
+        "start_requires": [
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-07",
+          "WS-GOAL-EPIC-08"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-07",
+          "WS-GOAL-EPIC-08"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-11",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-11-release-operations-recovery-readiness.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-11",
+        "workstream_type": "IMPLEMENTATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 11,
+        "start_requires": [
+          "WS-GOAL-EPIC-09",
+          "WS-GOAL-EPIC-10"
+        ],
+        "completion_requires": [
+          "WS-GOAL-EPIC-09",
+          "WS-GOAL-EPIC-10"
+        ],
+        "target_completion_level": "IMPLEMENTATION_READY"
+      },
+      {
+        "goal_id": "WS-GOAL-EPIC-12",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-12-formal-verification-gates.md",
+        "goal_kind": "WORKSTREAM",
+        "external_key": "EPIC-12",
+        "workstream_type": "FORMAL_VERIFICATION",
+        "parent_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
+        "priority_rank": 12,
+        "start_requires": [],
+        "completion_requires": [
+          "WS-GOAL-EPIC-04",
+          "WS-GOAL-EPIC-05",
+          "WS-GOAL-EPIC-06",
+          "WS-GOAL-EPIC-08",
+          "WS-GOAL-EPIC-09",
+          "WS-GOAL-EPIC-10",
+          "WS-GOAL-EPIC-11"
+        ],
+        "target_completion_level": "VERIFICATION_COMPLETE"
+      }
+    ]
+  },
+  "dynamic_node_contracts": [
+    {
+      "work_item_type": "POLICY_GAP_WORK",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/policy-gap-work-item.md",
+      "allowed_target_completion_levels": [
+        "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+        "IMPLEMENTATION_READY"
+      ],
+      "allowed_parent_scope": "IMPLEMENTATION_WORKSTREAM",
+      "required_start_evidence_roles": [],
+      "required_start_evidence_status_by_role": {},
+      "required_start_goal_type_counts": {},
+      "same_candidate_required": false
+    },
+    {
+      "work_item_type": "ARTIFACT_WORK",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "ARTIFACT_TARGET_STATE_REACHED"
+      ],
+      "allowed_parent_scope": "READY_CONTAINER",
+      "required_start_evidence_roles": [],
+      "required_start_evidence_status_by_role": {},
+      "required_start_goal_type_counts": {},
+      "same_candidate_required": false,
+      "materialization_output_subject_scope_required": true,
+      "materialization_reason_required": true,
+      "trigger_evidence_required_for_event_driven_update": true,
+      "one_artifact_code_per_work_item": true,
+      "pending_evaluation_allowed_only_for_applicability_decision": true,
+      "required_output_roles": [
+        "ARTIFACT_CHANGE_LOG",
+        "ARTIFACT_REGISTER"
+      ]
+    },
+    {
+      "work_item_type": "INTEGRATION_CANDIDATE",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "IMMUTABLE_CANDIDATE_BOUND"
+      ],
+      "allowed_parent_scope": "EPIC_11_OR_MASTER",
+      "required_start_evidence_roles": [],
+      "required_start_evidence_status_by_role": {},
+      "required_start_goal_type_counts": {},
+      "required_artifact_subject_codes_from_contract": "artifact_graph_contract.integration_candidate_required_artifact_codes",
+      "required_start_goal_ids_by_parent": {
+        "WS-GOAL-EPIC-11": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-04",
+          "WS-GOAL-EPIC-05",
+          "WS-GOAL-EPIC-06",
+          "WS-GOAL-EPIC-07",
+          "WS-GOAL-EPIC-08",
+          "WS-GOAL-EPIC-09",
+          "WS-GOAL-EPIC-10"
+        ],
+        "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2": [
+          "WS-GOAL-EPIC-02",
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-04",
+          "WS-GOAL-EPIC-05",
+          "WS-GOAL-EPIC-06",
+          "WS-GOAL-EPIC-07",
+          "WS-GOAL-EPIC-08",
+          "WS-GOAL-EPIC-09",
+          "WS-GOAL-EPIC-10",
+          "WS-GOAL-EPIC-11"
+        ]
+      },
+      "same_candidate_required": false
+    },
+    {
+      "work_item_type": "FORMAL_TEST_RUN",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "FORMAL_VERIFICATION_ACTION_COMPLETE"
+      ],
+      "allowed_parent_scope": "EPIC_12",
+      "required_start_evidence_roles": [
+        "TEST_PLAN_APPROVAL_RECEIPT",
+        "INTEGRATION_CANDIDATE_MANIFEST"
+      ],
+      "required_start_evidence_status_by_role": {
+        "TEST_PLAN_APPROVAL_RECEIPT": "APPROVED",
+        "INTEGRATION_CANDIDATE_MANIFEST": "BOUND"
+      },
+      "required_start_goal_type_counts": {
+        "INTEGRATION_CANDIDATE": 1
+      },
+      "same_candidate_required": true
+    },
+    {
+      "work_item_type": "RELEASE_GATE",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "RELEASE_GATE_CLOSED"
+      ],
+      "allowed_parent_scope": "EPIC_12",
+      "required_start_evidence_roles": [
+        "TEST_PLAN_APPROVAL_RECEIPT",
+        "INTEGRATION_CANDIDATE_MANIFEST"
+      ],
+      "required_start_evidence_status_by_role": {
+        "TEST_PLAN_APPROVAL_RECEIPT": "APPROVED",
+        "INTEGRATION_CANDIDATE_MANIFEST": "BOUND"
+      },
+      "required_start_goal_type_counts": {
+        "INTEGRATION_CANDIDATE": 1
+      },
+      "same_candidate_required": true
+    },
+    {
+      "work_item_type": "RELEASE_DECISION",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "RELEASE_ELIGIBILITY_DECIDED"
+      ],
+      "allowed_parent_scope": "EPIC_12",
+      "required_start_evidence_roles": [
+        "TEST_PLAN_APPROVAL_RECEIPT",
+        "INTEGRATION_CANDIDATE_MANIFEST",
+        "FORMAL_TEST_REPORT",
+        "ACTUAL_DEVICE_TEST_REPORT",
+        "RELEASE_GATE_CLOSURE_RECEIPT"
+      ],
+      "required_start_evidence_status_by_role": {
+        "TEST_PLAN_APPROVAL_RECEIPT": "APPROVED",
+        "INTEGRATION_CANDIDATE_MANIFEST": "BOUND",
+        "FORMAL_TEST_REPORT": "PASS",
+        "ACTUAL_DEVICE_TEST_REPORT": "PASS",
+        "RELEASE_GATE_CLOSURE_RECEIPT": "CLOSED"
+      },
+      "required_start_goal_type_counts": {
+        "INTEGRATION_CANDIDATE": 1,
+        "FORMAL_TEST_RUN": 1,
+        "RELEASE_GATE": 5
+      },
+      "same_candidate_required": true
+    },
+    {
+      "work_item_type": "DEPLOYMENT_DELIVERY_EVENT",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "RELEASE_DELIVERY_ACTION_COMPLETE"
+      ],
+      "allowed_parent_scope": "MASTER",
+      "required_start_evidence_roles": [
+        "RELEASE_ELIGIBILITY_APPROVAL",
+        "INTEGRATION_CANDIDATE_MANIFEST"
+      ],
+      "required_start_evidence_status_by_role": {
+        "RELEASE_ELIGIBILITY_APPROVAL": "ELIGIBLE",
+        "INTEGRATION_CANDIDATE_MANIFEST": "BOUND"
+      },
+      "required_start_goal_type_counts": {
+        "RELEASE_DECISION": 1
+      },
+      "required_start_goal_ids": [
+        "WS-GOAL-EPIC-12"
+      ],
+      "same_candidate_required": true
+    },
+    {
+      "work_item_type": "OPERATION_EVENT",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "OPERATION_EVENT_RECORDED"
+      ],
+      "allowed_parent_scope": "MASTER",
+      "required_start_evidence_roles": [
+        "PHASE_C_TECHNICAL_DELIVERY_RECEIPT"
+      ],
+      "required_start_evidence_status_by_role": {
+        "PHASE_C_TECHNICAL_DELIVERY_RECEIPT": "DELIVERED"
+      },
+      "required_start_goal_type_counts": {
+        "DEPLOYMENT_DELIVERY_EVENT": 1
+      },
+      "same_candidate_required": false
+    },
+    {
+      "work_item_type": "HANDOVER_CLOSURE_EVENT",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "HANDOVER_CLOSURE_ACTION_COMPLETE"
+      ],
+      "allowed_parent_scope": "MASTER",
+      "required_start_evidence_roles": [
+        "PHASE_C_TECHNICAL_DELIVERY_RECEIPT"
+      ],
+      "required_start_evidence_status_by_role": {
+        "PHASE_C_TECHNICAL_DELIVERY_RECEIPT": "DELIVERED"
+      },
+      "required_start_goal_type_counts": {
+        "DEPLOYMENT_DELIVERY_EVENT": 1,
+        "OPERATION_EVENT": 1
+      },
+      "same_candidate_required": false
+    },
+    {
+      "work_item_type": "BLOCKER_OR_EXTERNAL_RECEIPT",
+      "template_path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "allowed_target_completion_levels": [
+        "EXTERNAL_CONDITION_RESOLVED"
+      ],
+      "allowed_parent_scope": "READY_CONTAINER",
+      "required_start_evidence_roles": [],
+      "required_start_evidence_status_by_role": {},
+      "required_start_goal_type_counts": {},
+      "same_candidate_required": false
+    }
+  ],
+  "dynamic_inventory_contract": {
+    "static_manifest_changes_when_dynamic_goal_is_added": false,
+    "materialized_goal_is_immutable": true,
+    "source_binding_is_creation_time_snapshot": true,
+    "revision_strategy": "NEW_SUCCESSOR_FILE_AND_APPEND_ONLY_EVENT",
+    "mandatory_dynamic_canonical_input_roles": [
+      "ARTIFACT_APPLICATION_RECEIPT",
+      "ARTIFACT_CHANGE_LOG",
+      "ARTIFACT_REGISTER",
+      "DESIGN_TRACEABILITY",
+      "IMPLEMENTATION_BACKLOG",
+      "IMPLEMENTATION_GAP",
+      "MODULE_REGISTER",
+      "PLANNED_TEST_CASES",
+      "POLICY_BASELINE",
+      "REQUIREMENTS_TRACEABILITY"
+    ],
+    "active_dependency_may_reference_superseded_revision": false,
+    "work_item_completion_requires_subset_of_start_requires": true,
+    "work_item_dependency_container_scope": "SAME_OR_TRANSITIVE_UPSTREAM_OR_MASTER_LEVEL",
+      "required_fields": [
+        "artifact_trigger_evidence_refs",
+        "artifact_work_reason",
+        "goal_id",
+      "path",
+      "sha256",
+      "goal_kind",
+      "work_item_type",
+      "parent_goal_id",
+      "materialized_event_sha256",
+      "materialized_from_role",
+      "materialized_from_path",
+      "materialized_from_document_id",
+      "materialized_from_sha256",
+      "predecessor_goal_id",
+      "predecessor_goal_content_sha256",
+      "supersedes_goal_id",
+      "supersedes_goal_content_sha256"
+    ]
+  },
+  "transition_contract": {
+    "initial_event_is_immutable": true,
+    "subsequent_events_are_append_only": true,
+    "current_head_is_derived_from_replay": true,
+    "validation_cutoff_is_snapshot_specific": true,
+    "activation_event_required_before_execution": true,
+    "activation_event_changes_goal_status": false,
+    "activation_requires_user_request_and_quick_check_receipt": true,
+    "activation_authorization_requires_checker_trust_anchor": true,
+    "activation_quick_gate_is_separate_from_authorization": true,
+    "activation_quick_gate_is_bound_by_activation_event": true,
+    "execution_start_event": "GOAL_STARTED",
+    "execution_resume_event": "WORK_SESSION_RESUMED",
+    "execution_must_begin_after_goal_started": true,
+    "goal_started_requires_fresh_full_implementation_start_gate": true,
+    "work_session_resume_requires_fresh_full_implementation_start_gate": true,
+    "current_work_session_can_be_asserted_by_checker_argument": true,
+    "quick_activation_and_full_start_gates_are_distinct": true,
+    "check_command_contract_version": "2026-07-24.1",
+    "quick_activation_check_ids": [
+      "CONTINUATION_QUICK",
+      "GOAL_GRAPH_QUICK"
+    ],
+    "quick_activation_check_contract_sha256": "d85bf14758db3be8385c9df2cb277f29a9f9aa9b23d2a458ffbd80d6e59cd535",
+    "implementation_start_gate_check_ids": [
+      "REPOSITORY_STATE",
+      "CONTINUATION",
+      "GOAL_GRAPH",
+      "BASELINE_MATERIALIZATION",
+      "ANDROID_GATEWAY_BOUNDARY",
+      "NODE_TOOLCHAIN_PRE",
+      "GATEWAY_TYPECHECK",
+      "GATEWAY_TEST",
+      "GATEWAY_BUILD",
+      "WEB_TEST",
+      "WEB_LINT",
+      "WEB_TYPECHECK",
+      "WEB_BUILD",
+      "NODE_TOOLCHAIN_POST",
+      "ANDROID_UNIT_ASSEMBLE_LINT",
+      "TEST_LAYER_REGISTRY_VALIDATE",
+      "FIELD_AND_RELEASE_PYTEST",
+      "GOAL_CONTROL_PYTEST",
+      "CONTROL_AND_TRACE_PYTEST"
+    ],
+    "implementation_start_gate_check_contract_sha256": "0b20daee129ed0b38588bd237cb9588b8bd119496bc39e354500d0a67f5b4483",
+    "gate_repository_snapshot_is_event_bound": true,
+    "gate_output_paths_are_event_scoped_append_only": true,
+    "gate_evidence_is_excluded_from_working_snapshot_and_bound_directly": true,
+    "historical_implementation_trace_does_not_pin_future_live_bytes": true,
+    "materialization_initial_status": "PLANNED",
+    "materialization_parent_must_be_ready_container": true,
+    "planned_to_ready_event": "GOAL_READY",
+    "blocker_resolution_returns_recorded_status": true,
+    "successor_event": "GOAL_SUPERSEDED",
+    "successor_event_is_atomic": true,
+    "standalone_defect_successor_is_prohibited": true,
+    "successor_semantic_fields_immutable": [
+      "artifact_trigger_evidence_refs",
+      "artifact_work_reason",
+      "canonical_input_roles",
+      "gap_ids",
+      "output_subject_ids_by_role",
+      "parent_goal_id",
+      "priority_rank",
+      "question_policy",
+      "source_blocker_ids",
+      "source_policy_ids",
+      "stop_policy",
+      "target_completion_level",
+      "work_item_id",
+      "work_item_type"
+    ],
+    "package_completion_is_terminal": true,
+    "canonical_binding_update_event": "CANONICAL_BINDINGS_UPDATED",
+    "canonical_update_subject_diff_required": true,
+    "canonical_update_impact_disposition_required": true,
+    "canonical_update_producer_must_complete_atomically": true,
+    "canonical_update_internal_producer_roles_are_allowlisted": true,
+    "canonical_update_unscoped_change_is_global": true,
+    "canonical_update_unknown_payload_defaults_global": true,
+    "trace_row_without_policy_or_gap_defaults_global": true,
+    "artifact_work_output_scope_bound_at_materialization": true,
+    "artifact_work_queue_covers_register_exactly_once": true,
+    "artifact_work_due_target_requires_live_goal": true,
+    "artifact_work_live_subject_overlap_prohibited": true,
+    "artifact_work_one_subject_per_goal": true,
+    "artifact_work_requires_canonical_update_before_completion": true,
+    "artifact_work_requires_register_change_log_atomic_pair": true,
+    "artifact_target_activation_must_match_work_reason": true,
+    "externally_governed_artifact_state_requires_external_authorization": true,
+    "delegated_internal_artifact_approval_requires_strong_producer_evidence": true,
+    "delegated_internal_artifact_approval_is_event_declared": true,
+    "artifact_ledger_content_self_seal_required": true,
+    "policy_gap_work_requires_atomic_gap_backlog_output": true,
+    "policy_gap_work_requires_owned_reassessment_terminal_outcome": true,
+    "policy_gap_evidence_catalog_binds_current_producer_results": true,
+    "policy_gap_work_derives_parent_progress_and_next_action": true,
+    "backlog_operational_fields_change_only_through_policy_gap_work": true,
+    "artifact_change_log_rows_bind_semantics_goal_register_and_date": true,
+    "artifact_change_log_path_hashes_match_implementation_record": true,
+    "canonical_application_receipt_is_nonimpact_control": true,
+    "internal_completion_requires_changed_artifacts_checks_successor_trace": true,
+    "internal_completion_requires_independent_review_provenance": true,
+    "release_decision_binds_candidate_and_all_gate_provenance": true,
+    "operation_handover_same_deployment_chain_required": true,
+    "completed_workstream_change_strategy": "EVENT_SOURCED_AGGREGATE_REOPEN_WITH_WORK_ITEM_SUCCESSORS",
+    "completed_workstream_reopen_event": "CANONICAL_BINDINGS_UPDATED",
+    "completed_workstream_direct_reopen_status": "READY",
+    "completed_workstream_start_dependency_invalidated_status": "PLANNED",
+    "workstream_revalidation_binds_latest_impact_event": true,
+    "completed_master_change_strategy": "TERMINAL_NEW_PROJECT_PACKAGE_REQUIRED",
+    "same_package_reopen_requires_static_topology_unchanged": true,
+    "static_graph_change_strategy": "VERSIONED_SUCCESSOR_MANIFEST_AND_CHECKER_REQUIRED",
+    "nonretroactive_ledgers_require_append_or_identity_continuity": true,
+    "typed_start_evidence_event_binding_required": true,
+    "typed_completion_required_roles_are_exact": true,
+    "repository_scope_completion_milestone": "COMPLETE_AWAITING_EXTERNAL",
+    "repository_scope_completion_does_not_complete_package": true,
+    "user_decision_questions_are_separate_from_external_actions": true,
+    "new_request_event_is_prohibited_while_internal_ready_leaf_exists": true,
+    "external_request_identity_is_deduplicated": true,
+    "internal_independent_review_does_not_substitute_external_review": true,
+    "external_attestation_anchor_history_is_append_only": true,
+    "authority_roster_anchor_history_is_append_only": true,
+    "authority_roster_rotation_is_monotonic": true,
+    "completion_receipt_event_binding_required": true,
+    "tail_assurance": "INTERNAL_HASH_CHAIN_REQUIRES_GIT_OR_EXTERNAL_SNAPSHOT"
+  },
+  "protected_files": [
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/00-master-goal.md",
+      "sha256": "238f607322a9b421c4d6c014184a8c973c50ea3cc01749dea7c954d50b31b8a8"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/README.md",
+      "sha256": "21bee93053fa5cca426d2aee6363cef074c75c4fc6fe977d2c045fceb54796bf"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/preactivation-supersession-record-v1.1.0.json",
+      "sha256": "964651776fe7ac83f41796db09f7bf8e59626736bf6f933b988c8752d6971fed"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/preactivation-supersession-record-v2.0.0.json",
+      "sha256": "d82b78000c921a2368bb0d6a479c9a4487563cbc8e3041f45b36833bff579fd2"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/superseded-v2.0.0-package-prepared-event.json",
+      "sha256": "bc00770447729e62a9895ebc54c91e3ed3d03dec3c13b0b5e47411fbe7fa6521"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/dynamic-node-template.md",
+      "sha256": "c2c3f6aa5f119670f822f582ecc528458e79e5476dd1d943528f528536fc2a49"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/templates/policy-gap-work-item.md",
+      "sha256": "d879a43b556d4373f6dff3ea464bcaaf6ea27c7112f793045d7aebf96958894b"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/work-items/epic-02/epic-02-fp018-walk-state-recovery-r001.md",
+      "sha256": "fa725fdf84918f04fdee6fb592a34c31cdcbea4522b3a335b4a495994c6195c9"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-01-product-boundary.md",
+      "sha256": "ca03de4b68de11eaa0e1d5debae73b946058ba1a6ed9053ea43a1fa9545cb83f"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-02-safe-walk-state-and-permissions.md",
+      "sha256": "5928fb6d7a0f1aa244eb9c30b90e6ae7b2700d5ac86b7992326d96a4de8cfc1a"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-03-account-admin-security.md",
+      "sha256": "5755848a9cb1407c97f74d14293829e302271b9702e482f9516715a80d76ad8c"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-04-navigation-arrival-deviation.md",
+      "sha256": "165370ca7fc852b49d03b409dffc1f1fc36f77a526527b4f4f0bbd0584d8bbcb"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-05-object-detection-safety.md",
+      "sha256": "55e027b12ac665bea29f8987bbcc287d19bebfd7887fd852743391d3c8e75359"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-06-voice-haptic-accessibility.md",
+      "sha256": "9365d9edf67c00e5e88e3af422702353779c62225ba37a836995732f6520aacc"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-07-raw-data-lifecycle.md",
+      "sha256": "00821eb909df5bd609c1f4bba21cc900cfa419d2dadb4b32eacc821bf40049da"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-08-auto-report-queue.md",
+      "sha256": "5266310db6c05d60e15c2df7ab88cffd156ade5e03703982184b40320f748562"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-09-server-capacity-resilience.md",
+      "sha256": "7d57e0b5ad2aec5f3735a159a6794adea78370e2dcb4577242fc9d686f7e9220"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-10-ai-model-lifecycle.md",
+      "sha256": "b54d19a0da8469512ca6c9d5947a6dd1ed8e71e73d71a9692b5d6e8a89815760"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-11-release-operations-recovery-readiness.md",
+      "sha256": "ab889ac4b86aec2bc1e923b6c7d1fd54123a89a262224ef4e66abcfda08482f5"
+    },
+    {
+      "path": "docs/control/goals/walksafe-completion-graph-v2-1/workstreams/epic-12-formal-verification-gates.md",
+      "sha256": "c025ad169a84d098a90cb686da0f60e157cb220237d7d686d91ce58502cec651"
+    }
+  ]
+}

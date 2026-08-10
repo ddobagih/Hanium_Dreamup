@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP004-PRIORITY-USER-IMPLEMENTATION-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-24T16:38:00+09:00",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/README.md",
+      "after_sha256": "86eb7088a8a77b12e409cb714596fc6cd08498475181528fd5f8c79f1aa71f07",
+      "before_sha256": "0a347b4f47916abea1232b3c41ce64d2cf7e91031591627742ecebc9a5f2bddd"
+    },
+    {
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "649c21e5d5ee78a31cb674111d64c8b532b26df346b0a30a589758e094dedc1c",
+      "before_sha256": "101f5c44c7693852081aa8a7520e88bef8405aab8e6ef184e94d18e13774b368"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "87d937c73491f050625ea9941b1713718a4da7be6e5f1c6ea7af9f93fe5f3e11",
+      "before_sha256": "4ff2d1034acc5910b1310dd5947b0676cb2863dc25b90e990c78cf4f816b7b74"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuator.kt",
+      "after_sha256": "239e1da0d3eb3216e9944ce5e2b4759d16cf4630083511a189fb869152bf881c",
+      "before_sha256": "79137333d2786d625f32da6f3945dee12f55eb91c6725c3da93b1f8e75b67571"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicy.kt",
+      "after_sha256": "4284c2f588eae54d46c668c0145b98b0e08b7904fda846a7a2245d0e02b6c1a9"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "ae0834115453f67b8b9c0523781d94e19c7d556ac41f30577011e67ec2d9a838",
+      "before_sha256": "703e31d8752f57de658eda174245b0550ddad9ba1dc70b3ccc9d0b0580b2b83e"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "after_sha256": "e13fab9b1f6ed2dfdf73a181f334ffd7a42e861047b42188642bfdadd0215ac5"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicyTest.kt",
+      "after_sha256": "9b3c130472044c5eae6c6ef1022127941e400ed62ddcebbca5e15391d8d3f904"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "52437497f6c2474aef4bef07ac02076c918f3b69fd5af86c473529e29fb55662",
+      "before_sha256": "0bcb928ccb7d30d76fd0fddf7b2cec3299068271ed5bece7b5ae23be96a4f1dc"
+    }
+  ],
+  "implemented_controls": [
+    "blind and low-vision users have equal support priority",
+    "onboarding uses short Korean one-action instructions and explicit accessible controls",
+    "first walk stays blocked until education and four directly performed safety practices complete",
+    "speech playback completion and vibration request-window completion are both required for each practice",
+    "under-14 and unverified minor accounts fail closed",
+    "missing Korean speech or vibration blocks start and causes a reasoned safe stop if lost during a walk",
+    "onboarding completion is account-scoped while prior walks and routes never auto-resume after restart"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-004-01",
+      "TC-FP-004-02",
+      "TC-FP-004-03",
+      "TC-FP-004-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "priority_user_test_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "guardian_verification_provider_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

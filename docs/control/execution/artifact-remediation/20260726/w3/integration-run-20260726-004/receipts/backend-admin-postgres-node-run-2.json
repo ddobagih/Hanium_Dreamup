@@ -1,0 +1,81 @@
+{
+  "argv": [
+    "backend-admin-postgres-node-run-2",
+    "<REDACTED_EPHEMERAL_ARGS>"
+  ],
+  "command_id": "backend-admin-postgres-node-run-2",
+  "cwd": ".",
+  "end": "2026-07-26T16:52:06.558663885Z",
+  "environment_constraints": {
+    "database_name": "walksafe_dev21_test_004",
+    "loopback_port": 32772,
+    "secret_redacted": true,
+    "single_use_database": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "3f199cb5e3a968ffcb35fddde0455f46237fba9d7929f912f895c949df0ac7b5"
+    }
+  },
+  "log_path": "logs/backend-admin-postgres-node-run-2.log",
+  "log_sha256": "f9c9506451c8c246d741ba6f531e0c5616255ea5048df68bdc58562afc09939b",
+  "planned_repeat_ordinal": 2,
+  "pytest_counts": {
+    "deselected": 0,
+    "errors": 0,
+    "failed": 0,
+    "passed": 1,
+    "skipped": 0
+  },
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 165964,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "runtime_packages": [
+    "alembic==1.16.5",
+    "annotated-doc==0.0.4",
+    "annotated-types==0.7.0",
+    "anyio==4.13.0",
+    "certifi==2026.4.22",
+    "fastapi==0.128.8",
+    "geoalchemy2==0.17.1",
+    "greenlet==3.5.0",
+    "h11==0.16.0",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "idna==3.14",
+    "iniconfig==2.3.0",
+    "mako==1.3.12",
+    "markupsafe==3.0.3",
+    "packaging==26.2",
+    "pluggy==1.6.0",
+    "psycopg[binary]==3.2.13",
+    "psycopg-binary==3.2.13",
+    "pydantic==2.13.4",
+    "pydantic-core==2.46.4",
+    "pygments==2.20.0",
+    "pyotp==2.10.0",
+    "pytest==8.4.2",
+    "python-dotenv==1.2.1",
+    "python-multipart==0.0.20",
+    "sqlalchemy==2.0.49",
+    "starlette==0.52.1",
+    "typing-extensions==4.15.0",
+    "typing-inspection==0.4.2"
+  ],
+  "schema_version": "walksafe.w3-dev21-command-receipt.v4",
+  "start": "2026-07-26T16:52:05.320352798Z",
+  "status": "PASS",
+  "subject_binding": {
+    "content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712",
+    "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c"
+  },
+  "time_log_path": "logs/backend-admin-postgres-node-run-2.time",
+  "time_log_sha256": "26b346890312414f704ffe7f05b7f508618294b6b055b7c643b4721c8a4c55b4",
+  "tool": {
+    "runtime": "UV_ADMIN_RUNTIME"
+  }
+}

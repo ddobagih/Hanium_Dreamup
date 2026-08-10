@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "overlay_id": "WS-EPIC-02-FP016-CAMERA-CENTERED-BUTTONLESS-SCREEN-ACTIVE-LEDGER-OVERLAY-20260726-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-26",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-02 FP-016 camera-centered/buttonless-screen successor overlay"
+  },
+  "authority_boundary": {
+    "predecessor_overlay_preserved": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_product_policy": false,
+    "formal_test_completion_claimed": false,
+    "actual_talkback_user_completion_claimed": false,
+    "android_platform_review_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "production_deployment_completion_claimed": false,
+    "epic_in_progress_claimed": true,
+    "epic_complete_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": {
+    "predecessor_overlay": {
+      "path": "docs/control/execution/walksafe-epic-02-fp014-permission-denial-revocation-active-ledger-overlay-20260726-r001.json",
+      "bytes": 3333,
+      "sha256": "19f7f1e6caa02960ce744605c5ec23383d6a1ef6a93f07916beb988208993937"
+    },
+    "implementation_record": {
+      "name": "fp016_implementation",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/implementation-record.json",
+      "sha256": "986c65cb7dfcbdb0e74c45c163a3b6428eae2d8dc201d1ca3a978f8348bf768e"
+    },
+    "verification_result": {
+      "name": "fp016_verification",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/verification-result.json",
+      "sha256": "2b803c3246e3a92a98d5a0f7ab879fe1ad0e72717c372d7b0ca658382b7c1166"
+    },
+    "implementation_gap": {
+      "role": "IMPLEMENTATION_GAP",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r019.json",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260726-019",
+      "file_sha256": "99b3b53eaa7b86fbead93db74a86ac25199ff3c0c6cf443d7d19af0d8fe7a9f1"
+    },
+    "implementation_backlog": {
+      "role": "IMPLEMENTATION_BACKLOG",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r019.json",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-019",
+      "file_sha256": "0c95156951ffcf7004fc92fbd6ca2cffe04febcea86ac457195fb10551ee6e62"
+    }
+  },
+  "goal_state": {
+    "goal_id": "WS-GOAL-EPIC-02-FP-016-R001",
+    "internal_result": "PARTIAL_IMPLEMENTATION_VERIFIED",
+    "gap_id": "GAP-025",
+    "gap_status": "PARTIAL",
+    "next_source_policy_id": "FP-012",
+    "next_gap_id": "GAP-021"
+  },
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-016-01",
+      "TC-FP-016-02",
+      "TC-FP-016-03",
+      "TC-FP-016-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "android_platform_review_status": "NOT_RUN",
+    "operational_permission_profile_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

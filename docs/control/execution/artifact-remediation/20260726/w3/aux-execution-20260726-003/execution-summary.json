@@ -1,0 +1,976 @@
+{
+  "auxiliary_execution_id": "WALKSAFE-W3-AUX-EXECUTION-20260726-003",
+  "claim_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "formal_test_count": 279,
+    "formal_test_pass_claimed": false,
+    "formal_test_status": "NOT_RUN",
+    "legal_approval_claimed": false,
+    "production_validation_claimed": false,
+    "release_status": "NOT_ELIGIBLE",
+    "signing_status": "NOT_ASSESSED"
+  },
+  "cleanup_actions": [
+    {
+      "action": "DOCKER_RM_FORCE",
+      "status": "PASS",
+      "target": "walksafe-w3-aux-20260726-003-804775"
+    },
+    {
+      "action": "REMOVE_TEMPORARY_CREDENTIAL_FILE",
+      "status": "PASS",
+      "target": "/tmp/walksafe-w3-postgis-003.env"
+    },
+    {
+      "action": "REMOVE_TEMP_LICENSE_HELPER",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-license-review-003.py"
+    },
+    {
+      "action": "REMOVE_TEMP_LICENSE_BASE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-license-review-003-base.json"
+    },
+    {
+      "action": "REMOVE_TEMP_SCHEMA_HELPER",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-sbom-validation-003.py"
+    },
+    {
+      "action": "REMOVE_TEMP_SCHEMA_BASE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-sbom-validation-003-base.json"
+    },
+    {
+      "action": "REMOVE_TEMP_DB_STATE",
+      "existed": true,
+      "status": "PASS",
+      "target": "/tmp/w3-aux003-db-state.json"
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "uv",
+        "--version"
+      ],
+      "cleanup": [],
+      "command_id": "uv-version",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:07.535534Z",
+      "environment_constraints": {},
+      "exit_code": 0,
+      "log_path": "logs/uv-version.log",
+      "log_sha256": "f685f25bb08c4aa1ef2b039c4f963a601a4db6fe1479a61be78daae328d92c33",
+      "output_paths": [],
+      "peak_process_count": 0,
+      "peak_process_tree_rss_kb": 0,
+      "role": "UV_RUNTIME_PREFLIGHT",
+      "start": "2026-07-26T16:10:07.532916Z",
+      "status": "PASS",
+      "tool_version": "uv"
+    },
+    {
+      "argv": [
+        "docker",
+        "--version"
+      ],
+      "cleanup": [],
+      "command_id": "docker-version",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:07.542195Z",
+      "environment_constraints": {},
+      "exit_code": 0,
+      "log_path": "logs/docker-version.log",
+      "log_sha256": "2c86d624e5b49e53ea461166e4947e9754d50d6913ee173826d120ae4b920b7c",
+      "output_paths": [],
+      "peak_process_count": 0,
+      "peak_process_tree_rss_kb": 0,
+      "role": "DOCKER_CLIENT_PREFLIGHT",
+      "start": "2026-07-26T16:10:07.536220Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4"
+      ],
+      "cleanup": [],
+      "command_id": "docker-cached-image-preflight",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:07.559493Z",
+      "environment_constraints": {
+        "exact_digest_required": true,
+        "pull_allowed": false
+      },
+      "exit_code": 0,
+      "log_path": "logs/docker-cached-image-preflight.log",
+      "log_sha256": "7c25cb76bd1bfc55c56ddeb2f631d216bc1a03a9c2b2bc7f99b775ca535463e7",
+      "output_paths": [],
+      "peak_process_count": 0,
+      "peak_process_tree_rss_kb": 0,
+      "role": "DOCKER_CACHED_IMAGE_PREFLIGHT",
+      "start": "2026-07-26T16:10:07.542805Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--detach",
+        "--pull=never",
+        "--platform",
+        "linux/amd64",
+        "--name",
+        "walksafe-w3-aux-20260726-003-804775",
+        "--env-file",
+        "/tmp/walksafe-w3-postgis-003.env",
+        "--tmpfs",
+        "/var/lib/postgresql/data:rw,noexec,nosuid,size=512m",
+        "--publish",
+        "127.0.0.1::5432",
+        "postgis/postgis:16-3.5@sha256:43f20106cd2ac938475ba2631d22a7dc0b98a460438155109522f5928d6d10c4"
+      ],
+      "cleanup": [],
+      "command_id": "postgis-container-start",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:07.650236Z",
+      "environment_constraints": {
+        "published_interface": "127.0.0.1",
+        "published_port": "random",
+        "pull": "never",
+        "storage": "tmpfs"
+      },
+      "exit_code": 0,
+      "log_path": "logs/postgis-container-start.log",
+      "log_sha256": "3e8d158073f79ff661669a36740b5253b82797bb0d41b7b68f9095c28da986b8",
+      "output_paths": [],
+      "peak_process_count": 0,
+      "peak_process_tree_rss_kb": 0,
+      "role": "POSTGIS_EPHEMERAL_START",
+      "start": "2026-07-26T16:10:07.560276Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "walksafe-w3-aux-20260726-003-804775",
+        "sh",
+        "-ec",
+        "i=0; until pg_isready -U walksafe_w3 -d walksafe_w3_aux; do i=$((i+1)); [ \"$i\" -ge 30 ] && exit 1; sleep 1; done"
+      ],
+      "cleanup": [],
+      "command_id": "postgis-readiness",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:08.722989Z",
+      "environment_constraints": {
+        "attempt_limit": 30
+      },
+      "exit_code": 0,
+      "log_path": "logs/postgis-readiness.log",
+      "log_sha256": "4fd628f7d313ef5acf4d503f951e3add73d0f10a36d1f5785e1823a84d767af4",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 30764,
+      "role": "POSTGIS_READINESS",
+      "start": "2026-07-26T16:10:07.650971Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "docker",
+        "port",
+        "walksafe-w3-aux-20260726-003-804775",
+        "5432/tcp"
+      ],
+      "cleanup": [],
+      "command_id": "postgis-port-discovery",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:08.730338Z",
+      "environment_constraints": {},
+      "exit_code": 0,
+      "log_path": "logs/postgis-port-discovery.log",
+      "log_sha256": "0a32e63f72bb85ca7d2749314af091ed77ef23285a535d3ee2ba37538ab1b8bb",
+      "output_paths": [],
+      "peak_process_count": 0,
+      "peak_process_tree_rss_kb": 0,
+      "role": "POSTGIS_PORT_DISCOVERY",
+      "start": "2026-07-26T16:10:08.723755Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "-c",
+        "import importlib.metadata as md, os\nfrom alembic.config import Config\nfrom alembic.script import ScriptDirectory\nfrom sqlalchemy import create_engine, text\nmods=(\"alembic\",\"sqlalchemy\",\"geoalchemy2\",\"psycopg\",\"python-dotenv\",\"pydantic\",\"mako\",\"markupsafe\",\"greenlet\",\"typing-extensions\",\"packaging\",\"annotated-types\",\"pydantic-core\",\"typing-inspection\")\nprint({m:md.version(m) for m in mods})\ncfg=Config(\"backend/alembic.ini\"); heads=ScriptDirectory.from_config(cfg).get_heads(); assert len(heads)==1, heads; print(\"heads\",heads)\nwith create_engine(os.environ[\"DATABASE_URL\"]).connect() as c: print(\"engine_select\",c.execute(text(\"SELECT 1\")).scalar_one())"
+      ],
+      "cleanup": [],
+      "command_id": "uv-import-revision-engine-smoke",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:09.660248Z",
+      "environment_constraints": {
+        "database_url": "REDACTED_EPHEMERAL_LOOPBACK",
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "environment_keys": [
+          "WALKSAFE_ENVIRONMENT",
+          "PYTHONPATH",
+          "DATABASE_URL"
+        ],
+        "runtime": "uv run --no-project"
+      },
+      "exit_code": 0,
+      "log_path": "logs/uv-import-revision-engine-smoke.log",
+      "log_sha256": "a0d3d3a702b6a53bb2245a38a1f0a152f0ead7d1c98f73b78eb683738ec45f84",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 79848,
+      "role": "UV_IMPORT_REVISION_ENGINE_SMOKE",
+      "start": "2026-07-26T16:10:08.731133Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "-m",
+        "alembic",
+        "-c",
+        "backend/alembic.ini",
+        "upgrade",
+        "head"
+      ],
+      "cleanup": [],
+      "command_id": "alembic-upgrade-head-1",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:10.382992Z",
+      "environment_constraints": {
+        "database_url": "REDACTED_EPHEMERAL_LOOPBACK",
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "environment_keys": [
+          "WALKSAFE_ENVIRONMENT",
+          "PYTHONPATH",
+          "DATABASE_URL"
+        ],
+        "runtime": "uv run --no-project"
+      },
+      "exit_code": 0,
+      "log_path": "logs/alembic-upgrade-head-1.log",
+      "log_sha256": "04ac63352155ce970d96aa6044e11b90aee7d65ae99387d3d88db30419869453",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 55648,
+      "role": "ALEMBIC_UPGRADE_HEAD",
+      "start": "2026-07-26T16:10:09.661905Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "-m",
+        "alembic",
+        "-c",
+        "backend/alembic.ini",
+        "downgrade",
+        "-1"
+      ],
+      "cleanup": [],
+      "command_id": "alembic-downgrade-minus-one",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:10.783656Z",
+      "environment_constraints": {
+        "database_url": "REDACTED_EPHEMERAL_LOOPBACK",
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "environment_keys": [
+          "WALKSAFE_ENVIRONMENT",
+          "PYTHONPATH",
+          "DATABASE_URL"
+        ],
+        "runtime": "uv run --no-project"
+      },
+      "exit_code": 0,
+      "log_path": "logs/alembic-downgrade-minus-one.log",
+      "log_sha256": "cc6c28f67a9025bde094e1638026269f59d96b3d5d25c57436e231b79dbf8b80",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 56192,
+      "role": "ALEMBIC_DOWNGRADE_MINUS_ONE",
+      "start": "2026-07-26T16:10:10.384173Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "-m",
+        "alembic",
+        "-c",
+        "backend/alembic.ini",
+        "upgrade",
+        "head"
+      ],
+      "cleanup": [],
+      "command_id": "alembic-upgrade-head-2",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:11.184475Z",
+      "environment_constraints": {
+        "database_url": "REDACTED_EPHEMERAL_LOOPBACK",
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "environment_keys": [
+          "WALKSAFE_ENVIRONMENT",
+          "PYTHONPATH",
+          "DATABASE_URL"
+        ],
+        "runtime": "uv run --no-project"
+      },
+      "exit_code": 0,
+      "log_path": "logs/alembic-upgrade-head-2.log",
+      "log_sha256": "2432925cea9eb02b38d4728583a2a41086f712679d01ad9eaa1bd8e605656b3e",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 56308,
+      "role": "ALEMBIC_REUPGRADE_HEAD",
+      "start": "2026-07-26T16:10:10.792278Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "-m",
+        "alembic",
+        "-c",
+        "backend/alembic.ini",
+        "current"
+      ],
+      "cleanup": [],
+      "command_id": "alembic-current",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:11.577487Z",
+      "environment_constraints": {
+        "database_url": "REDACTED_EPHEMERAL_LOOPBACK",
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "environment_keys": [
+          "WALKSAFE_ENVIRONMENT",
+          "PYTHONPATH",
+          "DATABASE_URL"
+        ],
+        "runtime": "uv run --no-project"
+      },
+      "exit_code": 0,
+      "log_path": "logs/alembic-current.log",
+      "log_sha256": "7714e07107b1dc1f3493f7f60d84e024be6929f5362a0b5b0ee6e3b3814540b0",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 55824,
+      "role": "ALEMBIC_CURRENT",
+      "start": "2026-07-26T16:10:11.185373Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "docker",
+        "rm",
+        "--force",
+        "walksafe-w3-aux-20260726-003-804775"
+      ],
+      "cleanup": [],
+      "command_id": "postgis-container-cleanup",
+      "cwd": ".",
+      "end": "2026-07-26T16:10:11.765342Z",
+      "environment_constraints": {
+        "required": true
+      },
+      "exit_code": 0,
+      "log_path": "logs/postgis-container-cleanup.log",
+      "log_sha256": "903033093de9ba1e474599a36d28c33e81bfab1e534f10c9d16818939e3729e7",
+      "output_paths": [],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 30004,
+      "role": "POSTGIS_EPHEMERAL_CLEANUP",
+      "start": "2026-07-26T16:10:11.585422Z",
+      "status": "PASS",
+      "tool_version": "docker"
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "--no-project",
+        "--with",
+        "alembic==1.16.5",
+        "--with",
+        "sqlalchemy==2.0.49",
+        "--with",
+        "geoalchemy2==0.17.1",
+        "--with",
+        "psycopg==3.2.13",
+        "--with",
+        "psycopg-binary==3.2.13",
+        "--with",
+        "python-dotenv==1.2.1",
+        "--with",
+        "pydantic==2.13.4",
+        "--with",
+        "mako==1.3.12",
+        "--with",
+        "markupsafe==3.0.3",
+        "--with",
+        "greenlet==3.5.0",
+        "--with",
+        "typing-extensions==4.15.0",
+        "--with",
+        "packaging==26.2",
+        "--with",
+        "annotated-types==0.7.0",
+        "--with",
+        "pydantic-core==2.46.4",
+        "--with",
+        "typing-inspection==0.4.2",
+        "python",
+        "/tmp/w3-license-review-003.py",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/sbom.cyclonedx.json",
+        "/tmp/w3-license-review-003-base.json"
+      ],
+      "cleanup": [],
+      "command_id": "license-metadata-review",
+      "cwd": ".",
+      "end": "2026-07-26T16:12:25.163373Z",
+      "environment_constraints": {
+        "dependency_closure": [
+          "alembic==1.16.5",
+          "sqlalchemy==2.0.49",
+          "geoalchemy2==0.17.1",
+          "psycopg==3.2.13",
+          "psycopg-binary==3.2.13",
+          "python-dotenv==1.2.1",
+          "pydantic==2.13.4",
+          "mako==1.3.12",
+          "markupsafe==3.0.3",
+          "greenlet==3.5.0",
+          "typing-extensions==4.15.0",
+          "packaging==26.2",
+          "annotated-types==0.7.0",
+          "pydantic-core==2.46.4",
+          "typing-inspection==0.4.2"
+        ],
+        "legal_approval_claimed": false
+      },
+      "exit_code": 0,
+      "log_path": "logs/license-metadata-review.log",
+      "log_sha256": "cc2af516f9c265ab9cbcfa852a56018aa7f0319ca0047e16987b6d6245f7212d",
+      "output_paths": [
+        "license-review.json"
+      ],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 55584,
+      "role": "SBOM_LICENSE_METADATA_REVIEW",
+      "start": "2026-07-26T16:12:24.915556Z",
+      "status": "PASS",
+      "tool_version": "uv exact ephemeral Python closure"
+    },
+    {
+      "argv": [
+        "python3",
+        "-B",
+        "/tmp/w3-sbom-validation-003.py",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002",
+        "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas",
+        "/tmp/w3-sbom-validation-003-base.json"
+      ],
+      "cleanup": [],
+      "command_id": "official-sbom-schema-validation",
+      "cwd": ".",
+      "end": "2026-07-26T16:12:25.944824Z",
+      "environment_constraints": {
+        "max_schema_bytes": 5242880,
+        "official_upstream_only": true,
+        "package_install_allowed": false,
+        "timeout_seconds": 20
+      },
+      "exit_code": 0,
+      "log_path": "logs/official-sbom-schema-validation.log",
+      "log_sha256": "8c4111c4ffd04f5a7ec633a73139f65a8025bd4ed50c8d7b0c2148996b0073b3",
+      "output_paths": [
+        "sbom-validation-result.json",
+        "schemas/"
+      ],
+      "peak_process_count": 1,
+      "peak_process_tree_rss_kb": 29000,
+      "role": "OFFICIAL_SBOM_SCHEMA_VALIDATION",
+      "start": "2026-07-26T16:12:25.164238Z",
+      "status": "PASS",
+      "tool_version": "Python 3.14.6; jsonschema version recorded in result"
+    }
+  ],
+  "common_subject_fingerprint": {
+    "algorithm": "SHA-256",
+    "basis": "canonical aux id + core + aux002 + aux003 command-log bindings",
+    "value": "5d4f01f3d3354cf7dd154a4edd5f6dad1f9cf700b90fbd8be3db60e200b36f6f"
+  },
+  "core_binding": {
+    "evidence_file_set": {
+      "content_set_sha256": "1a1a1e067209adaa55100477b532a68d0a73f8f905399943561043553c8dfd76",
+      "file_count": 8,
+      "files": [
+        {
+          "bytes": 5215,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/engineering-evidence-manifest.json",
+          "sha256": "261bcfe5f64962ccf6dcf3b594ba83732a4f769f5f626df6fe65f9d97b4b947e"
+        },
+        {
+          "bytes": 68485,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/fixture-inventory.json",
+          "sha256": "be584ced83fad77cf859dbd5f3ec2e3c2ba8ba56c848d7a16afccdddbc6a1aa6"
+        },
+        {
+          "bytes": 126562,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/internal-build-provenance.json",
+          "sha256": "cf827114332dc4a418d4d96916ea990d32baf25d8a6a284f17bc9462f9941c93"
+        },
+        {
+          "bytes": 576621,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/lock-inventory.json",
+          "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+        },
+        {
+          "bytes": 86869,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/module-inventory.json",
+          "sha256": "1a3527e327c0c5d6e82a30281c303d66fe40e30cd77e4a50c77c97bddff63254"
+        },
+        {
+          "bytes": 815731,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/sbom.cyclonedx.json",
+          "sha256": "c152aaf20d30cde286ddbb68a5778005ae96d44681fe6e00d8923f3a1a991cd4"
+        },
+        {
+          "bytes": 907864,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/sbom.spdx.json",
+          "sha256": "5214f86e9d55aa434852c43fddefbab345f6186b9a550799e3bfb9fbb40490d8"
+        },
+        {
+          "bytes": 605082,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/source-snapshot.json",
+          "sha256": "10d641852af4b09dba8890477980f7725aae8e302252bba420762f998dccb807"
+        }
+      ],
+      "path_set_sha256": "7afd614af8654dad015b01ef1dd384c46b364d76108f73695dedffc5fc877d93"
+    },
+    "evidence_manifest": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-002/engineering-evidence-manifest.json",
+      "sha256": "261bcfe5f64962ccf6dcf3b594ba83732a4f769f5f626df6fe65f9d97b4b947e"
+    },
+    "run_receipt": {
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/run-20260726-002/command-receipt.json",
+      "sha256": "d1ee69b8983d4905d30229100bc2fa53226634fd80a4a124cdc33406b40182e6"
+    }
+  },
+  "dependency_closure": [
+    "alembic==1.16.5",
+    "sqlalchemy==2.0.49",
+    "geoalchemy2==0.17.1",
+    "psycopg==3.2.13",
+    "psycopg-binary==3.2.13",
+    "python-dotenv==1.2.1",
+    "pydantic==2.13.4",
+    "mako==1.3.12",
+    "markupsafe==3.0.3",
+    "greenlet==3.5.0",
+    "typing-extensions==4.15.0",
+    "packaging==26.2",
+    "annotated-types==0.7.0",
+    "pydantic-core==2.46.4",
+    "typing-inspection==0.4.2"
+  ],
+  "document_id": "WALKSAFE-W3-AUX-EXECUTION-SUMMARY-20260726-003",
+  "helper_bindings": {
+    "license_helper_sha256": "11fb23fbf2b536ade4482c831763d78e9248801f9dcdec74563a7c9633c8874f",
+    "schema_helper_sha256": "56d99d6c81138daa6823b63847ddb2945674e6c30e14471ce2b46083a689e8fd"
+  },
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "9e0c17218a2c243036801f690dad2078969672327d98571095186a3c63372416"
+    }
+  },
+  "output_bindings": {
+    "license_review": {
+      "content_fingerprint": "4c4bf3ca2f09e7c70f5f374448aa0bdaa85af1281eab49af43159c1b649b96cc",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/license-review.json",
+      "sha256": "0bfbaf2d48bcd80c0e793d0e51dde66c61bb0fdf36be3ed5bef6d8ef8cdfd6b8"
+    },
+    "sbom_validation_result": {
+      "content_fingerprint": "da68c9bc0aededd4f635e332a94b7e3363744f65be374890f51e983d360441c9",
+      "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/sbom-validation-result.json",
+      "sha256": "806472d069165f8ce7c0c1b939d2f282acfe428f6f36f5d98aca9a001acbfc79"
+    },
+    "schemas": [
+      {
+        "bytes": 252625,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-1.6.schema.json",
+        "sha256": "3e92dddbc30cf7f6a02b80f0942b1a4cfd4fb1c26f1dfc4310afa9d613cafb93"
+      },
+      {
+        "bytes": 8058,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/cyclonedx-jsf-0.82.schema.json",
+        "sha256": "8bae002c25e723db7ee1f26afde680ae1a2b1a8f6b4b4b0fd65dc3becb090aae"
+      },
+      {
+        "bytes": 45312,
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-003/schemas/spdx-2.3.schema.json",
+        "sha256": "239208b7ac287b3cf5d9a9af23f9d69863971102a5e1587a27a398b43490b89b"
+      }
+    ]
+  },
+  "predecessor_aux002": {
+    "binding": {
+      "content_set_sha256": "69791e0b70e423f199b2347694505f17979a6556c694def0ccc6ec9788680e5a",
+      "file_count": 11,
+      "files": [
+        {
+          "bytes": 215,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/alembic-upgrade-head-1.log",
+          "sha256": "7efcbe93092b456a04b39ca3054df5eb8e09160a2ecead6950c3e287cfe63dc6"
+        },
+        {
+          "bytes": 2383,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-admin-lint.log",
+          "sha256": "ff9e721afb1799f978a10edfdae32673b4233559e2bd6e07d7a210b558e75d84"
+        },
+        {
+          "bytes": 2213,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/android-app-lint.log",
+          "sha256": "499bceeda8b403a337791f3cdab3cbbf361e640d782017221c1f8546aeccb599"
+        },
+        {
+          "bytes": 4017,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/docker-cached-image-preflight.log",
+          "sha256": "f72ed95049ba2b5f8ada44f7f848e9b772b0d67b3cd2a54d6f820656cb49791d"
+        },
+        {
+          "bytes": 168,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/docker-client-version.log",
+          "sha256": "12b4ea5299ffe1c739fa98685ece403f0709e4efa8af83b1c3dd133cebfc16e7"
+        },
+        {
+          "bytes": 206,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/gateway-typecheck.log",
+          "sha256": "450be6540062a7231730f8f389ae4cff23118793118005653acf6aba9203bb2c"
+        },
+        {
+          "bytes": 171,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-container-cleanup.log",
+          "sha256": "252de6f3d2dec0fc76beaf558f5ffc5d5ca41db57231d57c094812a3055f5435"
+        },
+        {
+          "bytes": 198,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-container-start.log",
+          "sha256": "11de3559de2ed8c4042c04cf1ba6a5a894f8ac66b475e81618d3c063865642fe"
+        },
+        {
+          "bytes": 148,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-port-discovery.log",
+          "sha256": "230e171b382a2d3decd50b225fcea1f630c86334e0ac6d7d16baa96125f5765a"
+        },
+        {
+          "bytes": 254,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/postgis-readiness.log",
+          "sha256": "3a60edb52dda29b183ab4cd7f63f2d7d6ca72bd9420db5d7053cabd10af4b814"
+        },
+        {
+          "bytes": 141,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002/logs/python-compileall-backend-model.log",
+          "sha256": "a7b482a52c6c1ffeb0221e110089fdd7f5eb1920cd1dd92c4ddc40d6ed979079"
+        }
+      ],
+      "path_set_sha256": "561c64b915b4635521348003b7122de5e720957384c27d2063a6d2237e397c6b"
+    },
+    "immutable": true,
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/aux-execution-20260726-002",
+    "reason": "HOST_PYTHON_MODULE_ALEMBIC_UNAVAILABLE_BEFORE_MIGRATION_EXECUTION",
+    "status": "STOPPED_AT_ALEMBIC_PREFLIGHT"
+  },
+  "prepared_on": "2026-07-27",
+  "resource_summary": {
+    "commands_run_serially": true,
+    "peak_command_id": "uv-import-revision-engine-smoke",
+    "peak_process_tree_rss_kb": 79848,
+    "resource_anomaly_detected": false
+  },
+  "results": {
+    "ephemeral_postgis_cleanup": "PASS",
+    "import_revision_engine_smoke": "PASS",
+    "license_metadata_review": "PASS_METADATA_INVENTORY_NOT_LEGAL_APPROVAL",
+    "migration_current": "PASS",
+    "migration_downgrade_minus_one": "PASS",
+    "migration_upgrade_head_1": "PASS",
+    "migration_upgrade_head_2": "PASS",
+    "official_cyclonedx_schema_validation": "NOT_RUN",
+    "official_spdx_schema_validation": "NOT_RUN",
+    "overall_status": "PARTIAL_WITH_SCHEMA_BOUNDARY"
+  },
+  "schema_version": "walksafe.w3-aux-execution-summary.v1",
+  "source_commit": null
+}

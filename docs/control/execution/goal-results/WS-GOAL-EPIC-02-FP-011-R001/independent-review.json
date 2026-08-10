@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP011-LONG-LIVED-LOGIN-INTERNAL-REVIEW-20260725-001",
+  "evidence_type": "INDEPENDENT_INTERNAL_REVIEW",
+  "goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+  "status": "PASS",
+  "reviewer_id": "CODEX-FP011-LONG-LIVED-LOGIN-SEPARATE-REVIEW-20260725-001",
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "122f95eec5f68e97cf4fe702c3f8223f38e306f2552a8aab50ff33ccc8ae853f",
+    "VERIFICATION_RESULT": "96431f81e55b08181a66d53ed1c13a7172c05373a0cb720a73e898adf15b368e",
+    "SUCCESSOR_TRACE": "326509905f30375ebf67583623c9264b3cd3a933832c3822b179e1d1237aef5f"
+  },
+  "reviewed_at": "2026-07-25T13:16:41+09:00",
+  "findings": {
+    "blocking": 0,
+    "major_open": 0,
+    "resolved_before_acceptance": [
+      "access and refresh purposes, lifetimes and storage boundaries are distinct",
+      "raw refresh credentials are not persisted by the Gateway state model",
+      "one-time rotation and reuse detection revoke only the affected device family",
+      "idle and absolute expiry both fail closed",
+      "selective device revoke is distinct from account-wide lock and incident revoke",
+      "Android restore remains unverified until server refresh and durable replacement save",
+      "stale, duplicate, late, reordered and partial-save results cannot advance authentication",
+      "walk start and resume require the verified actor-bound Gateway state",
+      "logout stops login-dependent activity without changing OS permission grants",
+      "long-lived capability remains disabled by default pending approved configuration"
+    ],
+    "known_nonblocking_boundaries": [
+      "production credentials, deployment and long-lived enablement remain unconfigured",
+      "actual users, devices, networks and security drills were not run",
+      "formal tests and release gates were not run"
+    ]
+  },
+  "review_boundary": {
+    "separate_internal_review_pass": true,
+    "external_independence_claimed": false,
+    "formal_tests_remain_not_run": true,
+    "actual_user_tests_remain_not_run": true,
+    "actual_device_tests_remain_not_run": true,
+    "actual_network_tests_remain_not_run": true,
+    "production_deployment_remains_not_run": true,
+    "security_drills_remain_not_run": true,
+    "release_remains_not_eligible": true
+  }
+}

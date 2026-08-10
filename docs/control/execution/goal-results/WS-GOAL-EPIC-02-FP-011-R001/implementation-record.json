@@ -1,0 +1,237 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP011-LONG-LIVED-LOGIN-IMPLEMENTATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-25T12:25:00+09:00",
+  "implementation_content_set_sha256": "c0ade298334858b5d7a30782411316b73e270ffccd2d61c44743edd88604fa33",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/build.gradle.kts",
+      "after_sha256": "90b98f8b7d2393d20031ffa25a3b1df9d2ca211a762e2fd5f908eac55faf7309",
+      "before_sha256": "77b795314d53e3c3da032c2346cd1bac4d4d91551b35fe3cd0b0e09b45cfe83e",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "91039b0ab58b3564082418eabdfdb50f32af9807a47c7e03d199b8a7ce880d4c",
+      "before_sha256": "fd7cf3d01999fa69db3d333145ba6ecb8b9aad8597643cb29e2b9e34c340221a",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "after_sha256": "085c8818cbad50eee57326395b37e5b70d7e593b55858a9aab02d6771eb2259d",
+      "before_sha256": "8a7c6cdab0b94d4b7172bfbe10d213840aee8719326e5f8c0edcecb595c15dae",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "after_sha256": "b6739e1d501bc3168df8bfc0931c57a4f23380563fea7968f0571d95f0ac0350",
+      "before_sha256": "59688fff65b7b613fe814235f7ac8ee2578db7f18577a7f364da1a9860ca3d7d",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayPersistedLoginState.kt",
+      "after_sha256": "6aa5602811c109fe4a1ba6737b3b389ae3f58f0e2348673f97229e6613d699ab",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinator.kt",
+      "after_sha256": "c2b3b15d7062a5406997220c978342ab1cd218a817de4dc88beafbabf87ff7ee",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "f16eadc5773d11119560300c95bd3f582563c222d25cb2d83d946ecfa4cd0e22",
+      "before_sha256": "2c703ae451dda201384d0eb3b275a048b059d5e3a6e784642fe22d177219f685",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "d1c81f9c0bc0079ddf4d328b631b8bfb904f213f00ccba2bc16f8ac746be0005",
+      "before_sha256": "22cd4d135deebaf27196e313e9fc11196d405db4febb678e31b29e804c3e3c99",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityLongLivedLoginStaticTest.kt",
+      "after_sha256": "7791a336afa6d5d813f3d54caa9284ea31df69d2e90ca8c7654b59c99ca296ed",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+      "after_sha256": "47a2a22c8c25e68a2bf80b9fe88a3ba8700f94c7899c27c80f450e0bcfef7e3b",
+      "before_sha256": "a8afa921b66a038ac600aacf9594c6c3ee4f9b0401fb1824e153dfab5cd9be1e",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "after_sha256": "24288a3ed0795089b47f78cb9fb9968ee5c2f3c0f2991ae47be6284cf7ec9366",
+      "before_sha256": "2fc06aeab1776a2347b8eb646e845d4b55b7d3678b54279a99fe97fde82ee7a8",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "after_sha256": "fc734bbaa57568858761b32657ecdeb45e935af6a3a1a03496ffe685f4f56803",
+      "before_sha256": "f5d383abdce0095276d8c13925d570254bebed543430d0863b14d5bdd235bf3f",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "after_sha256": "0ffb67634f94722d4546155da5c6478c46374e1cac55c9a33c6cad8f2350ef54",
+      "before_sha256": "98dddc0297e187c89a4f65c93784a968a50cd6eac9b3ed3ae987cc8c5a334ab7",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "after_sha256": "64970907e96316ad6b92fd3cbf90c1483d803d6a22ee0c619735a3b2911f1367",
+      "before_sha256": "64ca718b81d7e215931a0611c67377b672dba4f12e62a66732c7865df4bf3abe",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayPersistedLoginStateTest.kt",
+      "after_sha256": "ee2ff0c69900a10ce9791c175c864c2358480db7417b067d0a2d1208f67134c4",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinatorTest.kt",
+      "after_sha256": "97466b47dd200de5fdce646424e3ff75fbd6e1774847514939274734b1603044",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "after_sha256": "b0bf63b336448447ea1f0225573d8173b5c964535c21c650db395d946839b246",
+      "before_sha256": "1b7a5e093f8835154ce802f07735bec9793c8281f52659b833791146fec51341",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "after_sha256": "3b9042d0f8a2e5768e388fe5e7edf2fa73ccd745f5baa83b388a5ef1378dafbf",
+      "before_sha256": "df01fac8e8a6060ce9d0c68ada8b8b3f2109b416e874f0fc44855987a7fade5f",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "87a76f9c9b4a3d1279403b8ca05f1db9f53c8cf14842cb657c316f21f647e953",
+      "before_sha256": "636ff9420a7ad6b0c842807d1246f7e1ce45155a505be73eeb13375fcdea9007",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/README.md",
+      "after_sha256": "946633a9f6b58dda17f788f81052f58e0a8db4b48684c53a99413e308190dde4",
+      "before_sha256": "b89ed746a788b519b3f54897cd40a5fb0a0c2cf5687a89cd6d83d5f157a1c43a",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/openapi.json",
+      "after_sha256": "6f00db2fe0a9088e8121a821ef6c46c1382b58bd7a211fc7ace2ce81ab040ee7",
+      "before_sha256": "63c9dad5e789d21c6e5b4f4fbc53dfbc7e3577305beaad73dac576b22d046875",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/auth.ts",
+      "after_sha256": "470dbefd50ec77f356c11432bbbc79a3319704ca54089b9e1b3912665ceca9b5",
+      "before_sha256": "9ca34186455e596920958e15d56c610e68b62474eb78a368a9f38e51418b4011",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/config.ts",
+      "after_sha256": "30ab07d7219965cd5bc69fecd7487d4e685170342cd5bbacaca64fec632d30e7",
+      "before_sha256": "374360f7e324901dcad48397f4d6f96c26945cb45d8e5ba41c4bf8c023e6ff67",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-long-session.ts",
+      "after_sha256": "eddf2668305564e306669871d22a814afe0b14555d3977509046d278157adb70",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "after_sha256": "1a4a9aa450ed656aba47a54086791025fd144e2f6168e8b3df5112dc7d3ec6ac",
+      "before_sha256": "4fb388ae97f7b8171f1ab8d17e22c7abe72ef901c64ac7dcfaf2a2e95a447e99",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-long-session.test.ts",
+      "after_sha256": "13bf854978e16ded94b5a9a1b7d0e7398b90cd5a8f346543ce71097ded3c80d6",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "after_sha256": "4bda6a25d50217766b8c4a0c2edb49a752ab236f52d5683468c7588f7b2a7685",
+      "before_sha256": "9dd04f01e6fac76d48c5cd80fa57722c9510688f068edf5005123fa05d150bf1",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/node-adapter.test.ts",
+      "after_sha256": "84f33251a9285883e348f77ea462785290a485dadfad076db2755dda9f55b0ad",
+      "before_sha256": "970b56328b79cb3a8de895bcbb065c0527f8ea26d6afed3ea9ed47dd9457f56f",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/config/walksafe-android-gateway.env.example",
+      "after_sha256": "12d69ee258bab424bfc201ea544e4461495f226f0079a57326b57f8b419e0c0f",
+      "before_sha256": "b9c1f41466e2970156ec170a44226ce78e11b79d58a781f6ed11031c487ebf64",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "after_sha256": "561c5327130c9fe69bf912c48978174167608fbdc0be3380ec5d3740d2e96356",
+      "before_sha256": "e3a3fb723d913709f93053ecbfa73e0196536e8297b5df755cce7a594e25849f",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph_v2_4.py",
+      "after_sha256": "1a25370101b8ad12da28f650fd605b8e5d84d76195740a90841ffd75b06736dd",
+      "before_sha256": "18b21efd3b4fd3ee8753982627e54a989935ae4ab633a17333b9bbd8b14fec8f",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "access and one-time refresh credentials have separate purpose, lifetime and storage boundaries",
+    "the server stores token digests and device-family lineage rather than raw refresh credentials",
+    "refresh rotation is atomic and reuse revokes only the affected device family",
+    "idle and absolute expiry both fail closed and require explicit configured durations",
+    "selective device revocation is distinct from account-lock and security-incident all-family revocation",
+    "Android persists only the long-lived bundle through Android Keystore backed authenticated encryption",
+    "restored state is unverified until a server refresh succeeds and the replacement is durably saved",
+    "stale, duplicate, late, out-of-order and partial-save results cannot promote authentication",
+    "legacy short sessions remain process-only and long-lived mode is disabled by default",
+    "readiness capture rejects expired sessions and observed logout or downgrade invalidates prepared walk tokens",
+    "logout clears login and walk-dependent outputs without revoking camera, location or microphone OS permissions"
+  ],
+  "remaining_implementation_boundaries": [
+    "production credentials, deployment and long-lived-login enablement remain unconfigured",
+    "approved idle, absolute and access duration values remain outside this internal implementation claim",
+    "automatic expiry-time monitoring and protected-API access-expiry renewal integration remain open",
+    "dedicated sensitive-account-change reauthentication enforcement remains open",
+    "actual users, Android devices and network interruption scenarios were not run",
+    "remote-device revoke, account-lock and security-incident drills were not run",
+    "TC-FP-011-01 through TC-FP-011-05, the 279-test formal set and five release gates were not run"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-011-01",
+      "TC-FP-011-02",
+      "TC-FP-011-03",
+      "TC-FP-011-04",
+      "TC-FP-011-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_network_status": "NOT_RUN",
+    "production_credentials_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "remote_device_revoke_drill_status": "NOT_RUN",
+    "account_lock_drill_status": "NOT_RUN",
+    "security_incident_drill_status": "NOT_RUN",
+    "production_long_lived_login_enabled": false,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

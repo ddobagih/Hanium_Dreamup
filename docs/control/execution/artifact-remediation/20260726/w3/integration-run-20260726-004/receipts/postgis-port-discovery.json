@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "postgis-port-discovery",
+    "<REDACTED_EPHEMERAL_ARGS>"
+  ],
+  "command_id": "postgis-port-discovery",
+  "cwd": ".",
+  "end": "2026-07-26T16:52:03.434391934Z",
+  "environment_constraints": {
+    "database_name": "walksafe_dev21_test_004",
+    "loopback_port": 32772,
+    "secret_redacted": true,
+    "single_use_database": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "89d8162127a8340fced0ba5098f56dd6ccf9398b4f538f6a39f446f5cd9f8401"
+    }
+  },
+  "log_path": "logs/postgis-port-discovery.log",
+  "log_sha256": "9b70335176689e697c274c2cb729c72d2bf245dd7bee60a36c5976accaed65e9",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 28368,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-dev21-command-receipt.v4",
+  "start": "2026-07-26T16:52:03.426297715Z",
+  "status": "PASS",
+  "subject_binding": {
+    "content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712",
+    "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c"
+  },
+  "time_log_path": "logs/postgis-port-discovery.time",
+  "time_log_sha256": "c525e27c1ea2ba3fc45791a23c6dca0aa5711d2ea7e8d64e57234e3faa4c2279",
+  "tool": {
+    "runtime": "docker"
+  }
+}

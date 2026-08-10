@@ -1,0 +1,1110 @@
+{
+  "schema_version": "walksafe.implementation-receipt.v5",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W5-IMPLEMENTATION-RECEIPT-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "result": "PARTIAL_WAVE_COMPLETED_WITH_3_OPEN_INTERNAL_GAPS_AND_1_EXTERNAL_BOUNDARY",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "5ae2a694c2361ee407d91a192d16f6fb6123ec8a1af111dade700b8d332f8424"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+    "upstream": {
+      "artifact_status_delta": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json",
+        "sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+        "byte_count": 64421
+      },
+      "validation_summary": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+        "byte_count": 47147
+      },
+      "predecessor_receipt": {
+        "byte_count": 19207,
+        "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+      },
+      "input_set_sha256": "e385856ee00ce497c69e732e415ceab9d38efe8fb5c773c05044b2ba6a5ae833"
+    },
+    "downstream": [],
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS"
+  },
+  "scope": {
+    "wave_id": "W5",
+    "artifact_count": 9,
+    "exact_artifact_ids": [
+      "DLV-SEC-01",
+      "DLV-SEC-02",
+      "DLV-SEC-03",
+      "DLV-SEC-06",
+      "DLV-SEC-09",
+      "DLV-SEC-10",
+      "DLV-SEC-11",
+      "DLV-SEC-12",
+      "DLV-SEC-15"
+    ]
+  },
+  "state_transition": {
+    "baseline_counts_before_w5": {
+      "OK": 109,
+      "INTERNAL_GAP": 71,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "applied_delta": {
+      "OK": 5,
+      "INTERNAL_GAP": -6,
+      "EXTERNAL": 1,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    },
+    "counts_after_w5": {
+      "OK": 114,
+      "INTERNAL_GAP": 65,
+      "EXTERNAL": 42,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "OK": {
+      "count": 5,
+      "artifact_ids": [
+        "DLV-SEC-02",
+        "DLV-SEC-03",
+        "DLV-SEC-09",
+        "DLV-SEC-11",
+        "DLV-SEC-15"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 3,
+      "artifact_ids": [
+        "DLV-SEC-01",
+        "DLV-SEC-10",
+        "DLV-SEC-12"
+      ]
+    },
+    "EXTERNAL": {
+      "count": 1,
+      "artifact_ids": [
+        "DLV-SEC-06"
+      ]
+    }
+  },
+  "completion_scope": {
+    "OK": {
+      "artifact_ids": [
+        "DLV-SEC-02",
+        "DLV-SEC-03",
+        "DLV-SEC-09",
+        "DLV-SEC-11",
+        "DLV-SEC-15"
+      ],
+      "meaning": "INTERNAL_CONTENT_TRACE_REQUIRED_ACTION_SATISFIED_NOT_FORMAL_SECURITY_PASS"
+    },
+    "INTERNAL_GAP": {
+      "artifact_ids": [
+        "DLV-SEC-01",
+        "DLV-SEC-10",
+        "DLV-SEC-12"
+      ],
+      "open_count": 3
+    },
+    "EXTERNAL": {
+      "artifact_ids": [
+        "DLV-SEC-06"
+      ],
+      "open_count": 1
+    }
+  },
+  "independent_review_lineage": {
+    "historical_remediation_evidence": [
+      {
+        "byte_count": 15654,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+        "sha256": "7dbf30fa7e9520bf802be2b23883b83f8dfa5f09ba8ecc2000324b03ece29b8a",
+        "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-REVIEW-20260727-001",
+        "status": "NO_GO_REQUIRES_CORRECTION_AND_REREVIEW",
+        "status_delta_allowed": false,
+        "subject_file_count": 19,
+        "subject_set_sha256": "70892c0d8f7d8eb536ba005625cdc4b1f77bc86459623b50173484b1fb16610c",
+        "findings": {
+          "blocking": 2,
+          "major": 1,
+          "minor": 0
+        },
+        "historical_remediation_evidence_only": true
+      },
+      {
+        "byte_count": 15725,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-rereview.md",
+        "sha256": "6243efe959bb3cbaa154f662c9889ad873eee02bc06893f4204dd4c103f4be6a",
+        "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-REREVIEW-20260727-001",
+        "status": "NO_GO_REQUIRES_CORRECTION_AND_REREVIEW",
+        "status_delta_allowed": false,
+        "subject_file_count": 21,
+        "subject_set_sha256": "a6fa8a79b7556f33086690d9ae3c82f1d8837d25b5823c3a7ecd1e2afac1e8b3",
+        "findings": {
+          "blocking": 1,
+          "major": 0,
+          "minor": 0
+        },
+        "historical_remediation_evidence_only": true
+      }
+    ],
+    "current_transition_authority": {
+      "byte_count": 13416,
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-final-review.md",
+      "sha256": "11bcfcde2203cd1215f22858e6f0c84c971f20cf0d2d69cbbbf90bf6f99bf0d9",
+      "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-FINAL-REVIEW-20260727-001",
+      "status": "GO_STATUS_DELTA_ALLOWED",
+      "status_delta_allowed": true,
+      "formal_signing_deployment_release_transition_allowed": false,
+      "subject_file_count": 22,
+      "subject_set_sha256": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8",
+      "findings": {
+        "blocking": 0,
+        "major": 0,
+        "minor": 0
+      },
+      "authority_scope": "EXACT9_INTERNAL_ARTIFACT_STATUS_DELTA_ONLY"
+    },
+    "historical_no_go_preserved": true
+  },
+  "current_validation_authority": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+    "sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+    "byte_count": 47147,
+    "status": "PASS",
+    "check_count": 28,
+    "passed_check_count": 28,
+    "failed_check_count": 0,
+    "authority": "CURRENT_W5_CENTRAL_VALIDATION_AUTHORITY"
+  },
+  "predecessor_validation_lineage": {
+    "w4_terminal_receipt": {
+      "byte_count": 19207,
+      "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+      "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+    },
+    "w4_counts_after": {
+      "OK": 109,
+      "INTERNAL_GAP": 71,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    }
+  },
+  "source_evidence_bindings": {
+    "current_state_pairs": [
+      {
+        "pair_id": "W5-SECURITY-PLAN-THREAT-RISK",
+        "artifact_ids": [
+          "DLV-SEC-01",
+          "DLV-SEC-02",
+          "DLV-SEC-03"
+        ],
+        "json": {
+          "byte_count": 109714,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.json",
+          "sha256": "2e5119f2253519f4fd329f54363c31738ef2a46d9991f71a2407ba631e3e56a7"
+        },
+        "markdown": {
+          "byte_count": 45055,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.md",
+          "sha256": "31b3ff3c4775e81cf9bae1945246a7507c6260196a44404c230dd587c70a87cf"
+        }
+      },
+      {
+        "pair_id": "W5-PRIVACY-CONSENT-SECRETS",
+        "artifact_ids": [
+          "DLV-SEC-06",
+          "DLV-SEC-09"
+        ],
+        "json": {
+          "byte_count": 97289,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+          "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675"
+        },
+        "markdown": {
+          "byte_count": 46405,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.md",
+          "sha256": "15e6f467f2d340dec781a29404641cf0a8cc88368bab681429b020fa243a5aec"
+        }
+      },
+      {
+        "pair_id": "W5-SECURITY-SCAN",
+        "artifact_ids": [
+          "DLV-SEC-10",
+          "DLV-SEC-11",
+          "DLV-SEC-12",
+          "DLV-SEC-15"
+        ],
+        "json": {
+          "byte_count": 150923,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+          "sha256": "be717aa01b8b9c9f1e218f1bf8dfd90a5b07cfe6aed427255e5fcd0b133b0e32"
+        },
+        "markdown": {
+          "byte_count": 14129,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.md",
+          "sha256": "1c755571c493272722d2b930fa0e455e672247d77a557f770df949a9b7578066"
+        }
+      }
+    ],
+    "security_finding_register": {
+      "byte_count": 123698,
+      "path": "docs/control/execution/artifact-remediation/20260726/w5/security-finding-register.json",
+      "sha256": "fdc0cb5d5d5aef301816967bb0b5e6757f3d9edeed925ee1d07846ed1548c285"
+    },
+    "scan_execution_summaries": [
+      {
+        "byte_count": 15975,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/execution-summary.json",
+        "sha256": "88c16018d88c5d5983d531c62b4908eea9ee1d1cbccd58841767668132f12455"
+      },
+      {
+        "byte_count": 22246,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+        "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a"
+      },
+      {
+        "byte_count": 17078,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/execution-summary.json",
+        "sha256": "ce9e230afeabe591728de39f1e15a050023581751a6f03a660a57970c943e372"
+      }
+    ],
+    "dependency_remediation_receipt": [
+      {
+        "byte_count": 774,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/changes.json",
+        "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+      },
+      {
+        "byte_count": 1241,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/execution-lineage.json",
+        "sha256": "5d159ce8a4483cdce319a58dd49ebb53128f4f04fd591a19df5a63175d22a767"
+      },
+      {
+        "byte_count": 4225,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/manifest.json",
+        "sha256": "fa1bbe0bf3072ef72c7d529b962f42bb47947fdc4f98991fa040456dba3f5153"
+      },
+      {
+        "byte_count": 4942,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/package-delta.json",
+        "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+      },
+      {
+        "byte_count": 2303,
+        "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/validation-summary.json",
+        "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+      }
+    ],
+    "tls_current_source": [
+      {
+        "byte_count": 15539,
+        "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+        "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7"
+      },
+      {
+        "byte_count": 132303,
+        "path": "tests/test_walksafe_full_rc_tooling.py",
+        "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+      }
+    ],
+    "dependency_current_source": [
+      {
+        "byte_count": 256,
+        "path": "backend/requirements.txt",
+        "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+      },
+      {
+        "byte_count": 148063,
+        "path": "backend/requirements.lock",
+        "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700"
+      },
+      {
+        "byte_count": 141132,
+        "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+      }
+    ]
+  },
+  "source_freshness_authority": {
+    "source_commit": null,
+    "build_id": null,
+    "dirty_worktree": true,
+    "whole_repository_frozen": false,
+    "authority": "CURRENT_EXACT_FILE_BYTES_REVIEW_SUBJECT",
+    "subject_file_count": 22,
+    "subject_set_sha256": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8",
+    "dependency_current_source": [
+      {
+        "byte_count": 256,
+        "path": "backend/requirements.txt",
+        "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+      },
+      {
+        "byte_count": 148063,
+        "path": "backend/requirements.lock",
+        "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700"
+      },
+      {
+        "byte_count": 141132,
+        "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+        "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+      }
+    ]
+  },
+  "remaining_action_registry": [
+    {
+      "artifact_type_code": "DLV-SEC-01",
+      "classification": "INTERNAL_GAP",
+      "boundary": "ROLE_ASSIGNMENT_TRAINING_AND_ACKNOWLEDGEMENT_RECEIPTS",
+      "status": "OPEN",
+      "reason": "current generation, scan scope, SLA and gates are now explicit, but actual role acknowledgement and training receipts are both zero; source_commit/build_id and independent approval also remain absent."
+    },
+    {
+      "artifact_type_code": "DLV-SEC-10",
+      "classification": "INTERNAL_GAP",
+      "boundary": "KOTLIN_PARSE_ERROR_AND_NAMED_SOURCE_GENERATION",
+      "status": "OPEN",
+      "reason": "Semgrep 1.164.0 scan and triage are current-source bound, but one Kotlin parse error remains, source_commit/build_id are null, and no formal release-generation rerun exists."
+    },
+    {
+      "artifact_type_code": "DLV-SEC-12",
+      "classification": "INTERNAL_GAP",
+      "boundary": "FULL_REPOSITORY_HISTORY_SECRET_SCAN",
+      "status": "NOT_RUN",
+      "reason": "The selected current tree has zero findings after two reviewed false positives were narrowly allowlisted, but the required full repository history scan is NOT_RUN."
+    },
+    {
+      "artifact_type_code": "DLV-SEC-06",
+      "classification": "EXTERNAL",
+      "boundary": "LEGAL_PRIVACY_PRODUCT_AND_TMAP_CONTRACT_APPROVAL",
+      "status": "PROPOSED_PENDING_EXTERNAL_LEGAL_REVIEW",
+      "reason": "Current code traces policy/item versions, independent selections, chained receipts, fail-closed enforcement, withdrawal and technical reconsent. Legal basis, final Korean notice wording, recipient/contract terms and international-transfer determination require external legal/privacy approval."
+    }
+  ],
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_execution_status": "NOT_RUN",
+    "formal_executed_count": 0,
+    "formal_pass_count": 0,
+    "formal_evidence_count": 0,
+    "formal_result_null_count": 279,
+    "formal_empty_evidence_ids_count": 279,
+    "formal_security_pass_claimed": false,
+    "actual_device_status": "NOT_RUN",
+    "full_e2e_status": "NOT_RUN",
+    "signing_status": "NOT_RUN",
+    "deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "legal_privacy_approval_status": "NOT_RUN_EXTERNAL_PENDING",
+    "release_status": "NOT_ELIGIBLE",
+    "zero_vulnerability_claimed": false,
+    "full_repository_history_secret_scan": "NOT_RUN"
+  },
+  "completion_statement": "W5 applies only the final-review-authorized exact9 status delta: five OK, three retained INTERNAL_GAP and one EXTERNAL boundary. Formal279, signing, deployment and release remain NOT_RUN or NOT_ELIGIBLE.",
+  "claims_not_made": [
+    "FORMAL_279_EXECUTED",
+    "FORMAL_279_PASS",
+    "FORMAL_SECURITY_PASS",
+    "ZERO_VULNERABILITY",
+    "ALL_FINDINGS_CLOSED",
+    "LEGAL_PRIVACY_APPROVAL",
+    "FULL_REPOSITORY_HISTORY_SECRET_SCAN_PASS",
+    "NAMED_SOURCE_COMMIT",
+    "SIGNED_BUILD",
+    "DEPLOYMENT_COMPLETED",
+    "RELEASE_GATES_WAIVED",
+    "RELEASE_ELIGIBLE"
+  ],
+  "integrity": {
+    "artifact_count": 9,
+    "ok_count": 5,
+    "internal_gap_count": 3,
+    "external_count": 1,
+    "post_total": 257,
+    "input_set_sha256": "e385856ee00ce497c69e732e415ceab9d38efe8fb5c773c05044b2ba6a5ae833",
+    "review_subject_set_sha256": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8",
+    "common_fingerprint": "5ae2a694c2361ee407d91a192d16f6fb6123ec8a1af111dade700b8d332f8424",
+    "predecessor_receipt_sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+    "delta_sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+    "validation_sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+    "source_commit_is_null": true,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "5ec25c1140588b6c502f1c9c596b2a70e2e8fcde5234001ffeb5be2fd3d21633"
+    }
+  },
+  "digest_contracts": {
+    "input_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "path-ascending array of exact input file records",
+      "basis_schema": {
+        "type": "array",
+        "item_fields": [
+          "byte_count",
+          "path",
+          "sha256"
+        ],
+        "item_types": {
+          "byte_count": "integer",
+          "path": "string",
+          "sha256": "lowercase hexadecimal string length 64"
+        }
+      },
+      "preimage": [
+        {
+          "byte_count": 148063,
+          "path": "backend/requirements.lock",
+          "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700"
+        },
+        {
+          "byte_count": 256,
+          "path": "backend/requirements.txt",
+          "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+        },
+        {
+          "byte_count": 639009,
+          "path": "docs/control/artifact-types.json",
+          "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+        },
+        {
+          "byte_count": 26822,
+          "path": "docs/control/execution/artifact-audits/20260726/security-ai-audit.json",
+          "sha256": "4eb543de60cb07d267f52af17f725036aa79520da883ba02814456dbfe4dbd14"
+        },
+        {
+          "byte_count": 576621,
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+          "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+        },
+        {
+          "byte_count": 19207,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+          "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba"
+        },
+        {
+          "byte_count": 13416,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-final-review.md",
+          "sha256": "11bcfcde2203cd1215f22858e6f0c84c971f20cf0d2d69cbbbf90bf6f99bf0d9"
+        },
+        {
+          "byte_count": 15725,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-rereview.md",
+          "sha256": "6243efe959bb3cbaa154f662c9889ad873eee02bc06893f4204dd4c103f4be6a"
+        },
+        {
+          "byte_count": 15654,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+          "sha256": "7dbf30fa7e9520bf802be2b23883b83f8dfa5f09ba8ecc2000324b03ece29b8a"
+        },
+        {
+          "byte_count": 97289,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+          "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675"
+        },
+        {
+          "byte_count": 46405,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.md",
+          "sha256": "15e6f467f2d340dec781a29404641cf0a8cc88368bab681429b020fa243a5aec"
+        },
+        {
+          "byte_count": 123698,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-finding-register.json",
+          "sha256": "fdc0cb5d5d5aef301816967bb0b5e6757f3d9edeed925ee1d07846ed1548c285"
+        },
+        {
+          "byte_count": 109714,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.json",
+          "sha256": "2e5119f2253519f4fd329f54363c31738ef2a46d9991f71a2407ba631e3e56a7"
+        },
+        {
+          "byte_count": 45055,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.md",
+          "sha256": "31b3ff3c4775e81cf9bae1945246a7507c6260196a44404c230dd587c70a87cf"
+        },
+        {
+          "byte_count": 150923,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+          "sha256": "be717aa01b8b9c9f1e218f1bf8dfd90a5b07cfe6aed427255e5fcd0b133b0e32"
+        },
+        {
+          "byte_count": 14129,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.md",
+          "sha256": "1c755571c493272722d2b930fa0e455e672247d77a557f770df949a9b7578066"
+        },
+        {
+          "byte_count": 774,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/changes.json",
+          "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+        },
+        {
+          "byte_count": 1241,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/execution-lineage.json",
+          "sha256": "5d159ce8a4483cdce319a58dd49ebb53128f4f04fd591a19df5a63175d22a767"
+        },
+        {
+          "byte_count": 4225,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/manifest.json",
+          "sha256": "fa1bbe0bf3072ef72c7d529b962f42bb47947fdc4f98991fa040456dba3f5153"
+        },
+        {
+          "byte_count": 4942,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/package-delta.json",
+          "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+        },
+        {
+          "byte_count": 2303,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/validation-summary.json",
+          "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+        },
+        {
+          "byte_count": 15975,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/execution-summary.json",
+          "sha256": "88c16018d88c5d5983d531c62b4908eea9ee1d1cbccd58841767668132f12455"
+        },
+        {
+          "byte_count": 22246,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+          "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a"
+        },
+        {
+          "byte_count": 17078,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/execution-summary.json",
+          "sha256": "ce9e230afeabe591728de39f1e15a050023581751a6f03a660a57970c943e372"
+        },
+        {
+          "byte_count": 15539,
+          "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+          "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7"
+        },
+        {
+          "byte_count": 141132,
+          "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+          "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+        },
+        {
+          "byte_count": 132303,
+          "path": "tests/test_walksafe_full_rc_tooling.py",
+          "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+        }
+      ],
+      "ordering": {
+        "array": "path ascending by UTF-8 byte order; all current paths are ASCII",
+        "object_keys": "recursive lexicographic order from sort_keys=true"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "role",
+        "all output document fields",
+        "all self/content fingerprints"
+      ],
+      "digest": "e385856ee00ce497c69e732e415ceab9d38efe8fb5c773c05044b2ba6a5ae833"
+    },
+    "review_subject_set_sha256": {
+      "algorithm": "SHA-256",
+      "basis": "final independent review exact22 subject rows",
+      "preimage": [
+        {
+          "path": "docs/control/artifact-types.json",
+          "sha256": "73a17c237a0e2fb6b25fb5a34203d187f25cd0571d879ffa3a6a2d63ed5c5fbb"
+        },
+        {
+          "path": "docs/control/execution/artifact-audits/20260726/security-ai-audit.json",
+          "sha256": "4eb543de60cb07d267f52af17f725036aa79520da883ba02814456dbfe4dbd14"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w3/evidence-20260726-003/lock-inventory.json",
+          "sha256": "baddd42d96d21a751df4494a48fa0b1e81f7df233c60d63981dd4e754ee5df04"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-rereview.md",
+          "sha256": "6243efe959bb3cbaa154f662c9889ad873eee02bc06893f4204dd4c103f4be6a"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+          "sha256": "7dbf30fa7e9520bf802be2b23883b83f8dfa5f09ba8ecc2000324b03ece29b8a"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+          "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.md",
+          "sha256": "15e6f467f2d340dec781a29404641cf0a8cc88368bab681429b020fa243a5aec"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-finding-register.json",
+          "sha256": "fdc0cb5d5d5aef301816967bb0b5e6757f3d9edeed925ee1d07846ed1548c285"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.json",
+          "sha256": "2e5119f2253519f4fd329f54363c31738ef2a46d9991f71a2407ba631e3e56a7"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.md",
+          "sha256": "31b3ff3c4775e81cf9bae1945246a7507c6260196a44404c230dd587c70a87cf"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+          "sha256": "be717aa01b8b9c9f1e218f1bf8dfd90a5b07cfe6aed427255e5fcd0b133b0e32"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.md",
+          "sha256": "1c755571c493272722d2b930fa0e455e672247d77a557f770df949a9b7578066"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/changes.json",
+          "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/execution-lineage.json",
+          "sha256": "5d159ce8a4483cdce319a58dd49ebb53128f4f04fd591a19df5a63175d22a767"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/manifest.json",
+          "sha256": "fa1bbe0bf3072ef72c7d529b962f42bb47947fdc4f98991fa040456dba3f5153"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/package-delta.json",
+          "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/validation-summary.json",
+          "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/execution-summary.json",
+          "sha256": "88c16018d88c5d5983d531c62b4908eea9ee1d1cbccd58841767668132f12455"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+          "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a"
+        },
+        {
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/execution-summary.json",
+          "sha256": "ce9e230afeabe591728de39f1e15a050023581751a6f03a660a57970c943e372"
+        },
+        {
+          "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+          "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7"
+        },
+        {
+          "path": "tests/test_walksafe_full_rc_tooling.py",
+          "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+        }
+      ],
+      "serialization": "<repository-relative-path><TAB><file-sha256><LF>",
+      "ordering": "path ascending by UTF-8 byte order; all current paths are ASCII",
+      "encoding": "UTF-8",
+      "final_review_excluded_from_subject": true,
+      "digest": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8"
+    },
+    "common_fingerprint": {
+      "algorithm": "SHA-256",
+      "basis": "exact W5 central state and sole transition authority object reproduced in preimage",
+      "basis_fields": [
+        "schema",
+        "wave_id",
+        "exact",
+        "OK",
+        "INTERNAL_GAP",
+        "EXTERNAL",
+        "pre",
+        "post",
+        "input_set_sha256",
+        "review_subject_set_sha256",
+        "predecessor",
+        "transition_authority",
+        "historical_reviews",
+        "source_evidence",
+        "boundary",
+        "open_boundaries"
+      ],
+      "preimage": {
+        "schema": "walksafe.w5-central-common.v1",
+        "wave_id": "W5",
+        "exact": [
+          "DLV-SEC-01",
+          "DLV-SEC-02",
+          "DLV-SEC-03",
+          "DLV-SEC-06",
+          "DLV-SEC-09",
+          "DLV-SEC-10",
+          "DLV-SEC-11",
+          "DLV-SEC-12",
+          "DLV-SEC-15"
+        ],
+        "OK": [
+          "DLV-SEC-02",
+          "DLV-SEC-03",
+          "DLV-SEC-09",
+          "DLV-SEC-11",
+          "DLV-SEC-15"
+        ],
+        "INTERNAL_GAP": [
+          "DLV-SEC-01",
+          "DLV-SEC-10",
+          "DLV-SEC-12"
+        ],
+        "EXTERNAL": [
+          "DLV-SEC-06"
+        ],
+        "pre": {
+          "OK": 109,
+          "INTERNAL_GAP": 71,
+          "EXTERNAL": 41,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "post": {
+          "OK": 114,
+          "INTERNAL_GAP": 65,
+          "EXTERNAL": 42,
+          "N_A_CANDIDATE": 36,
+          "TOTAL": 257
+        },
+        "input_set_sha256": "e385856ee00ce497c69e732e415ceab9d38efe8fb5c773c05044b2ba6a5ae833",
+        "review_subject_set_sha256": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8",
+        "predecessor": {
+          "byte_count": 19207,
+          "path": "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+          "sha256": "e924b5216da5ba174fb765c8c5d8d18e91a9b2a8aeec8dd8b6876b0a644210ba",
+          "counts": {
+            "OK": 109,
+            "INTERNAL_GAP": 71,
+            "EXTERNAL": 41,
+            "N_A_CANDIDATE": 36,
+            "TOTAL": 257
+          },
+          "relation": "W4_TERMINAL_PREDECESSOR"
+        },
+        "transition_authority": {
+          "byte_count": 13416,
+          "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-final-review.md",
+          "sha256": "11bcfcde2203cd1215f22858e6f0c84c971f20cf0d2d69cbbbf90bf6f99bf0d9",
+          "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-FINAL-REVIEW-20260727-001",
+          "status": "GO_STATUS_DELTA_ALLOWED",
+          "status_delta_allowed": true,
+          "formal_signing_deployment_release_transition_allowed": false,
+          "subject_file_count": 22,
+          "subject_set_sha256": "649a8eeceae8863b0f75a19a40672fbc2e36484f496366daaea95026d7cccee8",
+          "findings": {
+            "blocking": 0,
+            "major": 0,
+            "minor": 0
+          },
+          "authority_scope": "EXACT9_INTERNAL_ARTIFACT_STATUS_DELTA_ONLY"
+        },
+        "historical_reviews": [
+          {
+            "byte_count": 15654,
+            "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+            "sha256": "7dbf30fa7e9520bf802be2b23883b83f8dfa5f09ba8ecc2000324b03ece29b8a",
+            "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-REVIEW-20260727-001",
+            "status": "NO_GO_REQUIRES_CORRECTION_AND_REREVIEW",
+            "status_delta_allowed": false,
+            "subject_file_count": 19,
+            "subject_set_sha256": "70892c0d8f7d8eb536ba005625cdc4b1f77bc86459623b50173484b1fb16610c",
+            "findings": {
+              "blocking": 2,
+              "major": 1,
+              "minor": 0
+            },
+            "historical_remediation_evidence_only": true
+          },
+          {
+            "byte_count": 15725,
+            "path": "docs/control/execution/artifact-remediation/20260726/w5/independent-rereview.md",
+            "sha256": "6243efe959bb3cbaa154f662c9889ad873eee02bc06893f4204dd4c103f4be6a",
+            "review_id": "WS-ARTIFACT-REMEDIATION-W5-INDEPENDENT-REREVIEW-20260727-001",
+            "status": "NO_GO_REQUIRES_CORRECTION_AND_REREVIEW",
+            "status_delta_allowed": false,
+            "subject_file_count": 21,
+            "subject_set_sha256": "a6fa8a79b7556f33086690d9ae3c82f1d8837d25b5823c3a7ecd1e2afac1e8b3",
+            "findings": {
+              "blocking": 1,
+              "major": 0,
+              "minor": 0
+            },
+            "historical_remediation_evidence_only": true
+          }
+        ],
+        "source_evidence": {
+          "current_state_pairs": [
+            {
+              "pair_id": "W5-SECURITY-PLAN-THREAT-RISK",
+              "artifact_ids": [
+                "DLV-SEC-01",
+                "DLV-SEC-02",
+                "DLV-SEC-03"
+              ],
+              "json": {
+                "byte_count": 109714,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.json",
+                "sha256": "2e5119f2253519f4fd329f54363c31738ef2a46d9991f71a2407ba631e3e56a7"
+              },
+              "markdown": {
+                "byte_count": 45055,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/security-plan-threat-risk-current-state.md",
+                "sha256": "31b3ff3c4775e81cf9bae1945246a7507c6260196a44404c230dd587c70a87cf"
+              }
+            },
+            {
+              "pair_id": "W5-PRIVACY-CONSENT-SECRETS",
+              "artifact_ids": [
+                "DLV-SEC-06",
+                "DLV-SEC-09"
+              ],
+              "json": {
+                "byte_count": 97289,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.json",
+                "sha256": "46ac5d716b6a04be7fb275c57755a2d8ffbdf1e4171ac473b7814c766249e675"
+              },
+              "markdown": {
+                "byte_count": 46405,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/privacy-consent-secrets-current-state.md",
+                "sha256": "15e6f467f2d340dec781a29404641cf0a8cc88368bab681429b020fa243a5aec"
+              }
+            },
+            {
+              "pair_id": "W5-SECURITY-SCAN",
+              "artifact_ids": [
+                "DLV-SEC-10",
+                "DLV-SEC-11",
+                "DLV-SEC-12",
+                "DLV-SEC-15"
+              ],
+              "json": {
+                "byte_count": 150923,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.json",
+                "sha256": "be717aa01b8b9c9f1e218f1bf8dfd90a5b07cfe6aed427255e5fcd0b133b0e32"
+              },
+              "markdown": {
+                "byte_count": 14129,
+                "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-current-state.md",
+                "sha256": "1c755571c493272722d2b930fa0e455e672247d77a557f770df949a9b7578066"
+              }
+            }
+          ],
+          "security_finding_register": {
+            "byte_count": 123698,
+            "path": "docs/control/execution/artifact-remediation/20260726/w5/security-finding-register.json",
+            "sha256": "fdc0cb5d5d5aef301816967bb0b5e6757f3d9edeed925ee1d07846ed1548c285"
+          },
+          "scan_execution_summaries": [
+            {
+              "byte_count": 15975,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-001/execution-summary.json",
+              "sha256": "88c16018d88c5d5983d531c62b4908eea9ee1d1cbccd58841767668132f12455"
+            },
+            {
+              "byte_count": 22246,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-002/execution-summary.json",
+              "sha256": "47be8e6516f423381a51a616b6bbebf8b984bc57cca87b2eef74df20996beb0a"
+            },
+            {
+              "byte_count": 17078,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/run-20260727-003/execution-summary.json",
+              "sha256": "ce9e230afeabe591728de39f1e15a050023581751a6f03a660a57970c943e372"
+            }
+          ],
+          "dependency_remediation_receipt": [
+            {
+              "byte_count": 774,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/changes.json",
+              "sha256": "052c7d08de49efd119fcf205d7f8aa698c8c40bb8559ea012bca7329d31b40b6"
+            },
+            {
+              "byte_count": 1241,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/execution-lineage.json",
+              "sha256": "5d159ce8a4483cdce319a58dd49ebb53128f4f04fd591a19df5a63175d22a767"
+            },
+            {
+              "byte_count": 4225,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/manifest.json",
+              "sha256": "fa1bbe0bf3072ef72c7d529b962f42bb47947fdc4f98991fa040456dba3f5153"
+            },
+            {
+              "byte_count": 4942,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/package-delta.json",
+              "sha256": "e3fdc3940bead48cdce49cc914b9397d0e0a3c967fc5d60f9e3bea92e3304c5c"
+            },
+            {
+              "byte_count": 2303,
+              "path": "docs/control/execution/artifact-remediation/20260726/w5/security-scan-execution/dependency-remediation-20260727-001/validation-summary.json",
+              "sha256": "87994ede6f09a1bd3fd43ea0fc6c26233ca56df171adcf436bab7908d9c3b1d7"
+            }
+          ],
+          "tls_current_source": [
+            {
+              "byte_count": 15539,
+              "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+              "sha256": "2a9568b6d207a76f78a0aefde1e77d2a639c042b1a4df4ef5501b3fad4d975b7"
+            },
+            {
+              "byte_count": 132303,
+              "path": "tests/test_walksafe_full_rc_tooling.py",
+              "sha256": "dd4e1c2fd0d298e670e662b27496f7b986333be29f26fbd29ba31b702dd62874"
+            }
+          ],
+          "dependency_current_source": [
+            {
+              "byte_count": 256,
+              "path": "backend/requirements.txt",
+              "sha256": "304f4dcca26b40bc7a5e296deaa0c8c32b0bea5122edc50388bef8da2e118e24"
+            },
+            {
+              "byte_count": 148063,
+              "path": "backend/requirements.lock",
+              "sha256": "0d17e6bb78f882a7e32b4d14d047c4c34e60737db28c5c163b60c2929fea6700"
+            },
+            {
+              "byte_count": 141132,
+              "path": "tests/general-quality-cp312-linux-x86_64-cpu.lock",
+              "sha256": "5fe49848eee31f86211fafd6a0077ec0e0859737190221421c74a10db53918aa"
+            }
+          ]
+        },
+        "boundary": {
+          "formal_test_count": 279,
+          "formal_execution_status": "NOT_RUN",
+          "formal_executed_count": 0,
+          "formal_pass_count": 0,
+          "formal_evidence_count": 0,
+          "formal_result_null_count": 279,
+          "formal_empty_evidence_ids_count": 279,
+          "formal_security_pass_claimed": false,
+          "actual_device_status": "NOT_RUN",
+          "full_e2e_status": "NOT_RUN",
+          "signing_status": "NOT_RUN",
+          "deployment_status": "NOT_RUN",
+          "release_gate_count": 5,
+          "release_gate_status": "NOT_RUN",
+          "release_gates_waived": false,
+          "legal_privacy_approval_status": "NOT_RUN_EXTERNAL_PENDING",
+          "release_status": "NOT_ELIGIBLE",
+          "zero_vulnerability_claimed": false,
+          "full_repository_history_secret_scan": "NOT_RUN"
+        },
+        "open_boundaries": [
+          {
+            "artifact_type_code": "DLV-SEC-01",
+            "classification": "INTERNAL_GAP",
+            "boundary": "ROLE_ASSIGNMENT_TRAINING_AND_ACKNOWLEDGEMENT_RECEIPTS",
+            "status": "OPEN",
+            "actual_assignee_count": 0,
+            "training_receipt_count": 0,
+            "acknowledgement_receipt_count": 0,
+            "reason": "current generation, scan scope, SLA and gates are now explicit, but actual role acknowledgement and training receipts are both zero; source_commit/build_id and independent approval also remain absent."
+          },
+          {
+            "artifact_type_code": "DLV-SEC-10",
+            "classification": "INTERNAL_GAP",
+            "boundary": "KOTLIN_PARSE_ERROR_AND_NAMED_SOURCE_GENERATION",
+            "status": "OPEN",
+            "kotlin_parse_error_count": 1,
+            "parse_error_scope": "KOTLIN_PARTIAL",
+            "source_commit": null,
+            "build_id": null,
+            "reason": "Semgrep 1.164.0 scan and triage are current-source bound, but one Kotlin parse error remains, source_commit/build_id are null, and no formal release-generation rerun exists."
+          },
+          {
+            "artifact_type_code": "DLV-SEC-12",
+            "classification": "INTERNAL_GAP",
+            "boundary": "FULL_REPOSITORY_HISTORY_SECRET_SCAN",
+            "status": "NOT_RUN",
+            "reason": "The selected current tree has zero findings after two reviewed false positives were narrowly allowlisted, but the required full repository history scan is NOT_RUN."
+          },
+          {
+            "artifact_type_code": "DLV-SEC-06",
+            "classification": "EXTERNAL",
+            "boundary": "LEGAL_PRIVACY_PRODUCT_AND_TMAP_CONTRACT_APPROVAL",
+            "status": "PROPOSED_PENDING_EXTERNAL_LEGAL_REVIEW",
+            "external_decision_owners": [
+              "LEGAL_PRIVACY_COUNSEL",
+              "PRODUCT_POLICY_OWNER",
+              "TMAP_CONTRACT_OWNER"
+            ],
+            "reason": "Current code traces policy/item versions, independent selections, chained receipts, fail-closed enforcement, withdrawal and technical reconsent. Legal basis, final Korean notice wording, recipient/contract terms and international-transfer determination require external legal/privacy approval."
+          }
+        ]
+      },
+      "ordering": {
+        "object_keys": "recursive lexicographic order from sort_keys=true",
+        "exact_array": "preserve final independent review exact9 order",
+        "classification_arrays": "preserve exact9 relative order",
+        "nested_arrays": "preserve source value order unless explicitly path-sorted"
+      },
+      "encoding": "UTF-8",
+      "serialization": {
+        "format": "JSON",
+        "ensure_ascii": true,
+        "sort_keys": true,
+        "separators": [
+          ",",
+          ":"
+        ],
+        "whitespace_outside_strings": "none"
+      },
+      "trailing_newline": "exactly one LF byte (0x0A)",
+      "excluded_fields": [
+        "digest_contracts",
+        "common_fingerprint output wrapper",
+        "artifact-status-delta raw SHA",
+        "validation-summary raw SHA",
+        "implementation-receipt raw SHA",
+        "all integrity.content_fingerprint objects"
+      ],
+      "digest": "5ae2a694c2361ee407d91a192d16f6fb6123ec8a1af111dade700b8d332f8424"
+    },
+    "output_binding_dag": {
+      "topological_order": [
+        "artifact-status-delta.json",
+        "validation-summary.json",
+        "implementation-receipt.json"
+      ],
+      "artifact_status_delta": "binds only immutable upstream input hashes; validation and receipt are PATH_ONLY forward references",
+      "validation_summary": "binds artifact-status-delta raw SHA; implementation-receipt is a PATH_ONLY forward reference",
+      "implementation_receipt": "binds artifact-status-delta and validation-summary raw SHAs",
+      "cycle_rule": "no output may bind a downstream output raw SHA",
+      "cycle_status": "ACYCLIC"
+    },
+    "document_content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "scope": "entire individual output document with only its own integrity.content_fingerprint.value replaced by null",
+      "raw_file_serialization": "UTF-8 JSON, ensure_ascii=false, insertion order, indent=2, exactly one trailing LF"
+    }
+  },
+  "digest_contract_validation": {
+    "input_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "review_subject_set_sha256": "PASS_INDEPENDENT_RECOMPUTE",
+    "common_fingerprint": "PASS_INDEPENDENT_RECOMPUTE",
+    "artifact_status_delta_sha256": "82e81294c5acf3346bc4128c0ebd0ed7b31142c70b04877d8af9826635e16932",
+    "validation_summary_sha256": "48de6bc48d552e8b9609bb6069f87edbbc78c67816d091ae09aba6aaaf31224c",
+    "output_binding_dag": "PASS_ACYCLIC"
+  }
+}

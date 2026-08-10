@@ -1,0 +1,911 @@
+{
+  "schema_version": "walksafe.closure-readiness-register.v1",
+  "metadata": {
+    "title": "WalkSafe 종료·이관 준비 원장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "CLS-07",
+      "CLS-08",
+      "CLS-09",
+      "CLS-10"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "register_mode": "PREOPENED_APPEND_ONLY",
+  "w9_as_of": "2026-07-27",
+  "w9_source_bindings": {
+    "implementation_gap_analysis_r020": {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260726-r020.json",
+      "sha256": "6c6bd3e1db80cfcca05361afedb6f2eb4de0cc4a67bf76b9a6830c71cf2a70b7"
+    },
+    "remediation_backlog_r020": {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+      "sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f"
+    },
+    "data_retention_policy": {
+      "path": "docs/operations/data_retention_policy.md",
+      "sha256": "92bf94b3ecaa03b0d53749be5b7c2fce8b20b7c39aa1033ca369b20d497b0deb"
+    },
+    "navigation_integration_policy": {
+      "path": "docs/walksafe-v2/navigation_integration_policy.md",
+      "sha256": "af9a05935a3f54a7f06e6dfcba4a39a6d57ef94879cf1c3afa0288ca050a63a8"
+    },
+    "development_deployment_descriptor": {
+      "path": "model/deployments/local-deployment.json",
+      "sha256": "09ff54d2fd7dc43d4dad3d06891de2e7ffb37063308ea7d0bc981bb27fff7ec9"
+    },
+    "android_user_guide": {
+      "path": "apps/android/USER_GUIDE.md",
+      "sha256": "746d5c13b99171e8da2d562efcdfb5ec0de47ba9fe5d167b11d9edfcb2f2a82b"
+    }
+  },
+  "w9_content_contracts": {
+    "CLS-07": {
+      "artifact_type_id": "CLS-07",
+      "content_outcome": "OK_CANDIDATE_CONTENT_COMPLETENESS",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "OPENING_SNAPSHOT_SCHEMA_READY",
+      "record_fields": [
+        "snapshot_id",
+        "source_register",
+        "as_of",
+        "defect_id",
+        "severity",
+        "affected_release_id",
+        "status",
+        "owner_role",
+        "target_condition",
+        "evidence_refs",
+        "snapshot_sha256"
+      ],
+      "current_boundary": [
+        "formal_execution_count=0",
+        "closure_snapshot_status=NOT_TAKEN",
+        "opening snapshot의 0건은 결함 없음의 품질 증거가 아님"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-08": {
+      "artifact_type_id": "CLS-08",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "RISK_REGISTER_SCHEMA_READY_ACCEPTANCE_EXTERNAL",
+      "record_fields": [
+        "risk_id",
+        "source_ref",
+        "severity",
+        "likelihood",
+        "user_data_service_impact",
+        "mitigation",
+        "owner_role",
+        "due_condition",
+        "acceptance_decision",
+        "acceptor_identity",
+        "effective_window",
+        "evidence_refs",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "risk_acceptance_status=NOT_APPROVED",
+        "acceptor_identity=None",
+        "actual acceptance receipt 없음"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-09": {
+      "artifact_type_id": "CLS-09",
+      "content_outcome": "OK_CANDIDATE_CONTENT_COMPLETENESS",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "TECHNICAL_DEBT_SCHEMA_READY",
+      "record_fields": [
+        "debt_id",
+        "source_ref",
+        "impact",
+        "priority",
+        "owner_role",
+        "due_condition",
+        "closure_criteria",
+        "evidence_refs",
+        "risk_acceptance_status",
+        "acceptance_receipt_ref"
+      ],
+      "current_boundary": [
+        "OPS-21 원장을 정본으로 사용",
+        "closure_snapshot_status=NOT_TAKEN",
+        "risk acceptance=NOT_APPROVED"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-10": {
+      "artifact_type_id": "CLS-10",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "HANDOVER_SCHEMA_READY_EXECUTION_EXTERNAL",
+      "record_fields": [
+        "handover_id",
+        "branch",
+        "recipient_identity",
+        "operator_identity",
+        "scope",
+        "account_permission_inventory_refs",
+        "secret_reference_ids",
+        "backlog_and_risk_refs",
+        "support_boundary",
+        "approval_status",
+        "effective_at",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "recipient_identity=None",
+        "operator_identity=None",
+        "approval_status=NOT_APPROVED",
+        "actual handover=NOT_RUN"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-14": {
+      "artifact_type_id": "CLS-14",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "DATA_DISPOSITION_SCHEMA_READY_EXECUTION_EXTERNAL",
+      "record_fields": [
+        "action_id",
+        "branch",
+        "data_class",
+        "storage_location",
+        "technical_retention_target",
+        "legal_basis_status",
+        "transfer_format",
+        "encryption_control",
+        "deletion_or_transfer_action",
+        "backup_reconciliation",
+        "notification_status",
+        "operator_identity",
+        "approval_status",
+        "execution_status",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "legal basis와 최종 한국어 고지=NOT_APPROVED",
+        "actual transfer=NOT_RUN",
+        "actual deletion=NOT_RUN",
+        "external receipt 없음"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-15": {
+      "artifact_type_id": "CLS-15",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "ACCESS_SECRET_INFRA_SCHEMA_READY_EXECUTION_EXTERNAL",
+      "record_fields": [
+        "asset_id",
+        "asset_type",
+        "current_controller",
+        "target_controller",
+        "action_transfer_rotate_or_revoke",
+        "secret_reference_id",
+        "least_privilege_check",
+        "recovery_boundary_check",
+        "operator_identity",
+        "approval_status",
+        "effective_at",
+        "verification_result",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "secret 값 기록 금지",
+        "recipient/operator=None",
+        "transfer/rotation/revocation=NOT_RUN",
+        "approval=NOT_APPROVED"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    },
+    "CLS-16": {
+      "artifact_type_id": "CLS-16",
+      "content_outcome": "EXTERNAL_AFTER_INTERNAL",
+      "schema_status": "STRUCTURED_DRAFT_COMPLETE",
+      "lifecycle_status": "DECOMMISSION_SCHEMA_READY_EXECUTION_EXTERNAL",
+      "record_fields": [
+        "decommission_id",
+        "decision_branch",
+        "authority_identity",
+        "user_notice_status",
+        "new_session_block_status",
+        "data_disposition_refs",
+        "provider_exit_refs",
+        "account_key_infrastructure_refs",
+        "monitoring_window",
+        "final_verification",
+        "approval_status",
+        "execution_status",
+        "receipt_ref"
+      ],
+      "current_boundary": [
+        "decommission decision/authority=None",
+        "provider exit test=NOT_RUN",
+        "decommission execution=NOT_RUN",
+        "approval=NOT_APPROVED"
+      ],
+      "approval_status": "NOT_APPROVED",
+      "execution_status": "NOT_RUN",
+      "receipt_status": "NOT_RUN",
+      "actual_receipt_ids": []
+    }
+  },
+  "external_execution_contracts": [
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-CLS-08",
+      "artifact_type_id": "CLS-08",
+      "catalog_artifact_id": "DLV-CLS-08",
+      "responsible_role": "프로젝트관리자",
+      "approver_role": "프로젝트책임자",
+      "external_trigger": "종료 시점에 수용·감시할 잔여 위험이 존재하는 경우 활성",
+      "external_authority": "PROJECT_OWNER_EXPLICIT_SCOPED_ACCEPTANCE_OR_REJECTION",
+      "required_inputs": [
+        "최종 인수 범위와 승인 릴리스 기준선",
+        "산출물·결함·위험·부채·권한 inventory",
+        "운영 수신자·계약·데이터 보존 결정"
+      ],
+      "internal_action": "Record mitigation and monitoring for every residual risk, then obtain an explicit scoped acceptance or rejection from the authorized approver.",
+      "procedure": [
+        "실제 잔여 위험과 activation 근거를 식별한다.",
+        "모든 lifecycle field와 mitigation·monitoring을 채우거나 소유자·기한이 있는 차단 상태로 둔다.",
+        "승인자가 exact scope와 effective window를 명시적으로 수용 또는 거절한다.",
+        "실제 decision과 acceptor identity를 receipt hash binding으로 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "위험 ID·시나리오",
+          "가능성·영향·노출",
+          "기존 통제·효과",
+          "잔여 등급",
+          "모니터링·비상조치",
+          "수용자·재검토일"
+        ],
+        "lifecycle_fields": [
+          "risk_id",
+          "source_ref",
+          "severity",
+          "likelihood",
+          "user_data_service_impact",
+          "mitigation",
+          "owner_role",
+          "due_condition",
+          "acceptance_decision",
+          "acceptor_identity",
+          "effective_window",
+          "evidence_refs",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 위험 ID·시나리오, 가능성·영향·노출.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_PROJECT_CLOSURE_AND_AT_EACH_ACCEPTANCE_REVIEW",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "승인된 실제 risk acceptance receipt 전에는 프로젝트 종료·인계를 완료할 수 없고 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    },
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-CLS-10",
+      "artifact_type_id": "CLS-10",
+      "catalog_artifact_id": "DLV-CLS-10",
+      "responsible_role": "프로젝트관리자",
+      "approver_role": "프로젝트책임자",
+      "external_trigger": "서비스·자산·계정의 운영 책임을 다른 주체에게 이관할 때 활성",
+      "external_authority": "PROJECT_OWNER_AND_NAMED_RECIPIENT_BILATERAL_CONFIRMATION",
+      "required_inputs": [
+        "최종 인수 범위와 승인 릴리스 기준선",
+        "산출물·결함·위험·부채·권한 inventory",
+        "운영 수신자·계약·데이터 보존 결정"
+      ],
+      "internal_action": "Execute ownership and least-privilege handover with named recipient/operator, verification, revocation boundary and bilateral confirmation.",
+      "procedure": [
+        "실제 이관 decision과 named recipient/operator를 확인한다.",
+        "자산·계정·권한·backlog·risk·support 범위를 최소권한으로 대조한다.",
+        "전달·검증·기존 권한 회수 경계를 양측이 확인한다.",
+        "effective time과 양측 identity를 실제 handover receipt에 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "자산·service owner",
+          "계정·역할·접근",
+          "credential 회전·전달 방식",
+          "runbook·지원·연락",
+          "권한 test·회수",
+          "양측 확인·일시"
+        ],
+        "lifecycle_fields": [
+          "handover_id",
+          "branch",
+          "recipient_identity",
+          "operator_identity",
+          "scope",
+          "account_permission_inventory_refs",
+          "secret_reference_ids",
+          "backlog_and_risk_refs",
+          "support_boundary",
+          "approval_status",
+          "effective_at",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 자산·service owner, 계정·역할·접근.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_OPERATIONAL_RESPONSIBILITY_TRANSFER_EFFECTIVE_AT",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "named recipient의 실제 양측 인계 receipt 전에는 운영 이관·프로젝트 종료를 완료할 수 없고 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    },
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-CLS-14",
+      "artifact_type_id": "CLS-14",
+      "catalog_artifact_id": "DLV-CLS-14",
+      "responsible_role": "프로젝트관리자",
+      "approver_role": "프로젝트책임자",
+      "external_trigger": "종료 시 보존·이관·삭제할 데이터가 존재하는 경우 활성",
+      "external_authority": "PROJECT_OWNER_APPROVED_DATA_BRANCH_WITH_APPLICABLE_LEGAL_AUTHORITY",
+      "required_inputs": [
+        "최종 인수 범위와 승인 릴리스 기준선",
+        "산출물·결함·위험·부채·권한 inventory",
+        "운영 수신자·계약·데이터 보존 결정"
+      ],
+      "internal_action": "Execute the approved retention, transfer or deletion branch for each data class and reconcile backups and notifications.",
+      "procedure": [
+        "각 data class·storage location의 승인된 branch와 법적 권한을 확인한다.",
+        "보존·이관·삭제, encryption, backup reconciliation, notification을 class별 실행한다.",
+        "operator와 승인 범위 및 미처리 예외를 검증한다.",
+        "실제 transfer/deletion event와 receipt를 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "데이터 inventory·분류",
+          "보존 근거·기간",
+          "이관 대상·형식·암호화",
+          "삭제·익명화·backup",
+          "사용자·기관 통지",
+          "검증·승인 기록",
+          "선행 승인된 CLS-16 폐기계획 ID와 데이터 보존·이관·삭제 실행 receipt"
+        ],
+        "lifecycle_fields": [
+          "action_id",
+          "branch",
+          "data_class",
+          "storage_location",
+          "technical_retention_target",
+          "legal_basis_status",
+          "transfer_format",
+          "encryption_control",
+          "deletion_or_transfer_action",
+          "backup_reconciliation",
+          "notification_status",
+          "operator_identity",
+          "approval_status",
+          "execution_status",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 데이터 inventory·분류, 보존 근거·기간.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_EACH_TRANSFER_OR_DELETION_AND_PROJECT_CLOSURE",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "법적 근거·고지 승인과 실제 class별 receipt 전에는 데이터 처분·프로젝트 종료를 완료할 수 없고 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    },
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-CLS-15",
+      "artifact_type_id": "CLS-15",
+      "catalog_artifact_id": "DLV-CLS-15",
+      "responsible_role": "프로젝트관리자",
+      "approver_role": "프로젝트책임자",
+      "external_trigger": "프로젝트 전용 계정·key·도메인·인프라가 존재하는 경우 활성",
+      "external_authority": "PROJECT_OWNER_AUTHORIZED_ASSET_RETAIN_TRANSFER_ROTATE_OR_REVOKE_DECISION",
+      "required_inputs": [
+        "최종 인수 범위와 승인 릴리스 기준선",
+        "산출물·결함·위험·부채·권한 inventory",
+        "운영 수신자·계약·데이터 보존 결정"
+      ],
+      "internal_action": "Execute the authorized retain/transfer/rotate/revoke decision for every account, key and infrastructure asset without recording secret values.",
+      "procedure": [
+        "실제 asset inventory와 authorized action을 확인하되 secret 값은 기록하지 않는다.",
+        "retain/transfer/rotate/revoke를 최소권한·복구수단 분리 경계에서 실행한다.",
+        "target controller, operator, effective time과 검증 결과를 확인한다.",
+        "실제 asset action과 receipt를 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "자산·계정 inventory",
+          "유지·이관·폐기 판정",
+          "key·certificate 회전",
+          "서버·storage·DNS 종료",
+          "backup·로그 보존",
+          "검증·비용 종료",
+          "선행 승인된 CLS-16 폐기계획 ID와 계정·키·인프라 정리 실행 receipt"
+        ],
+        "lifecycle_fields": [
+          "asset_id",
+          "asset_type",
+          "current_controller",
+          "target_controller",
+          "action_transfer_rotate_or_revoke",
+          "secret_reference_id",
+          "least_privilege_check",
+          "recovery_boundary_check",
+          "operator_identity",
+          "approval_status",
+          "effective_at",
+          "verification_result",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 자산·계정 inventory, 유지·이관·폐기 판정.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_EACH_TRANSFER_ROTATION_OR_REVOCATION",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "모든 asset의 승인 action과 실제 receipt 전에는 권한·인프라 정리나 프로젝트 종료를 완료할 수 없고 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    },
+    {
+      "contract_schema": "walksafe.w9.external-execution-contract.v1",
+      "stable_id": "W9-EXT-CLS-16",
+      "artifact_type_id": "CLS-16",
+      "catalog_artifact_id": "DLV-CLS-16",
+      "responsible_role": "프로젝트관리자",
+      "approver_role": "프로젝트책임자",
+      "external_trigger": "서비스 중단 또는 완전 폐기가 승인된 경우 활성",
+      "external_authority": "PROJECT_OWNER_APPROVED_SERVICE_SHUTDOWN_OR_DECOMMISSION_DECISION",
+      "required_inputs": [
+        "최종 인수 범위와 승인 릴리스 기준선",
+        "산출물·결함·위험·부채·권한 inventory",
+        "운영 수신자·계약·데이터 보존 결정"
+      ],
+      "internal_action": "Approve and execute the ordered service shutdown/decommission branch with notices, data rights, provider exit, checkpoints and final verification.",
+      "procedure": [
+        "실제 폐기 권한·범위·순서·중단점을 승인한다.",
+        "사용자 고지와 신규세션 차단 뒤 CLS-14, CLS-15, provider exit를 순서대로 실행한다.",
+        "monitoring window와 final verification에서 잔여 접근·자료·비용을 확인한다.",
+        "실제 decommission decision, operator와 receipt를 hash 결속한다."
+      ],
+      "evidence_schema": {
+        "catalog_fields": [
+          "종료 사유·범위·일정",
+          "사용자·이해관계자 고지",
+          "기능·신규가입 단계 종료",
+          "데이터 export·삭제",
+          "인프라·계정 철거",
+          "지원 종료·최종 검증",
+          "CLS-14 데이터 처리와 CLS-15 계정·키·인프라 정리 전에 승인할 폐기 순서·중단점·책임자"
+        ],
+        "lifecycle_fields": [
+          "decommission_id",
+          "decision_branch",
+          "authority_identity",
+          "user_notice_status",
+          "new_session_block_status",
+          "data_disposition_refs",
+          "provider_exit_refs",
+          "account_key_infrastructure_refs",
+          "monitoring_window",
+          "final_verification",
+          "approval_status",
+          "execution_status",
+          "receipt_ref"
+        ]
+      },
+      "receipt_schema": [
+        "repository_relative_path",
+        "sha256",
+        "byte_length",
+        "source_event_or_decision_id",
+        "occurred_or_effective_at",
+        "operator_or_acceptor_identity"
+      ],
+      "completion_test": [
+        "다음 핵심 내용이 근거·버전과 함께 구체적으로 작성되어 있다: 종료 사유·범위·일정, 사용자·이해관계자 고지.",
+        "필수 내용에 공란·암묵적 가정이 없고 미결정은 소유자·기한이 있는 차단 항목으로 표시되어 있다.",
+        "상위 입력과 요구·설계·코드·시험·변경요청의 해당 추적 링크가 유효하다.",
+        "지정 검토자가 사실·일관성·추적성을 확인하고 승인자가 명시적으로 승인했다.",
+        "The activation condition is satisfied by a real event or authorized decision, not a synthetic row.",
+        "Every lifecycle field is populated or conservatively blocked with owner and due condition.",
+        "The named approver explicitly approves the exact scope and effective window.",
+        "The actual receipt path, SHA-256 and byte length reproduce and bind the real event/decision and operator/acceptor identity."
+      ],
+      "current_state": {
+        "actual_event_ids": [],
+        "actual_evidence_ids": [],
+        "actual_receipt_ids": [],
+        "actual_event_count": 0,
+        "actual_evidence_count": 0,
+        "actual_receipt_count": 0,
+        "execution_status": "NOT_RUN",
+        "approval_status": "NOT_APPROVED",
+        "acceptance_status": "NOT_APPROVED",
+        "recipient_state": "UNASSIGNED",
+        "operator_state": "UNASSIGNED"
+      },
+      "due_and_review": {
+        "due_condition": "BEFORE_DECOMMISSION_AUTHORIZATION_AND_EXECUTION",
+        "due_at": null,
+        "review_due_at": null,
+        "date_status": "UNASSIGNED_UNTIL_REAL_TRIGGER"
+      },
+      "release_impact": "승인된 폐기 decision과 모든 단계의 실제 receipt 전에는 service decommission·프로젝트 종료를 완료할 수 없고 release는 NOT_ELIGIBLE이다.",
+      "fake_event_or_receipt_allowed": false,
+      "normative_model": "BUILDER_INTERNAL_CANONICAL"
+    }
+  ],
+  "project_status": "ACTIVE_NOT_CLOSED",
+  "closure_event_started": false,
+  "final_acceptance": {
+    "status": "NOT_ISSUED",
+    "external_record_ref": null
+  },
+  "final_release": {
+    "status": "NOT_AVAILABLE",
+    "release_id": null
+  },
+  "final_artifact_index": {
+    "status": "PLANNED",
+    "items": []
+  },
+  "final_archive": {
+    "status": "NOT_RUN",
+    "archive_id": null,
+    "sha256": null
+  },
+  "unresolved_defects": {
+    "source_register": "docs/deliverables/06-testing/registers/defects.json",
+    "formal_execution_count": 0,
+    "snapshot_status": "NOT_TAKEN",
+    "record_schema_fields": [
+      "snapshot_id",
+      "source_register",
+      "as_of",
+      "defect_id",
+      "severity",
+      "affected_release_id",
+      "status",
+      "owner_role",
+      "target_condition",
+      "evidence_refs",
+      "snapshot_sha256"
+    ],
+    "records": [],
+    "opening_snapshot_proves_no_defects": false,
+    "warning": "시험 실행 0건은 결함 0건의 품질 증거가 아니다."
+  },
+  "residual_risks": {
+    "source_register": "docs/deliverables/06-testing/registers/residual-risks.json",
+    "gate_ids": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "open_policy_issue_ids": [
+      "ISS-POLICY-FP035-NETWORK-001"
+    ],
+    "record_schema_fields": [
+      "risk_id",
+      "source_ref",
+      "severity",
+      "likelihood",
+      "user_data_service_impact",
+      "mitigation",
+      "owner_role",
+      "due_condition",
+      "acceptance_decision",
+      "acceptor_identity",
+      "effective_window",
+      "evidence_refs",
+      "receipt_ref"
+    ],
+    "closure_snapshot_status": "NOT_TAKEN",
+    "risk_acceptance_status": "NOT_APPROVED",
+    "acceptor_identity": null,
+    "risk_acceptance_records": [],
+    "actual_receipt_ids": []
+  },
+  "technical_debt": {
+    "source_register": "docs/deliverables/10-operations/registers/operations-registers.json",
+    "record_schema_fields": [
+      "debt_id",
+      "source_ref",
+      "impact",
+      "priority",
+      "owner_role",
+      "due_condition",
+      "closure_criteria",
+      "evidence_refs",
+      "risk_acceptance_status",
+      "acceptance_receipt_ref"
+    ],
+    "closure_snapshot_status": "NOT_TAKEN",
+    "risk_acceptance_status": "NOT_APPROVED",
+    "acceptance_receipt_ids": []
+  },
+  "handover": {
+    "branch": "UNDECIDED_CONTINUE_OPERATIONS_OR_DECOMMISSION",
+    "recipient": null,
+    "operator": null,
+    "record_schema_fields": [
+      "handover_id",
+      "branch",
+      "recipient_identity",
+      "operator_identity",
+      "scope",
+      "account_permission_inventory_refs",
+      "secret_reference_ids",
+      "backlog_and_risk_refs",
+      "support_boundary",
+      "approval_status",
+      "effective_at",
+      "receipt_ref"
+    ],
+    "account_and_permission_transfer_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "execution_status": "NOT_RUN",
+    "evidence_refs": [],
+    "actual_handover_receipts": []
+  },
+  "data_disposition": {
+    "branch": "UNDECIDED_CONTINUE_OPERATIONS_OR_DECOMMISSION",
+    "policy_ref": "docs/operations/data_retention_policy.md",
+    "record_schema_fields": [
+      "action_id",
+      "branch",
+      "data_class",
+      "storage_location",
+      "technical_retention_target",
+      "legal_basis_status",
+      "transfer_format",
+      "encryption_control",
+      "deletion_or_transfer_action",
+      "backup_reconciliation",
+      "notification_status",
+      "operator_identity",
+      "approval_status",
+      "execution_status",
+      "receipt_ref"
+    ],
+    "legal_basis_status": "NOT_APPROVED",
+    "final_korean_notice_status": "NOT_APPROVED",
+    "operator": null,
+    "approval_status": "NOT_APPROVED",
+    "actual_transfer_status": "NOT_RUN",
+    "actual_deletion_status": "NOT_RUN",
+    "execution_records": [],
+    "actual_receipt_ids": []
+  },
+  "access_secret_infrastructure_disposition": {
+    "record_schema_fields": [
+      "asset_id",
+      "asset_type",
+      "current_controller",
+      "target_controller",
+      "action_transfer_rotate_or_revoke",
+      "secret_reference_id",
+      "least_privilege_check",
+      "recovery_boundary_check",
+      "operator_identity",
+      "approval_status",
+      "effective_at",
+      "verification_result",
+      "receipt_ref"
+    ],
+    "secret_values_allowed": false,
+    "recipient": null,
+    "operator": null,
+    "approval_status": "NOT_APPROVED",
+    "transfer_status": "NOT_RUN",
+    "rotation_status": "NOT_RUN",
+    "revocation_status": "NOT_RUN",
+    "execution_records": [],
+    "actual_receipt_ids": []
+  },
+  "decommissioning": {
+    "record_schema_fields": [
+      "decommission_id",
+      "decision_branch",
+      "authority_identity",
+      "user_notice_status",
+      "new_session_block_status",
+      "data_disposition_refs",
+      "provider_exit_refs",
+      "account_key_infrastructure_refs",
+      "monitoring_window",
+      "final_verification",
+      "approval_status",
+      "execution_status",
+      "receipt_ref"
+    ],
+    "decision_branch": null,
+    "authority": null,
+    "operator": null,
+    "approval_status": "NOT_APPROVED",
+    "execution_status": "NOT_RUN",
+    "provider_exit_test_status": "NOT_RUN",
+    "alternate_provider_validation_status": "NOT_RUN",
+    "execution_records": [],
+    "actual_receipt_ids": []
+  },
+  "closure_results": [],
+  "approval_boundary": {
+    "project_completed": false,
+    "project_closed": false,
+    "final_acceptance_signed": false,
+    "service_decommissioned": false,
+    "risk_acceptance_approved": false,
+    "actual_handover_claimed": false,
+    "actual_data_transfer_or_deletion_claimed": false,
+    "actual_secret_rotation_or_revocation_claimed": false,
+    "closure_result_count": 0,
+    "actual_execution_receipt_count": 0,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

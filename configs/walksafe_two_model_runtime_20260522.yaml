@@ -1,0 +1,84 @@
+version: 1
+primary_model: unified_walksafe
+fallback_model: legacy_two_model
+models:
+  custom_tactile:
+    source_model: "YOLO26s custom"
+    category: "tactile"
+    classes:
+      - normal_tactile_block
+      - damaged_tactile_block
+      - tactile_damage_area
+    thresholds:
+      default: 0.25
+      normal_tactile_block: 0.25
+      damaged_tactile_block: 0.25
+      tactile_damage_area: 0.25
+  coco_general:
+    source_model: "YOLO26n COCO pretrained"
+    category: "general_obstacle"
+    allowlist:
+      - person
+      - bicycle
+      - car
+      - motorcycle
+      - bus
+      - truck
+      - traffic light
+      - bench
+    thresholds:
+      default: 0.25
+      person: 0.25
+      bicycle: 0.25
+      car: 0.25
+      motorcycle: 0.25
+      bus: 0.25
+      truck: 0.25
+      traffic light: 0.25
+      bench: 0.25
+  unified_walksafe:
+    source_model: "YOLO26n COCO+WalkSafe tactile unified"
+    category: "unified"
+    classes:
+      - person
+      - bicycle
+      - car
+      - motorcycle
+      - bus
+      - truck
+      - traffic light
+      - normal_tactile_block
+      - damaged_tactile_block
+      - crosswalk
+      - curb_step
+      - uneven_sidewalk
+      - e_scooter_obstruction
+    class_categories:
+      person: vulnerable_road_user
+      bicycle: vulnerable_road_user
+      car: vehicle
+      motorcycle: vehicle
+      bus: vehicle
+      truck: vehicle
+      traffic light: traffic_signal
+      normal_tactile_block: tactile_normal
+      damaged_tactile_block: tactile_damage
+      crosswalk: path_guidance
+      curb_step: surface_hazard
+      uneven_sidewalk: surface_hazard
+      e_scooter_obstruction: obstruction
+    thresholds:
+      default: 0.25
+      person: 0.25
+      bicycle: 0.25
+      car: 0.25
+      motorcycle: 0.25
+      bus: 0.25
+      truck: 0.25
+      traffic light: 0.25
+      normal_tactile_block: 0.25
+      damaged_tactile_block: 0.25
+      crosswalk: 0.25
+      curb_step: 0.25
+      uneven_sidewalk: 0.25
+      e_scooter_obstruction: 0.25

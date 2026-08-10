@@ -1,0 +1,599 @@
+WALKSAFE_EXECUTION_EVENT_SEQUENCE=42
+WALKSAFE_EXECUTION_EVENT_ID=WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005
+WALKSAFE_EXECUTION_EVENT_SHA256=e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9
+WALKSAFE_IMPLEMENTATION_CONTENT_SET_SHA256=be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048
+WALKSAFE_VERIFICATION_INPUT_CONTENT_SET_SHA256=ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74
+WALKSAFE_RUN_ID=fp048-https-no-downgrade-2d3ca48809758d4b
+WALKSAFE_COMMAND_SHA256=32d311ae0f2fe03c2fd0e31f71852cdb79acdb3cd5aef6bb5cd21e050de08456
+WALKSAFE_COMMAND_STARTED_AT=2026-08-03T01:35:01.491462+09:00
+WALKSAFE_LANE_ID=HTTPS_NO_DOWNGRADE
+WALKSAFE_LANE_STATUS=PASS
+WALKSAFE_RAW_COMMAND_OUTPUT_BEGIN
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:javaPreCompileDebug
+> Task :app:mapDebugSourceSetPaths
+> Task :app:checkDebugAarMetadata
+> Task :app:parseDebugLocalResources
+> Task :app:compileDebugNavigationResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:generateDebugRFile
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugResources
+
+> Task :app:compileDebugKotlin
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:13178:24 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt:13366:59 'fun announceForAccessibility(p0: CharSequence!): Unit' is deprecated. Deprecated in Java.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt:25:29 Non-public primary constructor is exposed via the generated 'copy()' method of the 'data' class.
+
+The generated 'copy()' will change its visibility in future releases.
+
+To suppress the warning do one of the following:
+- Annotate the data class with the '@ConsistentCopyVisibility' annotation.
+- Use the '-Xconsistent-data-class-copy-visibility' compiler flag.
+- Annotate the data class with the '@ExposedCopyVisibility' annotation 
+  (Discouraged, but can be used to keep binary compatibility).
+
+To learn more, see the documentation of the '@ConsistentCopyVisibility' and '@ExposedCopyVisibility' annotations.
+
+This will become an error in language version 2.3.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt:46:32 Non-public primary constructor is exposed via the generated 'copy()' method of the 'data' class.
+
+The generated 'copy()' will change its visibility in future releases.
+
+To suppress the warning do one of the following:
+- Annotate the data class with the '@ConsistentCopyVisibility' annotation.
+- Use the '-Xconsistent-data-class-copy-visibility' compiler flag.
+- Annotate the data class with the '@ExposedCopyVisibility' annotation 
+  (Discouraged, but can be used to keep binary compatibility).
+
+To learn more, see the documentation of the '@ConsistentCopyVisibility' and '@ExposedCopyVisibility' annotations.
+
+This will become an error in language version 2.3.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt:62:29 Non-public primary constructor is exposed via the generated 'copy()' method of the 'data' class.
+
+The generated 'copy()' will change its visibility in future releases.
+
+To suppress the warning do one of the following:
+- Annotate the data class with the '@ConsistentCopyVisibility' annotation.
+- Use the '-Xconsistent-data-class-copy-visibility' compiler flag.
+- Annotate the data class with the '@ExposedCopyVisibility' annotation 
+  (Discouraged, but can be used to keep binary compatibility).
+
+To learn more, see the documentation of the '@ConsistentCopyVisibility' and '@ExposedCopyVisibility' annotations.
+
+This will become an error in language version 2.3.
+w: file:///home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt:473:42 Non-public primary constructor is exposed via the generated 'copy()' method of the 'data' class.
+
+The generated 'copy()' will change its visibility in future releases.
+
+To suppress the warning do one of the following:
+- Annotate the data class with the '@ConsistentCopyVisibility' annotation.
+- Use the '-Xconsistent-data-class-copy-visibility' compiler flag.
+- Annotate the data class with the '@ExposedCopyVisibility' annotation 
+  (Discouraged, but can be used to keep binary compatibility).
+
+To learn more, see the documentation of the '@ConsistentCopyVisibility' and '@ExposedCopyVisibility' annotations.
+
+This will become an error in language version 2.3.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+
+BUILD SUCCESSFUL in 21s
+26 actionable tasks: 26 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+
+> walksafe-android-gateway@0.1.0 typecheck
+> tsc --noEmit
+
+
+> walksafe-android-gateway@0.1.0 test
+> npm run build && node --test dist/test/*.test.js
+
+
+> walksafe-android-gateway@0.1.0 build
+> npm run clean && tsc
+
+
+> walksafe-android-gateway@0.1.0 clean
+> node --input-type=module --eval "import { rmSync } from 'node:fs'; rmSync('dist', { recursive: true, force: true })"
+
+TAP version 13
+# Subtest: AES-256-GCM envelope has an exact schema and hides plaintext
+ok 1 - AES-256-GCM envelope has an exact schema and hides plaintext
+  ---
+  duration_ms: 9.534462
+  type: 'test'
+  ...
+# Subtest: ciphertext tampering and wrong AAD fail authentication
+ok 2 - ciphertext tampering and wrong AAD fail authentication
+  ---
+  duration_ms: 2.588421
+  type: 'test'
+  ...
+# Subtest: duplicate JSON members are rejected in keyrings, envelopes and migration input
+ok 3 - duplicate JSON members are rejected in keyrings, envelopes and migration input
+  ---
+  duration_ms: 2.232457
+  type: 'test'
+  ...
+# Subtest: envelope rejects noncanonical encodings and invalid IV or tag lengths
+ok 4 - envelope rejects noncanonical encodings and invalid IV or tag lengths
+  ---
+  duration_ms: 1.201615
+  type: 'test'
+  ...
+# Subtest: keyring rejects multiple active keys, reused material and compromised material
+ok 5 - keyring rejects multiple active keys, reused material and compromised material
+  ---
+  duration_ms: 3.474028
+  type: 'test'
+  ...
+# Subtest: keyring rejects symlinks, hard links and broad permissions
+ok 6 - keyring rejects symlinks, hard links and broad permissions
+  ---
+  duration_ms: 1.892784
+  type: 'test'
+  ...
+# Subtest: single-byte JSON values round-trip through the public helper
+ok 7 - single-byte JSON values round-trip through the public helper
+  ---
+  duration_ms: 1.682436
+  type: 'test'
+  ...
+# Subtest: runtime rejects plaintext and startup rejects a missing keyring
+ok 8 - runtime rejects plaintext and startup rejects a missing keyring
+  ---
+  duration_ms: 1.250077
+  type: 'test'
+  ...
+# Subtest: decrypt-only rotation works while compromised and unknown keys never decrypt
+ok 9 - decrypt-only rotation works while compromised and unknown keys never decrypt
+  ---
+  duration_ms: 2.687408
+  type: 'test'
+  ...
+# Subtest: production startup requires explicit keyring and field-walk ledger paths
+ok 10 - production startup requires explicit keyring and field-walk ledger paths
+  ---
+  duration_ms: 0.648198
+  type: 'test'
+  ...
+# Subtest: an exact live owner makes nested sync and async acquisitions busy
+ok 11 - an exact live owner makes nested sync and async acquisitions busy
+  ---
+  duration_ms: 10.431311
+  type: 'test'
+  ...
+# Subtest: sync API rejects thenables without releasing their critical section early
+ok 12 - sync API rejects thenables without releasing their critical section early
+  ---
+  duration_ms: 8.050784
+  type: 'test'
+  ...
+# Subtest: release preserves one stable owned 0600 lock inode
+ok 13 - release preserves one stable owned 0600 lock inode
+  ---
+  duration_ms: 4.626039
+  type: 'test'
+  ...
+# Subtest: three child processes cannot overlap one held critical section
+ok 14 - three child processes cannot overlap one held critical section
+  ---
+  duration_ms: 152.326936
+  type: 'test'
+  ...
+# Subtest: a process crash automatically releases the kernel lock
+ok 15 - a process crash automatically releases the kernel lock
+  ---
+  duration_ms: 61.223391
+  type: 'test'
+  ...
+# Subtest: release detects and never deletes a swapped replacement path
+ok 16 - release detects and never deletes a swapped replacement path
+  ---
+  duration_ms: 4.429086
+  type: 'test'
+  ...
+# Subtest: long-lived mode requires explicit enablement and all bounded TTL values
+ok 17 - long-lived mode requires explicit enablement and all bounded TTL values
+  ---
+  duration_ms: 63.385724
+  type: 'test'
+  ...
+# Subtest: device login returns split credentials while persisted state contains only digests
+ok 18 - device login returns split credentials while persisted state contains only digests
+  ---
+  duration_ms: 11.578093
+  type: 'test'
+  ...
+# Subtest: rotation is one-time and consumed-token reuse revokes only that device family
+ok 19 - rotation is one-time and consumed-token reuse revokes only that device family
+  ---
+  duration_ms: 34.046423
+  type: 'test'
+  ...
+# Subtest: concurrent use of one refresh token permits one rotation then fails closed
+ok 20 - concurrent use of one refresh token permits one rotation then fails closed
+  ---
+  duration_ms: 15.281735
+  type: 'test'
+  ...
+# Subtest: an external actor lock blocks every mutation without changing persisted state
+ok 21 - an external actor lock blocks every mutation without changing persisted state
+  ---
+  duration_ms: 22.758772
+  type: 'test'
+  ...
+# Subtest: independent processes serialize one refresh proof across an actor-lock barrier
+ok 22 - independent processes serialize one refresh proof across an actor-lock barrier
+  ---
+  duration_ms: 216.687196
+  type: 'test'
+  ...
+# Subtest: login reclaims 32 idle-expired device families before capacity enforcement
+ok 23 - login reclaims 32 idle-expired device families before capacity enforcement
+  ---
+  duration_ms: 69.960604
+  type: 'test'
+  ...
+# Subtest: a random refresh mismatch does not revoke the valid family
+ok 24 - a random refresh mismatch does not revoke the valid family
+  ---
+  duration_ms: 16.503328
+  type: 'test'
+  ...
+# Subtest: access, refresh idle, and refresh absolute boundaries expire at the exact timestamp
+ok 25 - access, refresh idle, and refresh absolute boundaries expire at the exact timestamp
+  ---
+  duration_ms: 8.854084
+  type: 'test'
+  ...
+# Subtest: device listing and selective revoke remain bound to the authenticated actor
+ok 26 - device listing and selective revoke remain bound to the authenticated actor
+  ---
+  duration_ms: 32.395598
+  type: 'test'
+  ...
+# Subtest: removing an actor account immediately closes status and device-management access
+ok 27 - removing an actor account immediately closes status and device-management access
+  ---
+  duration_ms: 9.088137
+  type: 'test'
+  ...
+# Subtest: refresh-proof logout works without an access cookie and is idempotent
+ok 28 - refresh-proof logout works without an access cookie and is idempotent
+  ---
+  duration_ms: 18.417452
+  type: 'test'
+  ...
+# Subtest: account lock and security incident revoke every actor session but no other actor
+ok 29 - account lock and security incident revoke every actor session but no other actor
+  ---
+  duration_ms: 49.041595
+  type: 'test'
+  ...
+# Subtest: pre-commit storage failures preserve the old refresh proof for one retry
+ok 30 - pre-commit storage failures preserve the old refresh proof for one retry
+  ---
+  duration_ms: 25.150089
+  type: 'test'
+  ...
+# Subtest: post-rename durability failure is outcome-unknown and old proof fails closed
+ok 31 - post-rename durability failure is outcome-unknown and old proof fails closed
+  ---
+  duration_ms: 11.859024
+  type: 'test'
+  ...
+# Subtest: field-session query and refresh shapes reject ambiguous input
+ok 32 - field-session query and refresh shapes reject ambiguous input
+  ---
+  duration_ms: 8.905622
+  type: 'test'
+  ...
+# Subtest: field walk lease is idempotent and takeover uses the current walk and fence
+ok 33 - field walk lease is idempotent and takeover uses the current walk and fence
+  ---
+  duration_ms: 22.299332
+  type: 'test'
+  ...
+# Subtest: expired lease is audited before a new acquisition
+ok 34 - expired lease is audited before a new acquisition
+  ---
+  duration_ms: 7.255417
+  type: 'test'
+  ...
+# Subtest: renew and end reject stale lease CAS values
+ok 35 - renew and end reject stale lease CAS values
+  ---
+  duration_ms: 10.245379
+  type: 'test'
+  ...
+# Subtest: an external ledger lock blocks expiry and commands without changing bytes
+ok 36 - an external ledger lock blocks expiry and commands without changing bytes
+  ---
+  duration_ms: 6.000662
+  type: 'test'
+  ...
+# Subtest: child processes cannot overlap the ledger critical section
+ok 37 - child processes cannot overlap the ledger critical section
+  ---
+  duration_ms: 167.903038
+  type: 'test'
+  ...
+# Subtest: request retention is bounded and evicts the deterministic oldest response
+ok 38 - request retention is bounded and evicts the deterministic oldest response
+  ---
+  duration_ms: 9.241858
+  type: 'test'
+  ...
+# Subtest: audit and serialized-size ceilings fail closed
+ok 39 - audit and serialized-size ceilings fail closed
+  ---
+  duration_ms: 8.792047
+  type: 'test'
+  ...
+# Subtest: pre-rename failures are retryable and directory fsync is outcome unknown
+ok 40 - pre-rename failures are retryable and directory fsync is outcome unknown
+  ---
+  duration_ms: 11.079768
+  type: 'test'
+  ...
+# Subtest: malformed nested ledger state fails closed
+ok 41 - malformed nested ledger state fails closed
+  ---
+  duration_ms: 2.565437
+  type: 'test'
+  ...
+# Subtest: POST revalidates the exact long-session binding after body read
+ok 42 - POST revalidates the exact long-session binding after body read
+  ---
+  duration_ms: 24.91273
+  type: 'test'
+  ...
+# Subtest: prototype-named account and request ids remain isolated
+ok 43 - prototype-named account and request ids remain isolated
+  ---
+  duration_ms: 9.327311
+  type: 'test'
+  ...
+# Subtest: OpenAPI and router expose exactly five public paths and approved methods
+ok 44 - OpenAPI and router expose exactly five public paths and approved methods
+  ---
+  duration_ms: 28.796744
+  type: 'test'
+  ...
+# Subtest: privacy rights page is public, separate from the five APIs, and links only to approved HTTPS intake
+ok 45 - privacy rights page is public, separate from the five APIs, and links only to approved HTTPS intake
+  ---
+  duration_ms: 1.630587
+  type: 'test'
+  ...
+# Subtest: configuration accepts only the fixed loopback backend and bind host
+ok 46 - configuration accepts only the fixed loopback backend and bind host
+  ---
+  duration_ms: 0.418061
+  type: 'test'
+  ...
+# Subtest: privacy rights intake configuration accepts only one exact HTTPS URL
+ok 47 - privacy rights intake configuration accepts only one exact HTTPS URL
+  ---
+  duration_ms: 0.180391
+  type: 'test'
+  ...
+# Subtest: admin environment cannot affect field authority or expose a gateway route
+ok 48 - admin environment cannot affect field authority or expose a gateway route
+  ---
+  duration_ms: 1.718364
+  type: 'test'
+  ...
+# Subtest: field login fails busy while the global or actor state lock is held
+ok 49 - field login fails busy while the global or actor state lock is held
+  ---
+  duration_ms: 21.915305
+  type: 'test'
+  ...
+# Subtest: field session is actor-bound, revocable, secure on HTTPS, and never cached
+ok 50 - field session is actor-bound, revocable, secure on HTTPS, and never cached
+  ---
+  duration_ms: 28.918795
+  type: 'test'
+  ...
+# Subtest: field login limiter blocks the sixth attempt from one trusted client
+ok 51 - field login limiter blocks the sixth attempt from one trusted client
+  ---
+  duration_ms: 21.215008
+  type: 'test'
+  ...
+# Subtest: walking and search proxy only approved data and internal actor credentials
+ok 52 - walking and search proxy only approved data and internal actor credentials
+  ---
+  duration_ms: 11.559637
+  type: 'test'
+  ...
+# Subtest: upstream 401 and 403 never invalidate the Android field session
+ok 53 - upstream 401 and 403 never invalidate the Android field session
+  ---
+  duration_ms: 10.409099
+  type: 'test'
+  ...
+# Subtest: report multipart is bounded and proxied only after field authentication
+ok 54 - report multipart is bounded and proxied only after field authentication
+  ---
+  duration_ms: 47.992579
+  type: 'test'
+  ...
+# Subtest: multipart part counting ignores boundary text inside a payload
+ok 55 - multipart part counting ignores boundary text inside a payload
+  ---
+  duration_ms: 0.340985
+  type: 'test'
+  ...
+# Subtest: report authentication and busy admission reject before opening the body
+ok 56 - report authentication and busy admission reject before opening the body
+  ---
+  duration_ms: 14.166893
+  type: 'test'
+  ...
+# Subtest: report admission enforces one in-flight upload and twelve actor events per minute
+ok 57 - report admission enforces one in-flight upload and twelve actor events per minute
+  ---
+  duration_ms: 0.331598
+  type: 'test'
+  ...
+# Subtest: bounded navigation body and upstream deadline fail closed
+ok 58 - bounded navigation body and upstream deadline fail closed
+  ---
+  duration_ms: 12.877111
+  type: 'test'
+  ...
+# Subtest: four selections are independent, versioned, idempotent, and current
+ok 59 - four selections are independent, versioned, idempotent, and current
+  ---
+  duration_ms: 35.696458
+  type: 'test'
+  ...
+# Subtest: withdrawal advances revision and makes the prior receipt stale
+ok 60 - withdrawal advances revision and makes the prior receipt stale
+  ---
+  duration_ms: 6.272997
+  type: 'test'
+  ...
+# Subtest: all-denied selection is valid and wrong policy requires reconsent
+ok 61 - all-denied selection is valid and wrong policy requires reconsent
+  ---
+  duration_ms: 2.106308
+  type: 'test'
+  ...
+# Subtest: control secret protects read and write access
+ok 62 - control secret protects read and write access
+  ---
+  duration_ms: 1.741798
+  type: 'test'
+  ...
+# Subtest: older client revision cannot reverse a newer withdrawal
+ok 63 - older client revision cannot reverse a newer withdrawal
+  ---
+  duration_ms: 1.591303
+  type: 'test'
+  ...
+# Subtest: cellular authorization requires the independent mobile selection
+ok 64 - cellular authorization requires the independent mobile selection
+  ---
+  duration_ms: 1.887344
+  type: 'test'
+  ...
+# Subtest: receipt binds to the first field actor until explicit reconsent
+ok 65 - receipt binds to the first field actor until explicit reconsent
+  ---
+  duration_ms: 2.745969
+  type: 'test'
+  ...
+# Subtest: real loopback HTTP adapter supplies peer IP for direct Android login
+ok 66 - real loopback HTTP adapter supplies peer IP for direct Android login
+  ---
+  duration_ms: 64.978902
+  type: 'test'
+  ...
+# Subtest: response backpressure settles and cancels the body when the client closes
+ok 67 - response backpressure settles and cancels the body when the client closes
+  ---
+  duration_ms: 1.342391
+  type: 'test'
+  ...
+# Subtest: deletion tombstones the generation and exposes nine external-pending SLA items
+ok 68 - deletion tombstones the generation and exposes nine external-pending SLA items
+  ---
+  duration_ms: 78.421163
+  type: 'test'
+  ...
+# Subtest: item transitions use secret authorization, operation idempotency, and revision CAS
+ok 69 - item transitions use secret authorization, operation idempotency, and revision CAS
+  ---
+  duration_ms: 424.040389
+  type: 'test'
+  ...
+# Subtest: tombstone rejects old access and refresh before replay retries revocation
+ok 70 - tombstone rejects old access and refresh before replay retries revocation
+  ---
+  duration_ms: 42.915847
+  type: 'test'
+  ...
+# Subtest: maintenance inspects then explicitly migrates all five plaintext stores
+ok 71 - maintenance inspects then explicitly migrates all five plaintext stores
+  ---
+  duration_ms: 42.657367
+  type: 'test'
+  ...
+# Subtest: startup preflight rejects plaintext and accepts every migrated managed store
+ok 72 - startup preflight rejects plaintext and accepts every migrated managed store
+  ---
+  duration_ms: 12.798503
+  type: 'test'
+  ...
+# Subtest: rotation rewrites decrypt-only envelopes with the active key
+ok 73 - rotation rewrites decrypt-only envelopes with the active key
+  ---
+  duration_ms: 7.275675
+  type: 'test'
+  ...
+# Subtest: compromised-key state is inspectable but cannot be decrypted or rotated
+ok 74 - compromised-key state is inspectable but cannot be decrypted or rotated
+  ---
+  duration_ms: 6.775458
+  type: 'test'
+  ...
+# Subtest: maintenance requires service stop acknowledgement and honors existing locks
+ok 75 - maintenance requires service stop acknowledgement and honors existing locks
+  ---
+  duration_ms: 10.325751
+  type: 'test'
+  ...
+# Subtest: proxy and privacy failures emit only versioned allowlisted telemetry fields
+ok 76 - proxy and privacy failures emit only versioned allowlisted telemetry fields
+  ---
+  duration_ms: 27.417783
+  type: 'test'
+  ...
+# Subtest: telemetry sink failure does not change the gateway response contract
+ok 77 - telemetry sink failure does not change the gateway response contract
+  ---
+  duration_ms: 1.038416
+  type: 'test'
+  ...
+1..77
+# tests 77
+# suites 0
+# pass 77
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 714.619472
+WALKSAFE_RAW_COMMAND_OUTPUT_END
+WALKSAFE_ANDROID_HTTPS_STATIC_STATUS=PASS
+WALKSAFE_GATEWAY_TESTS=77
+WALKSAFE_GATEWAY_PASS=77
+WALKSAFE_GATEWAY_FAIL=0
+WALKSAFE_GATEWAY_TYPECHECK_STATUS=PASS
+WALKSAFE_COMMAND_ENDED_AT=2026-08-03T01:35:27.383808+09:00
+WALKSAFE_COMMAND_EXIT_CODE=0

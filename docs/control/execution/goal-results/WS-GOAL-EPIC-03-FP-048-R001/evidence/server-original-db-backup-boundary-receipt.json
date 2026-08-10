@@ -1,0 +1,81 @@
+{
+  "schema_version": "walksafe.fp048-internal-lane-receipt.v1",
+  "document_id": "WS-FP048-SERVER_ORIGINAL_DB_BACKUP_BOUNDARY-RECEIPT-20260802-001",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+  "lane_id": "SERVER_ORIGINAL_DB_BACKUP_BOUNDARY",
+  "status": "PASS",
+  "command_execution": {
+    "lane_id": "SERVER_ORIGINAL_DB_BACKUP_BOUNDARY",
+    "name": "Server original, database and backup encryption boundary",
+    "status": "PASS",
+    "command": "PYTHONPATH=backend /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q backend/tests --ignore=backend/tests/test_reports.py --ignore=backend/tests/test_reports_v2.py --ignore=backend/tests/test_actor_rate_limit_store.py --ignore=backend/tests/test_test_storage_isolation.py && PYTHONPATH=backend /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -m pytest -q tests/test_report_retention_operational_safety.py tests/test_report_retention_encrypted_objects.py && PYTHONPATH=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/lib/python3.12/site-packages /home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14 -B -m pytest -p no:cacheprovider -q tests/test_walksafe_backup_integrity.py tests/test_walksafe_backup_prune.py",
+    "command_sha256": "2934073d1663bda5f67a815a1ba85d4b8e5ac2e5e1cbade40ead9c6b66fbe926",
+    "run_id": "fp048-server-original-db-backup-boundary-c90c7033f52467ae",
+    "exit_code": 0,
+    "output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/logs/server-original-db-backup-boundary.log",
+    "output_sha256": "a708576421c7d1faa2418bac4eaf90be9cab9eb022bafe4d648dbbcfdbe042f3",
+    "started_at": "2026-08-03T01:35:33.526529+09:00",
+    "executed_at": "2026-08-03T01:35:41.472636+09:00",
+    "execution_event_sequence": 42,
+    "execution_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005",
+    "execution_event_sha256": "e8b4f8c91082e856934b93ea633047ddc32f8b1c7549c590b455483145fef1c9",
+    "implementation_content_set_sha256": "be4445d2a4e34f1fdc9e7aafd468fd91f296bdfcbd9e51017251923fbebc0048",
+    "binding_markers_exact_once": true,
+    "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+    "observed_assertions": {
+      "WALKSAFE_BACKEND_INTERNAL_PASSED": "441",
+      "WALKSAFE_BACKEND_INTERNAL_SKIPPED": "11",
+      "WALKSAFE_RETENTION_INTERNAL_PASSED": "38",
+      "WALKSAFE_BACKUP_INTERNAL_PASSED": "64",
+      "WALKSAFE_DATABASE_INTEGRATION_STATUS": "NOT_RUN",
+      "WALKSAFE_BACKUP_RESTORE_STATUS": "NOT_RUN"
+    }
+  },
+  "start_gate_binding": {
+    "document_id": "WS-GOAL-GRAPH-V2-4-IMPLEMENTATION-START-GATE-FP048-20260802-005",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/implementation-start-gate-receipt.json",
+    "sha256": "faba570d1e8d24651272b52e6ca0190ac43ff97c57bead00bcd5fd60e06951fd"
+  },
+  "repository_state_binding": {
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP048-20260802-005/19-REPOSITORY_STATE.log",
+    "sha256": "6516933756c6cca92aa34ad05c63fc1ae912151453304dfaa49007beec3e6f5d",
+    "pinned_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d"
+  },
+  "verification_input_manifest": [
+    {
+      "path": "tests/test_report_retention_operational_safety.py",
+      "byte_count": 18873,
+      "sha256": "83def3826dbf3701029f2c1c66f9c4292aee50a809220b71556d6309cd8a7369"
+    }
+  ],
+  "verification_input_content_set_sha256": "ece5d10dea5df067876d9ad344496e1096171a17194149be83626af827783c74",
+  "evidence_boundary": {
+    "formal_test_ids": [
+      "TC-FP-048-01",
+      "TC-FP-048-02",
+      "TC-FP-048-03",
+      "TC-FP-048-04",
+      "TC-FP-048-05",
+      "TC-FP-048-06",
+      "TC-FP-048-07"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "formal_279_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "external_tls_status": "NOT_RUN",
+    "external_kms_status": "NOT_RUN",
+    "external_cloud_status": "NOT_RUN",
+    "external_backup_restore_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_privacy_review_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 2,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "external_independence_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "receipt_content_sha256": "bf83df250d6d19f937620455b49eed2e52324491716b5a59297277b078404a37"
+}

@@ -1,0 +1,2821 @@
+{
+  "schema_version": "walksafe.design-trace-current-state.v1",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W2-DESIGN-TRACE-20260726-001",
+  "prepared_on": "2026-07-26",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "status": "CURRENT_INTERNAL_TRACE_COMPLETE_DOWNSTREAM_GAPS_OPEN",
+  "document_family": {
+    "paths": {
+      "design_trace_json": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.json",
+      "design_trace_markdown": "docs/control/execution/artifact-remediation/20260726/w2/design-trace-current-state.md",
+      "artifact_status_delta": "docs/control/execution/artifact-remediation/20260726/w2/artifact-status-delta.json",
+      "validation_summary": "docs/control/execution/artifact-remediation/20260726/w2/validation-summary.json",
+      "implementation_receipt": "docs/control/execution/artifact-remediation/20260726/w2/implementation-receipt.json"
+    },
+    "binding_dag": {
+      "order": [
+        "design_trace_json",
+        "design_trace_markdown",
+        "artifact_status_delta",
+        "validation_summary",
+        "implementation_receipt"
+      ],
+      "hash_edges": [
+        "artifact_status_delta -> design_trace_json",
+        "artifact_status_delta -> design_trace_markdown",
+        "validation_summary -> artifact_status_delta",
+        "implementation_receipt -> validation_summary"
+      ],
+      "forward_references": "PATH_ONLY",
+      "cycle_status": "ACYCLIC"
+    },
+    "role": "FOUNDATION_TRACE_NO_FORWARD_HASH"
+  },
+  "scope": {
+    "wave_id": "W2",
+    "artifact_count": 23,
+    "exact_artifact_ids": [
+      "DLV-DES-01",
+      "DLV-DES-02",
+      "DLV-DES-03",
+      "DLV-DES-04",
+      "DLV-DES-05",
+      "DLV-DES-06",
+      "DLV-DES-07",
+      "DLV-DES-08",
+      "DLV-DES-09",
+      "DLV-DES-10",
+      "DLV-DES-11",
+      "DLV-DES-12",
+      "DLV-DES-13",
+      "DLV-DES-14",
+      "DLV-DES-16",
+      "DLV-DES-17",
+      "DLV-DES-18",
+      "DLV-DES-22",
+      "DLV-DES-23",
+      "DLV-DES-24",
+      "DLV-DES-25",
+      "DLV-DES-26",
+      "DLV-DES-27"
+    ],
+    "predecessor_classification": "INTERNAL_GAP",
+    "current_artifact_disposition": "OK"
+  },
+  "authority_boundary": {
+    "approval_and_baseline": "UNCHANGED",
+    "artifact_register_mutated": false,
+    "audit_baseline_mutated": false,
+    "formal_product_release_completion_claimed": false,
+    "statement": "OK is limited to current design artifact required_action and bidirectional gap trace conformance."
+  },
+  "source_bindings": [
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/routes.ts",
+      "sha256": "fbedccde4dd1efafefe8fbc3926b3603bbb95147e8a4a616d7ff7bc2e496c5c8",
+      "byte_count": 30206,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android-gateway/src/telemetry.ts",
+      "sha256": "32d87523359a14efb13d6c082e8b51a1f55585fcaef7a8462088eb6810346a96",
+      "byte_count": 2345,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "apps/android-gateway/test/telemetry.test.ts",
+      "sha256": "13f62070ed2f405df8b249d117f61fd43421cb3c1b48ace3e6f2f544b6750e4b",
+      "byte_count": 4066,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    },
+    {
+      "role": "ADMIN_TELEMETRY_JUNIT_XML",
+      "path": "apps/android/adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml",
+      "sha256": "da40358253c6b0471e8432928d4224f0f0772abef083a4dd26854b37a1cde749",
+      "byte_count": 2349,
+      "allowed_claim": "Executed admin telemetry unit result 11/11 PASS.",
+      "prohibited_claim": "Formal, device, deployed collector or release PASS."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+      "sha256": "7bcb3b9065f780fbdbc73f5ab5eac0cc0cd8e4d955671f761a6578dfd7567c40",
+      "byte_count": 18158,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_IMPLEMENTATION_SOURCE",
+      "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+      "sha256": "942f6b97a5fc5cd8500462965f579bb434061b94d9506667b182a892b3999af0",
+      "byte_count": 3229,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+      "sha256": "05031bec9bb2c048cc18bdd0d9986f6fe48d3b433ff78bf34fe342b0eb94b50f",
+      "byte_count": 19897,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    },
+    {
+      "role": "CANONICAL_OPENAPI",
+      "path": "contracts/walksafe.openapi.json",
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "byte_count": 128867,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "AUDIT_BASELINE",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+      "sha256": "713835e71b9fd8a64c9f3744e00f2b52e06273705c725451de795ba4b1cb55dc",
+      "byte_count": 229471,
+      "allowed_claim": "Original factual required_action and INTERNAL_GAP classification for W2 exact 23.",
+      "prohibited_claim": "Retroactive mutation, approval or execution completion."
+    },
+    {
+      "role": "WAVE_PLAN",
+      "path": "docs/control/execution/artifact-audits/20260726/artifact-remediation-wave-plan.json",
+      "sha256": "873fb4f829e4da846e0f0947acdfb0774b983909eb099c639cce79fc1f4a2258",
+      "byte_count": 56499,
+      "allowed_claim": "W2 exact 23 scope and ordered downstream W3-W9 waves.",
+      "prohibited_claim": "That any wave is completed."
+    },
+    {
+      "role": "W1_FINAL_DELTA",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/artifact-status-delta.json",
+      "sha256": "c5b5291a2640c982f790b24821b9b1e4b524a4f1914d2c979b3a506a98eb68a9",
+      "byte_count": 53979,
+      "allowed_claim": "Post-W1 projection 75/105/41/36 and unchanged approval/release boundaries.",
+      "prohibited_claim": "Retroactive W1 mutation or W2 completion by itself."
+    },
+    {
+      "role": "W1_FINAL_RECEIPT",
+      "path": "docs/control/execution/artifact-remediation/20260726/w1/implementation-receipt.json",
+      "sha256": "895ff118ab2d41c67d4dfa767260bc7c4959a444aecfce5073cb3bea3fa2c641",
+      "byte_count": 16850,
+      "allowed_claim": "Post-W1 projection 75/105/41/36 and unchanged approval/release boundaries.",
+      "prohibited_claim": "Retroactive W1 mutation or W2 completion by itself."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+      "sha256": "470b4566a0272d5fc5fc028e53a3ee8a8bde19b06b889570ad60adcce53b62ea",
+      "byte_count": 86842,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+      "sha256": "3899ad0b8ac57a8835b32d50a2798696bd16ab54b26fa5a870e9e6378cb80d21",
+      "byte_count": 12586,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_UX_DESIGN_TOKEN_EVIDENCE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+      "sha256": "039afefa3809239e1140fd99882a7e8355664dfea532a1cefdd9cbf932939d0a",
+      "byte_count": 19389,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_INDEPENDENT_REVIEW",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+      "sha256": "a7d0da87529c60be3c416ade6fefc63e55578627f8c411ff63df0ceed4fba888",
+      "byte_count": 9303,
+      "allowed_claim": "W2 review APPROVED, 23 OK recommendations and findings 0/0/0.",
+      "prohibited_claim": "Formal artifact approval, product verification, deployment or release completion."
+    },
+    {
+      "role": "W2_INTERFACE_EVIDENCE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+      "sha256": "71103726662e25cf30fe38ab521e8151c46b8f66af70f6431d7af0aa4cb55a48",
+      "byte_count": 65576,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_INTERFACE_EVIDENCE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+      "sha256": "e9ddc685344bb12a89be236c42db11e8db019faf10c2ebe1cbc9c8fdc21bd949",
+      "byte_count": 16752,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+      "sha256": "e6eabf259f9eb223976c68b8d9315f5f7caf2abe757c4e4511cf4bcf53fee89d",
+      "byte_count": 59173,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+      "sha256": "21f7cdb3eb1f5ff43a68b28301b4d6d78fad168fb7629b6b9c1b6320b5b044fe",
+      "byte_count": 11048,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_OPERATIONS_EVIDENCE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+      "sha256": "ea5fd68ea2f37149b6864b37dde7a8cf1414aac447f53fc8485719bc4926ae6c",
+      "byte_count": 51261,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_OPERATIONS_EVIDENCE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+      "sha256": "d819b5e2a0c8f0a1cee17ff38c8a572d9b70ff8e5d4e3b3877170554dcd5db73",
+      "byte_count": 5581,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+      "sha256": "113ca25f769ecf932955c76edd47a4d8d5d23ccb064825f72f84de2be26ccb27",
+      "byte_count": 81615,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md",
+      "sha256": "b35668a2489c2a4d0c9b631c6c17e1ae1461a12c2475bbc181baf47f44b22375",
+      "byte_count": 12119,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_UX_PROTOTYPE_RENDERING",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+      "sha256": "4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356",
+      "byte_count": 10834,
+      "allowed_claim": "Exact bound evidence bytes.",
+      "prohibited_claim": "Claims outside the bound evidence scope."
+    },
+    {
+      "role": "W2_UX_PROTOTYPE_TRACE",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+      "sha256": "6403e24e9f2480ffe2fbd5363e4138d6c372ebe99593406e8a6bdc51578773a1",
+      "byte_count": 9215,
+      "allowed_claim": "Exact bound evidence bytes.",
+      "prohibited_claim": "Claims outside the bound evidence scope."
+    },
+    {
+      "role": "RAW_RUNTIME_OPENAPI",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+      "sha256": "e66280b6cc4308c07c49ee183ce557613b531e2fc0554124c55bb472fe9b5d1b",
+      "byte_count": 128867,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_JSON",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+      "sha256": "0d60327172735809b97c5d4546a6120f265c6f50d1ac101fd4fa9a644b8b46c1",
+      "byte_count": 15871,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "W2_FINAL_CURRENT_STATE_MARKDOWN",
+      "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md",
+      "sha256": "b726c793c934305f5c6bb9a380014607598b39e5f5aeccf5ce6b17f35134d1fe",
+      "byte_count": 3722,
+      "allowed_claim": "W2 current-state content, disposition, test provenance and open-gap facts within the named scope.",
+      "prohibited_claim": "Approval/baseline mutation or closure of downstream implementation/verification gaps."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/backup_walksafe_data_20260711.sh",
+      "sha256": "f0b262f6e7d7c248905a127980202bd380937fa07db0a898a121a7ef94bca97c",
+      "byte_count": 22315,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "OPENAPI_GENERATOR",
+      "path": "scripts/generate_walksafe_openapi.py",
+      "sha256": "849f0bb411a834f4f2bd147825c49f40cadaa963df67acafedc5f80423c54b02",
+      "byte_count": 5479,
+      "allowed_claim": "Runtime OpenAPI generation identity, exact bytes and deterministic two-run evidence.",
+      "prohibited_claim": "Deployed API, external compatibility or release completion."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "sha256": "5803633fd909ed2c9b88939a976d168ef12480c47df45a46bf9e47abe5023cf4",
+      "byte_count": 5755,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "BACKUP_RESTORE_IMPLEMENTATION_SOURCE",
+      "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "sha256": "a6014ef922caed329370a16113c65713eb6756f3450de944e5d59f7860b4b89b",
+      "byte_count": 47092,
+      "allowed_claim": "Exact internal source bytes for the named telemetry or backup boundary.",
+      "prohibited_claim": "Production operation, restore, collector, monitoring or release completion."
+    },
+    {
+      "role": "TELEMETRY_OR_BACKUP_TEST_SOURCE",
+      "path": "tests/test_walksafe_backup_prune.py",
+      "sha256": "8176b919a00caaed8c84a836c80b10ee07bc03bd0d3a94b8dfe11234301ccc0b",
+      "byte_count": 5112,
+      "allowed_claim": "Exact test source bound to the recorded W2 execution result.",
+      "prohibited_claim": "PASS without the W2 execution provenance."
+    }
+  ],
+  "source_binding_summary": {
+    "count": 34,
+    "exact_path_sha256_set": "298e1fa7f0e7d92e979a17d0bd3e2b5e304e8a680a4dd494e5d2bf7c603dde6e"
+  },
+  "trace_rows": [
+    {
+      "artifact_type_code": "DLV-DES-01",
+      "required_action": "현행 제품·서비스 경계로 SDD와 trace를 갱신하고 상태·검토 기록을 정합화한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-01"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/0",
+        "section_ids_or_summary": [
+          "architecture_current_state",
+          "runtime_flows",
+          "data_security_error_references",
+          "requirements_and_decision_trace"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "현행 SDD, trace와 architecture gap 계약 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/15"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-004",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/16"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-007",
+          "target_wave": "W6",
+          "gap_registry_pointer": "/open_gap_registry/19"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-011",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/23"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-007",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-011"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
+        "W9"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-02",
+      "required_action": "현행 외부 행위자·프로토콜·신뢰 경계를 다시 그려 승인 상태와 맞춘다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-02"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/1",
+        "section_ids_or_summary": [
+          "system_context",
+          "actors_and_external_systems",
+          "protocol_and_trust_boundaries",
+          "environment_differences"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "actor·protocol·trust boundary 및 후속 topology 추적 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-005",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/17"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-009",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/21"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-005",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-009"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-03",
+      "required_action": "실제 모듈·배포 단위·의존성으로 구조 및 module register를 재작성한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-03"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/2",
+        "section_ids_or_summary": [
+          "component_inventory",
+          "dependency_directions",
+          "deployment_units",
+          "source_bindings"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "실제 adminapp·gateway 포함 module/deployment inventory 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/15"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-005",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/17"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-009",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/21"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-011",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/23"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-005",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-009",
+        "W2-ARCH-GAP-011"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W7",
+        "W8",
+        "W9"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-04",
+      "required_action": "유효 FP-035 분기와 현행 admin/gateway 흐름을 반영하고 구현·시험 trace를 재결속한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-04"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/3",
+        "section_ids_or_summary": [
+          "runtime_flows",
+          "fp035_current_flow",
+          "admin_and_gateway_flow",
+          "failure_and_cancellation"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "FP-035 policy 1.0.1과 admin/gateway 흐름·trace 정정",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/15"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-004",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/16"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-010",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/22"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-010"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5",
+        "W7",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-05",
+      "required_action": "환경별 목표 topology와 미확정 값을 명시하고 내부 승인 가능한 설계 기준선을 만든다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-05"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/4",
+        "section_ids_or_summary": [
+          "deployment_topology",
+          "environment_targets",
+          "unresolved_deployment_values",
+          "observability_and_failure_boundaries"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "환경별 target topology, 미확정 값과 W8 closure 분리",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-004",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/16"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-005",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/17"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-009",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/21"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-010",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/22"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-011",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/23"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-005",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-009",
+        "W2-ARCH-GAP-010",
+        "W2-ARCH-GAP-011"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5",
+        "W8",
+        "W9"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-06",
+      "required_action": "결정별 상태·대안·검증 항목을 확정하고 필수 독립 검토를 기록한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-06"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/5",
+        "section_ids_or_summary": [
+          "decision_authority",
+          "architecture_decision_observations",
+          "alternatives_and_open_decisions",
+          "verification_tracking"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "결정 상태·대안·검증·open decision 추적 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/15"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-007",
+          "target_wave": "W6",
+          "gap_registry_pointer": "/open_gap_registry/19"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-010",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/22"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-007",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-010"
+      ],
+      "target_waves": [
+        "W3",
+        "W5",
+        "W6",
+        "W7",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-07",
+      "required_action": "현행 기술·버전·지원주기·라이선스 위험과 철회 조건을 다시 결속한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-07"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/6",
+        "section_ids_or_summary": [
+          "technology_stack",
+          "version_pinning",
+          "support_and_license_risks",
+          "withdrawal_conditions"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "stack·version·support/license 위험과 closure 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-007",
+          "target_wave": "W6",
+          "gap_registry_pointer": "/open_gap_registry/19"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-009",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/21"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-007",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-009"
+      ],
+      "target_waves": [
+        "W6",
+        "W7",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-08",
+      "required_action": "전체 현행 구성요소의 통합 순서, 환경, 합격 기준과 rollback을 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-08"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "json_pointer": "/artifact_coverage/7",
+        "section_ids_or_summary": [
+          "integration_plan",
+          "mock_to_live_transitions",
+          "acceptance_criteria",
+          "failure_isolation_and_rollback"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md"
+      ],
+      "source_disposition": "CURRENT_STATE_CONTENT_READY_FOR_REVIEW",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "통합 순서·환경·acceptance·rollback 및 실행 Wave 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-ARCH-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/14"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/15"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-004",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/16"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-005",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/17"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-006",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/18"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-007",
+          "target_wave": "W6",
+          "gap_registry_pointer": "/open_gap_registry/19"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-008",
+          "target_wave": "W7",
+          "gap_registry_pointer": "/open_gap_registry/20"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-009",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/21"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-010",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/22"
+        },
+        {
+          "gap_id": "W2-ARCH-GAP-011",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/23"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-ARCH-GAP-002",
+        "W2-ARCH-GAP-003",
+        "W2-ARCH-GAP-004",
+        "W2-ARCH-GAP-005",
+        "W2-ARCH-GAP-006",
+        "W2-ARCH-GAP-007",
+        "W2-ARCH-GAP-008",
+        "W2-ARCH-GAP-009",
+        "W2-ARCH-GAP-010",
+        "W2-ARCH-GAP-011"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
+        "W8",
+        "W9"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-ARCH-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-09",
+      "required_action": "OpenAPI·backend·gateway·두 Android 앱의 실제 interface를 대조해 명세와 trace를 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-09"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/0",
+        "section_ids_or_summary": [
+          "endpoint/behavior",
+          "request/response/header",
+          "auth",
+          "timeout/retry/idempotency/version gaps"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_CURRENT_STATE_WITH_CLASSIFIED_W3_W4_W5_GAPS",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "normalized interface mapping, gap classification 및 W3/W4/W5 양방향 추적 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-003",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/25"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-009",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/31"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-010",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/32"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-003",
+        "W2-IFDATA-GAP-009",
+        "W2-IFDATA-GAP-010"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-IFDATA-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-10",
+      "required_action": "현행 schema를 생성·검증하고 호환성 판정과 변경 diff를 기록한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-10"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/1",
+        "section_ids_or_summary": [
+          "two schemas and hashes",
+          "path/operation/security",
+          "compatibility mapping"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_SCHEMA_EVIDENCE_WITH_W3_EVENT_AND_GATEWAY_DECLARATION_GAPS",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "runtime schema evidence, compatibility diff와 event/Gateway gap 분류 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-002",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/24"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-002"
+      ],
+      "target_waves": [
+        "W3"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "W2-IFDATA-GAP-001"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-11",
+      "required_action": "현행 ORM·migration과 ERD의 관계·삭제 규칙을 대조하고 승인 상태를 정합화한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-11"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/2",
+        "section_ids_or_summary": [
+          "entities/IDs",
+          "logical cardinality",
+          "delete rule",
+          "PostGIS",
+          "migration relation"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_CURRENT_ERD_FACTS_WITH_W3_W4_DATA_INTEGRITY_GAPS",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "ORM·migration 기반 ERD와 FK/cascade 0, 후속 무결성 gap 명시",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-004",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/26"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-008",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/30"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-004",
+        "W2-IFDATA-GAP-008"
+      ],
+      "target_waves": [
+        "W3",
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-12",
+      "required_action": "현행 DB schema와 column·index·보존·삭제 정의를 재대조한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-12"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/3",
+        "section_ids_or_summary": [
+          "12 tables",
+          "column/type/null",
+          "PK/check/index",
+          "sensitivity/retention"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_CURRENT_DICTIONARY_WITH_W3_W5_W4_CLOSURE_GAPS",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "column·index·민감도·보존/삭제 current dictionary 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-004",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/26"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-005",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/27"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-008",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/30"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-004",
+        "W2-IFDATA-GAP-005",
+        "W2-IFDATA-GAP-008"
+      ],
+      "target_waves": [
+        "W3",
+        "W4",
+        "W5"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-13",
+      "required_action": "유효 정책 1.0.1로 생명주기 설계와 현행 구현 trace를 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-13"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/4",
+        "section_ids_or_summary": [
+          "report/image lifecycle",
+          "audit/admin boundary",
+          "backup/log residual",
+          "FP035 transfer"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_CURRENT_LIFECYCLE_WITH_W3_W5_W8_GAPS",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "policy 1.0.1 lifecycle과 queue·retention·restore gap 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-005",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/27"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-006",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/28"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-007",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/29"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-005",
+        "W2-IFDATA-GAP-006",
+        "W2-IFDATA-GAP-007"
+      ],
+      "target_waves": [
+        "W3",
+        "W5",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-14",
+      "required_action": "사용자 앱과 관리자 앱의 실제 화면·역할·오류 상태를 inventory한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-14"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "json_pointer": "/artifacts/0",
+        "section_ids_or_summary": [
+          "두 별도 Android 앱의 exact launcher/controller, 역할 경계, 논리 구역과 상태 frame을 결속했다."
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md"
+      ],
+      "source_disposition": "INTERNAL_CONTENT_COMPLETE_RUNTIME_EVIDENCE_PENDING",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "두 앱 route·screen·role·error inventory와 W4 capture closure 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-UX-GAP-DES14-001",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/33"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-UX-GAP-DES14-001"
+      ],
+      "target_waves": [
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-16",
+      "required_action": "현행 핵심 화면과 모든 상태를 prototype 기준선에 추가한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-16"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "json_pointer": "/artifacts/1",
+        "section_ids_or_summary": [
+          "source-linked deterministic HTML 10 frame과 trace matrix를 만들어 loading/empty/error/blocked/safety/recovery를 frame과 1:1 매핑했다."
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md"
+      ],
+      "source_disposition": "STATIC_PROTOTYPE_BASELINE_CREATED_RUNTIME_CAPTURE_PENDING",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "10-frame deterministic prototype과 source/state trace 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-UX-GAP-DES16-001",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/34"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-UX-GAP-DES16-001"
+      ],
+      "target_waves": [
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-17",
+      "required_action": "두 앱의 token·component·위험 상태 표현을 통합해 검토한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-17"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "json_pointer": "/artifacts/2",
+        "section_ids_or_summary": [
+          "공통 semantic color/typography/spacing/focus/announcement/risk/safe/admin-lock token과 8개 component contract를 정의하고 실제 literal/component를 TOKEN_MAPPED 또는 UNAPPROVED_DEVIATION으로 분류했다."
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md"
+      ],
+      "source_disposition": "DRAFT_SHARED_TOKEN_COMPONENT_CONTRACT_CREATED_RUNTIME_CONFORMANCE_PENDING",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "token/component/deviation contract와 non-color critical cue 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-UX-GAP-DES17-001",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/35"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-UX-GAP-DES17-001"
+      ],
+      "target_waves": [
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-18",
+      "required_action": "관리자 앱을 포함한 접근성 설계와 검증 포인트를 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-18"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "json_pointer": "/artifacts/3",
+        "section_ids_or_summary": [
+          "사용자 앱의 명시적 heading/live region/focus/TalkBack 정적 계약과 관리자 앱의 partial live-region 및 누락 focus 계약을 prototype·token에 연결했다."
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+        "docs/control/execution/artifact-remediation/20260726/w2/prototype-trace.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.md"
+      ],
+      "source_disposition": "STATIC_SEMANTIC_FOCUS_ANNOUNCEMENT_TRACE_COMPLETE_DEVICE_ACCESSIBILITY_PENDING",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "semantic/focus/TalkBack verification point와 W4 evidence closure 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-UX-GAP-DES18-001",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/36"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-UX-GAP-DES18-001"
+      ],
+      "target_waves": [
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-22",
+      "required_action": "현행 모듈별 오류 계약과 사용자 행동·관측 trace를 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-22"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "json_pointer": "/artifacts/0",
+        "section_ids_or_summary": [
+          "CURRENT_IMPLEMENTATION_CONTRACT_CAPTURED_INTERNAL_GAPS_REMAIN"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md"
+      ],
+      "source_disposition": "REMEDIATE_IMPLEMENTATION_CONTRACT_W3",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "현행 module error/retry/user-action contract와 W3 gap 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "DES22-GAP-01",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/0"
+        },
+        {
+          "gap_id": "DES22-GAP-02",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/1"
+        }
+      ],
+      "open_gap_ids": [
+        "DES22-GAP-01",
+        "DES22-GAP-02"
+      ],
+      "target_waves": [
+        "W3"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-23",
+      "required_action": "admin/gateway를 포함해 log·metric·redaction·retention 계약을 재결속한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-23"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "json_pointer": "/artifacts/1",
+        "section_ids_or_summary": [
+          "VERSIONED_PRODUCER_CONTRACT_IMPLEMENTED_MONITORING_W9_OPEN"
+        ]
+      },
+      "successor_evidence_paths": [
+        "apps/android-gateway/src/routes.ts",
+        "apps/android-gateway/src/telemetry.ts",
+        "apps/android-gateway/test/telemetry.test.ts",
+        "apps/android/adminapp/build/test-results/testDebugUnitTest/TEST-kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityControllerTest.xml",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+        "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityTelemetry.java",
+        "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md"
+      ],
+      "source_disposition": "PRODUCERS_IMPLEMENTED_MONITORING_DEFERRED_W9",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "producer telemetry 계약·unit evidence 완결, monitoring은 W9 경계",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "DES23-GAP-01",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/2"
+        },
+        {
+          "gap_id": "DES23-GAP-02",
+          "target_wave": "W9",
+          "gap_registry_pointer": "/open_gap_registry/3"
+        },
+        {
+          "gap_id": "DES23-GAP-03",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/4"
+        }
+      ],
+      "open_gap_ids": [
+        "DES23-GAP-01",
+        "DES23-GAP-02",
+        "DES23-GAP-03"
+      ],
+      "target_waves": [
+        "W5",
+        "W9"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-24",
+      "required_action": "지원 환경에서 측정 가능한 budget과 용량 임계값을 확정한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-24"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "json_pointer": "/artifacts/2",
+        "section_ids_or_summary": [
+          "APPROVED_POLICY_VALUES_SEPARATED_FROM_PROVISIONAL_W4_BUDGETS"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md"
+      ],
+      "source_disposition": "PROVISIONAL_BUDGETS_REQUIRE_MEASUREMENT_W4",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "승인값과 측정 가능한 provisional W4 budget을 분리·결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "DES24-GAP-01",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/5"
+        },
+        {
+          "gap_id": "DES24-GAP-02",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/6"
+        },
+        {
+          "gap_id": "DES24-GAP-03",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/7"
+        }
+      ],
+      "open_gap_ids": [
+        "DES24-GAP-01",
+        "DES24-GAP-02",
+        "DES24-GAP-03"
+      ],
+      "target_waves": [
+        "W4"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-25",
+      "required_action": "백업 대상·복원 절차·RTO/RPO를 현행 배포 형상에 맞춰 검토한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-25"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "json_pointer": "/artifacts/3",
+        "section_ids_or_summary": [
+          "RETENTION_FIX_VERIFIED_PROVISIONAL_RECOVERY_TIERS_W8_OPEN"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md",
+        "scripts/backup_walksafe_data_20260711.sh",
+        "scripts/prune_walksafe_backups_20260711.py",
+        "scripts/restore_walksafe_backup_drill_20260711.sh",
+        "tests/test_walksafe_backup_prune.py"
+      ],
+      "source_disposition": "PRUNE_FIXED_PROVISIONAL_RECOVERY_REQUIRES_DRILL_W8",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "prune 35일 구현·시험과 provisional recovery/W8 drill 경계 완결",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "DES25-GAP-01",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/8"
+        },
+        {
+          "gap_id": "DES25-GAP-02",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/9"
+        },
+        {
+          "gap_id": "DES25-GAP-03",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/10"
+        }
+      ],
+      "open_gap_ids": [
+        "DES25-GAP-01",
+        "DES25-GAP-02",
+        "DES25-GAP-03"
+      ],
+      "target_waves": [
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [
+        "DES25-GAP-04"
+      ],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-26",
+      "required_action": "현행 migration chain을 명세하고 검증·rollback 절차를 결속한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-26"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "json_pointer": "/artifact_assessments/5",
+        "section_ids_or_summary": [
+          "12-revision chain",
+          "effects/compatibility",
+          "rerun/lock",
+          "rollback/restore"
+        ]
+      },
+      "successor_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/runtime-openapi-current.json",
+        "scripts/generate_walksafe_openapi.py"
+      ],
+      "source_disposition": "ACCEPT_MIGRATION_CHAIN_FACTS_WITH_W8_EXECUTION_GAP",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "migration chain·risk·rollback/restore procedure와 W8 evidence 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "W2-IFDATA-GAP-007",
+          "target_wave": "W8",
+          "gap_registry_pointer": "/open_gap_registry/29"
+        },
+        {
+          "gap_id": "W2-IFDATA-GAP-008",
+          "target_wave": "W4",
+          "gap_registry_pointer": "/open_gap_registry/30"
+        }
+      ],
+      "open_gap_ids": [
+        "W2-IFDATA-GAP-007",
+        "W2-IFDATA-GAP-008"
+      ],
+      "target_waves": [
+        "W4",
+        "W8"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    },
+    {
+      "artifact_type_code": "DLV-DES-27",
+      "required_action": "모든 외부 의존성의 timeout·fallback·queue·재동기화 경로를 갱신한다.",
+      "required_action_source": {
+        "path": "docs/control/execution/artifact-audits/20260726/artifact-audit-baseline.json",
+        "artifact_code": "DLV-DES-27"
+      },
+      "successor_section": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "json_pointer": "/artifacts/4",
+        "section_ids_or_summary": [
+          "DEPENDENCY_FAIL_SAFE_MATRIX_CAPTURED_SLA_AND_FAULT_VALIDATION_UNRESOLVED"
+        ]
+      },
+      "successor_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w2/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.md",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.json",
+        "docs/control/execution/artifact-remediation/20260726/w2/operations-current-state.md"
+      ],
+      "source_disposition": "REMEDIATE_DEPENDENCY_CONTRACT_W3_AND_SECURITY_W5",
+      "current_artifact_disposition": "OK",
+      "ok_meaning": "CURRENT_DESIGN_ARTIFACT_REQUIRED_ACTION_AND_TRACE_CONFORMANCE_ONLY",
+      "independent_review_rationale": "외부 의존성 timeout/fallback/queue/resync current state와 후속 gap 결속",
+      "open_implementation_or_verification_gaps": [
+        {
+          "gap_id": "DES27-GAP-01",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/11"
+        },
+        {
+          "gap_id": "DES27-GAP-02",
+          "target_wave": "W5",
+          "gap_registry_pointer": "/open_gap_registry/12"
+        },
+        {
+          "gap_id": "DES27-GAP-03",
+          "target_wave": "W3",
+          "gap_registry_pointer": "/open_gap_registry/13"
+        }
+      ],
+      "open_gap_ids": [
+        "DES27-GAP-01",
+        "DES27-GAP-02",
+        "DES27-GAP-03"
+      ],
+      "target_waves": [
+        "W3",
+        "W5"
+      ],
+      "closed_w2_internal_gap_ids": [],
+      "allowed_claims": [
+        "The design artifact required_action and successor/gap trace are internally complete.",
+        "The artifact may transition from INTERNAL_GAP to OK in the post-W1 projection."
+      ],
+      "prohibited_claims": [
+        "Formal artifact approval or content baseline mutation.",
+        "Closure of the linked W3-W9 implementation or verification gaps.",
+        "Formal/device/deploy/restore/performance/accessibility PASS or release eligibility."
+      ]
+    }
+  ],
+  "open_gap_registry": [
+    {
+      "gap_id": "DES22-GAP-01",
+      "status": "INTERNAL_GAP",
+      "item": "One versioned cross-module error catalogue and correlation-ID propagation proof",
+      "target_wave": "W3",
+      "owner_roles": [
+        "기술책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "One versioned cross-module error catalogue and automated propagation proof passes internal integration tests.",
+      "expected_evidence_paths": [
+        "W3 error-contract catalogue",
+        "correlation propagation test receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-22"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES22-GAP-02",
+      "status": "INTERNAL_GAP",
+      "item": "Circuit-breaker thresholds and retry ownership for every external dependency",
+      "target_wave": "W3",
+      "owner_roles": [
+        "기술책임자",
+        "운영책임자"
+      ],
+      "closure_condition": "Every external dependency has bounded retry/circuit ownership and internal failure tests.",
+      "expected_evidence_paths": [
+        "W3 dependency retry matrix",
+        "failure-path test receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-22"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES23-GAP-01",
+      "status": "INTERNAL_GAP",
+      "item": "First-party structured logs, metrics and traces for adminapp and gateway",
+      "target_wave": "W9",
+      "owner_roles": [
+        "운영책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "Admin and gateway events reach an approved persistent collector with configured retention.",
+      "expected_evidence_paths": [
+        "W9 collector configuration",
+        "retention apply evidence",
+        "ingestion test receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-23"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES23-GAP-02",
+      "status": "INTERNAL_GAP",
+      "item": "End-to-end correlation schema, environment levels, sampling, dashboard and alert ownership",
+      "target_wave": "W9",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자"
+      ],
+      "closure_condition": "Dashboard, alert thresholds, delivery route and on-call acknowledgement are verified in a production-like environment.",
+      "expected_evidence_paths": [
+        "W9 dashboard export",
+        "alert rule manifest",
+        "notification drill receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-23"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES23-GAP-03",
+      "status": "INTERNAL_GAP",
+      "item": "Adminapp/gateway log redaction and retention periods",
+      "target_wave": "W5",
+      "owner_roles": [
+        "보안·개인정보책임자",
+        "운영책임자"
+      ],
+      "closure_condition": "Security review verifies all telemetry producers/collectors preserve the forbidden-data and redaction contract.",
+      "expected_evidence_paths": [
+        "W5 telemetry threat review",
+        "secret/PII negative-test receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-23"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES24-GAP-01",
+      "status": "INTERNAL_GAP",
+      "item": "End-to-end camera-to-feedback, route and report latency/throughput/concurrency acceptance budgets",
+      "target_wave": "W4",
+      "owner_roles": [
+        "기술책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "All PB latency, throughput, CPU and memory budgets are measured on the immutable declared environments and separately approved or revised.",
+      "expected_evidence_paths": [
+        "W4 raw measurement bundle",
+        "device/load manifest",
+        "budget decision receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-24"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES24-GAP-02",
+      "status": "INTERNAL_GAP",
+      "item": "Device-specific battery, thermal and storage numeric thresholds plus phone queue byte limit",
+      "target_wave": "W4",
+      "owner_roles": [
+        "Android책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "Battery, thermal, transient-storage and phone-queue budgets pass supported-device measurement and the phone queue gate closes.",
+      "expected_evidence_paths": [
+        "W4 device resource report",
+        "queue boundary test",
+        "GATE-PHONE-QUEUE-BYTE-LIMIT receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-24"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES24-GAP-03",
+      "status": "INTERNAL_GAP",
+      "item": "Measured cloud capacity, API saturation and monthly-cost proof",
+      "target_wave": "W4",
+      "owner_roles": [
+        "운영책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "Staging shape, capacity state, API saturation and storage/full-cloud cost are measured; separate full-cloud approval is recorded.",
+      "expected_evidence_paths": [
+        "W4 load report",
+        "capacity-state receipt",
+        "cost estimate and approval receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-24"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES25-GAP-01",
+      "status": "INTERNAL_GAP",
+      "item": "Service-tier RTO/RPO and backup frequency",
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "제품책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "T0/T1/T2 provisional frequency, RPO and RTO are measured in isolated drills and explicitly approved or revised.",
+      "expected_evidence_paths": [
+        "W8 tier drill receipts",
+        "RPO/RTO decision receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-25"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES25-GAP-02",
+      "status": "INTERNAL_GAP",
+      "item": "Actual signed backup, isolated restore receipt, deletion replay and failover proof",
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자"
+      ],
+      "closure_condition": "A signed bundle containing DB/object/model-config/deletion ledger/key-version is restored with the nine-step contract.",
+      "expected_evidence_paths": [
+        "W8 backup manifest",
+        "signed restore receipt",
+        "deletion replay evidence"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-25"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES25-GAP-03",
+      "status": "INTERNAL_GAP",
+      "item": "Approved alternate environment, credentials, network and storage capacity",
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "프로젝트책임자"
+      ],
+      "closure_condition": "Identity-separated alternate environment capacity and traffic-transition authority are approved and drilled.",
+      "expected_evidence_paths": [
+        "W8 isolated environment manifest",
+        "traffic approval record",
+        "failover drill receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-25"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES27-GAP-01",
+      "status": "INTERNAL_GAP",
+      "item": "Supplier SLA, quota, cache TTL and approved retry/backoff for TMAP and GCS",
+      "target_wave": "W3",
+      "owner_roles": [
+        "제품책임자",
+        "운영책임자",
+        "보안·개인정보책임자"
+      ],
+      "closure_condition": "TMAP/GCS supplier limits and every dependency retry/backoff/circuit rule are implemented without unsafe substitution.",
+      "expected_evidence_paths": [
+        "W3 supplier/dependency matrix",
+        "bounded retry tests"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-27"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES27-GAP-02",
+      "status": "INTERNAL_GAP",
+      "item": "Cross-boundary adminapp/gateway/backend outage telemetry and user-message verification",
+      "target_wave": "W5",
+      "owner_roles": [
+        "기술책임자",
+        "QA책임자",
+        "접근성·안전책임자"
+      ],
+      "closure_condition": "Cross-boundary admin/gateway/backend outage messages and telemetry pass security and accessibility review.",
+      "expected_evidence_paths": [
+        "W5 outage threat review",
+        "message/accessibility test receipt"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-27"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "DES27-GAP-03",
+      "status": "INTERNAL_GAP",
+      "item": "Actual offline, timeout, quota, fault injection, recovery and re-synchronization evidence",
+      "target_wave": "W3",
+      "owner_roles": [
+        "QA책임자",
+        "운영책임자"
+      ],
+      "closure_condition": "Offline, timeout, quota and re-synchronization internal fault scenarios pass while external/device execution remains separately gated.",
+      "expected_evidence_paths": [
+        "W3 fault scenario receipt",
+        "idempotent re-sync evidence"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-27"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-002",
+      "status": "OPEN",
+      "item": "Admin direct-backend path versus FP-040 protected single entry",
+      "target_wave": "W3",
+      "owner_roles": [
+        "기술책임자",
+        "보안·개인정보책임자",
+        "Android 관리자 앱 책임자",
+        "게이트웨이 책임자",
+        "백엔드 책임자"
+      ],
+      "closure_condition": "A protected single-entry implementation or an explicitly approved exception is represented in current code/manifests, with admin session/high-risk-action tests and no operational workflow enablement before the boundary passes.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-003",
+      "status": "OPEN",
+      "item": "FP-035 persistent encrypted queue, chunk/resume, capacity-state and receipt-bound deletion implementation",
+      "target_wave": "W3",
+      "owner_roles": [
+        "Android 사용자 앱 책임자",
+        "백엔드 책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "Current implementation and manifest evidence covers encrypted persistent retention, byte/capacity bounds, restart-safe chunk/resume, server commit/hash receipt, deletion and movement cancellation without weakening the four effective policy branches.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-004",
+      "status": "OPEN",
+      "item": "279 formal tests and actual-device/user/TalkBack/network/socket/field/PostGIS end-to-end execution",
+      "target_wave": "W4",
+      "owner_roles": [
+        "QA책임자",
+        "Android 사용자 앱 책임자",
+        "백엔드 책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "The fixed source/build/config bundle has reproducible formal results for all 279 catalog entries and the required actual-device, accessibility, live-network/socket, field and PostGIS paths, with failures retained rather than promoted to PASS.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-005",
+      "status": "OPEN",
+      "item": "Repeatable integration hosts, device routing, accounts/fixtures and mock-to-live TMAP evidence",
+      "target_wave": "W4",
+      "owner_roles": [
+        "QA책임자",
+        "운영책임자",
+        "백엔드 책임자",
+        "Android 사용자 앱 책임자"
+      ],
+      "closure_condition": "An isolated integration environment record fixes hosts, device routing, certificates, accounts, fixtures and build identities; mock TMAP precedes controlled live TMAP with key/quota/readiness/error evidence.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w4/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-006",
+      "status": "OPEN",
+      "item": "Security/privacy trust-boundary controls and raw-collection independent review preparation",
+      "target_wave": "W5",
+      "owner_roles": [
+        "보안·개인정보책임자",
+        "기술책임자",
+        "독립기술검토자"
+      ],
+      "closure_condition": "Threat/privacy/access-control records cover user, admin, gateway, backend, database, model, TMAP and original-data boundaries; raw-collection notice/consent/rights review inputs are complete while external approval remains separately bounded.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w5/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w5/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-02",
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-007",
+      "status": "OPEN",
+      "item": "AI/ML data, model-weight and dataset provenance/rights baseline",
+      "target_wave": "W6",
+      "owner_roles": [
+        "AI/ML책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "Dataset sources, consent/use rights, preprocessing/splits, experiment linkage, model-weight provenance and distribution constraints are bound to exact artifacts without asserting unreviewed license clearance.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w6/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w6/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w6/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-008",
+      "status": "OPEN",
+      "item": "Promoted model artifact/digest, PT-TFLite equivalence, device performance and safe rollback evidence",
+      "target_wave": "W7",
+      "owner_roles": [
+        "AI/ML책임자",
+        "QA책임자",
+        "Android 사용자 앱 책임자",
+        "릴리스책임자"
+      ],
+      "closure_condition": "The promoted model is versioned and digest-bound, conversion/equivalence and threshold evidence is reproducible, supported-device performance is measured, and rollback or safe-stop behavior is proven.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w7/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w7/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w7/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-04",
+        "DLV-DES-06",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-009",
+      "status": "OPEN",
+      "item": "Production domains/TLS/reverse proxy/firewall, service packaging, DB/object-store/KMS topology and third-party release inventory",
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "릴리스책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "The release candidate package fixes HTTPS domains, TLS/proxy/firewall, gateway/backend packaging, private DB, encrypted object storage/KMS and dependency/SBOM/notices, with provisioned-test evidence and no production-complete overclaim.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-02",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-07",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-010",
+      "status": "OPEN",
+      "item": "Backup/restore, data-safe deployment rollback and single-admin recovery drill evidence",
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "릴리스책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "A fixed candidate demonstrates backup completeness, isolated restore, migration/data reconciliation, component rollback boundaries, session revocation/high-risk freeze and the lost-admin-device recovery drill.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w8/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w8/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-04",
+        "DLV-DES-05",
+        "DLV-DES-06",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-011",
+      "status": "OPEN",
+      "item": "Operational structured logging, metrics/traces, correlation, alert ownership and retention thresholds",
+      "target_wave": "W9",
+      "owner_roles": [
+        "운영책임자",
+        "보안·개인정보책임자",
+        "기술책임자"
+      ],
+      "closure_condition": "Operations evidence defines and exercises first-party admin/gateway/backend/device telemetry, correlation, redaction, sampling, dashboards, alerts, retention and handover/closure behavior without raw-data or secret leakage.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w9/implementation-receipt.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/validation-summary.json",
+        "docs/control/execution/artifact-remediation/20260726/w9/independent-review.md",
+        "docs/control/execution/artifact-remediation/20260726/w9/artifact-status-delta.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-01",
+        "DLV-DES-03",
+        "DLV-DES-05",
+        "DLV-DES-08"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-002",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W3",
+      "owner_roles": [
+        "기술책임자",
+        "Android Gateway책임자"
+      ],
+      "closure_condition": "Gateway OpenAPI declares page/consent/deletion control variants and an explicit event-registry presence or governed N/A decision; source/schema diff has zero unexplained items",
+      "expected_evidence_paths": [
+        "apps/android-gateway/openapi.json",
+        "contracts/walksafe-events.schema.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/interface-contract-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-10"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-003",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W3",
+      "owner_roles": [
+        "기술책임자",
+        "Backend책임자",
+        "Android Gateway책임자"
+      ],
+      "closure_condition": "each operation has governed error/idempotency/server/deprecation disposition with executable schema or explicit N/A rationale",
+      "expected_evidence_paths": [
+        "contracts/walksafe.openapi.json",
+        "apps/android-gateway/openapi.json",
+        "docs/control/execution/artifact-remediation/20260726/w3/interface-contract-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-09"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-004",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W3",
+      "owner_roles": [
+        "Backend책임자",
+        "데이터책임자"
+      ],
+      "closure_condition": "FK/cascade/ORM implementation or compensating no-FK controls are selected, implemented and source-tested",
+      "expected_evidence_paths": [
+        "backend/app/models.py",
+        "backend/alembic/versions",
+        "docs/control/execution/artifact-remediation/20260726/w3/data-integrity-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-11",
+        "DLV-DES-12"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-005",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W5",
+      "owner_roles": [
+        "보안·개인정보책임자",
+        "데이터책임자"
+      ],
+      "closure_condition": "security/privacy authority approves retention, archive and erasure-exception matrix and verification evidence binds implementation",
+      "expected_evidence_paths": [
+        "docs/deliverables/07-security/security-and-privacy-plan.md",
+        "docs/control/execution/artifact-remediation/20260726/w5/security-contract-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-12",
+        "DLV-DES-13"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-006",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W3",
+      "owner_roles": [
+        "Android책임자",
+        "보안책임자"
+      ],
+      "closure_condition": "approved product disposition is implemented and source tests prove durable limit/encryption/restart/resume behavior or explicitly remove queue claim",
+      "expected_evidence_paths": [
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe",
+        "docs/control/execution/artifact-remediation/20260726/w3/fp035-queue-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-13"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-007",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W8",
+      "owner_roles": [
+        "운영책임자",
+        "Backend책임자"
+      ],
+      "closure_condition": "controlled migration plus rollback/isolated restore drill produces signed receipts and measured lock/volume result",
+      "expected_evidence_paths": [
+        "docs/deliverables/09-release/deployment-evidence.md",
+        "docs/deliverables/10-operations/templates/recovery-exercise-template.json",
+        "docs/control/execution/artifact-remediation/20260726/w8/migration-restore-closure.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-13",
+        "DLV-DES-26"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-008",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W4",
+      "owner_roles": [
+        "Backend책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "isolated integration database reaches head and normalized catalog/ORM diff has zero unexplained mismatches",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/database-compatibility-evidence.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-11",
+        "DLV-DES-12",
+        "DLV-DES-26"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-009",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W4",
+      "owner_roles": [
+        "QA책임자",
+        "Android책임자",
+        "Android Gateway책임자",
+        "Backend책임자"
+      ],
+      "closure_condition": "formal contract integration executes all mapped user calls and classified error branches with actual network transport",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/user-interface-compatibility-evidence.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-09"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-010",
+      "status": "OPEN",
+      "item": null,
+      "target_wave": "W5",
+      "owner_roles": [
+        "보안책임자",
+        "QA책임자",
+        "Android 관리자앱책임자",
+        "Backend책임자"
+      ],
+      "closure_condition": "formal security contract integration proves login/session/revoke/reauth/recovery and high-risk nonce behavior on the separated admin app",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w5/admin-security-contract-evidence.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-09"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    },
+    {
+      "gap_id": "W2-UX-GAP-DES14-001",
+      "status": "STATIC_ROUTE_SCREEN_INVENTORY_COMPLETE_ACTUAL_DEVICE_PENDING",
+      "item": "STATIC_ROUTE_SCREEN_INVENTORY_COMPLETE_ACTUAL_DEVICE_PENDING",
+      "target_wave": "W4",
+      "owner_roles": [
+        "Android개발책임자",
+        "QA책임자",
+        "접근성·안전책임자"
+      ],
+      "closure_condition": "고정 후보 Android build에서 user/admin launcher와 10개 상태 frame에 대응하는 실제 화면·전이·회복을 확인하고 route/screen capture manifest를 승인 가능한 evidence로 결속한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/android-ui-state-capture-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/android-ui-route-transition-results.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-14"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+    },
+    {
+      "gap_id": "W2-UX-GAP-DES16-001",
+      "status": "STATIC_PROTOTYPE_CREATED_ACTUAL_DEVICE_VISUAL_BASELINE_PENDING",
+      "item": "STATIC_PROTOTYPE_CREATED_ACTUAL_DEVICE_VISUAL_BASELINE_PENDING",
+      "target_wave": "W4",
+      "owner_roles": [
+        "제품책임자",
+        "Android개발책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "고정 후보 build의 실제 user/admin 화면을 동일 state matrix로 재현하고 screenshot hash, viewport/device identity, prototype 차이와 승인 판정을 남긴다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/android-ui-state-capture-manifest.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/android-prototype-conformance-results.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-16"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+    },
+    {
+      "gap_id": "W2-UX-GAP-DES17-001",
+      "status": "DRAFT_CONTRACT_COMPLETE_SOURCE_REFACTOR_AND_DEVICE_MEASUREMENT_PENDING",
+      "item": "DRAFT_CONTRACT_COMPLETE_SOURCE_REFACTOR_AND_DEVICE_MEASUREMENT_PENDING",
+      "target_wave": "W4",
+      "owner_roles": [
+        "기술책임자",
+        "Android개발책임자",
+        "접근성·안전책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "두 앱이 승인된 resource/component contract를 소비하도록 deviation을 처리하고 실제 대비, 큰 글꼴, focus indicator와 48dp target을 측정해 PASS 또는 잔여 결함으로 판정한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/android-visual-token-conformance-results.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/android-ui-accessibility-defect-register.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-17"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+    },
+    {
+      "gap_id": "W2-UX-GAP-DES18-001",
+      "status": "STATIC_TRACE_COMPLETE_TALKBACK_AND_USER_VALIDATION_PENDING",
+      "item": "STATIC_TRACE_COMPLETE_TALKBACK_AND_USER_VALIDATION_PENDING",
+      "target_wave": "W4",
+      "owner_roles": [
+        "접근성·안전책임자",
+        "Android개발책임자",
+        "QA책임자"
+      ],
+      "closure_condition": "실기기 TalkBack tree와 탐색 순서, dynamic announcement, panel/group 전환 focus, 큰 글꼴/reflow, 대비/touch target을 10개 frame에 대해 실행하고 차단 결함 0 또는 승인된 잔여위험을 증명한다.",
+      "expected_evidence_paths": [
+        "docs/control/execution/artifact-remediation/20260726/w4/android-talkback-accessibility-results.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/android-accessibility-tree-captures.json",
+        "docs/control/execution/artifact-remediation/20260726/w4/android-ui-accessibility-defect-register.json"
+      ],
+      "affected_artifact_ids": [
+        "DLV-DES-18"
+      ],
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/ux-accessibility-current-state.json"
+    }
+  ],
+  "closed_w2_internal_gap_registry": [
+    {
+      "gap_id": "DES25-GAP-04",
+      "prior_status": "CLOSED_INTERNAL",
+      "final_w2_disposition": "CLOSED_BY_W2_INTERNAL_EVIDENCE_OR_FINAL_REVIEW",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/operations-contract-evidence.json"
+    },
+    {
+      "gap_id": "W2-ARCH-GAP-001",
+      "prior_status": "OPEN",
+      "final_w2_disposition": "CLOSED_BY_W2_INTERNAL_EVIDENCE_OR_FINAL_REVIEW",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/architecture-current-state.json"
+    },
+    {
+      "gap_id": "W2-IFDATA-GAP-001",
+      "prior_status": "CLOSED_INTERNAL",
+      "final_w2_disposition": "CLOSED_BY_W2_INTERNAL_EVIDENCE_OR_FINAL_REVIEW",
+      "source_path": "docs/control/execution/artifact-remediation/20260726/w2/interface-data-current-state.json"
+    }
+  ],
+  "gap_summary": {
+    "all_registered_count": 40,
+    "closed_in_w2_count": 3,
+    "open_downstream_count": 37,
+    "target_wave_counts": {
+      "W3": 10,
+      "W4": 11,
+      "W5": 5,
+      "W6": 1,
+      "W7": 1,
+      "W8": 6,
+      "W9": 3
+    },
+    "bidirectional_reference_status": "PASS",
+    "orphan_gap_count": 0,
+    "orphan_artifact_reference_count": 0
+  },
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_test_status": "NOT_RUN",
+    "actual_device_deploy_restore_performance_accessibility_status": "NOT_RUN",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "artifact_count": 23,
+    "artifact_unique_count": 23,
+    "artifact_id_set_sha256": "af4cf681b96957974bdff1709600748d3bfd419052ed958e08703c1f201a7032",
+    "open_gap_count": 37,
+    "open_gap_unique_count": 37,
+    "closed_w2_gap_count": 3,
+    "source_binding_count": 34,
+    "source_binding_set_sha256": "298e1fa7f0e7d92e979a17d0bd3e2b5e304e8a680a4dd494e5d2bf7c603dde6e",
+    "bidirectional_gap_trace": "PASS",
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), content_fingerprint.value=null, trailing LF",
+      "value": "b0d06a6cf2e44e6f0e988881c6657413a1f5629a4f1847755a204e193e93c893"
+    }
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "schema_version": "walksafe.implementation-receipt.v3",
+  "document_id": "WS-ARTIFACT-REMEDIATION-W3-IMPLEMENTATION-RECEIPT-20260727-001",
+  "prepared_on": "2026-07-27",
+  "source_commit": null,
+  "dirty_worktree": true,
+  "result": "PARTIAL_WAVE_COMPLETED_WITH_8_OPEN_GAPS",
+  "common_fingerprint": {
+    "algorithm": "SHA-256",
+    "value": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4"
+  },
+  "binding_dag": {
+    "node": "docs/control/execution/artifact-remediation/20260726/w3/implementation-receipt.json",
+    "upstream": {
+      "trace_json": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.json",
+        "sha256": "0c816c830a4371fc4abbef0e3f4848940daa130837e3cead06a0e7a9eb800ce0"
+      },
+      "trace_markdown": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/engineering-trace-current-state.md",
+        "sha256": "d002f65855525e407918b2855f4274c1b959840e2a954992c655b211dcb219be"
+      },
+      "trace_pair_sha256": "24aa9b0b43d56e9a1d8c834b2ee2c4d39ee8718bbb59aac5f2e5a5c8aa958c66",
+      "delta": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/artifact-status-delta.json",
+        "sha256": "b4cfc2a7d126227f5d87dda42c53f2fefc93cc26d9c90c7071775b5a0f085407"
+      },
+      "validation": {
+        "path": "docs/control/execution/artifact-remediation/20260726/w3/validation-summary.json",
+        "sha256": "72a9cbfa0d8f1035888884b6a8f2daaf8dc0bcd4ee43e0131d4a88d8cf7296f5"
+      }
+    },
+    "downstream": [],
+    "cycle_status": "ACYCLIC",
+    "dag_status": "PASS"
+  },
+  "scope": {
+    "wave_id": "W3",
+    "artifact_count": 17,
+    "exact_artifact_ids": [
+      "DLV-DEV-01",
+      "DLV-DEV-02",
+      "DLV-DEV-03",
+      "DLV-DEV-04",
+      "DLV-DEV-05",
+      "DLV-DEV-06",
+      "DLV-DEV-07",
+      "DLV-DEV-08",
+      "DLV-DEV-09",
+      "DLV-DEV-12",
+      "DLV-DEV-14",
+      "DLV-DEV-16",
+      "DLV-DEV-17",
+      "DLV-DEV-18",
+      "DLV-DEV-19",
+      "DLV-DEV-20",
+      "DLV-DEV-21"
+    ]
+  },
+  "state_transition": {
+    "baseline_counts_before_w3": {
+      "OK": 98,
+      "INTERNAL_GAP": 82,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "applied_delta": {
+      "OK": 9,
+      "INTERNAL_GAP": -9,
+      "EXTERNAL": 0,
+      "N_A_CANDIDATE": 0,
+      "TOTAL": 0
+    },
+    "counts_after_w3": {
+      "OK": 107,
+      "INTERNAL_GAP": 73,
+      "EXTERNAL": 41,
+      "N_A_CANDIDATE": 36,
+      "TOTAL": 257
+    },
+    "OK": {
+      "count": 9,
+      "artifact_ids": [
+        "DLV-DEV-01",
+        "DLV-DEV-02",
+        "DLV-DEV-03",
+        "DLV-DEV-04",
+        "DLV-DEV-05",
+        "DLV-DEV-06",
+        "DLV-DEV-07",
+        "DLV-DEV-08",
+        "DLV-DEV-18"
+      ]
+    },
+    "INTERNAL_GAP": {
+      "count": 8,
+      "artifact_ids": [
+        "DLV-DEV-09",
+        "DLV-DEV-12",
+        "DLV-DEV-14",
+        "DLV-DEV-16",
+        "DLV-DEV-17",
+        "DLV-DEV-19",
+        "DLV-DEV-20",
+        "DLV-DEV-21"
+      ]
+    }
+  },
+  "current_generation": {
+    "build": "run-20260726-003",
+    "evidence": "evidence-20260726-003",
+    "auxiliary": "aux-execution-20260726-005",
+    "integration": "integration-run-20260726-004",
+    "status": "CURRENT_AUTHORITATIVE_INTERNAL_EVIDENCE"
+  },
+  "current_source_binding_set_sha256": "490146a7869fb5364363f208fb98b6456bfa85a06bb1a7671282772656c9ae13",
+  "evidence_summary": {
+    "scope": "INTERNAL_AUTOMATED_EVIDENCE_DISTINCT_FROM_FORMAL_279",
+    "build": {
+      "generation": "run-20260726-003",
+      "exact_commands": 5,
+      "passed": 5,
+      "status": "PASS"
+    },
+    "evidence_generation": {
+      "generation": "evidence-20260726-003",
+      "write": "PASS",
+      "check": "PASS",
+      "outputs": 8
+    },
+    "module_tests": [
+      {
+        "module": "android-gateway",
+        "passed": 62,
+        "mode": "CURRENT_RUN"
+      },
+      {
+        "module": "app",
+        "passed": 728,
+        "mode": "REUSED_AFTER_EXACT_MODULE_HASH_EQUALITY"
+      },
+      {
+        "module": "adminapp",
+        "passed": 38,
+        "mode": "REUSED_AFTER_EXACT_MODULE_HASH_EQUALITY"
+      },
+      {
+        "module": "backend-db-free",
+        "passed": 33,
+        "mode": "CURRENT_INTEGRATION"
+      },
+      {
+        "module": "backend-postgres-exact-node",
+        "passed": 2,
+        "mode": "TWO_SEQUENTIAL_RUNS_SAME_SINGLE_USE_DB"
+      }
+    ],
+    "sbom_schema": {
+      "SPDX-2.3": "PASS",
+      "CycloneDX-1.6": "PASS",
+      "validator": "jsonschema 4.25.1",
+      "errors": 0
+    },
+    "license": {
+      "total": 531,
+      "known": 346,
+      "unknown": 185,
+      "exceptions": 13,
+      "NOTICE": "NOT_COMPLETED",
+      "legal_approval": "NOT_APPROVED"
+    },
+    "integration": {
+      "generation": "integration-run-20260726-004",
+      "result": "INTERNAL_INTEGRATION_PASS_WITH_EXTERNAL_BOUNDARIES",
+      "schema_parity": "PASS",
+      "same_db_repeatability": "PASS",
+      "cleanup": "PASS"
+    },
+    "formal_279_relationship": "NO_FORMAL_EXECUTION_OR_PASS_CLAIM"
+  },
+  "independent_review": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w3/independent-review.md",
+    "sha256": "006f676b0eb06df3843c1838c7adc247747f886369242cb4c087b26b2f837107",
+    "status": "APPROVED_WITH_OPEN_GAPS",
+    "findings": {
+      "blocking": 0,
+      "major": 0,
+      "minor": 0
+    }
+  },
+  "remaining_action_registry": [
+    {
+      "artifact_type_code": "DLV-DEV-09",
+      "gap_id": "W3-DEV09-GAP-001",
+      "reason": "내부 build만 확인됐고 backend/model installable artifact, startup, full runtime은 미검증.",
+      "target_waves": [
+        "W4",
+        "W8"
+      ],
+      "closure_condition": "backend/model 포함 installable build와 startup/full runtime을 동일 generation에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-12",
+      "gap_id": "W3-DEV12-GAP-001",
+      "reason": "migration/schema 내부 검증은 있으나 현행 formal build roundtrip과 backup/restore 완료 근거가 없음.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "현행 후보의 migration roundtrip과 backup/restore를 실행·결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-14",
+      "gap_id": "W3-DEV14-GAP-001",
+      "reason": "formal fixture 연결이 0/279이고 formal test set은 미승인·미실행.",
+      "target_waves": [
+        "W4"
+      ],
+      "closure_condition": "정확히 279개 formal case fixture를 결속하고 승인 환경에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-16",
+      "gap_id": "W3-DEV16-GAP-001",
+      "reason": "명명된 check는 있으나 승인된 전체 static ruleset 및 완전 실행 근거가 없음.",
+      "target_waves": [
+        "W5"
+      ],
+      "closure_condition": "승인 대상 전체 static ruleset을 확정하고 current source에서 실행한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-17",
+      "gap_id": "W3-DEV17-GAP-001",
+      "reason": "dependency 531개 중 known 346, unknown 185, exception 13이며 NOTICE·법무 승인이 없음.",
+      "target_waves": [
+        "W5"
+      ],
+      "closure_condition": "unknown/exception을 해소하고 NOTICE와 권한 있는 license review를 결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-19",
+      "gap_id": "W3-DEV19-GAP-001",
+      "reason": "SBOM은 dirty source snapshot 기준이며 fixed release generation 산출물이 아님.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "fixed release candidate에서 SPDX/CycloneDX SBOM을 재생성·검증한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-20",
+      "gap_id": "W3-DEV20-GAP-001",
+      "reason": "internal provenance 1회만 존재하고 repeat build 재현성 및 formal attestation이 없음.",
+      "target_waves": [
+        "W8"
+      ],
+      "closure_condition": "고정 입력 repeat build 동일성을 확인하고 formal attestation을 결속한다."
+    },
+    {
+      "artifact_type_code": "DLV-DEV-21",
+      "gap_id": "W3-DEV21-GAP-002/003/004",
+      "reason": "internal DB/module check는 통과했으나 actual cross-process, device/network, TMAP, production-shape 통합은 미실행.",
+      "target_waves": [
+        "W4",
+        "W8"
+      ],
+      "closure_condition": "Android→Gateway→Backend→PostGIS, device/network/TMAP, production-shape 통합을 실행한다."
+    }
+  ],
+  "verification_boundary": {
+    "formal_test_count": 279,
+    "formal_fixture_linked_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "formal_pass_claimed": false,
+    "actual_device_status": "NOT_RUN",
+    "cross_process_android_gateway_backend_postgis": "NOT_RUN",
+    "tmap_status": "NOT_RUN",
+    "deploy_status": "NOT_RUN",
+    "production_status": "NOT_RUN",
+    "signing_status": "NOT_ASSESSED",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "completion_statement": "W3는 내부 근거로 닫을 수 있는 9건만 OK로 전이했다. 8건은 W4/W5/W8 closure evidence 전까지 INTERNAL_GAP이며 formal·외부·release 경계는 완료되지 않았다.",
+  "claims_not_made": [
+    "FORMAL_279_PASS",
+    "ACTUAL_DEVICE_PASS",
+    "CROSS_PROCESS_PASS",
+    "TMAP_PASS",
+    "DEPLOY_PASS",
+    "PRODUCTION_PASS",
+    "SIGNING_ASSESSED",
+    "RELEASE_ELIGIBLE",
+    "LICENSE_OR_LEGAL_APPROVED",
+    "FULL_W3_COMPLETION_WITHOUT_GAPS"
+  ],
+  "integrity": {
+    "artifact_count": 17,
+    "ok_count": 9,
+    "internal_gap_count": 8,
+    "post_total": 257,
+    "trace_pair_sha256": "24aa9b0b43d56e9a1d8c834b2ee2c4d39ee8718bbb59aac5f2e5a5c8aa958c66",
+    "delta_sha256": "b4cfc2a7d126227f5d87dda42c53f2fefc93cc26d9c90c7071775b5a0f085407",
+    "validation_sha256": "72a9cbfa0d8f1035888884b6a8f2daaf8dc0bcd4ee43e0131d4a88d8cf7296f5",
+    "common_fingerprint": "aba4fe81c7fdc2c91c86d66df17e7d67b9fd584fef7fbdd075fc5ab48db8d4a4",
+    "source_commit_is_null": true,
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON; ensure_ascii=false; sort_keys=true; compact separators; integrity.content_fingerprint.value=null; trailing LF",
+      "value": "823e144e82508f24cc63ab7b41232bb9a612f4c59f3619c1b5c026cb774871cd"
+    }
+  }
+}

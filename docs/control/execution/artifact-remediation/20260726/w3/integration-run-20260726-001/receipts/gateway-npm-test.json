@@ -1,0 +1,44 @@
+{
+  "argv": [
+    "npm",
+    "test"
+  ],
+  "command_id": "gateway-npm-test",
+  "cwd": "apps/android-gateway",
+  "end": "2026-07-26T16:20:43.244388553Z",
+  "environment_constraints": {
+    "NODE_OPTIONS": "--max-old-space-size=1024"
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "f315b18070cbe08869e548dd8c4961a2fb81889aae79164e44d7507ba452a31b"
+    }
+  },
+  "log_path": "logs/gateway-npm-test.log",
+  "log_sha256": "00bb601dc150b5004e1792d160237cbdd1f2c9dafdbf9558e15d9faea8bd0ab2",
+  "node_test_counts": {
+    "cancelled": 0,
+    "failed": 0,
+    "passed": 62,
+    "skipped": 0,
+    "suites": 0,
+    "tests": 62,
+    "todo": 0
+  },
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 264668,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-integration-command-receipt.v1",
+  "start": "2026-07-26T16:20:41.21038874Z",
+  "status": "PASS",
+  "time_log_path": "logs/gateway-npm-test.time",
+  "time_log_sha256": "5763d317ad495671300b3b22328683b2abf8e7eeee6a1df0ac592e94b3790881",
+  "tool": {
+    "node": "v22.22.1",
+    "npm": "9.2.0"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-NPC-PERMISSION-SESSION-STATE-MATRIX-20260724-001",
+  "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+  "status": "PASS",
+  "observed_at": "2026-07-24T13:42:00+09:00",
+  "states": [
+    {
+      "state_id": "OS_RUNTIME_PERMISSIONS",
+      "owner": "ANDROID_OS",
+      "storage": "SYSTEM_PERMISSION_STORE",
+      "lifetime": "UNTIL_USER_OR_OS_CHANGES_GRANT",
+      "mutation_events": [
+        "USER_GRANT",
+        "USER_REVOKE",
+        "OS_EXPIRY_OR_RESET"
+      ],
+      "dependent_features": [
+        "CAMERA_WALK_SAFETY",
+        "LOCATION_ROUTE_AND_DISTANCE",
+        "MICROPHONE_VOICE_INPUT",
+        "ACTIVITY_STEP_TRACKING"
+      ],
+      "independence_guarantee": "A permission change affects only dependent features; account and consent states remain unchanged."
+    },
+    {
+      "state_id": "ACCOUNT_LOGIN_SESSION",
+      "owner": "ANDROID_APP_AND_GATEWAY",
+      "storage": "ANDROID_KEYSTORE_AES_GCM_APP_PRIVATE_STORE",
+      "lifetime": "UNTIL_LOGOUT_AUTH_REJECTION_OR_EXPIRY",
+      "mutation_events": [
+        "LOGIN_ACCEPTED",
+        "EXPLICIT_LOGOUT",
+        "AUTH_REJECTION",
+        "SESSION_EXPIRY",
+        "ACTOR_OR_GATEWAY_CHANGE"
+      ],
+      "dependent_features": [
+        "GATEWAY_SEARCH",
+        "GATEWAY_ROUTE",
+        "GATEWAY_REPORT_UPLOAD"
+      ],
+      "independence_guarantee": "Logout clears only the local authenticated session and does not change OS grants, consent, network choice, or server-held records."
+    },
+    {
+      "state_id": "RAW_COLLECTION_CONSENT",
+      "owner": "ANDROID_USER",
+      "storage": "APP_PRIVATE_PREFERENCES",
+      "lifetime": "UNTIL_EXPLICIT_WITHDRAWAL_OR_APP_DATA_REMOVAL",
+      "mutation_events": [
+        "EXPLICIT_GRANT",
+        "EXPLICIT_WITHDRAWAL"
+      ],
+      "dependent_features": [
+        "NEW_RAW_REPORT_COLLECTION_AND_TRANSFER"
+      ],
+      "independence_guarantee": "Withdrawal stops new raw report transfers without logging out or changing unrelated OS and automatic-report settings."
+    },
+    {
+      "state_id": "AUTOMATIC_REPORT_CONSENT",
+      "owner": "ANDROID_USER",
+      "storage": "APP_PRIVATE_PREFERENCES",
+      "lifetime": "UNTIL_EXPLICIT_WITHDRAWAL_OR_APP_DATA_REMOVAL",
+      "mutation_events": [
+        "EXPLICIT_GRANT",
+        "EXPLICIT_WITHDRAWAL"
+      ],
+      "dependent_features": [
+        "NEW_AUTOMATIC_REPORT_CANDIDATES"
+      ],
+      "independence_guarantee": "Withdrawal cancels automatic report work only; explicit reporting and account state remain independently controlled."
+    },
+    {
+      "state_id": "MOBILE_NETWORK_CHOICE",
+      "owner": "ANDROID_USER",
+      "storage": "APP_PRIVATE_PREFERENCES_DEFAULT_WIFI_ONLY",
+      "lifetime": "UNTIL_USER_CHANGES_CHOICE_OR_APP_DATA_REMOVAL",
+      "mutation_events": [
+        "ALLOW_CELLULAR",
+        "REQUIRE_WIFI"
+      ],
+      "dependent_features": [
+        "NEW_GATEWAY_TRANSFERS"
+      ],
+      "independence_guarantee": "A transport choice gates network transfers without changing login, consent, OS permissions, or local walk state."
+    },
+    {
+      "state_id": "WALK_AND_ROUTE_RUNTIME",
+      "owner": "ANDROID_ACTIVITY_PROCESS",
+      "storage": "MEMORY_ONLY_WITH_NON_RESUMING_INTERRUPTION_MARKER",
+      "lifetime": "ONE_EXPLICITLY_STARTED_WALK",
+      "mutation_events": [
+        "EXPLICIT_START",
+        "SAFE_STOP",
+        "PROCESS_OR_DEVICE_RESTART"
+      ],
+      "dependent_features": [
+        "ACTIVE_WALK_AND_ROUTE"
+      ],
+      "independence_guarantee": "Process or device restart never restores an active walk or route; a new explicit start is required."
+    },
+    {
+      "state_id": "SERVER_DATA_RIGHTS_ENTRY",
+      "owner": "ANDROID_GATEWAY_CONFIGURATION",
+      "storage": "PUBLIC_NON_API_ROUTE_TO_APPROVED_HTTPS_INTAKE",
+      "lifetime": "INDEPENDENT_OF_APP_INSTALL_AND_LOGIN",
+      "mutation_events": [
+        "DEPLOYMENT_CONFIGURATION_CHANGE"
+      ],
+      "dependent_features": [
+        "SERVER_DATA_RIGHTS_REQUEST_ENTRY"
+      ],
+      "independence_guarantee": "The public rights entry remains reachable without an installed app or an authenticated Android session."
+    }
+  ],
+  "boundary": {
+    "repository_internal_evidence": true,
+    "actual_device_status": "NOT_RUN",
+    "formal_test_status": "NOT_RUN",
+    "external_rights_operation_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "matrix_sha256": "98d97e24740f837bc5ce24e278562460c9b079261c4c6c28e2c84efd1a54c0d4"
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "walksafe.incident-postmortem-template.v1",
+  "metadata": {
+    "title": "운영 incident·postmortem instance 템플릿",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "approval_status": "NOT_APPROVED",
+    "verification_status": "STRUCTURE_CHECKED_EXECUTION_NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "generated_by": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py"
+  },
+  "template_only": true,
+  "is_live_incident": false,
+  "target_artifact_type_ids": [
+    "OPS-17",
+    "OPS-18"
+  ],
+  "incident_id": null,
+  "severity": null,
+  "started_at": null,
+  "detected_at": null,
+  "ended_at": null,
+  "user_and_data_impact": null,
+  "timeline": [],
+  "evidence_refs": [],
+  "root_cause": null,
+  "corrective_actions": [],
+  "incident_status": "NOT_OCCURRED_OR_NOT_RECORDED",
+  "postmortem_status": "NOT_RUN"
+}

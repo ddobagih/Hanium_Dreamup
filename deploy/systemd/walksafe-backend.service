@@ -1,0 +1,35 @@
+[Unit]
+Description=WalkSafe Backend API
+Requires=walksafe-backend-migrate.service
+After=network-online.target walksafe-backend-migrate.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=walksafe-backend
+Group=walksafe-backend
+WorkingDirectory=/srv/walksafe/backend
+Environment=PYTHONPATH=/srv/walksafe/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/backend.env
+RuntimeDirectory=walksafe-backend
+RuntimeDirectoryMode=0700
+StateDirectory=walksafe/uploads walksafe/android-debug-logs
+StateDirectoryMode=0700
+ExecStart=/srv/walksafe/backend/.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=3
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadOnlyPaths=/etc/walksafe/report-image-keyring.json
+ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs /run/walksafe-backend
+
+[Install]
+WantedBy=multi-user.target

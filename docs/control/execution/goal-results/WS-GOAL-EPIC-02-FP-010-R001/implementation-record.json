@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-IMPLEMENTATION-20260725-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-25T02:17:00+09:00",
+  "implementation_content_set_sha256": "f72983583f25f97663b572a852a48a2dec8fbfbaa5a03e92d518d00dd02a8df9",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "fd7cf3d01999fa69db3d333145ba6ecb8b9aad8597643cb29e2b9e34c340221a",
+      "before_sha256": "dc08c1ef35fc5d4bb84fcddc36388e0ecb1fa87249a6a22d95656747ae8a1591"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicy.kt",
+      "after_sha256": "544719a304f4cc4b5511e155aba1273c920f896a1e76dc26f99748d6ba82959a"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "22cd4d135deebaf27196e313e9fc11196d405db4febb678e31b29e804c3e3c99",
+      "before_sha256": "379cb4ad1fc5f4ce581b738f39382884fc5a231b5abf6d1b32716c9868e43a09"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+      "after_sha256": "a8afa921b66a038ac600aacf9594c6c3ee4f9b0401fb1824e153dfab5cd9be1e"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityOfficialEnvironmentStaticTest.kt",
+      "after_sha256": "5fe117b8f1751d1f1dd737ea26dd834f42ba6a9faa6a2515fe98aa2a6292f8c8",
+      "before_sha256": "b26117b07daea7363dd4702e1a79941e324a6283b7a5e2d6c67ef85df37dd2cb"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "after_sha256": "1d878ab8862a4949e174296c5d866782c53819c9541ab508912649f8214bfe13",
+      "before_sha256": "d3952ddcb4c072048f05b00869c0c4fe976dc565cca607dda37cceb24c660535"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt",
+      "after_sha256": "eb39d09f5da4bf77a8a6f58248cc916451fb041c0b4207d6fea1c4b34f63dffe",
+      "before_sha256": "50eca038d3dd446954f9f5ac9bef71e332519105b6faeb40b4c86b87e9b2d848"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "b8fec270095f2187263ab8bb7fd364f753c2b80067dee232cfcef329d34146ac",
+      "before_sha256": "155de4c6cd4b3363aee6e81460c9989400ce2cdbde8c98596e012d7157a061d0"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "after_sha256": "f5d383abdce0095276d8c13925d570254bebed543430d0863b14d5bdd235bf3f",
+      "before_sha256": "e13fab9b1f6ed2dfdf73a181f334ffd7a42e861047b42188642bfdadd0215ac5"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicyTest.kt",
+      "after_sha256": "5d7e1f9b038945fbaaf19cfe595c344ef68d8ab0083070b7abf57ef5d036bc91"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "636ff9420a7ad6b0c842807d1246f7e1ce45155a505be73eeb13375fcdea9007",
+      "before_sha256": "8f4e8d8b3996ca8fe648ead073877fd41ea601756bbca2af958c04c0470b59da"
+    },
+    {
+      "path": "scripts/check_walksafe_project_continuation_v2_3.py",
+      "after_sha256": "1785a97c5fd0cc0182cb1a9f95616328c344aca777f2e86839980afbe7bdab3f",
+      "before_sha256": "a28286281f993fb558c7cc1ea46af0ff02973dcf38201957314771c18e51fa04"
+    },
+    {
+      "path": "tests/test_walksafe_goal_graph_v2_3.py",
+      "after_sha256": "a7e9762baf99ff41ee4ee3c5c7230d7d1f90d1d2b4e72fb0859d09d6eeabfe53",
+      "before_sha256": "53f8191567df2f63349fce9816ebb20efd9829fa588593f10f7a5f0356f992ad"
+    },
+    {
+      "path": "tests/test_walksafe_project_continuation_v2_3.py",
+      "after_sha256": "f2de52ef345d62b955552054aecd5be5bd832b4085e0f7114181a5c78b37252e",
+      "before_sha256": "f11735fa87b8e352c2665fdeacbaca1db41f30e5b4dd67e222fbcb484be9f5b6"
+    }
+  ],
+  "implemented_controls": [
+    "purpose and safety limits precede age-band selection and every later first-run stage",
+    "under-14 users terminate fail closed and only ages 14 through 17 require guardian evidence",
+    "consent, opaque submission, verified SMS, guardian approval when required, activation and verified login are ordered",
+    "the immutable state machine binds epoch, revision, request and attempt identity and ignores stale, duplicate or reordered responses",
+    "restoration accepts only a verified ordered receipt prefix and never restores pending work or a raw completion boolean",
+    "raw password, OTP, phone number, phone hash, exact birth date and disability type are neither modeled nor persisted",
+    "the production evidence verifier is deliberately unconfigured and rejects positive external-provider claims",
+    "current OS permission observation is just in time; device preflight is isolated before completion and runtime sensors remain blocked",
+    "all start, resume, destination, route and report actions require completed first-run readiness",
+    "local reporter input cannot impersonate externally verified signup, activation or login",
+    "accessible status, logical traversal and 48dp controls avoid duplicate non-emergency TTS under TalkBack",
+    "existing FP-004 priority-user training remains a distinct required stage and policy"
+  ],
+  "remaining_implementation_boundaries": [
+    "external signup, SMS and guardian providers and operating credentials are unconfigured",
+    "actual account activation and verified login against production services were not run",
+    "actual TalkBack users, Android devices and network interruption scenarios were not run",
+    "TC-FP-010-01 through TC-FP-010-04, the 279-test formal set and five release gates were not run"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-010-01",
+      "TC-FP-010-02",
+      "TC-FP-010-03",
+      "TC-FP-010-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "external_signup_provider_status": "NOT_RUN",
+    "external_sms_provider_status": "NOT_RUN",
+    "external_guardian_provider_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_talkback_user_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "production_evidence_verifier_configured": false,
+    "approved_production_provider_count": 0,
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

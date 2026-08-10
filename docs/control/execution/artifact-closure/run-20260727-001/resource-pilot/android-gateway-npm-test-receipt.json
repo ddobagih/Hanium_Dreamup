@@ -1,0 +1,84 @@
+{
+  "capture": {
+    "failure": "The test process passed, but tee used a non-existent relative destination and returned exit 1.",
+    "raw_log_preserved": false,
+    "rerun_performed": false,
+    "wrapper_exit_status": 1
+  },
+  "capture_boundary": {
+    "current_subject_manifest_relation": "POST_HOC_CURRENT_STATE_ONLY_NOT_EXECUTION_TIME_PROOF",
+    "execution_ended_at": "NOT_CAPTURED",
+    "execution_started_at": "NOT_CAPTURED",
+    "execution_time_subject_manifest": "NOT_CAPTURED",
+    "raw_log_status": "NOT_PRESERVED_WRAPPER_EXIT_1",
+    "tool_versions": {
+      "gradle": "NOT_CAPTURED",
+      "java": "NOT_CAPTURED",
+      "node": "NOT_CAPTURED",
+      "npm": "NOT_CAPTURED"
+    }
+  },
+  "command": "/usr/bin/time -v timeout --signal=TERM --kill-after=5s 120s env NODE_OPTIONS=--max-old-space-size=1024 nice -n 10 npm test",
+  "credit_boundary": {
+    "actual_device_credit": false,
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "production_credit": false,
+    "release_credit": false
+  },
+  "decision": {
+    "actual_device_credit": false,
+    "admissible_test_result": "NOT_ESTABLISHED_CAPTURE_INCOMPLETE",
+    "admission_status": "CONDITIONAL",
+    "capture_status": "CAPTURE_INCOMPLETE",
+    "child_process_output_observed": "62_PASS",
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "next_allowed_level": "MODERATE_SINGLE_LANE",
+    "production_credit": false,
+    "release_credit": false,
+    "resource_pilot_result": "CONDITIONAL_CAPTURE_INCOMPLETE",
+    "subject_identity": "POST_HOC_CURRENT_STATE_ONLY"
+  },
+  "integrity": {
+    "canonical_byte_length": 2464,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "2395202cf60e01bf60fd3560fe84917041f81aed36e89124dfcc98e61284bc9e"
+  },
+  "observation_classification": {
+    "actual_device_evidence": false,
+    "evidence_grade": false,
+    "formal_evidence": false,
+    "record_class": "DIAGNOSTIC_ADMISSION_OBSERVATION",
+    "release_evidence": false,
+    "scope": "RESOURCE_ADMISSION_ONLY"
+  },
+  "prepared_on": "2026-07-27",
+  "resource_class": "LIGHT",
+  "resource_observation": {
+    "cpu_percent": 283,
+    "maximum_resident_set_kib": 257796,
+    "measurement_status": "DIAGNOSTIC_OBSERVATION_CAPTURE_INCOMPLETE",
+    "swap_operations": 0,
+    "wall_seconds": 2.5
+  },
+  "schema_version": "walksafe.resource-pilot-diagnostic-observation.v2",
+  "subject": "apps/android-gateway",
+  "subject_manifest_binding": {
+    "byte_length": 5945,
+    "captured_at": "2026-07-27T19:41:59+09:00",
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android-gateway.json",
+    "sha256": "a7b7d8823df835e4f2a94c97a002e054c22ec8b107034b66057e0e4532b39e93",
+    "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+  },
+  "test_process": {
+    "duration_ms": 622.925651,
+    "exit_status": 0,
+    "failed": 0,
+    "passed": 62,
+    "tests": 62
+  },
+  "timezone": "Asia/Seoul",
+  "working_directory": "/home/ddobagi/Code/hanium-dreamup-walksafe-rc2-20260715/apps/android-gateway"
+}

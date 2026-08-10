@@ -1,0 +1,347 @@
+{
+  "checks": [
+    {
+      "check_id": "R004-CHK-001",
+      "expected": [
+        {
+          "binding_id": "PRE-R003-EVIDENCE",
+          "byte_length": 67520,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r003/evidence.json",
+          "sha256": "8440aebfaf8313b122754574be2d144112064b22595847f036588572a36b865c",
+          "subject_role": "R003_EVIDENCE_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R003-RECEIPT",
+          "byte_length": 37347,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r003.json",
+          "sha256": "5d8fe7083978a93c8a8395533b5f4133352ff0e41bf5822adbae32c108f1901a",
+          "subject_role": "R003_CHECK_RECEIPT_PREDECESSOR"
+        }
+      ],
+      "name": "R003_PHYSICAL_PREDECESSORS_BOUND",
+      "observed": [
+        {
+          "binding_id": "PRE-R003-EVIDENCE",
+          "byte_length": 67520,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r003/evidence.json",
+          "sha256": "8440aebfaf8313b122754574be2d144112064b22595847f036588572a36b865c",
+          "subject_role": "R003_EVIDENCE_PREDECESSOR"
+        },
+        {
+          "binding_id": "PRE-R003-RECEIPT",
+          "byte_length": 37347,
+          "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r003.json",
+          "sha256": "5d8fe7083978a93c8a8395533b5f4133352ff0e41bf5822adbae32c108f1901a",
+          "subject_role": "R003_CHECK_RECEIPT_PREDECESSOR"
+        }
+      ],
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-002",
+      "expected": {
+        "check_count": 10,
+        "evidence_integrity": "45c77153344f406433786279c336a8a5bd49280372d62d7ced8dc1c37cc000f8",
+        "receipt_integrity": "0457a94ae69bb2a37579b4c7e3dad52b7251d626f8ec5a7440d6093977f6f6ba",
+        "source_binding_count": 37
+      },
+      "name": "R003_CHECKS_BINDINGS_INTEGRITY_PRESERVED",
+      "observed": {
+        "check_count": 10,
+        "evidence_integrity": "45c77153344f406433786279c336a8a5bd49280372d62d7ced8dc1c37cc000f8",
+        "receipt_integrity": "0457a94ae69bb2a37579b4c7e3dad52b7251d626f8ec5a7440d6093977f6f6ba",
+        "source_binding_count": 37
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-003",
+      "evidence_binding_ids": [
+        "PRE-R003-EVIDENCE"
+      ],
+      "evidence_pointers": [
+        "/review_exact_coverage_audit",
+        "/r002_corrections/minor_findings/0"
+      ],
+      "finding_status": "R001-MINOR-001:CLOSED",
+      "name": "R001_MINOR_001_CLOSED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-004",
+      "evidence_binding_ids": [
+        "PRE-R003-EVIDENCE",
+        "PRE-R003-RECEIPT"
+      ],
+      "evidence_pointers": [
+        "/r003_corrections/ordered_id_array_check",
+        "/checks/R003-CHK-005"
+      ],
+      "finding_status": "R001-MINOR-002:CLOSED",
+      "name": "R001_MINOR_002_CLOSED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-005",
+      "evidence_binding_ids": [
+        "PRE-R003-EVIDENCE",
+        "PRE-R003-RECEIPT"
+      ],
+      "evidence_pointers": [
+        "/r003_corrections/ledger_subject_role_alignment",
+        "/checks/R003-CHK-001"
+      ],
+      "finding_status": "R002-MINOR-ROLE-001:CLOSED",
+      "name": "R002_MINOR_ROLE_001_CLOSED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-006",
+      "evidence_binding_ids": [
+        "PRE-R003-EVIDENCE",
+        "PRE-R003-RECEIPT",
+        "CURRENT-R004-EVIDENCE"
+      ],
+      "evidence_pointers": [
+        "/r004_closure_register",
+        "/checks/R004-CHK-009"
+      ],
+      "finding_status": "R003-MINOR-CLOSURE-REGISTER-001:CLOSED",
+      "name": "R003_MINOR_CLOSURE_REGISTER_001_CLOSED",
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-007",
+      "expected": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "queue": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 37,
+          "INTERNAL_RUN_REQUIRED": 16,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 11,
+          "SCOPE_DECISION_PENDING": 45
+        }
+      },
+      "name": "CANONICAL_AND_QUEUE_COUNTS_PRESERVED",
+      "observed": {
+        "canonical": {
+          "EXTERNAL": 49,
+          "INTERNAL_GAP": 48,
+          "N_A_CANDIDATE": 36,
+          "OK": 124
+        },
+        "queue": {
+          "ATTESTATION_REVIEW_PENDING": 4,
+          "EVIDENCE_FACT_PENDING": 6,
+          "INTERNAL_READY": 37,
+          "INTERNAL_RUN_REQUIRED": 16,
+          "OK_BASELINE": 124,
+          "OWNER_APPROVAL_PENDING": 14,
+          "REAL_EVENT_PENDING": 11,
+          "SCOPE_DECISION_PENDING": 45
+        }
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-008",
+      "expected": {
+        "closure_delta_count": 0,
+        "extra_exact_ids_ledger_credit_count": 0,
+        "formal_pass_count": 0,
+        "owner_approval_count": 0,
+        "per_id_validation_credit_count": 0,
+        "real_event_count": 0,
+        "release_eligible_count": 0,
+        "scope_decision_count": 0,
+        "verified_external_fact_count": 0
+      },
+      "name": "ZERO_CREDITS_PRESERVED",
+      "observed": {
+        "closure_delta_count": 0,
+        "extra_exact_ids_ledger_credit_count": 0,
+        "formal_pass_count": 0,
+        "owner_approval_count": 0,
+        "per_id_validation_credit_count": 0,
+        "real_event_count": 0,
+        "release_eligible_count": 0,
+        "scope_decision_count": 0,
+        "verified_external_fact_count": 0
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-009",
+      "expected": {
+        "all_closed": true,
+        "entry_count": 4,
+        "finding_ids": [
+          "R001-MINOR-001",
+          "R001-MINOR-002",
+          "R002-MINOR-ROLE-001",
+          "R003-MINOR-CLOSURE-REGISTER-001"
+        ]
+      },
+      "name": "CURRENT_R004_CLOSURE_REGISTER_COMPLETE",
+      "observed": {
+        "all_closed": true,
+        "entry_count": 4,
+        "finding_ids": [
+          "R001-MINOR-001",
+          "R001-MINOR-002",
+          "R002-MINOR-ROLE-001",
+          "R003-MINOR-CLOSURE-REGISTER-001"
+        ]
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-010",
+      "expected": {
+        "canonical_length": 81809,
+        "sha256": "40baff06a04114c25312b189c12ec5a15ee28e2181c2346b109dd67b7ee1d018"
+      },
+      "name": "R004_EVIDENCE_NONSELF_INTEGRITY",
+      "observed": {
+        "canonical_length": 81809,
+        "sha256": "40baff06a04114c25312b189c12ec5a15ee28e2181c2346b109dd67b7ee1d018"
+      },
+      "status": "PASS"
+    },
+    {
+      "check_id": "R004-CHK-011",
+      "detail_path": "/receipt_self_integrity_check",
+      "name": "R004_RECEIPT_NONSELF_INTEGRITY",
+      "status": "PASS"
+    }
+  ],
+  "integrity": {
+    "algorithm": "SHA-256",
+    "content_sha256": "31a3504ebb450798303ef31f009b91c2fc456ede161e72106d801b0166bc84e1",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "line_ending": "LF",
+    "projection_byte_length": 8814,
+    "projection_null_paths": [
+      "/integrity/content_sha256",
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/canonical_length",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "projection_rule": "SET ALL projection_null_paths TO null, recursively sort keys, compact JSON, append LF, encode UTF-8",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json"
+  },
+  "output_bindings": [
+    {
+      "binding_id": "UNCHANGED-LEDGER",
+      "byte_length": 2498803,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-ledger.json",
+      "sha256": "db60888e2fef5c0a1ac76865d92dac6eafac348076272fbc99e8e6e187c97052",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_LEDGER_OUTPUT"
+    },
+    {
+      "binding_id": "CURRENT-R004-EVIDENCE",
+      "byte_length": 110612,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r004/evidence.json",
+      "sha256": "c1b673fbeb29615ea3ee8176972daab2c3025e14315691c6750d1bf7ff3bb3a1",
+      "subject_role": "PHASE1_EXACT257_SUCCESSOR_R004_EVIDENCE_OUTPUT"
+    }
+  ],
+  "predecessor_r003_bindings": [
+    {
+      "binding_id": "PRE-R003-EVIDENCE",
+      "byte_length": 67520,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r003/evidence.json",
+      "sha256": "8440aebfaf8313b122754574be2d144112064b22595847f036588572a36b865c",
+      "subject_role": "R003_EVIDENCE_PREDECESSOR"
+    },
+    {
+      "binding_id": "PRE-R003-RECEIPT",
+      "byte_length": 37347,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r003.json",
+      "sha256": "5d8fe7083978a93c8a8395533b5f4133352ff0e41bf5822adbae32c108f1901a",
+      "subject_role": "R003_CHECK_RECEIPT_PREDECESSOR"
+    }
+  ],
+  "prepared_on": "2026-07-28",
+  "receipt_id": "WS-PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-20260728-R004",
+  "receipt_self_integrity_check": {
+    "algorithm": "SHA-256",
+    "auxiliary_projection_null_fields": [
+      "/integrity/projection_byte_length",
+      "/receipt_self_integrity_check/canonical_length",
+      "/receipt_self_integrity_check/content_sha256"
+    ],
+    "canonical_length": 8814,
+    "content_sha256": "31a3504ebb450798303ef31f009b91c2fc456ede161e72106d801b0166bc84e1",
+    "encoding": "UTF-8",
+    "excluded_field": "/integrity/content_sha256",
+    "final_lf": true,
+    "line_ending": "LF",
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/phase1-exact257-successor-check-receipt-r004.json"
+  },
+  "schema_version": "walksafe.phase1-exact257-successor-check-receipt.v4",
+  "status": "PASS",
+  "summary": {
+    "all_findings_closed": true,
+    "canonical_status_counts": {
+      "EXTERNAL": 49,
+      "INTERNAL_GAP": 48,
+      "N_A_CANDIDATE": 36,
+      "OK": 124
+    },
+    "check_count": 11,
+    "closure_delta_count": 0,
+    "closure_register_entry_count": 4,
+    "closure_statuses": {
+      "R001-MINOR-001": "CLOSED",
+      "R001-MINOR-002": "CLOSED",
+      "R002-MINOR-ROLE-001": "CLOSED",
+      "R003-MINOR-CLOSURE-REGISTER-001": "CLOSED"
+    },
+    "extra_exact_ids_ledger_credit_count": 0,
+    "fail_count": 0,
+    "formal_pass_count": 0,
+    "owner_approval_count": 0,
+    "pass_count": 11,
+    "per_id_validation_credit_count": 0,
+    "preserved_source_binding_count": 37,
+    "queue_route_counts": {
+      "ATTESTATION_REVIEW_PENDING": 4,
+      "EVIDENCE_FACT_PENDING": 6,
+      "INTERNAL_READY": 37,
+      "INTERNAL_RUN_REQUIRED": 16,
+      "OK_BASELINE": 124,
+      "OWNER_APPROVAL_PENDING": 14,
+      "REAL_EVENT_PENDING": 11,
+      "SCOPE_DECISION_PENDING": 45
+    },
+    "r003_bindings_preserved": true,
+    "r003_integrity_preserved": true,
+    "r003_validations_preserved": true,
+    "real_event_count": 0,
+    "record_count": 257,
+    "release_eligible_count": 0,
+    "scope_decision_count": 0,
+    "verified_external_fact_count": 0
+  }
+}

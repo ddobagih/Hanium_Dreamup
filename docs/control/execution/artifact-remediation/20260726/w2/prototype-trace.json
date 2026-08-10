@@ -1,0 +1,60 @@
+{
+  "schema_version": "walksafe.static-prototype-trace.v1",
+  "document_id": "WS-W2-DES16-PROTOTYPE-TRACE-20260726-001",
+  "version": "1.0.0",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T22:05:20+09:00",
+  "source_commit": null,
+  "lifecycle_status": "DRAFT_DETERMINISTIC_STATIC_PROTOTYPE",
+  "prototype": {
+    "path": "docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html",
+    "sha256": "4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356",
+    "rendering_kind": "STATIC_HTML_SOURCE_LINKED_NOT_ACTUAL_DEVICE_SCREENSHOT",
+    "javascript_present": false,
+    "external_asset_dependency_count": 0,
+    "actual_device_screenshot_status": "NOT_RUN",
+    "approved_prototype_claimed": false
+  },
+  "route_bindings": [
+    {"route_id":"ANDROID-USER-LAUNCHER","application":"WALKSAFE-ANDROID-USER","entry":"MAIN/LAUNCHER","controller":"kr.co.hanium.dreamup.walksafe.MainActivity","manifest_binding_id":"SRC-USER-MANIFEST","controller_binding_id":"SRC-USER-MAIN","secondary_route_observed":false},
+    {"route_id":"ANDROID-ADMIN-LAUNCHER","application":"WALKSAFE-ANDROID-ADMIN","entry":"MAIN/LAUNCHER","controller":"kr.co.hanium.dreamup.walksafe.admin.AdminBoundaryActivity","manifest_binding_id":"SRC-ADMIN-MANIFEST","controller_binding_id":"SRC-ADMIN-ACTIVITY","secondary_route_observed":false}
+  ],
+  "required_state_classes": ["loading", "empty", "error", "blocked", "safety", "recovery"],
+  "frames": [
+    {"frame_id":"FRAME-U-LOADING","application":"WALKSAFE-ANDROID-USER","route_id":"ANDROID-USER-LAUNCHER","state":"loading","html_selector":"#FRAME-U-LOADING","source_symbols":["buildContentView","walk_safety_preparing","startupCapabilityText"],"controller_state":"PREPARING_OR_PROBING","token_refs":["color.state.loading","announcement.polite","type.status"],"component_refs":["CMP-STATUS-BANNER","CMP-ACTION-BUTTON"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-U-EMPTY","application":"WALKSAFE-ANDROID-USER","route_id":"ANDROID-USER-LAUNCHER","state":"empty","html_selector":"#FRAME-U-EMPTY","source_symbols":["latestNavigationState=\"navigation=not_started\"","navigation=destination_none hazard_only","destinationSearchResultsContainer"],"controller_state":"DESTINATION_NONE","token_refs":["color.state.empty","type.status"],"component_refs":["CMP-STATUS-BANNER","CMP-INPUT-FIELD"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-U-ERROR","application":"WALKSAFE-ANDROID-USER","route_id":"ANDROID-USER-LAUNCHER","state":"error","html_selector":"#FRAME-U-ERROR","source_symbols":["permissionDenialPanel","showPermissionDenialPanel","ObservedPermission.denialReasonKo"],"controller_state":"PERMISSION_BLOCKED","token_refs":["color.state.error","announcement.assertive","focus.order.heading_status_action"],"component_refs":["CMP-PERMISSION-BLOCK","CMP-ACTION-BUTTON"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-U-BLOCKED","application":"WALKSAFE-ANDROID-USER","route_id":"ANDROID-USER-LAUNCHER","state":"blocked","html_selector":"#FRAME-U-BLOCKED","source_symbols":["WalkSessionState.PAUSED","walk_safety_paused","renderAwaitingExplicitResumeControl"],"controller_state":"PAUSED_OR_AWAITING_EXPLICIT_RESUME","token_refs":["color.state.blocked","announcement.assertive","focus.visible"],"component_refs":["CMP-SAFETY-STATE","CMP-ACTION-BUTTON"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-U-SAFETY","application":"WALKSAFE-ANDROID-USER","route_id":"ANDROID-USER-LAUNCHER","state":"safety","html_selector":"#FRAME-U-SAFETY","source_symbols":["walk_safety_active","safetySummaryText","emitFeedbackAction","announceForTalkBack"],"controller_state":"ACTIVE_WITH_RISK_CUE_CANDIDATE","token_refs":["color.state.safe","color.state.critical","cue.safe.active","cue.risk.critical"],"component_refs":["CMP-SAFETY-STATE","CMP-STATUS-BANNER"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-A-LOADING","application":"WALKSAFE-ANDROID-ADMIN","route_id":"ANDROID-ADMIN-LAUNCHER","state":"loading","html_selector":"#FRAME-A-LOADING","source_symbols":["operationInFlight","runSecurityOperation","setInteractiveEnabled"],"controller_state":"ASYNC_OPERATION_IN_FLIGHT","token_refs":["color.state.loading","announcement.polite","type.status"],"component_refs":["CMP-ASYNC-RESULT","CMP-INPUT-FIELD"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-A-EMPTY","application":"WALKSAFE-ANDROID-ADMIN","route_id":"ANDROID-ADMIN-LAUNCHER","state":"empty","html_selector":"#FRAME-A-EMPTY","source_symbols":["renderSessions","sessions.isEmpty","등록된 세션을 아직 불러오지 못했습니다."],"controller_state":"SESSION_LIST_EMPTY_OR_NOT_RECEIVED","token_refs":["color.state.empty","type.status"],"component_refs":["CMP-SESSION-LIST","CMP-ACTION-BUTTON"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-A-ERROR","application":"WALKSAFE-ANDROID-ADMIN","route_id":"ANDROID-ADMIN-LAUNCHER","state":"error","html_selector":"#FRAME-A-ERROR","source_symbols":["AdminSecurityState.FAIL_CLOSED","AdminRecoveryMessagePolicy.failureMessage","resultText"],"controller_state":"FAIL_CLOSED","token_refs":["color.state.error","announcement.assertive","type.status"],"component_refs":["CMP-ASYNC-RESULT","CMP-STATUS-BANNER"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-A-BLOCKED","application":"WALKSAFE-ANDROID-ADMIN","route_id":"ANDROID-ADMIN-LAUNCHER","state":"blocked","html_selector":"#FRAME-A-BLOCKED","source_symbols":["ADMIN_OPERATIONAL_WORKFLOWS_ENABLED","operationalLockText","AdminHighRiskActionGate.Action"],"controller_state":"OPERATIONAL_WORKFLOWS_LOCKED","token_refs":["color.admin.lock","cue.admin.lock","announcement.assertive"],"component_refs":["CMP-ADMIN-HIGH-RISK-LOCK","CMP-STATUS-BANNER"],"actual_device_status":"NOT_RUN"},
+    {"frame_id":"FRAME-A-RECOVERY","application":"WALKSAFE-ANDROID-ADMIN","route_id":"ANDROID-ADMIN-LAUNCHER","state":"recovery","html_selector":"#FRAME-A-RECOVERY","source_symbols":["AdminSecurityState.RECOVERY_IN_PROGRESS","recoveryCompleteGroup","completeRecovery"],"controller_state":"RECOVERY_IN_PROGRESS","token_refs":["color.state.warning","color.admin.lock","announcement.assertive"],"component_refs":["CMP-ADMIN-HIGH-RISK-LOCK","CMP-INPUT-FIELD","CMP-ACTION-BUTTON"],"actual_device_status":"NOT_RUN"}
+  ],
+  "matrix_invariants": {
+    "frame_count": 10,
+    "user_frame_count": 5,
+    "admin_frame_count": 5,
+    "required_state_class_count": 6,
+    "each_matrix_row_has_exactly_one_frame": true,
+    "each_frame_has_exactly_one_route_and_state": true,
+    "historical_figma_or_pwa_used_as_current": false
+  },
+  "source_bindings": [
+    {"binding_id":"SRC-USER-MAIN","path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","sha256":"a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43","allowed_claim":"User controller symbols and state surfaces.","prohibited_claim":"Runtime rendering or screenshot fidelity."},
+    {"binding_id":"SRC-USER-MANIFEST","path":"apps/android/app/src/main/AndroidManifest.xml","sha256":"d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52","allowed_claim":"User launcher route and portrait declaration.","prohibited_claim":"Successful device execution."},
+    {"binding_id":"SRC-USER-STRINGS","path":"apps/android/app/src/main/res/values/strings.xml","sha256":"0ad4c251442380d72b8adc2519fcffbc0027a562308a7e9c87b3238d2cfa8e64","allowed_claim":"User safety lifecycle labels.","prohibited_claim":"Complete copy or user comprehension."},
+    {"binding_id":"SRC-ADMIN-ACTIVITY","path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","sha256":"9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97","allowed_claim":"Admin controller states, groups and messages.","prohibited_claim":"Operational workflow or runtime accessibility completion."},
+    {"binding_id":"SRC-ADMIN-MANIFEST","path":"apps/android/adminapp/src/main/AndroidManifest.xml","sha256":"064bed717a50365fcc231428f8d229be47a7ff1d89b4c3d64beb338ba46c2ccb","allowed_claim":"Separate admin launcher route.","prohibited_claim":"Authentication or authorization completion."},
+    {"binding_id":"SRC-DESIGN-TOKEN-CONTRACT","path":"docs/control/execution/artifact-remediation/20260726/w2/design-token-contract.json","sha256":"039afefa3809239e1140fd99882a7e8355664dfea532a1cefdd9cbf932939d0a","allowed_claim":"Draft semantic tokens, components and deviations used by prototype.","prohibited_claim":"Approved design system or runtime conformance."},
+    {"binding_id":"SRC-STATIC-PROTOTYPE","path":"docs/control/execution/artifact-remediation/20260726/w2/prototype-current-state.html","sha256":"4781961172dde0c1bfea932194137ea620af005a91dacdff90a8802e03a63356","allowed_claim":"Deterministic state frames and matrix.","prohibited_claim":"Actual-device screenshot or approved UI."}
+  ],
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), trailing_lf=true, integrity.content_fingerprint.value=null",
+      "value": "4be2b74018f4d3d3cc85db42009c84144ee0a8fa3632e0c0313d6da1beaff826"
+    }
+  }
+}

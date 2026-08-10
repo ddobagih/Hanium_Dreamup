@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-2-PACKAGE-ACTIVATION-AUTHORIZATION-20260724-001",
+  "evidence_type": "PACKAGE_ACTIVATION_AUTHORIZATION",
+  "status": "AUTHORIZED",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-2",
+  "activation_request": {
+    "request_id": "WS-USER-GOAL-CONTINUATION-REQUEST-20260724-001",
+    "source_kind": "USER_EXPLICIT_REQUEST",
+    "request_sha256": "51ec01e446fc9534f4b623d8cd5fd583475213827988d7266840ac9d5d091502",
+    "requested_at": "2026-07-24T01:02:16+09:00"
+  },
+  "authorized_at": "2026-07-24T03:47:26+09:00",
+  "generated_at": "2026-07-24T03:47:27+09:00"
+}

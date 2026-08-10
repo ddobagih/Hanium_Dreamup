@@ -1,0 +1,102 @@
+{
+  "schema_version": "walksafe.design-token-contract.v1",
+  "document_id": "WS-W2-DES17-DESIGN-TOKEN-CONTRACT-20260726-001",
+  "version": "1.0.0",
+  "prepared_on": "2026-07-26",
+  "observed_source_time": "2026-07-26T22:05:20+09:00",
+  "source_commit": null,
+  "lifecycle_status": "DRAFT_INTERNAL_DESIGN_CONTRACT_NOT_APPROVED",
+  "scope": {
+    "artifact_type_id": "DLV-DES-17",
+    "applications": ["WALKSAFE-ANDROID-USER", "WALKSAFE-ANDROID-ADMIN"],
+    "contract_purpose": "두 Android 앱의 의미 토큰, component 상태, focus와 announcement 규칙을 하나의 검토 가능한 Draft 계약으로 통합한다."
+  },
+  "authority_boundary": {
+    "approved_design_system_claimed": false,
+    "application_code_changed": false,
+    "runtime_conformance_claimed": false,
+    "actual_device_measurement_status": "NOT_RUN",
+    "interpretation": "토큰은 W2 정적 prototype과 후속 구현·검증의 목표 계약이다. 실제 literal이 매핑됐다는 사실은 코드가 토큰 resource를 사용한다는 뜻이 아니다."
+  },
+  "tokens": [
+    {"token_id":"color.surface.canvas","category":"COLOR","value":"#F5F7F4","semantic_role":"전체 배경","contrast_or_usage_rule":"본문 panel과 구분하고 장식 의미로 사용하지 않는다."},
+    {"token_id":"color.surface.panel","category":"COLOR","value":"#FFFFFF","semantic_role":"읽기·입력 panel","contrast_or_usage_rule":"text.primary와 함께 사용한다."},
+    {"token_id":"color.text.primary","category":"COLOR","value":"#111C18","semantic_role":"기본 본문","contrast_or_usage_rule":"일반 text 대비 목표 4.5:1 이상; W4 측정 전 PASS 금지."},
+    {"token_id":"color.text.muted","category":"COLOR","value":"#42544C","semantic_role":"보조 설명","contrast_or_usage_rule":"중요 상태의 유일한 표현으로 쓰지 않는다."},
+    {"token_id":"color.text.inverse","category":"COLOR","value":"#FFFFFF","semantic_role":"짙은 상태 면 위 text","contrast_or_usage_rule":"배경 token과 조합별 W4 측정 필요."},
+    {"token_id":"color.action.primary","category":"COLOR","value":"#0B6B58","semantic_role":"주요 안전 행동","contrast_or_usage_rule":"위험·오류·잠금과 같은 색으로 쓰지 않는다."},
+    {"token_id":"color.focus.ring","category":"COLOR","value":"#005FCC","semantic_role":"keyboard/접근성 focus","contrast_or_usage_rule":"3dp outline과 위치 변화 없이 사용한다."},
+    {"token_id":"color.state.loading","category":"COLOR","value":"#245C84","semantic_role":"진행 중","contrast_or_usage_rule":"[진행 중] text와 polite announcement를 병행한다."},
+    {"token_id":"color.state.empty","category":"COLOR","value":"#59656B","semantic_role":"결과 없음","contrast_or_usage_rule":"[결과 없음] text와 가능한 다음 행동을 병행한다."},
+    {"token_id":"color.state.error","category":"COLOR","value":"#B42318","semantic_role":"회복 가능한 오류","contrast_or_usage_rule":"[오류] text, 원인 영향, 다음 행동, assertive announcement를 병행한다."},
+    {"token_id":"color.state.blocked","category":"COLOR","value":"#7A271A","semantic_role":"정책·권한 차단","contrast_or_usage_rule":"[차단] text, 차단 이유와 명시적 회복 행동을 병행한다."},
+    {"token_id":"color.state.safe","category":"COLOR","value":"#067647","semantic_role":"안전 기능 정상","contrast_or_usage_rule":"[안전] text와 현재 기능 수준을 병행하며 절대 안전 보증 문구는 금지한다."},
+    {"token_id":"color.state.warning","category":"COLOR","value":"#B54708","semantic_role":"주의 위험","contrast_or_usage_rule":"[주의] text, 방향/행동과 음성·진동 cue를 병행한다."},
+    {"token_id":"color.state.critical","category":"COLOR","value":"#B42318","semantic_role":"중대 위험","contrast_or_usage_rule":"[위험] text, 즉시 행동과 assertive announcement를 병행한다."},
+    {"token_id":"color.admin.lock","category":"COLOR","value":"#7A271A","semantic_role":"관리자 고위험 작업 잠금","contrast_or_usage_rule":"[잠김] text, action 이름, gate reason과 assertive result cue를 병행한다."},
+    {"token_id":"type.title","category":"TYPOGRAPHY","value":{"size_sp":24,"weight":700,"line_height_ratio":1.25},"semantic_role":"화면 제목","contrast_or_usage_rule":"heading semantic을 함께 제공한다."},
+    {"token_id":"type.status","category":"TYPOGRAPHY","value":{"size_sp":20,"weight":700,"line_height_ratio":1.3},"semantic_role":"핵심 상태","contrast_or_usage_rule":"큰 글꼴 확대 시 잘림 없는지 W4 검증한다."},
+    {"token_id":"type.body","category":"TYPOGRAPHY","value":{"size_sp":16,"weight":400,"line_height_ratio":1.5},"semantic_role":"본문·입력","contrast_or_usage_rule":"system font scale을 차단하지 않는다."},
+    {"token_id":"type.support","category":"TYPOGRAPHY","value":{"size_sp":14,"weight":400,"line_height_ratio":1.45},"semantic_role":"보조정보","contrast_or_usage_rule":"핵심 상태나 오류의 유일한 표현으로 사용하지 않는다."},
+    {"token_id":"space.1","category":"SPACING","value":{"dp":4},"semantic_role":"밀접한 text 간격","contrast_or_usage_rule":"touch target 간격으로 단독 사용하지 않는다."},
+    {"token_id":"space.2","category":"SPACING","value":{"dp":8},"semantic_role":"동일 group 내부 간격","contrast_or_usage_rule":"논리 group을 유지한다."},
+    {"token_id":"space.3","category":"SPACING","value":{"dp":12},"semantic_role":"component 내부 padding","contrast_or_usage_rule":"큰 글꼴에서 content를 자르지 않는다."},
+    {"token_id":"space.4","category":"SPACING","value":{"dp":16},"semantic_role":"section 간격","contrast_or_usage_rule":"focus 순서를 시각적으로 보조한다."},
+    {"token_id":"space.6","category":"SPACING","value":{"dp":24},"semantic_role":"주요 section 분리","contrast_or_usage_rule":"장식 공백이 landmark를 대체하지 않는다."},
+    {"token_id":"size.touch.minimum","category":"SIZE","value":{"dp":48},"semantic_role":"모든 조작 target 최소 크기","contrast_or_usage_rule":"W4 실기기 측정 전 전체 적합 주장 금지."},
+    {"token_id":"focus.visible","category":"FOCUS","value":{"outline_dp":3,"color_token":"color.focus.ring","offset_dp":2},"semantic_role":"시각 focus","contrast_or_usage_rule":"visibility/enable 전환 뒤 논리 대상에 복귀한다."},
+    {"token_id":"focus.order.heading_status_action","category":"FOCUS","value":["heading","current_status","explanation","primary_action","secondary_action"],"semantic_role":"공통 탐색 순서","contrast_or_usage_rule":"비동기 update는 사용자의 focus를 빼앗지 않는다."},
+    {"token_id":"announcement.polite","category":"ANNOUNCEMENT","value":{"live_region":"polite","repeat_suppression_required":true},"semantic_role":"진행·일반 상태","contrast_or_usage_rule":"빈번한 telemetry text에는 사용하지 않는다."},
+    {"token_id":"announcement.assertive","category":"ANNOUNCEMENT","value":{"live_region":"assertive","repeat_suppression_required":true},"semantic_role":"위험·오류·차단","contrast_or_usage_rule":"동일 문구 반복과 음성 충돌을 억제한다."},
+    {"token_id":"announcement.none_explicit","category":"ANNOUNCEMENT","value":{"live_region":"none","explicit_dispatch_required":true},"semantic_role":"고빈도 상태의 선택적 전달","contrast_or_usage_rule":"명시적 우선순위·lifecycle 경계로만 알린다."},
+    {"token_id":"cue.risk.critical","category":"MULTIMODAL_CUE","value":{"text_prefix":"[위험]","icon_label":"위험 삼각형","announcement_token":"announcement.assertive","haptic":"distinct_critical_pattern_candidate"},"semantic_role":"중대 보행 위험","contrast_or_usage_rule":"색 단독 금지; 종류·방향·즉시 행동을 포함한다."},
+    {"token_id":"cue.safe.active","category":"MULTIMODAL_CUE","value":{"text_prefix":"[안전 기능 실행]","icon_label":"방패","announcement_token":"announcement.polite"},"semantic_role":"안전 기능 실행 상태","contrast_or_usage_rule":"사고가 없음을 보증하는 '안전함'으로 읽지 않는다."},
+    {"token_id":"cue.admin.lock","category":"MULTIMODAL_CUE","value":{"text_prefix":"[잠김]","icon_label":"자물쇠","announcement_token":"announcement.assertive"},"semantic_role":"고위험 관리자 작업 잠금","contrast_or_usage_rule":"action·reason·회복 조건을 함께 표시한다."}
+  ],
+  "component_contracts": [
+    {"component_id":"CMP-STATUS-BANNER","semantic_role":"현재 상태","states":["loading","empty","error","blocked","safe","warning","critical"],"required_tokens":["type.status","focus.order.heading_status_action"],"required_cues":["text_prefix","icon_label_or_bracket_marker","announcement"],"source_mapping":"user status/safety TextView, admin statusText/resultText","runtime_status":"PARTIAL_SOURCE_PRESENT_NOT_DEVICE_VERIFIED"},
+    {"component_id":"CMP-ACTION-BUTTON","semantic_role":"명시적 행동","states":["enabled","disabled","pending","destructive"],"required_tokens":["color.action.primary","type.body","size.touch.minimum","focus.visible"],"required_cues":["verb_label","disabled_reason_nearby"],"source_mapping":"Android Button instances and accessiblePriorityUserButton helper","runtime_status":"PARTIAL_SOURCE_PRESENT_NOT_DEVICE_VERIFIED"},
+    {"component_id":"CMP-INPUT-FIELD","semantic_role":"값 입력","states":["empty","filled","invalid","disabled","sensitive"],"required_tokens":["type.body","color.text.primary","focus.visible"],"required_cues":["persistent_label_or_accessible_name","error_text","sensitive_data_policy"],"source_mapping":"user/admin EditText","runtime_status":"STANDARD_WIDGET_SOURCE_PRESENT_NOT_TALKBACK_VERIFIED"},
+    {"component_id":"CMP-PERMISSION-BLOCK","semantic_role":"권한 거부와 회복","states":["blocked","settings_pending","explicit_resume"],"required_tokens":["color.state.blocked","cue.admin.lock","focus.order.heading_status_action"],"required_cues":["permission_name","impact","confirm_or_settings_action","assertive_focus"],"source_mapping":"user permissionDenialPanel","runtime_status":"STATIC_TEST_CONTRACT_PRESENT_NOT_DEVICE_VERIFIED"},
+    {"component_id":"CMP-SAFETY-STATE","semantic_role":"보행 안전 기능 수준·위험","states":["preparing","active","paused","safe_stop","critical_risk"],"required_tokens":["color.state.safe","color.state.warning","color.state.critical","cue.safe.active","cue.risk.critical"],"required_cues":["text","direction_or_unknown","action","speech_or_talkback","haptic_when_applicable"],"source_mapping":"user safetySummaryText/statusText/feedback actuator","runtime_status":"STATIC_SOURCE_PRESENT_NOT_DEVICE_VERIFIED"},
+    {"component_id":"CMP-ASYNC-RESULT","semantic_role":"비동기 진행·성공·오류","states":["pending","success","error"],"required_tokens":["color.state.loading","color.state.error","announcement.polite","announcement.assertive"],"required_cues":["operation_name","impact","next_action"],"source_mapping":"admin resultText/runSecurityOperation","runtime_status":"SOURCE_PRESENT_NO_ADMIN_UI_TEST"},
+    {"component_id":"CMP-SESSION-LIST","semantic_role":"관리자 기기 session","states":["loading","empty","populated","revoked","error"],"required_tokens":["color.state.loading","color.state.empty","color.state.error","type.body"],"required_cues":["state_text","current_device_marker","action_label"],"source_mapping":"admin sessionList/renderSessions","runtime_status":"EMPTY_AND_LOAD_FAILURE_COPY_DEVIATION"},
+    {"component_id":"CMP-ADMIN-HIGH-RISK-LOCK","semantic_role":"출시승인·권한변경·삭제 잠금","states":["locked","allowed_candidate","fail_closed"],"required_tokens":["color.admin.lock","cue.admin.lock","announcement.assertive"],"required_cues":["action_name","locked_text","icon_label","gate_reason","recovery_condition"],"source_mapping":"admin operationalLockText/AdminHighRiskActionGate","runtime_status":"LOCK_SOURCE_PRESENT_OPERATIONAL_WORKFLOW_NOT_OPEN"}
+  ],
+  "literal_and_component_mappings": [
+    {"mapping_id":"MAP-USER-ACCENT","source_path":"apps/android/app/src/main/res/values/styles.xml","observed_literal":"#0b6b58","target_token_or_component":"color.action.primary","mapping_status":"TOKEN_MAPPED","note":"case-normalized exact color value"},
+    {"mapping_id":"MAP-ADMIN-ACCENT","source_path":"apps/android/adminapp/src/main/res/values/styles.xml","observed_literal":"#0B6B58","target_token_or_component":"color.action.primary","mapping_status":"TOKEN_MAPPED","note":"exact contract value"},
+    {"mapping_id":"MAP-USER-WHITE","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"0xffffffff","target_token_or_component":"color.text.inverse","mapping_status":"TOKEN_MAPPED","note":"semantic target only; source does not consume token resource"},
+    {"mapping_id":"MAP-USER-ATTENTION","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"0xffffe8bd","target_token_or_component":"color.state.warning","mapping_status":"UNAPPROVED_DEVIATION","note":"literal is lighter than target and has no measured background contrast"},
+    {"mapping_id":"MAP-USER-DEBUG-TEXT","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"0xffd7e0ff","target_token_or_component":"type.support + color.text.inverse candidate","mapping_status":"UNAPPROVED_DEVIATION","note":"debug detail text has no approved semantic color token"},
+    {"mapping_id":"MAP-USER-NAV-TEXT","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"0xffd7ffd9","target_token_or_component":"type.support + color.text.inverse candidate","mapping_status":"UNAPPROVED_DEVIATION","note":"navigation detail is excluded from accessibility and color is unmeasured"},
+    {"mapping_id":"MAP-ADMIN-WHITE-BLACK","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"Color.WHITE / Color.BLACK","target_token_or_component":"color.surface.panel / color.text.primary","mapping_status":"TOKEN_MAPPED","note":"semantic target only; source uses literals"},
+    {"mapping_id":"MAP-USER-TEXT-SIZES","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"13sp/14sp/16sp/18sp/20sp programmatic sizes","target_token_or_component":"type.support/type.body/type.status","mapping_status":"UNAPPROVED_DEVIATION","note":"18sp and 13sp lack exact contract tokens; font-scale reflow unverified"},
+    {"mapping_id":"MAP-ADMIN-TEXT-SIZES","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"14sp/15sp/16sp/19sp/24sp programmatic sizes","target_token_or_component":"type.support/type.body/type.status/type.title","mapping_status":"UNAPPROVED_DEVIATION","note":"15sp and 19sp are near-token literals, not contract consumers"},
+    {"mapping_id":"MAP-USER-TOUCH-HELPER","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"minimumHeight = 48dp in accessiblePriorityUserButton","target_token_or_component":"size.touch.minimum + CMP-ACTION-BUTTON","mapping_status":"TOKEN_MAPPED","note":"only helper-created buttons; all other targets remain unmeasured"},
+    {"mapping_id":"MAP-ADMIN-PADDING","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"48px padding","target_token_or_component":"space.6 candidate","mapping_status":"UNAPPROVED_DEVIATION","note":"raw px is density-dependent and not the 24dp token"},
+    {"mapping_id":"MAP-USER-STATUS-COMPONENTS","source_path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","observed_literal":"safetySummaryText/statusText/permissionDenialPanel","target_token_or_component":"CMP-STATUS-BANNER/CMP-PERMISSION-BLOCK/CMP-SAFETY-STATE","mapping_status":"TOKEN_MAPPED","note":"semantic source mapping; visual conformance unverified"},
+    {"mapping_id":"MAP-ADMIN-STATUS-COMPONENTS","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"statusText/resultText/sessionList/operationalLockText","target_token_or_component":"CMP-STATUS-BANNER/CMP-ASYNC-RESULT/CMP-SESSION-LIST/CMP-ADMIN-HIGH-RISK-LOCK","mapping_status":"TOKEN_MAPPED","note":"semantic source mapping; focus and TalkBack conformance unverified"},
+    {"mapping_id":"MAP-ADMIN-BUTTON-TARGET","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"default Android Button minimum and match-width layout","target_token_or_component":"size.touch.minimum + CMP-ACTION-BUTTON","mapping_status":"UNAPPROVED_DEVIATION","note":"no explicit 48dp measurement contract in source"},
+    {"mapping_id":"MAP-ADMIN-EMPTY-COPY","source_path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","observed_literal":"등록된 세션을 아직 불러오지 못했습니다.","target_token_or_component":"CMP-SESSION-LIST.empty/error split","mapping_status":"UNAPPROVED_DEVIATION","note":"zero-result and load-failure meanings are not separated"}
+  ],
+  "mapping_invariants": {
+    "allowed_mapping_statuses": ["TOKEN_MAPPED", "UNAPPROVED_DEVIATION"],
+    "unmapped_literal_or_component_claimed_count": 0,
+    "mapping_does_not_imply_source_refactor": true,
+    "runtime_visual_conformance_status": "NOT_RUN"
+  },
+  "source_bindings": [
+    {"binding_id":"SRC-USER-MAIN","path":"apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt","sha256":"a1b6b2a1853f41c538821b2a05345c94cd4b8f12a8e24d2f375b5044e0cd7b43","allowed_claim":"Observed user literals, components, accessibility and states.","prohibited_claim":"Runtime conformance or approval."},
+    {"binding_id":"SRC-USER-STYLES","path":"apps/android/app/src/main/res/values/styles.xml","sha256":"e4d7e6828932ca6d969086c37e51af2a076d9d22388a0854eef78d5cf6b3579c","allowed_claim":"Observed user theme and accent.","prohibited_claim":"Measured contrast or complete tokens."},
+    {"binding_id":"SRC-ADMIN-ACTIVITY","path":"apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java","sha256":"9be105f2a318b5ef140c3d10eb67655c7c53310c7e6b51f3269265b005e9ae97","allowed_claim":"Observed admin literals, components and high-risk lock states.","prohibited_claim":"Operational workflow or TalkBack completion."},
+    {"binding_id":"SRC-ADMIN-STYLES","path":"apps/android/adminapp/src/main/res/values/styles.xml","sha256":"b55e90d6a20aac934bcc4fd3e474c842d1fb4807d4b984a80de03959b529f649","allowed_claim":"Observed admin theme, font and accent.","prohibited_claim":"Approved shared design system."}
+  ],
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), trailing_lf=true, integrity.content_fingerprint.value=null",
+      "value": "dd318743588e46ff01810bb32a1b10dfd41aebc4f04a7eb2b2a904208dc595a4"
+    }
+  }
+}

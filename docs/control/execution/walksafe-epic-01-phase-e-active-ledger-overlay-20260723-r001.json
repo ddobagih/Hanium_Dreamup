@@ -1,0 +1,285 @@
+{
+  "schema_version": "walksafe.active-ledger-event-overlay.v1",
+  "metadata": {
+    "overlay_id": "WS-EPIC-01-PHASE-E-ACTIVE-LEDGER-OVERLAY-20260723-001",
+    "version": "0.1.0",
+    "as_of": "2026-07-23",
+    "status": "ACTIVE_EVENT_OVERLAY",
+    "title": "EPIC-01 Phase E 최소 Active 원장 successor overlay"
+  },
+  "authority_boundary": {
+    "phase_d_overlay_preserved": true,
+    "events_derived_from_phase_d_predecessor_only": true,
+    "canonical_active_files_modified_by_builder": false,
+    "approved_baseline_or_predecessor_modified": false,
+    "creates_new_artifact_type": false,
+    "changes_lifecycle_or_approval_state": false,
+    "formal_test_completion_claimed": false,
+    "deployment_completion_claimed": false,
+    "actual_device_completion_claimed": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "source_bindings": [
+    {
+      "name": "phase_d_active_overlay_predecessor",
+      "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.json",
+      "bytes": 13271,
+      "sha256": "a158c3cce36e10141b17fbab91a043f8a0c3ce405df0be620c9d03a86253f5bc",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "phase_d_record_predecessor",
+      "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.json",
+      "bytes": 20975,
+      "sha256": "f3352011c4ffd796ba7f9207e465396a51bd4e8941807229548e185dd1160481",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "gap_r004_predecessor",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r004.json",
+      "bytes": 400548,
+      "sha256": "24829b3e297103bf3b3453ae5a05b0ff669cd63d9ab36a4047720340813f1aa9",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "backlog_r004_predecessor",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r004.json",
+      "bytes": 54748,
+      "sha256": "af045e68a86ccc7a6be3f6d01dd0b57a460a028c6a1803346d339329b40db3b0",
+      "immutability": "PREDECESSOR_INPUT_NOT_MODIFIED"
+    },
+    {
+      "name": "phase_e_record",
+      "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.json",
+      "content_sha256": "ae9e65a2ab75f6de267a3406c32eb91d5c8e81fdc251f7a96d8d5be3b0009257",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    },
+    {
+      "name": "gap_r005",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260723-r005.json",
+      "content_sha256": "5e4da9995c7ffb94961f4ae73c159e9e55b613d6a5e44794dcfc4ab3a609423c",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    },
+    {
+      "name": "backlog_r005",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r005.json",
+      "content_sha256": "a36b8f45efdd6b53b0bce301283905e8bf69d9e5ea128479faa09239fe8ae1fa",
+      "binding_kind": "CANONICAL_JSON_OBJECT_EXCLUDING_OWN_HASH_FIELD"
+    }
+  ],
+  "application_rule": {
+    "effective_for_phase_e_trace": true,
+    "canonical_merge_required_for_next_doc01_snapshot": true,
+    "merge_method": "다음 범용 Active writer가 Phase D overlay와 이 overlay 지문을 검증한 뒤 관련 Active 원장의 새 revision에 한 번 반영한다.",
+    "duplicate_application_forbidden": true,
+    "failure_behavior": "binding이나 predecessor event가 다르면 병합하지 않고 새 overlay revision을 만든다."
+  },
+  "events": [
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-001",
+      "artifact_code": "DOC-01",
+      "artifact_instance_id": "ART-DOC-01-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-001",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-01-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-register.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Phase E 구현기록·r005·backlog r005·overlay의 8개 새 경로와 지문을 다음 정식 Active writer에서 등록한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-002",
+      "artifact_code": "DOC-05",
+      "artifact_instance_id": "ART-DOC-05-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-002",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-DOC-05-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/00-control/artifact-change-log.json",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Phase D와 승인 정책을 고치지 않고 독립 Gateway 추출, zero allowlist, 8개 Gap 검토 사건을 추가한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-003",
+      "artifact_code": "DSC-14",
+      "artifact_instance_id": "ART-DSC-14-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-003",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-DSC-14-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/02-discovery/product-registers.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "EPIC-01을 IN_PROGRESS로 유지하고 Gateway 추출 뒤 목적 표면 정합화를 다음 한 가지 행동으로 연결한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-004",
+      "artifact_code": "REQ-16",
+      "artifact_instance_id": "ART-REQ-16-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-004",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-REQ-16-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/03-requirements/requirements-traceability.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "FP-007·FP-009 직접 재평가와 FP-011·032·040·042·047·048 영향 확인을 내부 구현·미실행 경계에 역추적한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-005",
+      "artifact_code": "DES-06",
+      "artifact_instance_id": "ART-DES-06-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-005",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-DES-06-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/04-design/software-architecture.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Node 단일 Gateway, 정확한 4 route, Android 8081, Legacy allowlist 0과 no-fallback 경계를 설계 증거에 연결한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-006",
+      "artifact_code": "DEV-15",
+      "artifact_instance_id": "ART-DEV-15-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-006",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-DEV-15-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/05-implementation/implementation-quality-record.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "41개 통제 경로와 제거된 Next route 4개, 내부 회귀를 기록하되 배포·실기기·정식시험 증거가 아님을 남긴다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-007",
+      "artifact_code": "SEC-03",
+      "artifact_instance_id": "ART-SEC-03-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-007",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-SEC-03-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/07-security/security-and-privacy-plan.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "12시간 내부 세션이 장기 refresh를 대체하지 않고 draft TLS 배치가 실제 암호화 배포 증거가 아님을 잔여위험으로 유지한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-008",
+      "artifact_code": "TST-19",
+      "artifact_instance_id": "ART-TST-19-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-008",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-TST-19-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "Gateway·Android·경계 내부 회귀만 비정식 지표로 기록하고 정식 시험 PASS 수는 0으로 유지한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    },
+    {
+      "event_id": "WS-EPIC01-PHASEE-ACTIVE-009",
+      "artifact_code": "TST-21",
+      "artifact_instance_id": "ART-TST-21-001",
+      "predecessor_event_id": "WS-EPIC01-PHASED-ACTIVE-009",
+      "predecessor_overlay_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+      "predecessor_opening_snapshot_id": "ART-TST-21-001-SNAPSHOT-001",
+      "canonical_path": "docs/deliverables/06-testing/test-quality-report.md",
+      "update_mode": "APPEND_OR_SUCCESSOR_REVISION_ONLY",
+      "lifecycle_status_before": "ACTIVE",
+      "lifecycle_status_after": "ACTIVE",
+      "approval_state_changed": false,
+      "summary": "배포·실기기·외부 URL·캐시 PWA·279개 시험·5개 gate NOT_RUN과 출시 NOT_ELIGIBLE을 유지한다.",
+      "evidence_record_ids": [
+        "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+        "WS-IMPLEMENTATION-GAP-ANALYSIS-20260723-005",
+        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-005"
+      ]
+    }
+  ],
+  "draft_observations": [
+    {
+      "artifact_code": "DEV-18",
+      "lifecycle_status": "DRAFT",
+      "state_change": false,
+      "observation": "Phase E 독립 Gateway 모듈은 차기 module-register generator revision에 반영한다. 이번 overlay는 DEV-18을 승격하지 않는다."
+    }
+  ],
+  "open_evidence_boundaries": {
+    "legacy_web_official_repository_technical_closure": "COMPLETE_WITHOUT_RUNTIME_ALLOWLIST_INTERNAL",
+    "legacy_runtime_allowlist_count": 0,
+    "independent_android_gateway_repository_extraction": "INTERNAL_COMPLETE",
+    "android_gateway_deployment_status": "NOT_RUN",
+    "actual_device_connectivity_status": "NOT_RUN",
+    "historical_external_url_decommission_status": "NOT_RUN",
+    "previously_installed_or_cached_pwa_deactivation_status": "NOT_RUN",
+    "approved_production_profile_count": 0,
+    "formal_test_status": "NOT_RUN"
+  },
+  "formal_boundary": {
+    "formal_tests_total": 279,
+    "formal_tests_passed": 0,
+    "formal_tests_not_run": 279,
+    "remaining_gate_ids": [
+      "GATE-PHONE-QUEUE-BYTE-LIMIT",
+      "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+      "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+      "GATE-CLOUD-COST-MEASUREMENT",
+      "GATE-SINGLE-ADMIN-RECOVERY-DRILL"
+    ],
+    "remaining_gate_status": "NOT_RUN",
+    "remaining_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "overlay_content_sha256": "279c6d8e4181d98e72274d9818df17e6c77a8c3099ccee79872b6d169bf40f78"
+}

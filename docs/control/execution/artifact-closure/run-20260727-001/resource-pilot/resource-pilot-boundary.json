@@ -1,0 +1,124 @@
+{
+  "admission_decision": {
+    "actual_device_credit": false,
+    "admission_status": "CONDITIONAL",
+    "evidence_credit": false,
+    "formal_test_credit": false,
+    "heavy_execution_allowed": false,
+    "next_allowed_level": "MODERATE_SINGLE_LANE",
+    "production_credit": false,
+    "release_credit": false,
+    "resource_pilot_run": true,
+    "single_lane_only": true
+  },
+  "boundary_id": "WS-RESOURCE-PILOT-BOUNDARY-20260727-001",
+  "capture_limits": {
+    "execution_start_end_times": "NOT_CAPTURED",
+    "execution_time_subject_bytes": "NOT_CAPTURED",
+    "gateway_capture": "CAPTURE_INCOMPLETE",
+    "gradle_daemon_rss": "PARTIAL_NOT_PROCESS_TREE_CEILING",
+    "tool_versions": "NOT_CAPTURED"
+  },
+  "integrity": {
+    "canonical_byte_length": 4088,
+    "canonicalization": "UTF-8 JSON sort_keys=true compact separators trailing LF; integrity excluded",
+    "self_reference_included": false,
+    "sha256": "a29f192976f9cd99a630cd35d0a338824534c4e11a225d27c2061138b78042d9"
+  },
+  "observations": {
+    "fresh_admin": {
+      "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+      "observed_internal_test_output": "PASS",
+      "passed": 38,
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "tests": 38
+    },
+    "fresh_user": {
+      "admissible_current_subject_test_result": "NOT_ESTABLISHED",
+      "observed_internal_test_output": "PASS",
+      "passed": 728,
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "tests": 728
+    },
+    "gateway": {
+      "admissible_test_result": "NOT_ESTABLISHED_CAPTURE_INCOMPLETE",
+      "admission_status": "CONDITIONAL",
+      "capture_status": "CAPTURE_INCOMPLETE",
+      "child_passed": 62,
+      "child_process_output_observed": "62_PASS",
+      "child_tests": 62,
+      "raw_log_preserved": false,
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "wrapper_exit_status": 1
+    },
+    "up_to_date_admin": {
+      "admissible_current_subject_test_result": "NOT_ESTABLISHED_NO_FRESH_EXECUTION",
+      "fresh_execution_credit": false,
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "task_result": "UP_TO_DATE"
+    },
+    "up_to_date_user": {
+      "admissible_current_subject_test_result": "NOT_ESTABLISHED_NO_FRESH_EXECUTION",
+      "fresh_execution_credit": false,
+      "subject_identity": "POST_HOC_CURRENT_STATE_ONLY",
+      "task_result": "UP_TO_DATE"
+    }
+  },
+  "prepared_on": "2026-07-27",
+  "receipt_bindings": [
+    {
+      "byte_length": 3715,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-admin-unit-fresh-receipt.json",
+      "sha256": "52e76007d7c6fa126e74a202d92ce10056662c758a0f85487c8e859b94b3d772",
+      "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+    },
+    {
+      "byte_length": 3519,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-admin-unit-receipt.json",
+      "sha256": "eb1bd303e9556ce003f497aa3482a7fb6d2535278906cbce7bd1177020e897ae",
+      "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+    },
+    {
+      "byte_length": 3154,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-gateway-npm-test-receipt.json",
+      "sha256": "358f969b8444322b5ed4c5f4755feabca3a8050d9def05d68d6d8f547e89127a",
+      "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+    },
+    {
+      "byte_length": 3650,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-fresh-receipt.json",
+      "sha256": "22335b7c941fa83ffcba6489459b76880c8eda5ae134b1897a4274a1aa44923c",
+      "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+    },
+    {
+      "byte_length": 3508,
+      "captured_at": "2026-07-27T19:55:52+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/android-user-unit-receipt.json",
+      "sha256": "eb307c9c4f151ff363e332bb0a7eee0995e00a4c85ce72bdf2889e66eefef111",
+      "subject_role": "DIAGNOSTIC_ADMISSION_OBSERVATION"
+    }
+  ],
+  "schema_version": "walksafe.resource-pilot-boundary.v1",
+  "subject_manifest_bindings": [
+    {
+      "byte_length": 5945,
+      "captured_at": "2026-07-27T19:41:59+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android-gateway.json",
+      "sha256": "a7b7d8823df835e4f2a94c97a002e054c22ec8b107034b66057e0e4532b39e93",
+      "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+    },
+    {
+      "byte_length": 61975,
+      "captured_at": "2026-07-27T19:41:59+09:00",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/resource-pilot/subject-manifest-android.json",
+      "sha256": "c99fe6e6f009d084e688995ca9e19f083065d25af6a830785ee7f55d75bb5913",
+      "subject_role": "POST_HOC_CURRENT_SOURCE_MANIFEST_NOT_EXECUTION_TIME_PROOF"
+    }
+  ],
+  "timezone": "Asia/Seoul",
+  "utc_offset": "+09:00"
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATION-ATTEMPT-RESULT-20260724-001",
+  "evidence_type": "PACKAGE_ACTIVATION_ATTEMPT_RESULT",
+  "status": "FAILED_BEFORE_EVENT_COMMIT",
+  "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-001",
+  "quick_gate_status": "PASS",
+  "failure_codes": [
+    "NON_CANONICAL_FRACTIONAL_SECOND_TIMESTAMP",
+    "ACTIVATION_EVENT_VALIDATION_REJECTED"
+  ],
+  "checkpoint_restored": true,
+  "activation_event_committed": false,
+  "package_status_after": "PREPARED_NOT_ACTIVATED",
+  "activation_status_after": "READY_NOT_ACTIVATED",
+  "superseded_by_transition_event_id": "WS-GOAL-GRAPH-V2-3-PACKAGE-ACTIVATED-20260724-002",
+  "recorded_at": "2026-07-24T19:25:01+09:00"
+}

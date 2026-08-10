@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "IMPLEMENTATION_START_GATE_FAILURE",
+  "status": "FAIL",
+  "target_transition_event_id": "WS-GOAL-GRAPH-V2-3-GOAL-STARTED-FP010-20260725-001",
+  "target_goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+  "phase": "CHECK_RUN",
+  "message": "TEST_LAYER_REGISTRY_VALIDATE returned 2",
+  "check_run": {
+    "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+    "command": "WALKSAFE_LOCKED_TEST_PYTHON=\"${WALKSAFE_LOCKED_TEST_PYTHON:-/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python}\" && test -x \"${WALKSAFE_LOCKED_TEST_PYTHON}\" && PYTHON_BIN=\"${WALKSAFE_LOCKED_TEST_PYTHON}\" bash scripts/run_walksafe_test_layers_20260711.sh validate",
+    "executed_at": "2026-07-25T01:15:30+09:00",
+    "exit_code": 2,
+    "output_path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-3-GOAL-STARTED-FP010-20260725-001/15-TEST_LAYER_REGISTRY_VALIDATE.log",
+    "output_sha256": "4a7f9ec460a5087364497903de7e1ee6d5534ef957babd70c41456dd34644da6"
+  },
+  "event_directory": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-3-GOAL-STARTED-FP010-20260725-001",
+  "recorded_at": "2026-07-25T01:15:31+09:00"
+}

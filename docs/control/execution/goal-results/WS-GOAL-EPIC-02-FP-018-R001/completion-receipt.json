@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP018-WORK-ITEM-COMPLETION-20260724-001",
+  "evidence_type": "WORK_ITEM_EXECUTION_RECEIPT",
+  "status": "ACCEPTED",
+  "result": "PASS",
+  "target_goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+  "target_goal_content_sha256": "0607dd70faa6def46fe07f9511fc5eec87f884858b650600fe286b4c207aa501",
+  "work_item_id": "EPIC-02-FP018-WALK-STATE-RECOVERY",
+  "source_policy_ids": [
+    "FP-018"
+  ],
+  "gap_ids": [
+    "GAP-027"
+  ],
+  "target_completion_level": "INTERNAL_POLICY_CONFORMANCE_REASSESSED",
+  "execution_start_event_sha256": "7efc2714a75405c2f55884c1ee940cad86dd67b4775879d59646eb280c4694ed",
+  "execution_window": {
+    "started_at": "2026-07-24T12:11:00+09:00",
+    "ended_at": "2026-07-24T12:37:00+09:00"
+  },
+  "completed_at": "2026-07-24T12:37:00+09:00",
+  "executor": {
+    "id": "CODEX-FP018-IMPLEMENTER-20260724-001",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "authority": "GRAPH_V2_STANDING_EXECUTION_AUTHORITY"
+  },
+  "reviewer": {
+    "id": "CODEX-FP018-INDEPENDENT-REVIEWER-20260724-001",
+    "role": "INDEPENDENT_INTERNAL_REVIEWER",
+    "authority": "INTERNAL_REPOSITORY_CONTROL",
+    "decision": "APPROVED",
+    "decided_at": "2026-07-24T12:39:00+09:00"
+  },
+  "reviewer_provenance": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/independent-review.json",
+    "sha256": "5a658ddceac817aa72806a70d0a2c58708a0cabb1e783e5582da147e17a22c3f"
+  },
+  "result_evidence": [
+    {
+      "kind": "IMPLEMENTATION_RECORD",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/implementation-record.json",
+      "sha256": "1cde7b63852d695313750fc41cfa556abc1f3b45ecf4cec3d9a109f090f110de"
+    },
+    {
+      "kind": "VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/verification-result.json",
+      "sha256": "d5ea2b8370d05cffd69fb42f76aa20c7ace5ef23749d2ff040730d3003054dce"
+    },
+    {
+      "kind": "SUCCESSOR_TRACE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/successor-trace.json",
+      "sha256": "bf49320fc6893d68d16014c80f3f493ba6cfe1b8a841c2273dc0c2327501bcde"
+    }
+  ],
+  "generated_at": "2026-07-24T12:40:00+09:00"
+}

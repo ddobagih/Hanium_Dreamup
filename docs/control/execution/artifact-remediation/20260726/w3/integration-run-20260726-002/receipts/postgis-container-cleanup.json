@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "docker",
+    "rm",
+    "-f",
+    "walksafe-w3-dev21-002-1785083934003812807"
+  ],
+  "command_id": "postgis-container-cleanup",
+  "cwd": ".",
+  "end": "2026-07-26T16:38:56.887268366Z",
+  "environment_constraints": {
+    "container_removed": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "c8ae38b2782f4e5bae851354ece0efb8c732c82c766ff828f18ca2fb06937d79"
+    }
+  },
+  "log_path": "logs/postgis-container-cleanup.log",
+  "log_sha256": "f385059da3c4099fe48f41691f739f4fb209e60b9aabe1fbc376c29e848e2c5a",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 28700,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-dev21-command-receipt.v2",
+  "start": "2026-07-26T16:38:56.713381969Z",
+  "status": "PASS",
+  "time_log_path": "logs/postgis-container-cleanup.time",
+  "time_log_sha256": "35c1ed03cdd95682b685ed83c64933c5178b675df676f0fcd50b49b647c4577d",
+  "tool": {
+    "runtime": "docker"
+  }
+}

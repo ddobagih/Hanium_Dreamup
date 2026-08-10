@@ -1,0 +1,180 @@
+{
+  "schema_version": "1.0",
+  "document_id": "WS-FP012-MULTI-DEVICE-SESSION-LEDGER-IMPLEMENTATION-20260726-001",
+  "goal_id": "WS-GOAL-EPIC-02-FP-012-R001",
+  "kind": "IMPLEMENTATION_RECORD",
+  "status": "PASS",
+  "observed_at": "2026-07-26T10:30:27+09:00",
+  "implementation_content_set_sha256": "0b67f62cbbd83b980425b6186f9f26acf85f488f1e5aa046793819500affc945",
+  "changed_artifacts": [
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "before_sha256": "6fc96495fb2a8e33f67f1c479b5d24fbeb29cb1a61e08207c3b03adff5fbd5e6",
+      "after_sha256": "da37fe07d2f849fd1af7aa9f335a1a9bdf3fee34443d037bb64fff3d069f9481",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "before_sha256": "b6739e1d501bc3168df8bfc0931c57a4f23380563fea7968f0571d95f0ac0350",
+      "after_sha256": "36112c3ebf24f7431b86bc8e024cdb48473aa4ee9d3e90baa03095a218d69e33",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSession.kt",
+      "before_sha256": null,
+      "after_sha256": "d1dc0ac5c46b3901982979d94149871d704e7686006191ed74fb886f488f2d12",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp012StaticTest.kt",
+      "before_sha256": null,
+      "after_sha256": "e93fdf94af5dbc9996fecc29e22cd9c8ba03834c641e400c574e9decd00ed29b",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "before_sha256": "abedf388188385d1e57174304198eae33c534fc9021ba42ab1ce4ae62aee2c59",
+      "after_sha256": "6d581ebc70e0c81c1cf75b11bb7a2d5cfb347d9cf90b9efb3ef448866db488ad",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSessionTest.kt",
+      "before_sha256": null,
+      "after_sha256": "b94c58b099970b794108fff495349b511e6c430400a2dfcbf83664ae5e48986e",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleFp012Test.kt",
+      "before_sha256": null,
+      "after_sha256": "681bbe12646766b553562bfb8252a78c1d072ee2878d1e352bd7c9cd681df6b4",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/field-walk-ledger.ts",
+      "before_sha256": null,
+      "after_sha256": "ca65cdc10bf904abe6524a7e4323df3d7798bd8af16a9f411514d4e50bf94338",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "before_sha256": "38106ed30e5c0a89dd45cb94699d8762321bfb27e3c0f5b257b55e562b3e57de",
+      "after_sha256": "ab4651dbcdac60bf0b60fdff7961eaa53f0330cf210b17272f7f02211de9b528",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/src/auth.ts",
+      "before_sha256": "470dbefd50ec77f356c11432bbbc79a3319704ca54089b9e1b3912665ceca9b5",
+      "after_sha256": "a8cc9a6e6f7ee86bf1d33fb46e440fd11a07c2e502b6af9d7464ac63bb8e3d1d",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/openapi.json",
+      "before_sha256": "f09ddb9f9c50d183dfec23377bafed7e5137b5946aa758575d0a5f09b177d265",
+      "after_sha256": "bee3e05de6287ca420b12816d4cc822cc5666093cd260bfe895cdf28ba070f1f",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "apps/android-gateway/test/field-walk-ledger.test.ts",
+      "before_sha256": null,
+      "after_sha256": "a3ed889943a27327c1118bb9d5f05149dfa52edf044eeda44b8cb3928e4c871c",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "before_sha256": "0094eff1d4b2ac67d79d0a9193f9fe5da2b71ea8c61d70522a4a8cbe8ff60856",
+      "after_sha256": "ff8fd1ff4f93b23f3873e25c86daae8059b82e3fc5c78cb72f22899f1c3217e4",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "before_sha256": "d314cbce598c1fce797f24ae807f2d67ea1f448fda1ac9674ed4efd34b7f0e56",
+      "after_sha256": "976547476d61d789c7a453b16c361a40c8fc25719d57215d9d4c10f0e99537a0",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "before_sha256": "10f27296803d2f5155e69c767734f8723ae761cfed75e2b3d603da4fcbee782c",
+      "after_sha256": "a75eecac17b67eda8b05987c44e192765567552b95f90ba00194eb1393ae5fc4",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    },
+    {
+      "path": "scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "47f92f033bf23aee5dab41224df92eb51d17bd184c8e113a8dc928d592fc57cd",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "tests/test_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "before_sha256": null,
+      "after_sha256": "8dfff5cbe95e37f6fd3505a9071e60340c4e40ae9dd7114ce6c634eef7750253",
+      "before_source": "GATE_PINNED_HEAD_ABSENT",
+      "change_kind": "ADDED"
+    },
+    {
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "before_sha256": "a0ec591c7f31cd29ee3c5bf4df8b97fc28969578c2bbd77bf05f7b30bd298fc3",
+      "after_sha256": "a5a55de7426f08da07f7a85488af623a7ce749d4ebfbe3e4253ad1dae9f4cc20",
+      "before_source": "GATE_DIRTY_SNAPSHOT",
+      "change_kind": "MODIFIED"
+    }
+  ],
+  "implemented_controls": [
+    "multiple device login sessions remain valid while each account has exactly one active walk lease",
+    "a second-device start is atomically blocked until an explicit transfer decision is recorded",
+    "the server-authoritative ledger binds account, device, walk, lease and event-time identifiers",
+    "an approved transfer terminates the predecessor lease before activating the successor lease",
+    "a denied or absent transfer confirmation preserves the predecessor walk and blocks the successor",
+    "persistent offline predecessor or lease-conflict failure transitions the walk session to SAFE_STOP",
+    "duplicate requests and retries preserve the single-active-walk invariant",
+    "reports and walk data use idempotent identifiers and are neither overwritten nor duplicated",
+    "Android and Gateway contracts bind the same account-device-walk lease transition model",
+    "focused Android and Gateway regressions cover login preservation, atomic blocking, transfer, retry and offline convergence",
+    "the trace binds exact product-fifteen and tooling-three scopes as one canonical exact-eighteen content set"
+  ],
+  "remaining_implementation_boundaries": [
+    "TC-FP-012-01 through TC-FP-012-05 and the 279 formal tests were not run",
+    "actual voice confirmation, Android multi-device and unstable-network scenarios were not tested",
+    "actual unstable-network verification was not performed",
+    "the operational server lease policy was not approved",
+    "production credentials, networks and deployment were not used",
+    "the five release gates were not run or waived"
+  ],
+  "completion_boundary": {
+    "formal_test_ids": [
+      "TC-FP-012-01",
+      "TC-FP-012-02",
+      "TC-FP-012-03",
+      "TC-FP-012-04",
+      "TC-FP-012-05"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "planned_formal_test_total": 279,
+    "planned_formal_test_total_status": "NOT_RUN",
+    "actual_user_status": "NOT_RUN",
+    "actual_voice_confirmation_status": "NOT_RUN",
+    "actual_device_status": "NOT_RUN",
+    "actual_unstable_network_status": "NOT_RUN",
+    "operational_lease_policy_approval_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gate_count": 5,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  }
+}

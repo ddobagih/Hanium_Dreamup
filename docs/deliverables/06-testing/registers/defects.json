@@ -1,0 +1,79 @@
+{
+  "schema_version": "walksafe.defect-register.v1",
+  "metadata": {
+    "title": "WalkSafe 결함 관리대장",
+    "version": "0.1.0",
+    "as_of": "2026-07-21",
+    "lifecycle_status": "DRAFT",
+    "freshness_status": "CURRENT_DRAFT",
+    "verification_status": "NOT_RUN",
+    "approval_status": "NOT_APPROVED",
+    "release_status": "NOT_ELIGIBLE",
+    "artifact_type_ids": [
+      "TST-18"
+    ],
+    "source_policy_baseline": "PB-WALKSAFE-FEATURE-POLICY-1.0.0",
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": false,
+    "generated_by": "scripts/build_walksafe_formal_dev_test_20260721.py"
+  },
+  "storage_model": {
+    "this_file_role": "GENERATED_EMPTY_SNAPSHOT_AND_SCHEMA",
+    "edit_this_file_for_new_defect": false,
+    "append_only_instance_path": "docs/deliverables/06-testing/registers/defect-instances/<defect-id>.json",
+    "mutation_rule": "CREATE_NEW_REVISION_FILE; NEVER_OVERWRITE_SOURCE_EVIDENCE"
+  },
+  "allowed_statuses": [
+    "OPEN",
+    "TRIAGED",
+    "IN_PROGRESS",
+    "FIXED_PENDING_RETEST",
+    "CLOSED",
+    "DEFERRED_APPROVED"
+  ],
+  "severity_rules": {
+    "S1": "사람 안전·민감정보·인증·삭제·출시 무결성에 즉각 중대한 영향",
+    "S2": "핵심 기능이 잘못되거나 안전한 대체 경로가 없음",
+    "S3": "제한된 기능 오류이며 명확한 우회법이 있음",
+    "S4": "경미한 표시·문서 오류"
+  },
+  "defect_schema": {
+    "required_fields": [
+      "defect_id",
+      "version",
+      "title",
+      "environment_id",
+      "source_test_instance_id",
+      "evidence_id",
+      "reproduction_steps",
+      "expected_result",
+      "actual_result",
+      "severity",
+      "priority",
+      "owner_role",
+      "status",
+      "target_date",
+      "requirement_ids",
+      "policy_ids",
+      "risk_ids",
+      "waiver_ids",
+      "fix_commit",
+      "retest_evidence_ids"
+    ],
+    "identity_rule": "사람·기기는 실명이나 serial 대신 승인된 가명 ID를 사용한다.",
+    "closure_rule": "수정 commit과 같은 결함을 재현한 재시험 evidence가 없으면 CLOSED로 바꾸지 않는다.",
+    "nullable_only_with_reason": [
+      "target_date",
+      "fix_commit",
+      "retest_evidence_ids",
+      "waiver_ids"
+    ]
+  },
+  "defects": [],
+  "summary": {
+    "total": 0,
+    "open": 0,
+    "closed": 0
+  },
+  "note": "결함이 0개라는 시험 결과가 아니라, 정식 시험 실행 전 빈 통제 원장이다."
+}

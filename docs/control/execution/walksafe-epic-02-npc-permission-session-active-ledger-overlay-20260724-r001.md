@@ -1,0 +1,6 @@
+# EPIC-02 NPC 권한·세션 Active ledger overlay
+
+- Overlay: `WS-EPIC-02-NPC-PERMISSION-SESSION-ACTIVE-LEDGER-OVERLAY-20260724-001`
+- NPC 권한·세션 내부 구현·검증: `PARTIAL_IMPLEMENTATION_VERIFIED`
+- 실제 기기·정식·외부 운영 시험: `NOT_RUN`
+- 출시: `NOT_ELIGIBLE`

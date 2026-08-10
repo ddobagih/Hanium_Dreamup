@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "docker-image-preflight",
+    "<REDACTED_EPHEMERAL_ARGS>"
+  ],
+  "command_id": "docker-image-preflight",
+  "cwd": ".",
+  "end": "2026-07-26T16:52:02.257736048Z",
+  "environment_constraints": {
+    "database_name": "walksafe_dev21_test_004",
+    "loopback_port": 32772,
+    "secret_redacted": true,
+    "single_use_database": true
+  },
+  "exit_code": 0,
+  "integrity": {
+    "content_fingerprint": {
+      "algorithm": "SHA-256",
+      "canonicalization": "UTF-8 JSON, ensure_ascii=false, sort_keys=true, separators=(comma,colon), integrity.content_fingerprint.value=null, trailing LF",
+      "value": "8f49ab0c8859eed2a430cb398be6865171c6de913f45c509f0f9bb36c2e0bcb1"
+    }
+  },
+  "log_path": "logs/docker-image-preflight.log",
+  "log_sha256": "0c42ce27eab03a3b70038c862f4991e7ea2d5631871561b3f2f6809d84371beb",
+  "resource_peak": {
+    "maximum_resident_set_size_kb": 28360,
+    "measurement_tool": "/usr/bin/time -v"
+  },
+  "schema_version": "walksafe.w3-dev21-command-receipt.v4",
+  "start": "2026-07-26T16:52:02.241467366Z",
+  "status": "PASS",
+  "subject_binding": {
+    "content_fingerprint": "03224d7bbfb9a9bd75b39d88fb88c49d66e1230de27f9623ddb8c7bd7219b712",
+    "content_set_sha256": "5294c9a706fa5b69389e42b8c505a7b1fb4f72fa18f210d724037a79be2c431c"
+  },
+  "time_log_path": "logs/docker-image-preflight.time",
+  "time_log_sha256": "a0ab1e523f4e2be1bcd28e4d23819644031e2ef5ab08507f106b1b4c7267031d",
+  "tool": {
+    "runtime": "docker"
+  }
+}
