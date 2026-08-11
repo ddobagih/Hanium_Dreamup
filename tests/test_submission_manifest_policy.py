@@ -501,12 +501,33 @@ def test_submission_python_installation_lock_binds_both_requirements_files(
         manifest_policy._require_python_installation_lock(tmp_path, installation)
 
 
-def test_submission_toolchain_lock_binds_actual_libreoffice_runtime_chain() -> None:
+def test_submission_toolchain_lock_declares_exact_libreoffice_runtime_chain() -> None:
     root = Path(__file__).resolve().parents[1]
     lock = json.loads(
         (root / "configs/submission_toolchain_lock_20260713.json").read_text(encoding="utf-8")
     )
     libreoffice = next(tool for tool in lock["tools"] if tool["name"] == "libreoffice")
+    assert libreoffice == {
+        "name": "libreoffice",
+        "command": "libreoffice",
+        "resolved_path": "/usr/lib/libreoffice/program/soffice",
+        "bytes": 6621,
+        "sha256": "3d585422d7cdddf9bcc954e7064da24c7e44d43508a5abaeb11de9d918d24f13",
+        "runtime_chain": [
+            {
+                "resolved_path": "/usr/lib/libreoffice/program/oosplash",
+                "bytes": 47416,
+                "sha256": "e66a4617a325c3c7b09be9c8c996c3b5e0035f30f6219acd67773be00b7ed13b",
+            },
+            {
+                "resolved_path": "/usr/lib/libreoffice/program/soffice.bin",
+                "bytes": 14568,
+                "sha256": "1c5eeb050f546e1db613e2fc724a87dfe2b180ac85a0b70f2cff618dda1b3326",
+            },
+        ],
+        "version_args": ["--version"],
+        "version_output": "LibreOffice 26.2.4.2 620(Build:2)",
+    }
     launcher = Path(libreoffice["resolved_path"])
     expected_paths = (
         launcher.with_name("oosplash"),
@@ -517,8 +538,6 @@ def test_submission_toolchain_lock_binds_actual_libreoffice_runtime_chain() -> N
     assert tuple(
         Path(record["resolved_path"]) for record in libreoffice["runtime_chain"]
     ) == expected_paths
-    for record, path in zip(libreoffice["runtime_chain"], expected_paths, strict=True):
-        assert record == _file_lock(path)
 
 
 def test_submission_toolchain_attestation_rejects_actual_bytecode(

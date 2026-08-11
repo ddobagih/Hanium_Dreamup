@@ -242,3 +242,19 @@
 - 수정 전 계획 검토에서 `GITHUB_PATH`는 다음 step부터 적용되므로 같은 dependency install step의 npm이 ambient Node를 쓸 수 있는 문제와, restrictive umask에서 tar 권한이 달라지는 문제를 확인했다.
 - CI가 공식 `node-v22.23.1-linux-x64.tar.xz`를 고정 URL·SHA-256으로 내려받아 `--same-permissions`로 추출하고, lock checker를 통과한 root만 쓰도록 교정했다. 같은 step은 PATH를 즉시 공식 root로 고정하고 다음 step은 `GITHUB_PATH`·`WALKSAFE_NODE_BIN_DIR`를 사용한다.
 - 독립 임시 재현에서 archive SHA-256, Node 22.23.1, npm 10.9.8, 5,866-entry root closure와 npm closure가 lock과 exact 일치했다. 새 commit 게시 뒤 exact-SHA CI 성공을 최종 종료 조건으로 유지한다.
+
+두 번째 exact-SHA CI의 계층 경계 검토:
+
+- run `31497090277`은 Node·Web·Gateway·두 Python lock 환경과 모든 정적 gate를 통과했으나 unit에서 28건이 실패했다. 원인은 제품 코드가 아니라 전용 venv가 아닌 setup-python base, 과거 LibreOffice host bytes, runner-owned Java trust였다.
+- 독립 lifecycle 검토에서 `test_walksafe_product_quality_receipt.py`, `test_walksafe_operator_attestation.py`, `test_release_evidence_gate.py`가 모두 catalog상 `HISTORICAL`인 Web 포함 2026-07-13 Full-RC 스크립트를 직접 검증하면서 현행 Unit/Integration에 섞인 것을 확인했다.
+- 세 파일을 history inventory로 이동하고, 현재 제출 정책 파일의 portable 회귀는 유지하되 실제 LibreOffice host lock 대조 1건만 별도 history 파일로 분리한다. production 보안·attestation 코드는 수정하지 않는다.
+- general CPython은 history 분류와 무관하게 문서·runner 계약대로 exact 3.12.13 real venv로 만들고 hash lock을 설치한 뒤 모든 현행 Python 단계에 절대경로로 전달한다.
+- 수정 전 독립 판정은 이 경계와 meta 회귀를 반영하는 조건으로 진행 승인이다. 종료 기준은 180개 Python test exact partition, current 계층 전체 로컬 PASS, staged tree 검사, 새 exact-SHA CI PASS다.
+
+교정 후 로컬 수용 결과:
+
+- 현행 runner의 `all`을 단일 실행해 Unit Python 743 PASS·8 SKIP, Functional Python 741 PASS, Gateway 88 PASS, Backup 54 PASS, Integration Python 73 PASS를 확인했다.
+- Web lint·typecheck·production build·53 trace/1,295 unique file 검증과 Android JVM·lint·debug·AndroidTest·양 앱 unsigned release·model asset 검사가 모두 PASS했다.
+- 첫 로컬 release packaging의 일시적 incremental 실패 뒤 같은 task 재실행과 전체 `all` 재실행이 모두 성공했다. 제품 코드 변경 없이 깨끗한 단일 전체 실행을 최종 근거로 채택했다.
+- 독립 최종 lifecycle·exact-env 검수, checkpoint reconcile, staged index 검사와 새 exact-SHA GitHub CI만 최종 게시 종료 조건으로 남겼다.
+- lifecycle 독립 검수는 P0/P1/P2 0이었다. exact-env 독립 검수의 비차단 P2 1건인 초기 setup-python PATH 의존도 첫 action의 공식 `python-path` 출력 저장·절대경로 사용으로 제거했다. 관련 workflow meta 회귀와 실제 CI로 최종 확인한다.

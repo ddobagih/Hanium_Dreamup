@@ -223,7 +223,11 @@ def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> Non
     assert 'python-version: "3.14.6"' in workflow
     assert "update-environment: false" in workflow
     assert "steps.backup_python.outputs.python-path" in workflow
-    assert "python -I -B scripts/restore_walksafe_private_evidence_modes.py" in workflow
+    assert "steps.general_base_python.outputs.python-path" in workflow
+    assert (
+        '"${GENERAL_BASE_PYTHON}" -I -B scripts/restore_walksafe_private_evidence_modes.py'
+        in workflow
+    )
     assert 'GITLEAKS_VERSION: "8.30.1"' in workflow
     assert (
         'GITLEAKS_ARCHIVE_SHA256: "551f6fc83ea457d62a0d98237cbad105a'
@@ -274,6 +278,25 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     assert len(re.findall(r"(?m)^\s*run_locked_npm(?:\(\)|\s)", runner)) == 5
     assert len(re.findall(r"(?m)^\s*run_locked_gateway_npm(?:\(\)|\s)", runner)) == 3
     assert len(re.findall(r"(?m)^\s*run_locked_npm_in(?:\(\)|\s)", runner)) == 3
+    all_start = runner.index("  all)\n")
+    all_dispatch = runner[all_start : runner.index("\n    ;;", all_start)]
+    assert all_dispatch == (
+        "  all)\n"
+        "    run_unit\n"
+        "    run_functional\n"
+        "    run_integration"
+    )
+    for historical_test in (
+        "tests/test_release_evidence_gate.py",
+        "tests/test_submission_toolchain_host_lock_20260713_history.py",
+        "tests/test_walksafe_operator_attestation.py",
+        "tests/test_walksafe_product_quality_receipt.py",
+    ):
+        assert historical_test not in runner[
+            runner.index("UNIT_PYTHON_TESTS=(") : runner.index(
+                "HISTORICAL_CONTROL_PYTHON_TESTS=("
+            )
+        ]
     assert "./gradlew testDebugUnitTest --no-daemon --rerun-tasks" in runner
     assert (
         'WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'

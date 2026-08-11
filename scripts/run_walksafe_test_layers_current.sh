@@ -108,8 +108,6 @@ UNIT_PYTHON_TESTS=(
   tests/test_web_runtime_trace_scope.py
   tests/test_web_build_manifest.py
   tests/test_walksafe_isolated_python_bootstrap.py
-  tests/test_walksafe_product_quality_receipt.py
-  tests/test_walksafe_operator_attestation.py
   tests/test_walksafe_android_product_boundary.py
   tests/test_walksafe_artifact_baseline_materialization_20260722.py
   tests/test_walksafe_fp048_goal_start_gate_20260802.py
@@ -164,7 +162,6 @@ FUNCTIONAL_PYTHON_TESTS=(
 
 INTEGRATION_PYTHON_TESTS=(
   tests/test_runtime_model_integration.py
-  tests/test_release_evidence_gate.py
   tests/test_local_model_registry.py
   tests/test_submission_visual_privacy.py
   backend/tests/test_navigation_routes.py
@@ -194,6 +191,11 @@ HISTORICAL_CONTROL_PYTHON_TESTS=(
   # These tests bind the ignored, local-only legacy submission-candidate package.
   tests/test_submission_build_io.py
   tests/test_submission_promotion.py
+  # These tests bind the Web-inclusive 2026-07-13 Full-RC and its local host toolchain.
+  tests/test_submission_toolchain_host_lock_20260713_history.py
+  tests/test_walksafe_product_quality_receipt.py
+  tests/test_walksafe_operator_attestation.py
+  tests/test_release_evidence_gate.py
   # These snapshot contracts were superseded by the current Android/Gateway and RC boundaries.
   tests/test_android_depth_scaffold_contract.py
   tests/test_walksafe_android_gateway_boundary_20260723.py

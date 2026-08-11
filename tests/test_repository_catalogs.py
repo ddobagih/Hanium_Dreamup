@@ -93,6 +93,13 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
         self.assertEqual(entries["scripts/check_walksafe_goal_graph_v2_3.py"]["lifecycle"], "HISTORICAL")
         self.assertEqual(entries["scripts/check_walksafe_goal_package.py"]["lifecycle"], "HISTORICAL")
         self.assertEqual(entries["scripts/build_walksafe_control_bootstrap.py"]["lifecycle"], "HISTORICAL")
+        for path in (
+            "scripts/check_walksafe_release_evidence_20260711.py",
+            "scripts/run_walksafe_product_quality_20260713.py",
+            "scripts/verify_walksafe_operator_attestation_20260713.py",
+            "scripts/verify_walksafe_signed_android_release_20260713.py",
+        ):
+            self.assertEqual(entries[path]["lifecycle"], "HISTORICAL", path)
         self.assertEqual(entries["scripts/check_android_depth_scaffold_20260531.py"]["lifecycle"], "HISTORICAL")
         self.assertEqual(entries["scripts/check_walksafe_android_gateway_boundary_20260723.py"]["lifecycle"], "HISTORICAL")
         self.assertEqual(entries["scripts/check_walksafe_active_docs.py"]["lifecycle"], "CURRENT")
@@ -225,10 +232,14 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
         self.assertEqual(entries["tests/test_walksafe_goal_package.py"]["lifecycle"], "HISTORICAL")
         for path in (
             "tests/test_android_depth_scaffold_contract.py",
+            "tests/test_release_evidence_gate.py",
             "tests/test_submission_build_io.py",
             "tests/test_submission_promotion.py",
+            "tests/test_submission_toolchain_host_lock_20260713_history.py",
             "tests/test_walksafe_android_gateway_boundary_20260723.py",
             "tests/test_walksafe_full_rc_tooling.py",
+            "tests/test_walksafe_operator_attestation.py",
+            "tests/test_walksafe_product_quality_receipt.py",
         ):
             self.assertEqual(entries[path]["lifecycle"], "HISTORICAL", path)
             self.assertEqual(entries[path]["lifecycle_rule"], "test-runner-historical-array", path)

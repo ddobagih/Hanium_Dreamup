@@ -22,7 +22,7 @@
 | `functional` | 격리 PostGIS를 사용하는 Python 기능/API 테스트, Legacy Web lint·typecheck, Gateway typecheck, Android lint | `unit` 전제와 접근 가능한 `WALKSAFE_TEST_DATABASE_URL` | 운영 DB·실제 네트워크·실기기·배포 검증이 아님 |
 | `integration` | 모델 registry/TFLite 계약/PT smoke, 선택된 Python 통합 테스트, Legacy Web production build·trace, Android debug·AndroidTest APK·unsigned release build와 model asset 검사 | 격리 PostGIS, 모델 파일, Node·Java·Android build 환경, 백업 검사 전용 CPython 3.14.6 | AndroidTest APK 생성은 기기 실행이 아니며 unsigned APK는 배포 서명본이 아님 |
 | `model-audit` | 격리 fixture 기반 데이터 무결성·offline depth 감사 테스트 | 해당 Python 의존성. 실제 데이터가 필요한 후속 감사에는 별도 로컬 입력 | `all`과 분리된 CI 단계이며 정확도·동등성·실기기 성능·데이터 권리 검증을 대신하지 않음 |
-| `HISTORICAL_CONTROL_PYTHON_TESTS` | 동결된 v2.2/v2.3 제어, 완료된 FP046 등 과거 작성·trace snapshot, Git 밖의 기존 제출 후보 자료에 결속된 검사를 inventory에 보존 | 해당 archive·history 계약 또는 로컬 전용 과거 입력 | 실행 선택자가 없고 `all`에서도 실행되지 않으며 현재 제품 PASS 근거가 아님 |
+| `HISTORICAL_CONTROL_PYTHON_TESTS` | 동결된 v2.2/v2.3 제어, 완료된 FP046 등 과거 작성·trace snapshot, Web 포함 2026-07-13 Full-RC·release host와 기존 제출 후보 자료에 결속된 검사를 inventory에 보존 | 해당 archive·history 계약 또는 로컬 전용 과거 입력 | 실행 선택자가 없고 `all`에서도 실행되지 않으며 현재 제품 PASS 근거가 아님 |
 | `active-session-control` | strict continuation 검사 뒤 활성 v2.4 checkpoint의 transition lifecycle을 재검증하는 제어 테스트 | 정확한 활성 checkpoint와 예상 managed content | commit-stable이며 CI에서 별도 실행하지만 기능·정식 시험·Goal 상태 승격을 대신하지 않음 |
 | `all` | `unit` → `functional` → `integration` 순서 | 세 계층의 전제 전부 | `model-audit`·`active-session-control`·외부 작업을 포함하지 않으며, 한 번의 PASS를 정식 279개 시험 또는 출시 PASS로 해석하지 않음 |
 

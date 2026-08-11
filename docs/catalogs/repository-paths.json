@@ -15,7 +15,7 @@
     "GENERATED": 4,
     "GOVERNANCE": 250,
     "LEGACY_REFERENCE": 214,
-    "SUPPORT": 606
+    "SUPPORT": 607
   },
   "entries": [
     {
@@ -86840,6 +86840,32 @@
       },
       "movement": "KEEP",
       "movement_basis": "tests",
+      "path": "tests/test_submission_toolchain_host_lock_20260713_history.py",
+      "path_kind": "FILE",
+      "reason": "repository rule tests"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "tests",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP",
+      "movement_basis": "tests",
       "path": "tests/test_submission_visual_privacy.py",
       "path_kind": "FILE",
       "reason": "repository rule tests"
@@ -90565,11 +90591,11 @@
   ],
   "movement_counts": {
     "ARCHIVE_AFTER_DECOUPLING": 199,
-    "KEEP": 623,
+    "KEEP": 624,
     "KEEP_AS_STUB": 2,
     "KEEP_AT_PATH": 2649
   },
-  "path_count": 3473,
+  "path_count": 3474,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -90581,5 +90607,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8ef11f6a4368dd2fc2967f534875c0944fde999f30174b61575bd093b64928d6"
+  "source_set_sha256": "937ca5152d501dd4d6bc51f0ca61b049c880707d0f17d478aedff784539f6b0f"
 }

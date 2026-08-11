@@ -8,7 +8,7 @@
     "CROSS_REPOSITORY": 48,
     "LEGACY_WEB": 20,
     "MODEL_DATA": 8,
-    "TOOLING": 12,
+    "TOOLING": 13,
     "VOICE": 5
   },
   "catalog_kind": "TESTS",
@@ -1437,8 +1437,8 @@
     {
       "area": "CROSS_REPOSITORY",
       "framework": "PYTEST",
-      "lifecycle": "CURRENT",
-      "lifecycle_rule": "current-test",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_release_evidence_gate.py"
     },
     {
@@ -1503,6 +1503,13 @@
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_submission_promotion.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_submission_toolchain_host_lock_20260713_history.py"
     },
     {
       "area": "TOOLING",
@@ -2270,8 +2277,8 @@
     {
       "area": "CROSS_REPOSITORY",
       "framework": "PYTEST",
-      "lifecycle": "CURRENT",
-      "lifecycle_rule": "current-test",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_operator_attestation.py"
     },
     {
@@ -2319,8 +2326,8 @@
     {
       "area": "CROSS_REPOSITORY",
       "framework": "PYTEST",
-      "lifecycle": "CURRENT",
-      "lifecycle_rule": "current-test",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_product_quality_receipt.py"
     },
     {
@@ -2405,15 +2412,15 @@
     "ANDROID_INSTRUMENTATION_JUNIT": 2,
     "JUNIT": 124,
     "NODE_TEST": 12,
-    "PYTEST": 181,
+    "PYTEST": 182,
     "PYTHON_CLI": 2,
     "TYPESCRIPT_POLICY": 20
   },
   "lifecycle_counts": {
-    "CURRENT": 216,
-    "HISTORICAL": 125
+    "CURRENT": 213,
+    "HISTORICAL": 129
   },
-  "path_count": 341,
+  "path_count": 342,
   "schema_version": "1.0",
   "selection": [
     "test_*.py",
@@ -2431,5 +2438,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8ef11f6a4368dd2fc2967f534875c0944fde999f30174b61575bd093b64928d6"
+  "source_set_sha256": "937ca5152d501dd4d6bc51f0ca61b049c880707d0f17d478aedff784539f6b0f"
 }

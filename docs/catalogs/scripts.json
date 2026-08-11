@@ -2174,7 +2174,7 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8ef11f6a4368dd2fc2967f534875c0944fde999f30174b61575bd093b64928d6",
+  "source_set_sha256": "937ca5152d501dd4d6bc51f0ca61b049c880707d0f17d478aedff784539f6b0f",
   "strongest_side_effect_counts": {
     "DB_DEVICE": 19,
     "EXTERNAL": 8,

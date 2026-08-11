@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -319,15 +320,40 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
         setup_python:regression_install
     ]
     assert 'python-version: "3.12.13"' in workflow[setup_python:regression_install]
+    assert "id: general_base_python" in workflow[setup_python:regression_install]
+    assert (
+        "GENERAL_BASE_PYTHON: ${{ steps.general_base_python.outputs.python-path }}"
+        in workflow[setup_python:regression_install]
+    )
+    assert (
+        'echo "WALKSAFE_GENERAL_BASE_PYTHON=${GENERAL_BASE_PYTHON}" >> "${GITHUB_ENV}"'
+        in workflow[setup_python:regression_install]
+    )
+    assert re.search(r"(?m)^\s+(?:run:\s+)?python(?:\s|$)", workflow[setup_python:]) is None
     general_step = workflow[general_install:backup_setup]
     assert '"pip==26.1.1"' not in general_step
+    assert 'general_environment="${RUNNER_TEMP:?}/walksafe-general-cp312"' in general_step
+    assert '"${WALKSAFE_GENERAL_BASE_PYTHON:?}" -m venv "${general_environment}"' in general_step
+    assert 'general_python="${general_environment}/bin/python"' in general_step
+    assert "sys.implementation.name, *sys.version_info[:3]" in general_step
+    assert "sys.prefix != sys.base_prefix" in general_step
+    assert 'Path(sys.prefix, "pyvenv.cfg").is_file()' in general_step
     assert "--require-hashes --only-binary=:all: --no-compile" in general_step
     assert "-r tests/general-quality-cp312-linux-x86_64-cpu.lock" in general_step
     assert "-r backend/requirements.lock" not in general_step
     assert "-r tests/requirements.lock" not in general_step
     assert "-r backend/requirements.txt" not in general_step
     assert "-r tests/requirements.txt" not in general_step
-    assert "python -m pip check" in general_step
+    assert '"${general_python}" -m pip install' in general_step
+    assert '"${general_python}" -m pip check' in general_step
+    assert 'echo "WALKSAFE_GENERAL_PYTHON_BIN=${general_python}" >> "${GITHUB_ENV}"' in general_step
+    create_general = general_step.index(
+        '"${WALKSAFE_GENERAL_BASE_PYTHON:?}" -m venv "${general_environment}"'
+    )
+    verify_general = general_step.index("sys.prefix != sys.base_prefix")
+    install_general = general_step.index('"${general_python}" -m pip install')
+    export_general = general_step.index("WALKSAFE_GENERAL_PYTHON_BIN=${general_python}")
+    assert create_general < verify_general < install_general < export_general
     assert 'torch.__version__ == "2.11.0+cpu"' in general_step
     assert "torch.version.cuda is None" in general_step
     assert 'torchvision.__version__ == "0.26.0+cpu"' in general_step
@@ -346,6 +372,20 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
     assert workflow.count("WALKSAFE_RUN_ANDROID_DEVICE_TESTS:") == 1
     assert workflow.count("WALKSAFE_TFLITE_SMOKE_IMAGE:") == 1
     assert "PYTHON_BIN=python" not in workflow
+    assert 'PYTHON_BIN="$(command -v python)"' not in workflow
+    for command in (
+        "scripts/generate_walksafe_openapi.py --check",
+        "scripts/check_walksafe_project_continuation_v2_4.py",
+        "scripts/generate_repository_catalogs.py --check",
+        "scripts/check_walksafe_active_docs.py --check",
+        "scripts/run_walksafe_test_layers_current.sh active-session-control",
+        "scripts/run_walksafe_test_layers_current.sh validate",
+        "scripts/run_walksafe_test_layers_current.sh model-audit",
+        "scripts/run_walksafe_test_layers_current.sh all",
+    ):
+        command_start = workflow.index(command, general_install)
+        command_line = workflow[workflow.rfind("\n", 0, command_start) + 1 : workflow.find("\n", command_start)]
+        assert "WALKSAFE_GENERAL_PYTHON_BIN" in command_line or "general_python" in command_line
     assert "working-directory: apps/web" not in workflow[:regression_install]
 
 
