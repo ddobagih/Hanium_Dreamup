@@ -355,19 +355,32 @@ test("item transitions use secret authorization, operation idempotency, and revi
     { env: process.env }
   );
 
-  const racers = Array.from({ length: 8 }, (_, index) =>
-    execFileAsync(
+  const racers = Array.from({ length: 8 }, (_, index) => {
+    const actorId = `privacy-lock-racer-${index}`;
+    return execFileAsync(
       process.execPath,
       [
         "--input-type=module",
         "--eval",
         `const m=await import(${JSON.stringify(moduleUrl)});` +
-          `if(m.activateActorGeneration("privacy-lock-racer-${index}")!==1)process.exit(2);`
+          `const deadline=Date.now()+10000;` +
+          `for(;;){try{` +
+          `if(m.activateActorGeneration(${JSON.stringify(actorId)})!==1)process.exit(2);` +
+          `break;` +
+          `}catch(error){` +
+          `if(!(error instanceof m.PrivacyRightsLedgerError)||` +
+          `error.code!=="busy"||Date.now()>=deadline)throw error;` +
+          `await new Promise(resolve=>setTimeout(resolve,25));` +
+          `}}`
       ],
       { env: process.env }
-    )
+    );
+  });
+  const racerOutcomes = await Promise.allSettled(racers);
+  const rejectedRacer = racerOutcomes.find(
+    (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected"
   );
-  await Promise.all(racers);
+  if (rejectedRacer) throw rejectedRacer.reason;
   for (let index = 0; index < racers.length; index += 1) {
     assert.equal(currentActorGeneration(`privacy-lock-racer-${index}`), 1);
   }

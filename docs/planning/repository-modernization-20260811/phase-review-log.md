@@ -277,3 +277,11 @@
 - 독립 회귀가 최초 path-global 구현의 새 gate 호환성 결함을 발견해 event-scoped로 축소했다. 비대상 synthetic/current gate의 receipt==live PASS와 기존 FP008 start-gate 회귀를 다시 확인했다.
 - 최종 회귀는 CPython 3.12.13 관련 116 PASS, strict continuation+active singleton 42 PASS였다. 비대상 event의 과거 sealed SHA 재사용 FAIL도 직접 고정해 독립 최종 판정을 P0/P1/P2 0으로 닫았다.
 - catalog·runner validate·active docs와 XML 구조·유일성·origin 검사를 통과했다. 과거 receipt·repository-state log·transition history·anchor diff는 0건이다.
+
+네 번째 exact-SHA CI의 Gateway timing race:
+
+- run `31504235536`은 마지막 `all` 전 정적·보안·환경 gate를 전부 통과했고, Unit Python 744 PASS·8 SKIP와 Web 정책 suite도 PASS했다.
+- 첫 Gateway 실행은 88 PASS였으나 두 번째 실행의 동시 8-writer 테스트에서 racer 1개가 제품의 의도된 1초 대기 뒤 `busy`를 반환했다. 각 실행의 state directory가 다르고 crash holder 종료도 확인돼 이전 실행 오염이 아닌 I/O 속도 의존 one-shot 가정으로 판정했다.
+- 제품 timeout 증가·racer 축소·runner 중복 제거는 범위 밖이며 계약을 바꿀 수 있어 채택하지 않았다. test child가 `busy`만 10초 안에서 25ms 간격으로 재시도하고, all-settled 뒤 거부 사유를 전파하는 최소 수정만 적용했다.
+- exact Node 22.23.1 typecheck와 Gateway 88 PASS 연속 2회, diff-check를 확인했다. 독립 검수는 다른 오류 은폐 0, 무한 대기 0, orphan child 0, 기존 actor·ledger·tamper assertions 유지로 P0/P1/P2 0이다.
+- 동일한 단일 CPU·강한 부하 재현 조건에서 패치 전 `busy` 실패를 확인한 뒤, 패치 후 5/5 PASS와 모든 후속 ledger assertions 실행을 확인했다. 진단 child·부하 프로세스와 임시 로그는 남지 않았다.
