@@ -1,0 +1,2185 @@
+{
+  "catalog_kind": "SCRIPTS",
+  "entries": [
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "data_sources/scripts/apply_tactile_damage_area_review_decisions.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "data_sources/scripts/build_aihub513_validation_subset.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "data_sources/scripts/build_walksafe_kr_tactile.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "data_sources/scripts/build_walksafe_v1.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "data_sources/scripts/inspect_aihub513_validation.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "data_sources/scripts/prepare_tactile_damage_area_review_decisions.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/aihub_label_first_download_20260602.sh",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp008_goal_completed_seq49_50_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp008_goal_seq45_46_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp008_goal_started_seq47_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp008_work_session_resumed_seq48_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp046_goal_completed_seq54_55_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp046_goal_seq51_52_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp046_goal_started_seq53_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_goal_graph_v2_4_seq39_20260729.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/audit_project_classification_20260708.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/audit_submission_visual_privacy_20260711.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/audit_walksafe_test_report_contamination_20260711.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/backup_walksafe_data_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_design_documents_20260710.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_latest_model_report_20260710.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_midterm_design_ppt_20260712.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_midterm_design_ppt_practical_deliverables_20260712.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_midterm_design_ppt_template_faithful_20260712.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_submission_assets_20260710.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_submission_forms_20260710.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_answer_review.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_artifact_baseline_approval_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_artifact_baseline_candidate_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_artifact_baseline_candidate_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_artifact_content_readiness_audit_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_artifact_independent_review_record_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_control_bootstrap.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_decision_interview.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_deliverables_guide_20260731.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_design_deliverables_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_effective_baseline.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_effective_decision_register_alignment_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic01_phase_b_trace_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic01_phase_c_trace_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/build_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_feature_policy_baseline_approval_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_feature_policy_baseline_review_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_feature_policy_document.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_feature_policy_report.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_feature_policy_resolution.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_final_artifact_audit_20260727.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_aiml_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_dev_test_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_management_discovery_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_rel_ops_cls_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_sec_ws_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_formal_trace_7_12_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp004_priority_user_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp005_official_environment_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp006_phone_mounting_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp008_admin_review_delivery_trace_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp008_artifact_trace_successor_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp008_gap_backlog_r024_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp008_strict_review_gate_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp010_first_run_registration_trace_20260725.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp011_long_lived_login_trace_20260725.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp012_multi_device_session_ledger_trace_20260726.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp013_integrated_consent_trace_20260725.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp016_camera_centered_buttonless_screen_trace_20260726.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp018_walk_state_recovery_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp035_correction_candidate_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp046_artifact_trace_successor_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp046_strict_review_gate_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp048_artifact_trace_successor_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp048_gap_backlog_r023_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_fp048_strict_review_gate_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_full_rc_20260713.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/build_walksafe_goal_graph_v2_3.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_goal_graph_v2_4.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_implementation_gap_analysis_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_integrated_baseline.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_permission_session_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r011_20260729.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r012_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r013_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r014_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_plan_rebaseline_r022_candidate_20260730.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_project_questionnaire.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_requirements_draft_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_trace_integration_report_20260721.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_v2_5_control_candidate_20260730.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/build_walksafe_w3_engineering_evidence_20260726.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "BLOCKED",
+      "lifecycle_rule": "intentional-fail-closed-exact",
+      "path": "scripts/build_walksafe_web_release_20260711.sh",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/capture_submission_ui_20260710.py",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_android_apk_model_asset_20260713.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_android_depth_scaffold_20260531.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_android_tflite_contract_20260531.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_code_documentation_20260710.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_detect_report_export_trace_20260524.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_detect_v2_contract_smoke_20260523.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_detect_v2_stage1_candidate_health_20260523.sh",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_detect_v2_stage1_image_smoke_20260524.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_accessibility_static.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_admin_report_summary_policy_20260525.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_api_client_contract_policy_20260711.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_field_telemetry_policy_20260711.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_field_test_gateway_20260711.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_motion_projection_policy_20260711.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_motion_roi_policy_20260526.sh",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_navigation_destination_policy_20260525.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_navigation_guidance_policy_20260524.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_policy_suite.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_pwa_policy_20260526.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_risk_evaluator_policy_20260523.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_route_progress_policy_20260525.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_settings_privacy_20260526.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_step_length_policy_20260525.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_voice_report_wiring_20260711.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_frontend_walksafe_test_log_policy_20260701.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_navigation_guidance_timing_20260524.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_navigation_reroute_gate_20260525.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_pwa_browser_lifecycle_20260711.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_pwa_release_update_20260717.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_pwa_server_e2e.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_report_retention_dry_run.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_static_dataset_readiness_20260531.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_tmap_pedestrian_route_smoke_20260524.py",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_voice_contract.py",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_voice_tts_http_cache_20260525.py",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_active_docs.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_backup_source_20260713.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_gitleaks_report.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_goal_graph.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_goal_graph_v2_3.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_goal_graph_v2_5_candidate.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_goal_package.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_legacy_web_boundary_20260722.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_node_toolchain_20260715.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_project_continuation.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_project_continuation_v2_3.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_project_continuation_v2_5_candidate.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_release_evidence_20260711.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_walksafe_remote_field_browser_20260711.py",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_tactile3_reviewed_training_status_20260522.sh",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_tactile3_training_status_20260522.sh",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_test_database_20260713.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/check_walksafe_trusted_proxy_20260716.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "local-build-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/check_walksafe_unified_training_plan_20260601.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/check_web_runtime_trace_scope_20260713.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:check"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/create_walksafe_web_build_manifest_20260711.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:create"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/evaluate_aihub189_depthprediction_offline.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/evaluate_aihub_depth_vs_android.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/evaluate_predictions_manifest_presence_20260531.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/evaluate_yolo_image_level_presence_20260523.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/export_android_tflite_models_20260531.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/export_walksafe_unified_tflite_20260601.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:export"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/finalize_walksafe_deliverables_guide_20260731.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:finalize"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/generate_repository_catalogs.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/generate_walksafe_openapi.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/manage_field_telemetry_retention_20260711.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/manage_local_model_registry.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/materialize_walksafe_artifact_baseline_approval_20260722.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:materialize"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/materialize_walksafe_fp008_goal_seq45_46_20260803.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:materialize"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/materialize_walksafe_fp046_goal_seq51_52_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:materialize"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/materialize_walksafe_fp048_goal_20260802.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:materialize"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/materialize_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:materialize"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/post_reviewed_yolo26s_training_report_20260523.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:post"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/post_yolo26s_training_report_20260522.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:post"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/prepare_android_field_device_20260710.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/promote_submission_final_20260713.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:promote"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/provision_walksafe_admin_device_key.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/prune_walksafe_backups_20260711.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/pull_android_field_sessions_20260710.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/reconcile_walksafe_fp008_isolated_snapshot_fix_seq47a_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:reconcile"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/reconcile_walksafe_fp008_isolated_snapshot_fix_seq47b_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:reconcile"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/reconcile_walksafe_fp008_isolated_snapshot_fix_seq47c_20260809.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:reconcile"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/reconcile_walksafe_fp008_session_snapshot_seq47_20260808.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:reconcile"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/record_walksafe_agency_submission_20260711.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:record"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/restore_walksafe_backup_drill_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/restore_walksafe_private_evidence_modes.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/resume_walksafe_tactile3_yolo26s_20260522.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:resume"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "BLOCKED",
+      "lifecycle_rule": "intentional-fail-closed-exact",
+      "path": "scripts/run_cloudflare_field_test_services_20260711.sh",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_fp008_goal_start_gate_20260803.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_fp008_session_resume_gate_20260809.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_fp046_goal_start_gate_20260809.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_fp048_goal_start_gate_20260802.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_isolated_python_20260713.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_log_retention_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_product_quality_20260713.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "BLOCKED",
+      "lifecycle_rule": "intentional-fail-closed-exact",
+      "path": "scripts/run_walksafe_remote_field_stack_20260711.sh",
+      "strongest_side_effect": "EXTERNAL",
+      "strongest_side_effect_rule": "external-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_report_retention_20260717.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_submission_python_20260714.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_tactile3_reviewed_yolo26s_20260522.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_tactile3_yolo26s_20260521.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/run_walksafe_test_layers_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_test_layers_current.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_unified_aihub183_png_yolo26n_768_20260627.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_unified_aihub183_png_yolo26s_20260627.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "SHELL",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_unified_yolo26n_20260601.sh",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/run_walksafe_web_single_instance_20260713.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:run"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/smoke_android_tflite_runtime_20260711.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:smoke"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/smoke_backend_768_runtime_20260711.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:smoke"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/submission_build_io.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:submission"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/submission_manifest_policy.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:submission"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/summarize_android_field_sessions_20260710.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/summarize_presence_error_candidates_20260531.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/summarize_walksafe_tactile3_reviewed_yolo26s_run_20260523.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/summarize_walksafe_tactile3_yolo26s_run_20260522.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-predecessor-or-legacy-family",
+      "path": "scripts/summarize_web_field_session_20260711.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/test_stt.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:test"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/test_tts.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:test"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/validate_downloads_cleanup_readiness_20260710.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:validate"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/validate_project_classification_20260708.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/validate_submission_forms_20260710.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "read-only-code-review-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/validate_submission_materials_20260710.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "read-only-code-review-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/validate_walksafe_document_preparation.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:validate"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/validate_walksafe_formal_deliverables_0_6.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "read-only-code-review-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/validate_walksafe_full_rc_20260713.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:validate"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/verify_walksafe_operator_attestation_20260713.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:verify"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/verify_walksafe_signed_android_release_20260713.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "verb:verify"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/walksafe_admin_high_risk_gate.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/walksafe_android_dex_binding.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:walksafe"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/walksafe_backup_integrity.py",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/walksafe_dataset_integrity.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:walksafe"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/walksafe_environment_identity.py",
+      "strongest_side_effect": "READ_ONLY",
+      "strongest_side_effect_rule": "read-only-code-review-exact"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/walksafe_external_check_receipt.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:walksafe"
+    },
+    {
+      "entrypoint": false,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/walksafe_release_integrity.py",
+      "strongest_side_effect": "LOCAL_BUILD",
+      "strongest_side_effect_rule": "verb:walksafe"
+    }
+  ],
+  "lifecycle_counts": {
+    "BLOCKED": 3,
+    "CURRENT": 123,
+    "HISTORICAL": 113
+  },
+  "path_count": 239,
+  "roots": [
+    "data_sources/scripts/",
+    "scripts/"
+  ],
+  "schema_version": "1.0",
+  "source_contract": {
+    "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
+    "git_input": "tracked paths excluding deletions plus nonignored untracked paths",
+    "path_format": "UTF-8 POSIX repository-relative",
+    "virtual_output_paths": [
+      "docs/catalogs/repository-paths.json",
+      "docs/catalogs/scripts.json",
+      "docs/catalogs/tests.json"
+    ]
+  },
+  "source_set_sha256": "8ef11f6a4368dd2fc2967f534875c0944fde999f30174b61575bd093b64928d6",
+  "strongest_side_effect_counts": {
+    "DB_DEVICE": 19,
+    "EXTERNAL": 8,
+    "LOCAL_BUILD": 42,
+    "READ_ONLY": 39,
+    "REPOSITORY_WRITE": 131
+  }
+}

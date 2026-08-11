@@ -1,6 +1,6 @@
 # Backend
 
-Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/PostGIS 기반 탐지, 보행 경로 조회, 신고 저장·검토·내보내기를 제공한다.
+Android 사용자 앱과 별도 Android 관리자 앱에 FastAPI 및 PostgreSQL/PostGIS 기반 보행 경로 조회, 신고 저장·검토·내보내기와 관리자 API를 제공한다. 현행 Android 위험 탐지는 앱 내 TFLite가 담당한다.
 
 ## 책임 경계
 
@@ -63,21 +63,19 @@ PYTHONPATH=. python scripts/provision_walksafe_admin_device_key.py \
 | `tests/` | 순수 계약 테스트와 PostGIS 통합 테스트 |
 | `alembic/` | PostGIS schema migration |
 
-상세 API와 환경 변수는 `docs/backend/api_reference.md`, `docs/backend/backend_environment.md`를 기준으로 본다.
+현행 API schema는 실제 route·Pydantic source에서 생성한 [`contracts/walksafe.openapi.json`](../contracts/walksafe.openapi.json), 로컬 환경 절차는 [개발 환경 가이드](../docs/guides/development-environment-guide.md#python과-backend), 환경값은 [`backend/.env.example`](.env.example)과 실제 `config.py`를 기준으로 본다. [`docs/backend/api_reference.md`](../docs/backend/api_reference.md)와 [`docs/backend/backend_environment.md`](../docs/backend/backend_environment.md)는 FP-046 완료 근거에 bytes가 결속된 역사 설명이므로 오래된 인증·저장·실행 문구를 현행 계약으로 사용하지 않는다.
 
 ## 실행
 
+Backend lock과 로컬 설정을 준비하는 정확한 순서는 [개발 환경 가이드](../docs/guides/development-environment-guide.md#python과-backend)를 따른다. Compose는 `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`가 없는 상태에서 실행되지 않으므로 `backend/.env`를 먼저 만들고 예시의 `CHANGE_ME`를 실제 로컬 값으로 바꾼다.
+
 ```bash
-docker compose up -d db
+source .venv-backend/bin/activate
+docker compose --env-file backend/.env up -d db
 python -m alembic -c backend/alembic.ini upgrade head
 PYTHONPATH=. python -m uvicorn backend.app.main:app --reload --port 8000
 ```
 
 ## 검증
 
-```bash
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. WALKSAFE_TEST_DATABASE_URL="$WALKSAFE_TEST_DATABASE_URL" \
-  .venv/bin/python -m pytest -p no:cacheprovider backend/tests -q
-```
-
-`WALKSAFE_TEST_DATABASE_URL`은 이름에 `test`가 포함된 전용 PostGIS를 가리켜야 하며 운영 DB와 같을 수 없다. 지정한 DB에 연결할 수 없으면 테스트는 skip하지 않고 실패한다.
+Backend 검증도 개별 `backend/tests`를 한 번에 직접 수집하지 않고 [현재 테스트 가이드](../docs/guides/testing-guide.md)와 `scripts/run_walksafe_test_layers_current.sh`의 Unit·Functional·Integration 분류를 사용한다. 테스트 Python은 `.venv-tests/bin/python`, DB 검사가 필요한 계층은 이름에 `test`가 포함되고 운영 DB와 다른 전용 PostGIS를 사용한다. 지정한 DB에 연결할 수 없으면 테스트는 skip하지 않고 실패한다.

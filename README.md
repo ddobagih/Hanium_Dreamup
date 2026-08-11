@@ -1,85 +1,79 @@
-# Hanium Dreamup — WalkSafe
+# Hanium DreamUp — WalkSafe
 
-WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프로젝트입니다. 카메라로 가까운 위험을 찾고, TMAP으로 큰 이동 방향을 안내하며, 손상된 점자블록 신고를 돕습니다. 안전시험이 끝나기 전에는 흰지팡이·안내견·보호자를 대신하거나 보행 안전을 보장하는 제품으로 설명하지 않습니다.
+WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프로젝트입니다. 카메라와 기기 내 AI로 가까운 위험을 찾고, TMAP 기반 보행 경로와 음성·진동 안내를 제공하며, 손상된 점자블록 신고를 돕습니다. 정식 안전시험 전에는 흰지팡이·안내견·보호자를 대신하거나 보행 안전을 보장하는 제품으로 설명하지 않습니다.
 
-## 현재 제품 경계
+## 빠른 링크
 
-정책 기준선은 `PB-WALKSAFE-FEATURE-POLICY-1.0.1`입니다.
+| 찾는 내용 | 시작점 |
+|---|---|
+| 제품 코드와 구조 | [코드 가이드](docs/guides/code-guide.md) |
+| 팀 기능 분담 | [기능 구현 카탈로그](docs/planning/walksafe_feature_implementation_catalog.html) |
+| 산출물 정본 | [산출물 대장 current notice](docs/deliverables/00-control/artifact-register-current-notice-20260728-r001.md) |
+| 자동 테스트와 정식 시험 | [테스트 가이드](docs/guides/testing-guide.md) |
+| 현재 상태와 다음 작업 | [continuation checkpoint](docs/control/walksafe-project-continuation-checkpoint.json) |
+| 레거시 사용 금지 경계 | [저장소 가이드 — 레거시 경계](docs/guides/repository-guide.md#레거시-경계) |
+| 기여·보안 | [CONTRIBUTING](CONTRIBUTING.md) · [SECURITY](SECURITY.md) |
 
-| 구성 | 현재 역할 | 외부 배포 |
+[전체 가이드 포털](docs/guides/README.md)에서 프로젝트·개발환경·코드·산출물·스크립트·데이터/AI·보안·릴리스·팀 작업 안내를 찾을 수 있습니다.
+
+## 현재 상태
+
+기준일은 2026-08-11이며, 동적 현재 상태의 정본은 [checkpoint](docs/control/walksafe-project-continuation-checkpoint.json)입니다.
+
+- Goal package: v2.4 `ACTIVE`
+- 다음 내부 작업: `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`, Goal `READY`; 내부 시작 gate `NOT_RUN`
+- 정식 시험: 279/279 `NOT_RUN`
+- 출시 gate: 5/5 `NOT_RUN`, 면제 없음
+- 실제 기기·현장·운영 배포·외부 수락: `NOT_RUN`
+- 출시 상태: `NOT_ELIGIBLE`
+
+자동 테스트나 debug build가 통과해도 위 정식 시험·배포·출시 완료를 뜻하지 않습니다.
+
+## 제품 경계
+
+정책 기준선은 [PB-WALKSAFE-FEATURE-POLICY-1.0.1](docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json)입니다.
+
+| 구성 | 역할 | 상태 |
 |---|---|---|
-| `apps/android/app` | 일반 사용자용 Android 앱 | 정식 제품 후보. 승인된 서명·기기 시험·출시 승인을 거친 뒤 Google Play 배포 |
-| `apps/android/adminapp` | 한 명의 지정 관리자가 신고 검수와 수동 기관 전달 사실·상태·감사기록을 처리하는 제품 경계 | FP-008 저장소 내부 구현과 host/offline 검증 완료. 관리자 전용 서명·사설 배포·실기기·기관 전달·정식시험·출시승인은 `NOT_RUN` |
-| `backend` | 계정·신고·데이터·외부 API용 서버 | Android 제품을 지원하는 서버 후보 |
-| `apps/android-gateway` | Android의 세션·경로·목적지 검색·신고를 중계하는 독립 API Gateway | 내부 구현·검증 완료, 실제 배포·실기기 연결은 `NOT_RUN` |
-| `apps/web`의 UI·PWA·관리자·과거 API 코드 | `LEGACY_REFERENCE_ONLY` | 모든 Next 런타임 요청은 `410`, 외부 실행·정식 배포·출시 산출물 생성 금지 |
+| [`apps/android/app`](apps/android/app) | 일반 사용자용 Android 앱 | `CURRENT_PRODUCT`, 정식 출시 전 |
+| [`apps/android/adminapp`](apps/android/adminapp) | 지정 관리자용 별도 Android 앱 | `CURRENT_PRODUCT`, 내부 검증만 수행 |
+| [`apps/android-gateway`](apps/android-gateway) | Android 세션·보행·길찾기·신고·개인정보 제어 Gateway | `SUPPORT`, 실제 배포 `NOT_RUN` |
+| [`backend`](backend) | 계정·신고·관리자·데이터·외부 API 서버 | `SUPPORT`, 운영 배포 `NOT_RUN` |
+| [`model`](model) · [`data_sources`](data_sources) | 모델 runtime·학습 후보·provenance | `SUPPORT`, 정식 모델 승인 전 |
+| [`apps/web`](apps/web) | 과거 Web/PWA 코드와 410 경계 회귀 | `LEGACY_REFERENCE_ONLY`, 구현·출시 근거 사용 금지 |
+| [`voice`](voice) | 별도 로컬 음성 prototype | `LEGACY_REFERENCE`, Android 제품 경로 아님 |
 
-Web/PWA 소스는 과거 구현 회귀와 역사 참고자료로 보존합니다. Android가 사용하는 4개 API는 독립 Gateway로 추출됐고 Next 런타임 예외는 없습니다. Web 화면을 현재 사용자 제품, Android 완료 근거, 출시 후보로 사용하지 않습니다. `scripts/run_walksafe_remote_field_stack_20260711.sh`는 정책상 fail-closed 상태이며 공개 터널을 열지 않습니다.
-
-현재 5개 출시 gate는 모두 `NOT_RUN`이고 출시는 `NOT_ELIGIBLE`입니다. 코드가 빌드되거나 내부 테스트가 통과해도 실폰·현장·접근성·복구·용량 검증이 끝났다는 뜻은 아닙니다.
+관리자 앱은 외부 기관에 자동 전송하지 않습니다. 앱 밖에서 실제 수행한 수동 전달 사실과 상태를 기록할 뿐입니다.
 
 ## 작업 시작
 
-터미널이나 대화 문맥이 사라졌다면 먼저 다음 파일을 읽습니다.
-
-1. `AGENTS.md`
-2. `docs/control/walksafe-project-resumption-runbook.md`
-3. `docs/control/walksafe-project-continuation-checkpoint.json`
-
-그다음 읽기 전용 검사를 실행합니다.
+1. [AGENTS.md](AGENTS.md)를 읽습니다.
+2. [프로젝트 가이드](docs/guides/project-guide.md)와 [개발환경 가이드](docs/guides/development-environment-guide.md)를 확인합니다.
+3. 읽기 전용 continuation 검사를 실행합니다.
 
 ```bash
-python3 -B scripts/check_walksafe_project_continuation.py
+python3 -B scripts/check_walksafe_project_continuation_v2_4.py
 ```
 
-산출물의 승인 상태와 다음 작업은 위 체크포인트와 DOC-01을 따릅니다. 과거 README나 현재 코드가 승인 정책과 다르면 승인 정책을 우선합니다.
+현재 standalone 저장소의 Goal graph 검사는 제외된 과거 history 때문에 기존 63건이 실패합니다. 이를 성공으로 오인하거나 새 실패와 섞지 않습니다. 제품 기능 변경 전에는 `AGENTS.md`, 현재 checkpoint와 checkpoint가 가리키는 focus Goal의 event-scoped 계약을 따라야 합니다. hash로 봉인된 과거 재개 안내서의 gate 명령은 현행 절차가 아닙니다.
 
-## Android 사용자 앱 개발
+빌드·테스트 대표 명령은 [테스트 가이드](docs/guides/testing-guide.md), 환경 구성은 [개발환경 가이드](docs/guides/development-environment-guide.md)만 기준으로 사용합니다.
 
-```bash
-cd apps/android
-./gradlew test --no-daemon
-./gradlew assembleDebug --no-daemon
-```
+## 산출물과 구현 상태
 
-debug APK는 개발·내부 검증용입니다. 정식 배포에는 사용자 앱과 관리자 앱의 서로 다른 식별자·서명·배포 기록, 지원 기기 검사, 불변 릴리스 묶음과 별도 승인이 필요합니다. 사용자 앱은 `apps/android/README.md`, 관리자 앱은 `apps/android/adminapp/README.md`를 봅니다.
+- 산출물 작성·변경 절차: [산출물 가이드](docs/guides/deliverables-guide.md)
+- 최신 구현 Gap: [r025 Gap](docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json)
+- 최신 수정 백로그: [r025 Backlog](docs/control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json)
+- 기능별 분담: [팀 기능 카탈로그](docs/planning/walksafe_feature_implementation_catalog.html)
 
-## 서버 개발
+기존 승인 기록·Goal event·gate 증거와 canonical register는 직접 수정하지 않습니다. 변경 절차는 가이드와 checkpoint를 따릅니다.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r backend/requirements.txt
-cp backend/.env.example backend/.env
-docker compose up -d db
-python -m alembic -c backend/alembic.ini upgrade head
-PYTHONPATH=. python -m uvicorn backend.app.main:app --reload --port 8000
-```
+## 모델·데이터 저장 정책
 
-독립 Android API Gateway는 `apps/android-gateway`에 있습니다. 개발용 기본 bind는 `127.0.0.1:8081`, 내부 Backend origin은 `http://127.0.0.1:8000`입니다. 실제 HTTPS 배포·운영 비밀 주입·실기기 연결은 아직 실행하지 않았으므로 운영 완료로 해석하지 않습니다.
+현재 저장소에는 Android runtime에 필요한 TFLite 3개와 추적 가능한 모델 후보 PT 1개가 명시적 예외로 포함되어 있습니다. 이 예외는 새 weight·dataset·사용자 자료를 임의로 Git에 추가해도 된다는 뜻이 아닙니다.
 
-## Legacy Web 회귀검사
+원본 데이터셋, 사용자 영상·음성·정확 위치, 비밀값, 운영 로그, 신규 대형 모델 산출물은 Git에 넣지 않습니다. 자세한 반입·provenance 규칙은 [데이터·AI 가이드](docs/guides/data-ai-guide.md)를 따릅니다.
 
-로컬 개발 환경에서 과거 동작의 회귀만 확인할 수 있습니다.
+## 현대화 전 복구 지점
 
-```bash
-cd apps/web
-npm ci
-npm test
-npm run lint
-npm run typecheck
-npm run build
-```
-
-`npm run dev`, `npm run start`를 실행해도 모든 Next 요청은 `410`으로 닫힙니다. PWA 설치, 공개 터널, Web release/full-RC 도구는 현재 제품 실행·배포 절차가 아닙니다. 자세한 경계는 `apps/web/README.md`와 `deploy/README.md`를 봅니다.
-
-## 핵심 문서
-
-- 정책 기준선: `docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json`
-- 산출물 관리대장: `docs/deliverables/00-control/artifact-register.json`
-- 요구사항 추적표: `docs/deliverables/03-requirements/rtm.json`
-- 구현 Gap: `docs/control/audits/walksafe-implementation-gap-analysis-20260722-r001.json`
-- 수정 백로그: `docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r001.json`
-- 현재 구현 기록: `docs/control/execution/walksafe-epic-01-phase-a-implementation-record-20260722.md`
-
-모델·데이터 원본, `.pt`·`.onnx`·`.tflite`, 사용자 영상·음성·정확 위치, 비밀값과 운영 로그는 Git에 넣지 않습니다.
+현대화 전 `current`는 원격 `archive/current-pre-modernization-20260811`, 태그 `preservation/current-pre-modernization-20260811`, 권한 제한 로컬 bundle로 보존했습니다. 검증 기록은 [preservation record](docs/planning/repository-modernization-20260811/preservation-record.md)에 있습니다. 기존 `main`은 변경하지 않았습니다.

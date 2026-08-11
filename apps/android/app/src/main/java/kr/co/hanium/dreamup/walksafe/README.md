@@ -42,4 +42,4 @@ trusted GPS + step sensor
 - `reporter_user_id`는 현재 로컬 입력값이며 서버 인증 주체가 아니다.
 - JVM 테스트와 APK 빌드는 실기기 ARCore/보행 검증을 대체하지 않는다.
 
-빌드와 현재 검증 한계는 [`apps/android/README.md`](../../../../../../../../../README.md)를 먼저 본다.
+현행 빌드와 검증 한계는 [Android 사용자 앱 코드 지도](../../../../../../../../../../../docs/guides/code/android-user.md)를 먼저 본다. `apps/android/README.md`는 hash로 결속된 과거 snapshot이므로 현행 절차로 사용하지 않는다.

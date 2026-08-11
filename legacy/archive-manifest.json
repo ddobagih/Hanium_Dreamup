@@ -1,0 +1,38 @@
+{
+  "archive_id": "repository-modernization-20260811",
+  "classification": "LEGACY_REFERENCE",
+  "entries": [
+    {
+      "byte_length": 2532,
+      "destination_movement": "KEEP_AT_PATH",
+      "destination_path": "legacy/ai_tasks/walksafe_two_model_runtime_20260522/README.md",
+      "git_blob_oid": "e5bac52769221da60ff3d3ed6d5021b871844cfc",
+      "git_mode": "100644",
+      "historical_only": true,
+      "sha256": "2dda69f3e8946a706f5313c1511ff1e9f74c079b882feaa88e34f5c8cdcbaab7",
+      "source_classification": "LEGACY_REFERENCE",
+      "source_movement": "ARCHIVE_READY",
+      "source_path": "ai_tasks/walksafe_two_model_runtime_20260522/README.md"
+    },
+    {
+      "byte_length": 2004,
+      "destination_movement": "KEEP_AT_PATH",
+      "destination_path": "legacy/ai_tasks/walksafe_two_model_runtime_20260522/TASK_PROMPT_FOR_AI.md",
+      "git_blob_oid": "bb7b31831b662b2830580ef17e5b125ce3d84372",
+      "git_mode": "100644",
+      "historical_only": true,
+      "sha256": "b7f7117b18d670f13ac4f955750668b49105c1ba3480e18097e7d2c4e057f0fa",
+      "source_classification": "LEGACY_REFERENCE",
+      "source_movement": "ARCHIVE_READY",
+      "source_path": "ai_tasks/walksafe_two_model_runtime_20260522/TASK_PROMPT_FOR_AI.md"
+    }
+  ],
+  "payload_bytes_modified": false,
+  "preservation": {
+    "archive_branch": "archive/current-pre-modernization-20260811",
+    "commit": "f0093863e82bfc80d9f11915cef33a51d44b8730",
+    "tag": "preservation/current-pre-modernization-20260811"
+  },
+  "reason": "Unbound historical AI handoff package removed from the current work list and moved into the Legacy area after repository-wide reference and checkpoint audit.",
+  "schema_version": "1.0"
+}

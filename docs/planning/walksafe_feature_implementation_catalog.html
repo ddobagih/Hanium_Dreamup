@@ -249,7 +249,9 @@
       header { padding: 1rem 0; background: white; color: black; }
       header p { color: #333; }
       .notice { margin-top: 0; }
-      .controls, .skip-link, .assignment input, .done-cell input { display: none; }
+      .controls, .skip-link { display: none; }
+      .assignment input { border: 0; padding: 0; background: white; color: black; }
+      .done-cell input { display: inline-block; print-color-adjust: exact; }
       .table-card, .notice, .legend, .summary article { box-shadow: none; }
       .table-scroll { overflow: visible; }
       table { min-width: 0; font-size: 8pt; }
@@ -264,7 +266,7 @@
     <div class="wrap">
       <h1>WalkSafe 기능 구현·분담 목록</h1>
       <p>팀원이 구현할 기능을 분야 → 큰 기능 → 세부 기능으로 나눈 작업용 목록입니다.</p>
-      <p>기준일: 2026-08-10 · 기준 브랜치: <strong>current</strong></p>
+      <p>기준일: 2026-08-11 · 기준 브랜치: <strong>current</strong></p>
     </div>
   </header>
 
@@ -420,6 +422,7 @@
       {id:"AD-05",domain:"신고 · 관리자 업무",group:"관리자 검수",feature:"신고 생명주기 상태 변경",status:"미구현",next:"new·reviewed·resolved 변경 API와 관리자 UI를 연결한다.",owner:"Android Admin · Backend",priority:"P0"},
       {id:"AD-06",domain:"신고 · 관리자 업무",group:"고위험 작업",feature:"상태변경·내보내기·삭제 전 재인증",status:"일부 구현",next:"일회용 재인증 기반 코드를 실제 관리자 화면에 연결한다.",owner:"Android Admin · 보안 · Backend",priority:"P0"},
       {id:"AD-07",domain:"신고 · 관리자 업무",group:"기관 전달",feature:"전화·공문 등 수동 전달 결과 기록",status:"내부 구현",next:"기관별 절차와 접수번호·증빙 형식을 실제로 검증한다.",owner:"운영 · Android Admin",priority:"P1"},
+      {id:"AD-08",domain:"신고 · 관리자 업무",group:"기관 전달",feature:"최소정보 기관 제출본 생성·내보내기",status:"일부 구현",next:"Backend의 최소정보 CSV·manifest 제출본을 관리자 앱에 연결하고 판본·파일지문을 전달 이력·수신 증거와 묶는다.",owner:"Android Admin · Backend · 개인정보",priority:"P1"},
       {id:"AD-09",domain:"신고 · 관리자 업무",group:"감사",feature:"관리자 앱에서 감사 이력 보기",status:"미구현",next:"조회·변경·전달·복구 감사 이력을 읽는 화면을 만든다.",owner:"Android Admin · Backend",priority:"P2"},
 
       {id:"PV-01",domain:"개인정보 · 보안",group:"권한",feature:"사용자 권한과 관리자 권한 나누기",status:"내부 구현",next:"운영 로그인·권한 시스템과 실제 계정으로 확인한다.",owner:"보안 · 서버",priority:"P0"},
@@ -438,7 +441,7 @@
       {id:"PV-14",domain:"개인정보 · 보안",group:"외부 검토",feature:"개인정보 영향평가와 외부 보안 검토",status:"미구현",next:"현재 데이터 흐름을 기준으로 개인정보 영향평가와 독립 검토를 한다.",owner:"개인정보책임자 · 보안책임자",priority:"P2"},
 
       {id:"SV-01",domain:"서버 · Gateway · 저장소",group:"Gateway",feature:"앱의 로그인·길찾기·신고 요청 중계",status:"내부 구현",next:"운영 서버·보안 통신·실제 휴대전화와 연결한다.",owner:"Gateway · 서버 운영",priority:"P0"},
-      {id:"SV-02",domain:"서버 · Gateway · 저장소",group:"Gateway",feature:"계정 삭제 요청 경로 3개 연결",status:"미구현",next:"삭제 요청·상태·기기 증거 경로와 요청 크기 제한을 추가한다.",owner:"Gateway · 서버 운영",priority:"P0"},
+      {id:"SV-02",domain:"서버 · Gateway · 저장소",group:"Gateway",feature:"계정 삭제 요청 경로 3개 연결",status:"내부 구현",next:"실제 Android·Gateway·Backend와 운영 형태의 삭제 흐름을 검증한다.",owner:"Gateway · 서버 운영",priority:"P0"},
       {id:"SV-03",domain:"서버 · Gateway · 저장소",group:"세션 저장",feature:"장기 세션·기기 목록·토큰 재사용 탐지",status:"내부 구현",next:"단일 호스트 파일 저장을 운영 저장소 정책과 맞춘다.",owner:"Gateway · 보안",priority:"P1"},
       {id:"SV-04",domain:"서버 · Gateway · 저장소",group:"보행 세션",feature:"한 번에 한 기기만 보행 세션 사용",status:"내부 구현",next:"여러 서버에서 쓸지 정하고 공유 저장소와 연결한다.",owner:"Gateway · 아키텍처",priority:"P1"},
       {id:"SV-05",domain:"서버 · Gateway · 저장소",group:"개인정보 기록",feature:"동의·권리·삭제 기록의 위변조 확인",status:"내부 구현",next:"운영 키 교체·백업·복원과 외부 검토를 한다.",owner:"Gateway · 보안 · 서버 운영",priority:"P1"},
@@ -461,16 +464,16 @@
       {id:"ML-09",domain:"AI 데이터 · 모델 운영",group:"모델 생명주기",feature:"모델 등록·기준값·앱/서버 연결·되돌리기",status:"일부 구현",next:"이전 정상 모델을 지정하고 배포·되돌리기를 연습한다.",owner:"AI 운영 · 출시",priority:"P1"},
       {id:"ML-10",domain:"AI 데이터 · 모델 운영",group:"운영 개선",feature:"성능 변화 감시와 검수자료 재학습",status:"미구현",next:"동의·삭제를 지키며 검수자료를 다시 학습에 쓰는 절차를 만든다.",owner:"AI 운영 · 개인정보",priority:"P3"},
 
-      {id:"QA-01",domain:"품질 · 출시 · 산출물",group:"계획",feature:"현행 Android 로드맵·백로그·완료 기준",status:"문서 정리 필요",next:"과거 Web 중심 문서를 대체하는 현행 작업 기준을 만든다.",owner:"PM · 문서통제",priority:"P0"},
+      {id:"QA-01",domain:"품질 · 출시 · 산출물",group:"계획",feature:"현행 Android 로드맵·백로그·완료 기준",status:"내부 구현",next:"checkpoint와 다음 Goal이 바뀔 때 중앙 가이드와 분담 목록을 함께 갱신한다.",owner:"PM · 문서통제",priority:"P0"},
       {id:"QA-02",domain:"품질 · 출시 · 산출물",group:"UX 산출물",feature:"사용자·관리자 화면 지도와 고충실도 시제품",status:"미구현",next:"상태별 화면, TalkBack 순서, 오류·안전정지 화면을 설계한다.",owner:"UX · Android",priority:"P1"},
       {id:"QA-03",domain:"품질 · 출시 · 산출물",group:"사용자 검증",feature:"대상 사용자 조사와 UAT",status:"미구현",next:"안전요원·중단계획을 포함한 사용자 검증을 수행한다.",owner:"UX Research · QA",priority:"P2"},
       {id:"QA-04",domain:"품질 · 출시 · 산출물",group:"정식 시험",feature:"정식 시험 279건 실행",status:"검증 미실행",next:"하나의 고정 후보로 전체 시험을 실행하고 결과 기록을 남긴다.",owner:"QA · 출시",priority:"P0"},
       {id:"QA-05",domain:"품질 · 출시 · 산출물",group:"실기기 시험",feature:"사용자 앱 전체 흐름을 휴대전화에서 시험",status:"검증 미실행",next:"카메라·AI·거리·음성·길안내를 지원 휴대전화에서 실행한다.",owner:"Android QA · AI QA",priority:"P0"},
       {id:"QA-06",domain:"품질 · 출시 · 산출물",group:"접근성 시험",feature:"화면 읽기·큰 글자·진동·소음 환경 시험",status:"검증 미실행",next:"접근성 점검표와 실제 사용자 결과를 남긴다.",owner:"접근성 QA",priority:"P0"},
       {id:"QA-07",domain:"품질 · 출시 · 산출물",group:"현장 시험",feature:"야외·장시간·발열·배터리 시험",status:"검증 미실행",next:"지원 환경과 중단 기준을 정해 통제된 현장시험을 한다.",owner:"현장 QA · 안전담당",priority:"P0"},
-      {id:"QA-08",domain:"품질 · 출시 · 산출물",group:"회귀 테스트",feature:"Backend lifespan 회귀 1건 수정",status:"미구현",next:"신규 privacy HMAC DB 초기화를 mock하고 선택 회귀를 다시 통과시킨다.",owner:"Backend QA",priority:"P0"},
+      {id:"QA-08",domain:"품질 · 출시 · 산출물",group:"회귀 테스트",feature:"Backend lifespan 회귀 수정",status:"내부 구현",next:"privacy HMAC DB 초기화 mock이 포함된 회귀를 CI에서 계속 실행한다.",owner:"Backend QA",priority:"P0"},
       {id:"QA-09",domain:"품질 · 출시 · 산출물",group:"회귀 테스트",feature:"독립 current 저장소의 Goal graph 회귀 정리",status:"미구현",next:"비공개 과거 Git 이력 없이 고정 preimage를 검증하도록 fixture를 정리한다.",owner:"Control · QA",priority:"P0"},
-      {id:"QA-10",domain:"품질 · 출시 · 산출물",group:"CI",feature:"current 브랜치 전체 CI Green",status:"일부 구현",next:"Goal graph·Backend 회귀를 고치고 실제 GitHub Actions 결과를 남긴다.",owner:"QA · DevOps",priority:"P0"},
+      {id:"QA-10",domain:"품질 · 출시 · 산출물",group:"CI",feature:"current 브랜치 전체 CI Green",status:"일부 구현",next:"현대화 commit을 current에 게시하고 exact SHA의 GitHub Actions 결과를 남긴다.",owner:"QA · DevOps",priority:"P0"},
       {id:"QA-11",domain:"품질 · 출시 · 산출물",group:"사용자 앱 출시",feature:"Google Play에서 사용자 앱을 단계별 배포",status:"일부 구현",next:"서명된 앱을 내부 시험·제한 사용자·정식 운영 순서로 배포한다.",owner:"출시 · Android",priority:"P0"},
       {id:"QA-21",domain:"품질 · 출시 · 산출물",group:"관리자 앱 출시",feature:"관리자 앱을 별도 서명해 사설 배포",status:"일부 구현",next:"별도 키를 보관하고 승인된 관리자 기기에만 설치·업데이트한다.",owner:"출시 · Android · 보안",priority:"P1"},
       {id:"QA-22",domain:"품질 · 출시 · 산출물",group:"안전한 업데이트",feature:"보행 중 업데이트 미루기와 이전 정상판 복구",status:"일부 구현",next:"활성 보행은 안전 종료 뒤 갱신하고 자료 손실 없는 되돌리기를 연습한다.",owner:"출시 · Android · 서버 운영",priority:"P0"},
@@ -483,7 +486,7 @@
       {id:"QA-17",domain:"품질 · 출시 · 산출물",group:"출시 Gate",feature:"클라우드 비용 실측",status:"검증 미실행",next:"실제 사용량·저장·백업·지도 서비스 비용을 측정한다.",owner:"서버 운영 · PM",priority:"P0"},
       {id:"QA-18",domain:"품질 · 출시 · 산출물",group:"출시 Gate",feature:"관리자 휴대전화 분실 복구 훈련",status:"검증 미실행",next:"휴대전화 밖 복구자료로 새 기기 복구·세션 폐기·감사를 실행한다.",owner:"보안 · 운영 · QA",priority:"P0"},
       {id:"QA-19",domain:"품질 · 출시 · 산출물",group:"출시 자료",feature:"사용 부품 목록·출처·서명·출시 안내",status:"일부 구현",next:"실제 배포 파일과 정확히 묶어 승인 기록을 만든다.",owner:"출시 · 보안",priority:"P2"},
-      {id:"QA-20",domain:"품질 · 출시 · 산출물",group:"현행 문서",feature:"README·runbook·API 수량·모델 설명 갱신",status:"문서 정리 필요",next:"seq57·r025·Gateway 실제 경로·현재 모델 기준으로 고친다.",owner:"문서통제 · 각 기술담당",priority:"P1"}
+      {id:"QA-20",domain:"품질 · 출시 · 산출물",group:"현행 문서",feature:"README·가이드·API 수량·모델 설명 갱신",status:"내부 구현",next:"source·OpenAPI·checkpoint 변경과 같은 PR에서 중앙 가이드를 유지한다.",owner:"문서통제 · 각 기술담당",priority:"P1"}
     ];
 
     const statusClass = {
@@ -630,7 +633,7 @@
         assigned_owner: saved[item.id]?.owner || "",
         assignment_done: Boolean(saved[item.id]?.done)
       }));
-      const blob = new Blob([JSON.stringify({catalog_date:"2026-08-10", assignments:result}, null, 2)], {type:"application/json"});
+      const blob = new Blob([JSON.stringify({catalog_date:"2026-08-11", assignments:result}, null, 2)], {type:"application/json"});
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

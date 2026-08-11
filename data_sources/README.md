@@ -1,47 +1,37 @@
-# 데이터 소스
+# WalkSafe 데이터 소스
 
-이 폴더는 WalkSafe 학습 데이터의 변환 코드, 검수 결정, provenance manifest를 관리합니다. 원본 이미지와 materialize된 대용량 데이터셋은 로컬 전용이며 이 폴더에 복사하거나 Git에 커밋하지 않습니다.
+이 폴더는 학습 데이터 변환 코드, 소규모 확정 라벨·검수 결정과 provenance 근거를 관리합니다. 원본 이미지와 materialized 대용량 dataset은 저장소에 포함하지 않습니다.
 
-## 현재 기준
+## 현재 상태
 
-- data.yaml: `datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml`
-- 구성: 13 classes, train 167,759장, val 28,747장, 독립 test 없음
-- 전체 materialize: 196,506장, bbox 607,814개
-- 학습/평가 인덱스: `reports/walksafe_best_eval_20260708/training_reference_index_20260708.md`
-- 소스별 상세 provenance: `data_sources/manifests/walksafe_aihub_source_usage_20260628.md`
-- 현재 데이터 계약: `docs/model-data/walksafe_13class_dataset_source_contract_20260619.md`
+[dataset register](../docs/deliverables/08-ai-ml-data/registers/dataset-register.json)는 현재 dataset을 `CANDIDATE_REVALIDATION_REQUIRED`로 기록합니다. 선언된 `data.yaml`과 materialized manifest는 이 저장소에 없고, content hash·split 누수·권리·개인정보·독립 test가 검증되지 않았습니다.
 
-실제 포함 소스는 COCO 2017, AIHub 186, AIHub 513, AIHub 189 Surface, AIHub 572 이륜자동차 안전 위험 시설물 승인 전동킥보드, AIHub 189 수동 승인 전동킥보드 7장입니다. 기존 경로와 source key의 `aihub183`은 레거시 내부 별칭입니다. 다운로드 폴더에 파일이 있다는 사실과 현재 학습본에 포함됐다는 사실을 혼동하지 않습니다.
+과거 문서의 이미지·bbox 수치는 재계산되지 않은 선언값입니다. 로컬 폴더가 존재하거나 파일을 내려받았다는 사실만으로 현재 학습본 포함·권리 확인·출시 적격을 주장하지 않습니다.
 
 ## 폴더 책임
 
 | 경로 | 책임 |
-| --- | --- |
-| `scripts/` | 데이터 탐색, 빌드, 검수팩 생성·적용, 감사, 검증 CLI |
-| `manifests/` | 입력 provenance, split, 변환, 검수 결정과 실행 요약 근거 |
-| `manual_reviews/` | 사람이 확정한 검수 CSV. 자동 제안과 구분해서 취급 |
-| `labels/` | 사람이 수정해 확정한 소규모 YOLO 라벨 |
+|---|---|
+| [`scripts/`](scripts/) | 데이터 탐색·빌드·검수팩·감사·검증 CLI |
+| [`manifests/`](manifests/) | 저장소에 보존 가능한 source·변환·검수 근거 |
 
-스크립트 분류와 안전한 실행 순서는 `data_sources/scripts/README.md`를 봅니다.
+현재 데이터 관리 정책과 후보 상태는 [data management](../docs/deliverables/08-ai-ml-data/data-management.md), [dataset register](../docs/deliverables/08-ai-ml-data/registers/dataset-register.json), [데이터·AI 가이드](../docs/guides/data-ai-guide.md)를 함께 봅니다.
 
-## 검증
+## 로컬 dataset 검증
 
-현재 통합본은 train/val만 선언하므로 configured split을 읽는 검증기를 사용합니다.
+현재 저장소에는 train/val 구성의 13-class 후보를 검증하는 current validator와 materialized dataset·`data.yaml`이 없습니다. 존재하지 않는 경로나 도구를 만들어 검증 PASS로 해석하지 않습니다.
 
-```bash
-python data_sources/scripts/validate_yolo_dataset.py \
-  datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml
-```
+`python3 -B model/validate_yolo_dataset.py --data /absolute/path/to/data.yaml`은 train/val/test를 모두 요구하는 과거 구조용 도구입니다. 그 구조와 입력을 실제로 갖춘 경우에만 제한적으로 사용합니다. 현재 후보를 검증하려면 먼저 권리·개인정보·split 근거가 있는 dataset을 준비하고, 후보 구조에 맞는 validator를 구현·검토한 뒤 dataset register에 결과를 기록해야 합니다.
 
-`model/validate_yolo_dataset.py`는 train/val/test를 모두 요구하는 legacy 구조 검증기입니다. 데이터셋을 지정하지 않는 기본 실행은 지원하지 않습니다.
+builder·검수 적용·변환 스크립트는 파일을 만들거나 덮어쓸 수 있습니다. [데이터 스크립트 가이드](scripts/README.md)에서 부작용과 입력·출력을 확인하고, 가능하면 `--help`, `--dry-run` 또는 별도 출력 경로를 먼저 사용합니다.
 
-## 과거 데이터셋
+## 반입 규칙
 
-`walksafe_v1`, `walksafe_kr_v1`, `walksafe_kr_v2`, `walksafe_kr_v3` 계열은 초기 단일·소수 클래스 실험 기록입니다. 관련 builder와 manifest는 재현 근거로 보존하지만 현재 13-class 학습 입력이나 기본 경로가 아닙니다. 날짜가 붙은 문서는 작성 당시 상태로 읽고, 현재 상태는 위 기준 문서에서 확인합니다.
+- 원본 AIHub/COCO zip, 사용자 수집물, `datasets/**/images/**`, `datasets/**/labels/**`를 Git에 넣지 않습니다.
+- 정확한 source dataset ID·provider·license/이용조건·취득 시점·hash를 기록합니다.
+- 자동 제안 라벨은 사람 승인 전 학습 입력으로 사용하지 않습니다.
+- 사람·차량 번호·정확 위치·음성 등 개인정보 가능 자료는 최소 수집·분리 저장·보존기한·삭제 절차와 권한 검토가 먼저입니다.
+- 기존 materialized dataset을 덮어쓰기보다 새 출력 경로와 새 manifest를 사용합니다.
+- train/val/test는 촬영 sequence·장소·시간 누수를 피하도록 분리하고 독립 검증을 남깁니다.
 
-## 로컬 전용 정책
-
-- `datasets/**/images/**`, `datasets/**/labels/**`, 원본 AIHub zip, review 이미지팩은 Git에 올리지 않습니다.
-- source와 target 경로를 항상 명시하고, builder의 `--dry-run` 또는 preflight를 먼저 실행합니다.
-- 자동 제안 라벨은 사람 승인 전 학습 데이터로 사용하지 않습니다.
-- 기존 materialize 데이터셋을 덮어쓰기 전에 manifest와 백업 경로를 확인합니다.
+데이터 검증이나 모델 학습이 성공해도 실제 기기·현장·정식 시험·출시 PASS를 뜻하지 않습니다.

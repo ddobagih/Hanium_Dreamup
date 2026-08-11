@@ -20,7 +20,7 @@ RUNNER = ROOT / "scripts/run_walksafe_report_retention_20260717.sh"
 SERVICE = ROOT / "deploy/systemd/walksafe-report-retention.service"
 TIMER = ROOT / "deploy/systemd/walksafe-report-retention.timer"
 CONFIG = ROOT / "deploy/config/walksafe-report-retention.env.example"
-TEST_LAYERS = ROOT / "scripts/run_walksafe_test_layers_20260711.sh"
+TEST_LAYERS = ROOT / "scripts/run_walksafe_test_layers_current.sh"
 
 
 def _write_fake_python(path: Path) -> None:

@@ -60,10 +60,26 @@ def test_next_config_excludes_quality_only_python_files_from_runtime_trace() -> 
     )
 
     excludes = set(json.loads(completed.stdout))
-    assert {
+    assert excludes == {
+        "./app/**/*",
+        "./lib/**/*",
+        "./types/**/*",
+        "./tests/**/*",
+        "./public/**/*",
+        "./walksafe-field-logs/**/*",
+        "./walksafe-test-logs/**/*",
+        "./.env*",
+        "./*.md",
+        "./eslint.config.mjs",
+        "./next.config.mjs",
+        "./package-lock.json",
         "./quality-requirements.lock",
         "./quality-requirements.txt",
-    } <= excludes
+        "./proxy.ts",
+        "./legacy-runtime-boundary.ts",
+        "./tsconfig*.json",
+        "./tsconfig.tsbuildinfo",
+    }
 
 
 @pytest.mark.parametrize(

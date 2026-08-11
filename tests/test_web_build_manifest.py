@@ -214,13 +214,41 @@ def test_web_release_builder_writes_relative_output_receipt_from_web_directory(
 
 def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() -> None:
     workflow = Path(".github/workflows/quality.yml").read_text(encoding="utf-8")
+    current_runner = Path("scripts/run_walksafe_test_layers_current.sh").read_text(
+        encoding="utf-8"
+    )
+    setup_python = workflow.index(
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
+    )
     regression_install = workflow.index("Install Node regression dependencies")
     general_install = workflow.index(
         "Install hash-locked general test environment", regression_install
     )
-    openapi = workflow.index("Verify canonical OpenAPI contract", general_install)
+    backup_setup = workflow.index("actions/setup-python@", setup_python + 1)
+    backup_install = workflow.index(
+        "Install hash-locked backup integrity environment", backup_setup
+    )
+    openapi = workflow.index("Verify canonical OpenAPI contract", backup_install)
+    continuation = workflow.index("Verify current continuation boundary", openapi)
+    checkpoint_control = workflow.index(
+        "Run current checkpoint control tests", continuation
+    )
+    catalogs = workflow.index("Verify repository catalogs", checkpoint_control)
 
-    assert regression_install < general_install < openapi
+    assert setup_python < regression_install < general_install < backup_setup < backup_install < openapi
+    assert openapi < continuation < checkpoint_control < catalogs
+    assert (
+        "scripts/run_walksafe_test_layers_current.sh active-session-control"
+        in workflow[checkpoint_control:catalogs]
+    )
+    active_control = current_runner[
+        current_runner.index("run_active_session_control()") : current_runner.index(
+            "run_model_audit()"
+        )
+    ]
+    assert active_control.index(
+        "check_walksafe_project_continuation_v2_4.py"
+    ) < active_control.index("-m pytest")
     assert "Build source-bound Web release bundle" not in workflow
     assert "Verify Web release artifact binding" not in workflow
     assert "build_walksafe_web_release_20260711.sh" not in workflow
@@ -237,15 +265,16 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
         regression_install:general_install
     ]
     assert 'python-version: "3.14.4"' not in workflow
+    assert 'python-version: "3.14.6"' in workflow[backup_setup:backup_install]
+    assert "update-environment: false" in workflow[backup_setup:backup_install]
     assert 'node-version: "22.23.1"' in workflow[:regression_install]
-    assert "tests/general-quality-cp312-linux-x86_64-cpu.lock" not in workflow[
-        :regression_install
+    assert "tests/general-quality-cp312-linux-x86_64-cpu.lock" in workflow[
+        setup_python:regression_install
     ]
-    assert 'python-version: "3.12.13"' in workflow[regression_install:general_install]
-    general_step = workflow[general_install:openapi]
-    assert '"pip==26.1.1"' in general_step
+    assert 'python-version: "3.12.13"' in workflow[setup_python:regression_install]
+    general_step = workflow[general_install:backup_setup]
+    assert '"pip==26.1.1"' not in general_step
     assert "--require-hashes --only-binary=:all: --no-compile" in general_step
-    assert general_step.index('"pip==26.1.1"') < general_step.index("--require-hashes")
     assert "-r tests/general-quality-cp312-linux-x86_64-cpu.lock" in general_step
     assert "-r backend/requirements.lock" not in general_step
     assert "-r tests/requirements.lock" not in general_step
@@ -255,6 +284,20 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
     assert 'torch.__version__ == "2.11.0+cpu"' in general_step
     assert "torch.version.cuda is None" in general_step
     assert 'torchvision.__version__ == "0.26.0+cpu"' in general_step
+    backup_step = workflow[backup_install:openapi]
+    assert "steps.backup_python.outputs.python-path" in backup_step
+    assert "--require-hashes --only-binary=:all: --no-compile" in backup_step
+    assert "-r tests/backup-integrity-cp314.lock" in backup_step
+    assert "WALKSAFE_BACKUP_PYTHON_BIN" in backup_step
+    assert backup_step.count('= "3.12.13"') == 2
+    all_step_start = workflow.index("Run commit-stable test layers")
+    all_step_end = workflow.index("actions/upload-artifact@", all_step_start)
+    all_step = workflow[all_step_start:all_step_end]
+    assert all_step.count('= "3.12.13"') == 1
+    assert 'WALKSAFE_RUN_ANDROID_DEVICE_TESTS: "false"' in all_step
+    assert 'WALKSAFE_TFLITE_SMOKE_IMAGE: ""' in all_step
+    assert workflow.count("WALKSAFE_RUN_ANDROID_DEVICE_TESTS:") == 1
+    assert workflow.count("WALKSAFE_TFLITE_SMOKE_IMAGE:") == 1
     assert "PYTHON_BIN=python" not in workflow
     assert "working-directory: apps/web" not in workflow[:regression_install]
 

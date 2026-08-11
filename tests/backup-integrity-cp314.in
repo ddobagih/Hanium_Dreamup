@@ -1,0 +1,2 @@
+-c ../backend/requirements.lock
+pytest==8.4.2

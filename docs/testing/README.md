@@ -1,6 +1,6 @@
 # Testing Documents
 
-> 현재 제품은 Android 사용자 앱과 별도 Android 관리자 앱이다. 아래 Web/PWA 실행·릴리스 문서는 `LEGACY_REFERENCE_ONLY` 역사자료이며 현재 CI·현장시험·출시 증거로 실행하지 않는다. Web UI는 런타임에서 410으로 닫혀 있고 4개 전환형 Android BFF만 별도 추출 전까지 보존한다. 아래에 보존된 release evidence 예시는 역사 설명이며 `web-release`·`full` profile은 코드 78로 차단된다.
+> 현재 제품은 Android 사용자 앱과 별도 Android 관리자 앱이다. 아래 Web/PWA 실행·릴리스 문서는 `LEGACY_REFERENCE_ONLY` 역사자료이며 현재 CI·현장시험·출시 증거로 실행하지 않는다. Phase D 당시 네 전환형 Android BFF가 있었지만 Phase E에서 독립 Gateway로 추출되고 Next에서 제거됐다. 아래에 보존된 release evidence 예시는 역사 설명이며 `web-release`·`full` profile은 코드 78로 차단된다.
 
 이 폴더는 코드가 존재한다는 정적 판정과 실제 기기·현장 동작 판정을 분리하기 위한 실행 체크리스트와 테스트 절차를 관리한다.
 
@@ -17,7 +17,9 @@
 
 과거 Web artifact 생성·Web-only release evidence 절차는 차단됐다. 현재 실폰·기관·provider 증거는 향후 승인될 Android 릴리스 계약과 정식 시험계획에 따라 새 revision으로 작성한다.
 
-운영 gate는 `backend/requirements.lock`과 정책의 site closure가 정확히 일치하는 전용 `BACKEND_PYTHON`을 공용 격리 bootstrap으로 실행한다. 서로 다른 field/admin 내부 토큰, 양쪽 account JSON, 별도 session secret, 두 scope의 retention apply receipt, report retention manifest, 암호화 backup/복구 drill, 기관 접수 receipt/export/manifest, 사람이 작성한 privacy receipt와 외부 제출 산출물을 모두 명시한다.
+### 역사 Web release gate 예시 — 실행 금지
+
+아래 운영 gate는 `LEGACY_REFERENCE_ONLY`인 과거 계약이며 현재 CLI가 코드 78로 차단한다. 현행 Android 릴리스 검증이나 출시 근거로 실행하지 않는다. 당시 절차는 `backend/requirements.lock`과 정책의 site closure가 정확히 일치하는 전용 `BACKEND_PYTHON`을 공용 격리 bootstrap으로 실행하고, 서로 다른 field/admin 내부 토큰, 양쪽 account JSON, 별도 session secret, 두 scope의 retention apply receipt, report retention manifest, 암호화 backup/복구 drill, 기관 접수 receipt/export/manifest, 사람이 작성한 privacy receipt와 외부 제출 산출물을 모두 명시했다.
 
 ```bash
 "${BACKEND_PYTHON}" -I -S -B scripts/run_walksafe_isolated_python_20260713.py \

@@ -17,11 +17,11 @@
 | `check_walksafe_goal_graph_v2_4.py` | v2.3 archive의 20개 Goal projection, v2.4 native support 6개, Master→Workstream→동적 Work Item DAG와 ready frontier를 검증. v2.3 checker는 archive 감사에만 사용하고 새 제어 로직은 v2.4 경로에서 검사 |
 | `build_walksafe_goal_graph_v2_3.py`, `check_walksafe_project_continuation_v2_3.py`, `check_walksafe_goal_graph_v2_3.py` | frozen v2.3 predecessor 제어 도구. 현재 후보의 활성 진입점으로 직접 사용하거나 수정하지 않고 v2.4 archive와 `test_walksafe_goal_graph_v2_3_history.py`를 통한 역사 감사에만 사용 |
 | `check_walksafe_project_continuation.py`, `check_walksafe_goal_graph.py` | frozen v2.2 checker. 현재 후보의 활성 진입점으로 사용하지 않고 `test_walksafe_goal_graph_v2_2_history.py` adapter를 통한 predecessor 감사에만 사용 |
-| `tests/test_walksafe_goal_graph_v2_3_history.py`, `tests/test_walksafe_epic02_trace_v2_3_history.py` | v2.4가 보존한 v2.3 archive를 대상으로 각각 frozen Goal 제어 suite와 완료된 FP-005·FP-006·FP-010 trace를 재생하는 history adapter. 전자는 historical suite, 후자는 현재 trace gate용 active adapter로 분리하며 원본 v2.3 제어·trace tests는 historical inventory로 유지 |
-| `tests/test_walksafe_epic02_trace_v2_2_history.py` | v2.2 archive를 기준으로 frozen FP-018·NPC·FP-004 trace 23개를 재생하는 활성 history adapter. 원본 `test_walksafe_fp018_walk_state_recovery_trace_20260724.py`, `test_walksafe_npc_permission_session_trace_20260724.py`, `test_walksafe_fp004_priority_user_trace_20260724.py`는 historical inventory이며 현재 `CONTROL_AND_TRACE_PYTEST`에서 직접 실행하지 않음 |
+| `tests/test_walksafe_goal_graph_v2_3_history.py`, `tests/test_walksafe_epic02_trace_v2_3_history.py` | v2.4가 보존한 v2.3 archive를 대상으로 각각 frozen Goal 제어 suite와 완료된 FP-005·FP-006·FP-010 trace를 재생하는 history adapter. adapter와 원본 v2.3 제어·trace tests 모두 current runner의 historical inventory로만 유지 |
+| `tests/test_walksafe_epic02_trace_v2_2_history.py` | v2.2 archive를 기준으로 frozen FP-018·NPC·FP-004 trace 23개를 재생하는 history adapter. adapter와 원본 trace tests 모두 current runner의 historical inventory이며 현재 checkpoint gate로 실행하지 않음 |
 | `check_walksafe_goal_package.py` | 실행되지 않은 v1 A~D checker source를 역사 호환용으로 보존. v2 checkpoint에서 직접 실행하면 expected fail이며 archive 감사·현재 실행·활성화 진입점으로 사용하지 않음 |
-| `check_walksafe_android_gateway_boundary_20260723.py` | 독립 Gateway의 정확한 4개 경로·루프백 Backend·Android 8081·Next/React 비의존, Legacy Web 전체 410, DRAFT/NOT_APPLIED 배포 예제와 gate·출시 비승격을 검증 |
-| `check_walksafe_legacy_web_boundary_20260722.py` | Phase D 당시 정확한 Next BFF 4개 예외를 검증하는 불변 역사 검사. Phase E 이후 현재 경계 검사는 `check_walksafe_android_gateway_boundary_20260723.py`를 사용 |
+| `check_walksafe_android_gateway_boundary_20260723.py` | Phase E 당시의 5-route Gateway snapshot을 재현하는 역사 검사. 현재 9 path/13 operation Gateway 계약에는 직접 실행하지 않음 |
+| `check_walksafe_legacy_web_boundary_20260722.py` | Phase D 당시 정확한 Next BFF 4개 예외를 검증하는 불변 역사 검사. 두 날짜형 boundary checker는 history inventory로만 보존하고 현재 Gateway는 package tests·OpenAPI currentness로 검사 |
 | `check_frontend_*`, `check_pwa_server_e2e.py`, `check_pwa_browser_lifecycle_20260711.py`, `check_pwa_release_update_20260717.py` | `LEGACY_REFERENCE_ONLY` Web/PWA의 과거 계약·회귀 snapshot 검사. Android 정식 제품이나 현재 출시 증거로 사용하지 않음 |
 | `check_walksafe_trusted_proxy_20260716.py` | 과거 Web gateway nginx 예제의 재현 검사. 현행 Android API gateway 배포 검사가 아님 |
 | `build_walksafe_web_release_20260711.sh`, `create_walksafe_web_build_manifest_20260711.py`, `check_walksafe_release_evidence_20260711.py`, `walksafe_external_check_receipt.py` | `LEGACY_REFERENCE_ONLY` Web 출시 묶음의 역사적 재현 자료. builder와 release evidence의 `web-release`·`full` CLI는 역사 코드를 불러오기 전에 78로 종료하며 현재 CI·배포·출시 후보에서 사용 금지 |
@@ -31,14 +31,14 @@
 | `check_detect_*`, `evaluate_predictions_*`, `evaluate_yolo_*` | backend detection/report 계약과 저장 예측 평가 |
 | `check_navigation_*`, `check_tmap_*` | 길안내·reroute·TTS 타이밍 검사 |
 | `check_voice_*`, `test_stt.py`, `test_tts.py` | 음성 계약과 로컬 STT/TTS smoke |
-| `check_android_*`, `export_android_tflite_models_20260531.py` | Android depth/model asset 정적 계약과 legacy export |
+| `check_android_*`, `export_android_tflite_models_20260531.py` | Android model asset 정적 계약과 legacy export. cleartext debug를 요구하던 `check_android_depth_scaffold_20260531.py`는 대체된 역사 snapshot |
 | `check_android_apk_model_asset_20260713.py` | 빌드 APK의 runtime config가 source와 byte-identical인지, 설정된 3개 model asset만 있고 hash가 맞는지, env/log/test/fixture payload가 없는지 검사 |
 | `prepare_android_field_device_20260710.sh`, `pull_android_field_sessions_20260710.py`, `summarize_android_field_sessions_20260710.py` | `--apk`로 고정한 same-commit Android debug field APK의 로컬/기기 SHA를 대조해 설치하고, 앱 전용 현장 로그를 회수해 개인정보 제한 요약·strict 출발 gate를 수행. CameraX mode는 실제 analyzed frame을 요구하고 `--require-arcore-unsupported`로 debug 강제/Depth 제한 기능 증거와 실제 ARCore 미지원 증거를 분리한다. field APK와 서명 release APK는 별도 SHA이며 field 결과는 release binary 실행 근거가 아니다 |
 | `run_cloudflare_field_test_services_20260711.sh` | `LEGACY_REFERENCE_ONLY` Web 현장 stack의 역사자료. 부작용 전에 78로 종료하며 외부 공개나 현행 제품 실행에 사용 금지 |
 | `run_walksafe_remote_field_stack_20260711.sh` | FP-009에 따라 시작 즉시 fail-closed로 종료되는 과거 Cloudflare 공개 launcher |
 | `check_walksafe_remote_field_browser_20260711.py` | 인증된 headless 모바일 viewport에 fixture camera/GPS를 주입하는 통제 합성 E2E. server-v2 처리 동의를 카메라 전에 확인하고 actor-bound sessionStorage JSON과 person 위험 또는 damaged 자동 신고 JSONL을 검증하며 실폰 근거로 쓰지 않음 |
 | `summarize_web_field_session_20260711.py` | 최신 Web field JSONL의 class·confidence·latency·GPS·risk·비계량 advisory 방향/TMAP 동시 활성·navigation·report 상태를 Markdown/CSV로 요약. `--require-non-metric-advisory`는 server-v2·camera·foreground/online·GPS threshold·3프레임/700ms 계약을, `--expected-source-commit`은 전 record의 서버 build source를 fail-closed 검증 |
-| `check_frontend_field_test_gateway_20260711.sh` | 추출 전 Next BFF의 HttpOnly field/admin session과 `/api` 계약을 재현하는 역사 검사. 현재 Gateway 검사는 독립 package와 Phase E boundary checker를 사용 |
+| `check_frontend_field_test_gateway_20260711.sh` | 추출 전 Next BFF의 HttpOnly field/admin session과 `/api` 계약을 재현하는 역사 검사. 현재 Gateway는 독립 package tests·Gateway OpenAPI와 Backend provider OpenAPI currentness로 검사 |
 | `check_static_dataset_readiness_20260531.py`, `check_walksafe_unified_training_plan_20260601.py` | 모델·데이터·export 계획 정적 점검 |
 | `run_walksafe_*`, `resume_walksafe_*`, `post_*`, `summarize_walksafe_*` | 날짜별 모델 학습 실행과 결과 요약 |
 | `evaluate_aihub*_depth*.py` | AIHub depth 데이터의 offline/Android 비교 평가 |
@@ -63,7 +63,7 @@
 | `build_walksafe_feature_policy_baseline_review_20260721.py` | 최종 검토 답변 63개와 통제 반입 manifest, 검토된 JSON·HTML의 지문을 검증하고 정책 본문을 바꾸지 않은 r001 별도 기준선 승인 준비 기록을 생성. 이 파일은 r001 재현용으로 동결하고 후속 검토는 새 날짜의 생성기를 사용함. 검증항목 면제·출시 승인·0~6 정식 산출물은 만들지 않음 |
 | `build_walksafe_feature_policy_baseline_approval_20260721.py` | 사용자의 명시 승인 원문을 좁은 줄바꿈 정규화 규칙으로 검증해 기능 정책 기준선 1.0.0 승인 기록과 manifest를 생성. 5개 미실행 검증을 면제하지 않고 출시를 `NOT_ELIGIBLE`로 유지함 |
 | `build_walksafe_effective_decision_register_alignment_20260721.py` | 승인된 기능 정책 기준선에 135개 유효 결정·428개 기능 연결을 정렬한 In Review 원장을 생성. 정책 승인과 결정 원장 자체의 정식 승인을 구분함 |
-| `build_walksafe_control_bootstrap.py` | 승인 정책 manifest와 DOC~CLS 전체 카탈로그를 결속해 DOC-01·05 JSON, DOC-02~04 통제 규정의 상세 README·HTML 및 `docs/deliverables/README.md` 최상위 입구를 재생성한다. 0~12의 Draft manifest·정본 경로·anchor·SHA-256을 연결하면서 실행·서명·통제 증거가 없는 7~12 유형은 Planned/NOT_RUN으로 유지한다. 총 257개·필수 148/조건부 109·40개 묶음, 5개 NOT_RUN gate와 `NOT_ELIGIBLE` 출시 경계를 fail-closed 검증한다. |
+| `build_walksafe_control_bootstrap.py` | 최초 DOC~CLS 257개 bootstrap을 재현하는 역사 생성기. 현재 승인·successor 산출물과 bytes가 달라 `--check`도 예상 실패하므로 현행 정본에 실행하지 않고 새 revision의 소유 successor 절차를 확인함 |
 | `build_walksafe_formal_management_discovery_20260721.py` | MGT-01~18과 DSC-01~15 정식 Draft를 6개 읽기 문서와 WBS·RACI·RAID·backlog 등 통제 원장으로 생성. 조사·예산·일정·시험 결과가 없는 부분은 만들지 않고 미정 또는 0건으로 유지함 |
 | `build_walksafe_formal_dev_test_20260721.py` | DEV-01~21과 TST-01~23 정식 Draft, 구현 후보 형상·모듈 원장, 279개 실행계획과 빈 증거 snapshot을 생성. 실제 실행은 별도 append-only instance로 분리하고 모든 결과를 `NOT_RUN`으로 유지함 |
 | `build_walksafe_requirements_draft_20260721.py` | 기능 54개·공통정책 9개·미실행 gate 5개를 68개 요구, 1,460개 clause, 279개 인수조건과 RTM JSON/HTML로 생성하고 135개 결정·428개 연결을 추적함 |
@@ -84,7 +84,8 @@
 | `validate_walksafe_formal_deliverables_0_6.py` | DOC~TST 128개·21개 묶음, 68 요구·279 인수조건/시험·135 결정·27 설계의 경로·지문·역추적을 종합 검사하고 승인 과장, gate 면제, 출시 허용, 임의 N/A를 거부함 |
 | `build_submission_assets_20260710.py`, `build_submission_forms_20260710.py` | 검증된 근거 도식과 공식 서식1 DOCX·서식2 PPTX 작업본을 재생성 |
 | `promote_submission_final_20260713.py` | staging에서 검증한 제출 산출물 전체를 원자적으로 final에 승격하고 final manifest를 생성 |
-| `run_walksafe_test_layers_20260711.sh` | 모든 Python test를 중복·누락 없이 분류한다. frozen v2.3 제어·FP-005·FP-006·FP-010 원본 tests와 Goal history adapter는 `HISTORICAL_CONTROL_PYTHON_TESTS`, 승인 전 v2.4 후보 검사와 v2.3 trace history adapter는 `ACTIVE_SESSION_CONTROL_PYTHON_TESTS`로 분리한다. `validate`는 실행 없이 분류만 확인하며, 이 분류나 PASS가 최종 manifest 승인·package 활성화·FP-011 시작 권한을 만들지는 않음 |
+| `run_walksafe_test_layers_current.sh` | 현재 Python test를 중복·누락 없이 분류하는 정본이다. frozen 제어·완료 snapshot은 `HISTORICAL_CONTROL_PYTHON_TESTS`, 활성 v2.4 checkpoint의 managed snapshot·transition lifecycle 결속 검사는 `ACTIVE_SESSION_CONTROL_PYTHON_TESTS`, CPython 3.14.6/Linux 전용 백업 검사는 `BACKUP_INTEGRITY_PYTHON_TESTS`로 분리한다. `validate`는 실행 없이 분류만 확인하며, 이 분류나 PASS가 승인·출시 권한을 만들지는 않음 |
+| `run_walksafe_test_layers_20260711.sh` | 과거 Goal·checkpoint가 SHA-256으로 결속한 byte-exact 역사 실행기다. 수정하거나 일반 개발 명령에 사용하지 않고 `run_walksafe_test_layers_current.sh`를 사용한다. 현재 focus의 exact event 계약이 hash-bound 과거 명령을 직접 요구할 때만 계약 재현 범위에서 실행하고 현행 `validate`도 함께 수행함 |
 | `check_walksafe_test_database_20260713.py` | `postgresql+psycopg` test URL, 보호 DB명과의 분리, 실제 연결/current database 일치를 runner 전에 확인 |
 | `check_web_runtime_trace_scope_20260713.py` | 모든 Next NFT trace가 build/node_modules/package 허용 범위 안인지와 env/log/DB/key payload 부재를 검사 |
 | `smoke_backend_768_runtime_20260711.py`, `smoke_android_tflite_runtime_20260711.py` | canonical img768 PT warm-up과 Android TFLite 실제 invoke/tensor 출력 smoke |
@@ -93,10 +94,10 @@
 
 ## 현재 모델 관련 주의
 
-- 현재 학습 데이터는 `datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml`입니다.
+- epoch270 기록이 참조하는 학습 입력은 `datasets/walksafe_unified_coco_aihub_13cls_reviewed_aihub183_png_20260627/data.yaml`이지만 현재 저장소에는 없으며 후보는 `CANDIDATE_REVALIDATION_REQUIRED`입니다.
 - 위 경로의 `aihub183`은 레거시 내부 별칭이며, 해당 전동킥보드 원천의 현재 AIHub 공식 식별은 `AIHub 572`입니다.
 - 현재 평가 후보는 epoch 270의 13-class YOLO26n img768 weight입니다.
-- `run_walksafe_unified_aihub183_png_yolo26n_768_20260627.sh --print-only`는 명령만 확인합니다. 실제 실행은 GPU 학습을 시작합니다.
+- `run_walksafe_unified_aihub183_png_yolo26n_768_20260627.sh --print-only`도 먼저 `yolo` 실행파일을 확인하고 로컬 `TMPDIR`을 만듭니다. 이 전제를 갖춘 격리 환경에서 생성될 학습 명령만 출력하며, `--print-only` 없이 실행하면 GPU 학습을 시작합니다.
 - `export_walksafe_unified_tflite_20260601.py`의 기본값은 과거 640 실험 경로입니다. 현재 후보 export 때는 `--model`, `--data`, `--imgsz`, `--output-name`을 모두 명시해야 합니다.
 - epoch270 후보의 unified float32 img768 13-class TFLite는 Android primary로 반영됐습니다. asset SHA-256은 `92b39d3b24d97519038db5ef8ea613c32a46aaefabc5080fd989b7ab5c1fbb19`, tensor 계약은 `[1,768,768,3]`→`[1,300,6]`입니다. PT warm-up과 TFLite 단일 이미지 invoke는 통과했으며, PyTorch/TFLite box·class 동등성·실기기 FPS·실외 Device Field는 아직 완료되지 않았습니다.
 

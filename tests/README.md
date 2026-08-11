@@ -10,15 +10,15 @@
 | `test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py` | 목적지 없는 일반 위험안내와 경로 의존 점자블록 방향안내의 분리, Phase F 불변 선행근거, r007·Active successor와 실기기·279개 정식시험·5개 gate·출시 비승격을 변조 거부로 검증 |
 | `test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py` | FP-017 상태기계·background 정지·재검사·정확한 재개 확인의 13개 구현 경로, Phase G 10개 불변 선행자료, GAP-026 `PARTIAL`, EPIC-02 `IN_PROGRESS`, r008·Active successor와 실기기·279개 정식시험·5개 gate·출시 비승격을 변조 거부로 검증 |
 | `test_walksafe_fp005_official_environment_trace_20260724.py` | FP-005의 20개 구현 경로·v2.3 시작 게이트·실행 세션을 정확히 결속하고, GPS/카메라 fail-closed·횡단보도 비권위 경계, GAP-014 `MISSING → PARTIAL`, r012·Active overlay, FP-006/GAP-015 후속 선택과 생산 프로필·현장·사용자·실기기·정식 시험 비승격을 검증 |
-| `test_walksafe_goal_graph_v2_4.py` | 승인 전 v2.4 후보의 20개 imported Goal·6개 native support, FP-011 READY focus, v2.3 seq17 archive 결속과 현재 v2.4 Goal graph 검사를 검증. PASS만으로 package 활성화나 FP-011 시작을 승인하지 않음 |
-| `test_walksafe_project_continuation_v2_4.py` | v2.3 checkpoint·manifest·17-event tail·frozen 제어 파일의 byte-exact 경계와 v2.4 `PACKAGE_PREPARED` 후보, 이후 활성화·FP-011 시작 lifecycle의 fail-closed 검사를 검증 |
+| `test_walksafe_goal_graph_v2_4.py` | 승인 전 v2.4 후보와 FP-011 READY 시점의 Goal graph를 재현하는 역사 baseline. 현재 runner의 historical inventory로 보존하며 현재 checkpoint gate로 실행하지 않음 |
+| `test_walksafe_project_continuation_v2_4.py` | v2.3·v2.4 선행 경계부터 현재 seq57까지의 transition lifecycle을 검증하는 현재 singleton. `active-session-control`은 이 테스트 전에 strict continuation checker로 현재 checkpoint와 managed bytes를 먼저 확인함 |
 | `test_walksafe_goal_graph_v2_3_history.py` | frozen `test_walksafe_goal_graph_v2_3.py`를 v2.4의 byte-exact v2.3 archive에만 재생하고 현재 v2.4 checker가 유효한지 확인하는 historical adapter |
-| `test_walksafe_epic02_trace_v2_3_history.py` | 완료된 FP-005·FP-006·FP-010 원본 trace와 builder hash를 고정하고 v2.3 archive를 대상으로 재생하는 활성 history adapter |
+| `test_walksafe_epic02_trace_v2_3_history.py` | 완료된 FP-005·FP-006·FP-010 원본 trace와 builder hash를 고정하고 v2.3 archive를 대상으로 재생하는 historical adapter |
 | `test_walksafe_goal_graph_v2_3.py`, `test_walksafe_project_continuation_v2_3.py` | frozen v2.3 predecessor suite. 현재 v2.4 후보에 직접 적용하거나 수정하지 않고 `HISTORICAL_CONTROL_PYTHON_TESTS`에 보존 |
-| `test_walksafe_project_continuation.py` | 새 세션 재개 체크포인트 1.9.0의 정본 경로·ID·SHA-256, 정책 1.0.1, COMMITTED 상태, 산출물 수량, r008·EPIC-02 Phase A·Goal 패키지 연결, 정확한 작업경로 목록, Phase G 불변/`EXPECTED_STALE`, 정식시험 수치, 검증 명령·결과, blocker와 출시·gate fail-closed 변조 거부. 활성 branch·통제 snapshot 결속 검사이므로 일반 CI가 아니라 세션 시작·종료 때 직접 실행 |
-| `test_walksafe_goal_package.py` | Master→A~D→EPIC→동적 Work Item 구조, 68개 정책·Gap 단일 배치, dependency·불변 source·successor hash chain, 최신 Backlog/current leaf, 권한·질문 경계, 허위 완료증거 거부를 검증. FP-018 후속 leaf와 네 정본 증거가 결속된 Phase A→B→C 정상 전환, 증거 영수증 누락, AWAITING 상태, README·template 삭제, 잘못된 타입까지 격리 시뮬레이션하는 활성 세션 통제 검사 |
+| `test_walksafe_project_continuation.py` | 과거 unversioned checkpoint 1.9.0과 당시 EPIC-02 연결을 재현하는 역사 검사. 현재 checkpoint에는 직접 실행하지 않고 `HISTORICAL_CONTROL_PYTHON_TESTS`에 보존 |
+| `test_walksafe_goal_package.py` | 활성화되지 않고 대체된 A~D Goal package 후보를 재현하는 역사 검사. 현재 Goal graph·세션 통제로 사용하지 않고 history inventory에만 보존 |
 | `test_walksafe_android_product_boundary.py` | EPIC-01의 Android 사용자·관리자 앱 ID·역할·배포·세션 분리 계약, 잠긴 관리자 앱, 제품 목적·지원기기·출시 fail-closed 설정 |
-| `test_walksafe_android_gateway_boundary_20260723.py` | 독립 Gateway 4개 경로, 내부 자격증명 비노출, Android origin 전환, Legacy Web 전체 410, Next route 복구·fallback·배포 과장 변조 거부 |
+| `test_walksafe_android_gateway_boundary_20260723.py` | Phase E 당시 독립 Gateway 5-route snapshot을 재현하는 역사 검사. 현재 9 path/13 operation 계약에는 직접 실행하지 않음 |
 | `test_walksafe_legacy_web_boundary_20260722.py` | Phase D의 전환형 Next BFF 4개 보존 경계를 재현하는 역사 검사이며 Phase E 현재성 판정에는 사용하지 않음 |
 | `test_voice_intents.py` | 한국어 음성 intent 분류, 실행 정책, telemetry schema |
 | `test_voice_tts.py` | TTS cache/fallback, API 오류 처리, phrase 계약 |
@@ -28,7 +28,7 @@
 | `test_walksafe_feature_policy_baseline_review.py` | 최종 답변 63/63 확정·원본/통제본·검토 문서 지문 결속, 무변경 재생성 판단, 별도 승인·5개 gate·출시·정식 산출물 경계와 변조 거부 |
 | `test_walksafe_feature_policy_baseline_approval.py` | 사용자 승인 원문·승인 대상·결정 지문·정책 내용 지문, 승인 기록·기준선 manifest, 5개 미실행 gate와 출시 제한의 변조 거부 |
 | `test_walksafe_effective_decision_register_alignment.py` | 승인 기준선과 135개 결정·428개 기능 연결·9개 공통정책·5개 gate 정렬, 기존 역사 원장 보존과 승인 과장 방지 |
-| `test_walksafe_control_bootstrap.py` | DOC-01~05 초안과 DOC~CLS 257개 단일 등록, 필수 148·조건부 109, 40개 bundle coverage, 0~6 Draft와 7~12 계획·정책 Draft/실행 증거 Planned 경계, 각 행의 작성·책임·검토·변경·보존 계약, Android 주제품 정렬, 민감자료 원본 Git 금지, 승인 과장 방지와 gate·출시 경계·생성 재현성을 검증 |
+| `test_walksafe_control_bootstrap.py` | 최초 DOC~CLS 257개 bootstrap bytes를 재현하는 역사 검사. 현재 승인·successor 산출물에는 직접 실행하지 않으며 current runner의 history inventory로만 보존 |
 | `test_walksafe_formal_management_discovery.py` | MGT 18·DSC 15의 path/anchor/manifest 완전성, 54개 backlog, 5개 열린 gate, 조사·예산·일정 결과 미조작과 Android/Web 경계 |
 | `test_walksafe_formal_dev_test.py` | DEV 21·TST 23의 형상·모듈·증거 경계, 279개 실행 가능한 계획 구조, append-only 실행 원장, 전부 NOT_RUN인 결과와 5개 gate·출시 제한 |
 | `test_walksafe_requirements_draft.py` | REQ 19, 상위 요구 68·clause 1,460·인수조건/예정시험 279, 결정 135·연결 428, standalone RTM와 Draft/NOT_RUN 경계 |
@@ -50,16 +50,26 @@
 | `test_walksafe_implementation_gap_analysis_20260722.py` | 승인 정책·요구·설계·시험과 동결 구현의 68개 전수 Gap, 직접 근거·해시, 279개 NOT_RUN, 5개 BLOCKED gate, 수정 백로그 완전성, HTML 필터와 NOT_ELIGIBLE 경계를 검증 |
 
 ```bash
-"$PYTHON_BIN" -m pip install --require-hashes --no-compile \
-  -r backend/requirements.lock -r tests/requirements.lock
-PYTHONDONTWRITEBYTECODE=1 "$PYTHON_BIN" -m pytest -p no:cacheprovider tests -q
+python3.12 -m venv .venv-tests
+export PYTHON_BIN="$PWD/.venv-tests/bin/python"
+"$PYTHON_BIN" -m pip install --require-hashes --only-binary=:all: --no-compile \
+  -r tests/general-quality-cp312-linux-x86_64-cpu.lock
+node_executable="$(command -v node)"
+test -n "$node_executable"
+export WALKSAFE_NODE_BIN_DIR="$(dirname "$(readlink -f "$node_executable")")"
+PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh validate
+PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh unit
 ```
 
-프로젝트 전체의 Unit/Functional/Integration 계층 실행 방법은
-`docs/testing/test_layers_20260711.md`와 `scripts/run_walksafe_test_layers_20260711.sh`를 따른다.
-`backend/requirements.txt`와 `tests/requirements.txt`는 직접 의존성 source input이다. 로컬 일반 계층 테스트는 위의 두 hash-complete lock을 함께 설치한다. GitHub hosted CI의 CPython 3.12/Linux x86_64 환경은 같은 직접 의존성과 정확한 CPU-only PyTorch wheel로 생성한 단일 `tests/general-quality-cp312-linux-x86_64-cpu.lock`을 `--require-hashes --only-binary=:all: --no-compile`로 설치한다. 이 플랫폼 lock을 다른 Python/OS/architecture의 로컬 환경에 재사용하지 않는다. 일반 테스트 의존성을 가진 `PYTHON_BIN`과 제출물용 bytecode 없는 exact-8 `SUBMISSION_PYTHON`은 서로 다른 환경이다. 후자는 artifact clean-room 절차에서 production runner `--verify-only`로 builder보다 먼저 검증하며, 누락이나 불일치는 skip하지 않고 실패한다.
+`unit` 실행 전에 Node 22.23.1과 Web·Gateway의 `npm ci`, Java 21·Android SDK가 준비돼 있어야 한다. runner는 `WALKSAFE_NODE_BIN_DIR`의 실제 toolchain hash를 검사하고 다른 Node를 거부한다. 전체 준비 순서는 [개발 환경 가이드](../docs/guides/development-environment-guide.md)를 따른다.
 
-`scripts/run_walksafe_test_layers_20260711.sh`는 frozen v2.3 제어·FP-005·FP-006·FP-010 원본 tests와 Goal history adapter를 `HISTORICAL_CONTROL_PYTHON_TESTS`에, v2.4 active tests와 v2.3 trace history adapter를 `ACTIVE_SESSION_CONTROL_PYTHON_TESTS`에 둔다. active test PASS는 승인 전 `READY_NOT_ACTIVATED` 후보의 검증일 뿐 최종 manifest 승인, `PACKAGE_ACTIVATED`, FP-011 `GOAL_STARTED`를 대신하지 않는다.
+`integration`과 `all`은 `tests/test_walksafe_backup_integrity.py`를 일반 CPython 3.12 묶음과 분리해 실행한다. `tests/backup-integrity-cp314.lock`만 설치한 정확한 CPython 3.14.6/Linux venv의 절대경로를 `WALKSAFE_BACKUP_PYTHON_BIN`에 지정해야 하며, 누락되거나 memfd sealing preflight가 실패하면 일반 `PYTHON_BIN`으로 대체하지 않고 실패한다.
+
+프로젝트 전체의 Unit/Functional/Integration 계층 실행 방법은
+`docs/testing/test_layers_20260711.md`와 `scripts/run_walksafe_test_layers_current.sh`를 따른다. 루트 `tests/` 전체를 직접 수집하면 역사·활성 세션·helper가 보존되지 않은 테스트까지 현재 계층으로 섞이므로 현행 runner를 우회하지 않는다.
+`backend/requirements.txt`와 `tests/requirements.txt`는 직접 의존성 source input이다. GitHub hosted CI의 CPython 3.12/Linux x86_64 환경은 두 입력과 정확한 CPU-only PyTorch wheel로 생성한 단일 `tests/general-quality-cp312-linux-x86_64-cpu.lock`을 `--require-hashes --only-binary=:all: --no-compile`로 설치한다. 백업 검사 전용 `.in`·lock은 일반 환경과 분리한다. 이 플랫폼 lock을 다른 Python/OS/architecture의 로컬 환경에 재사용하지 않는다. 다른 환경에서 모듈 lock을 사용할 때는 Pillow pin이 충돌하는 `backend/requirements.lock`과 `tests/requirements.lock`을 한 환경에 함께 설치하지 말고 Backend·root 테스트 환경을 분리한다. 일반 테스트 의존성을 가진 `PYTHON_BIN`, 백업 검사 전용 `WALKSAFE_BACKUP_PYTHON_BIN`, 제출물용 bytecode 없는 exact-8 `SUBMISSION_PYTHON`은 서로 다른 환경이다. 후자는 artifact clean-room 절차에서 production runner `--verify-only`로 builder보다 먼저 검증하며, 누락이나 불일치는 skip하지 않고 실패한다.
+
+`scripts/run_walksafe_test_layers_current.sh`는 frozen v2.3 제어·완료된 Goal snapshot, Git에서 제외된 기존 제출 후보 자료에 직접 결속된 검사, 5-route Gateway·cleartext depth scaffold·Legacy Web Full-RC의 대체된 snapshot 검사를 `HISTORICAL_CONTROL_PYTHON_TESTS`에 둔다. 활성 v2.4 checkpoint의 managed snapshot·transition lifecycle을 재검증하는 검사는 `ACTIVE_SESSION_CONTROL_PYTHON_TESTS`에 둔다. 날짜가 붙은 `scripts/run_walksafe_test_layers_20260711.sh`는 과거 해시 결속용 동결 자료이며 현행 실행기가 아니다. active-session PASS는 현재 `package_status=ACTIVE`, NPC single-admin-recovery focus `READY`인 checkpoint와 managed content·transition 검사 코드가 일치한다는 뜻일 뿐 focus 완료, 279개 정식 시험, release gate나 출시 상태를 승격하지 않는다.
 
 CI는 Web 출시 artifact를 생성하지 않는다. Web/PWA 검사는 `LEGACY_REFERENCE_ONLY` 회귀 범위로만 실행하며 Android 출시·실폰·현장 증거로 승격하지 않는다.
 

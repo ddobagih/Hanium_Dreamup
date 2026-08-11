@@ -195,6 +195,7 @@ def test_backup_prune_cli_default_and_explicit_retention_are_dry_run(
         captured.append({"backup_root": backup_root, **kwargs})
         return {"destructive_action": False, "delete_candidates": []}
 
+    monkeypatch.setattr(prune, "require_backup_runtime_capabilities", lambda: None)
     monkeypatch.setattr(prune, "plan_backup_prune", fake_plan)
     monkeypatch.setattr(
         prune,

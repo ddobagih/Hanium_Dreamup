@@ -1,12 +1,14 @@
-# Applications
+# WalkSafe 애플리케이션
 
-사용자와 운영자가 직접 실행하는 애플리케이션을 모은다.
+현재 제품은 서로 분리된 Android 사용자 앱과 Android 관리자 앱입니다. Web/PWA는 역사 참고와 410 경계 회귀만 보존하며 제품 구현·완료·출시 근거로 사용하지 않습니다.
 
-| 경로 | 역할 | 현재 위치 |
+| 경로 | 역할 | 상태 |
 |---|---|---|
-| `android/app` | 가까운 위험·TMAP 큰 방향·손상 점자블록 신고를 제공하는 일반 사용자용 Android 앱 | 정식 제품 후보, 구현·검증 중 |
-| `android/adminapp` | 신고 검수·기관 전달·감사 업무를 위한 별도 Android 관리자 앱 경계 | EPIC-01 관리자 인증·복구 구현 전까지 기능 잠금 |
-| `android-gateway/` | 사용자 앱의 4개 API를 Backend에 안전하게 중계하는 독립 Gateway | 내부 구현·검증 완료, 배포·실기기 연결 `NOT_RUN` |
-| `web/` | 과거 Web/PWA UI·관리자·API 참고 코드 | `LEGACY_REFERENCE_ONLY`, Next 런타임 전체 `410`, 외부 실행·정식 배포 금지 |
+| [`android/app`](android/app) | 카메라·기기 내 TFLite·길안내·음성/진동·신고를 제공하는 사용자 앱 | `CURRENT_PRODUCT`, 정식 시험 전 |
+| [`android/adminapp`](android/adminapp) | 관리자 인증·신고 검토·수동 기관 전달 사실 기록을 담당하는 별도 앱 | `CURRENT_PRODUCT`, 사설 배포·실기기 `NOT_RUN` |
+| [`android-gateway`](android-gateway) | 세션·보행 원장은 로컬 종결하고, 길찾기·신고는 Backend에 중계하며, 동의·계정 삭제는 로컬 내구 상태와 Backend 동기화를 함께 적용 | `SUPPORT`, 운영 배포 `NOT_RUN` |
+| [`web`](web) | 과거 Web/PWA UI·관리자·API와 all-request 410 경계 | `LEGACY_REFERENCE_ONLY` |
 
-Web 회귀 결과를 Android Device·현장·출시 PASS로 사용하지 않는다. 현재 제품 경계는 `configs/walksafe_product_boundary_20260722.json`, 전체 정책은 `docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json`을 따른다.
+전체 요청 흐름과 수정 시 함께 볼 계약은 [코드 가이드](../docs/guides/code-guide.md), 제품 정책은 [승인 기준선](../docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json)을 따릅니다. Gateway 경로 수와 method는 고정 숫자 설명 대신 [OpenAPI](android-gateway/openapi.json)를 기준으로 봅니다.
+
+Web 회귀 결과는 Android 기기·현장·출시 PASS로 사용할 수 없습니다.

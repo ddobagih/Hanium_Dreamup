@@ -74,6 +74,8 @@ const runtimeTraceExcludes = [
   "./package-lock.json",
   "./quality-requirements.lock",
   "./quality-requirements.txt",
+  "./proxy.ts",
+  "./legacy-runtime-boundary.ts",
   "./tsconfig*.json",
   "./tsconfig.tsbuildinfo"
 ];

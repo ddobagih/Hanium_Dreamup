@@ -1,0 +1,2435 @@
+{
+  "area_counts": {
+    "ANDROID_ADMIN": 12,
+    "ANDROID_GATEWAY": 12,
+    "ANDROID_USER": 114,
+    "BACKEND": 28,
+    "CONTROL": 82,
+    "CROSS_REPOSITORY": 48,
+    "LEGACY_WEB": 20,
+    "MODEL_DATA": 8,
+    "TOOLING": 12,
+    "VOICE": 5
+  },
+  "catalog_kind": "TESTS",
+  "entries": [
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/encrypted-json-store.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/exclusive-file-lock.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/field-long-session.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/field-walk-ledger.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/gateway-contract.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/integrated-consent.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/node-adapter.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/privacy-deletion-v2-crash.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/privacy-deletion-v2.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/privacy-rights.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/state-encryption-maintenance.test.ts"
+    },
+    {
+      "area": "ANDROID_GATEWAY",
+      "framework": "NODE_TEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android-gateway/test/telemetry.test.ts"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminCanonicalEncodingTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceKeyDescriptorTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProofTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminEndpointPolicyTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationModelsTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClientTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java"
+    },
+    {
+      "area": "ANDROID_ADMIN",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminStrictJsonTest.java"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "ANDROID_INSTRUMENTATION_JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteDeviceSmokeTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "ANDROID_INSTRUMENTATION_JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/androidTest/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadInstrumentedTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AccountDeletionResetCoordinatorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AndroidReportSuccessorStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/AndroidRiskSelectionPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ArCoreAvailabilityPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/BuildProvenanceStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp012StaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFp016StaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityLongLivedLoginStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityOfficialEnvironmentStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityStartupCapabilityStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MetadataCaptureLogTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PersistentReportQueueDisabledStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/ProductPurposeSurfacesStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/HttpMetadataLogUploaderTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/debuglog/MetadataLogJsonEncoderTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/CoordinateMapperTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthEstimatorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthSamplerTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/DepthSmokePipelineTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/MessagePolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/MotionContextTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/ObjectDepthRuntimePipelineTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/ObjectTrackerTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/TactilePathPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/depth/TrackingRiskPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/AndroidLocalTactileCapabilityTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/ApprovedDeviceProfileTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/CameraFrameQualityPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/DeviceGateTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/PhoneMountingPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/RuntimeMetricPreflightTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSafeStartupCapabilityTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/device/WalkSessionDeviceResourceSnapshotTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidFeedbackActuatorStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/AndroidNonMetricObstacleAdvisoryPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/NavigationSpeechDeliveryTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/PendingSpeechQueueTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/UtteranceCallbackRegistryTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/feedback/WalkSafeFeedbackPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/DetectorRuntimeSupervisorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/TwoModelRuntimeConfigTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/UnifiedTfliteAssetContractTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/YoloEndToEndOutputParserTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/inference/YuvImagePreprocessorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidTactileRouteGuidanceTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommandTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/ArCoreTactileProjectionContextFactoryTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientNetworkTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigatorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimatorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AccountDeletionRev0RecoveryPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionCryptoLifecycleTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayActivityCallbackPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayEndpointPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayPersistedLoginStateTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewaySessionProcessCoordinatorTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayWalkSessionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/UserNetworkSecurityBoundaryStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidAccountDeletionFallbackMarkerTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidPendingReportStoreTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCandidatePolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportCooldownPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportPurposeHeaderStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyAccountDeletionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidKeyStoreAeadStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/AndroidSensitivePreferenceStoreTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/security/LocalAeadTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionAuthorityRestartTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionCallExecutionTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionDualAuthorityTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentAuthorityTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AccountDeletionIntentFenceTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/AndroidSensorLifecycleStaticTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/FirstRunOnboardingPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentWithdrawalTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/OfficialEnvironmentPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PriorityUserOnboardingPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleFp012Test.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleFp018Test.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionLifecycleTest.kt"
+    },
+    {
+      "area": "ANDROID_USER",
+      "framework": "JUNIT",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/admin-report-summary-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/api-client-contract-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/auto-report-v2-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/field-telemetry-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/field-test-gateway-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/image-upload-admission-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/motion-projection-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/navigation-destination-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/navigation-guidance-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/offline-report-queue-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/pwa-release-version-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/pwa-status-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/risk-evaluator-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/route-progress-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/sensor-heading-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/settings-privacy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/step-length-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/upstream-base-url-policy.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/voice-intent-executor.test.ts"
+    },
+    {
+      "area": "LEGACY_WEB",
+      "framework": "TYPESCRIPT_POLICY",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "legacy-web",
+      "path": "apps/web/tests/walksafe-test-log-policy.test.ts"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_actor_rate_limit_store.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_device_proof.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_report_workflow.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_security.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_android_debug_logs.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_backup_source.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_detect.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_detect_v2.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_field_test_security.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_fp008_postgres_integration.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_fp046_postgres_integration.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_health_readiness.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_inference_process.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_navigation_routes.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_openapi_contract.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_privacy_lifecycle.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_image_crypto.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_image_keyring.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_original_access.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_policy.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_retention.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_report_storage_reconciliation.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_reports.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_reports_v2.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_request_limits.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_test_storage_isolation.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_uploads.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_yolo_inference_adapter.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "control-preimage",
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-2-PRESTART-CONTROL-REPAIR-20260724-001/before/tests/test_walksafe_goal_graph.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "control-preimage",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/r023-provisional-retirement-20260803/producer-sources/test_walksafe_fp048_gap_backlog_r023_20260802.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "model/test_two_model_runtime.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTHON_CLI",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "scripts/test_stt.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTHON_CLI",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "scripts/test_tts.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_agency_submission_receipt.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_aihub183_dataset_integrity.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_aihub189_depthprediction_offline.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_android_apk_model_asset_check.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_android_depth_scaffold_contract.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_android_field_session_summary.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_cloudflare_field_runner.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_dataset_content_integrity.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_field_telemetry_retention.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_local_model_registry.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_pwa_release_update_checker.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_release_evidence_gate.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_report_retention_encrypted_objects.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_report_retention_operational_safety.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_report_retention_scheduler.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_repository_catalogs.py"
+    },
+    {
+      "area": "MODEL_DATA",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_runtime_model_integration.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_submission_build_io.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_submission_isolated_python.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_submission_manifest_policy.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_submission_promotion.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_submission_visual_privacy.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_tactile_route_policy_contract.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_test_contamination_audit.py"
+    },
+    {
+      "area": "VOICE",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_voice_intents.py"
+    },
+    {
+      "area": "VOICE",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_voice_model_integrity.py"
+    },
+    {
+      "area": "VOICE",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_voice_stt_policy.py"
+    },
+    {
+      "area": "VOICE",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_voice_stt_server.py"
+    },
+    {
+      "area": "VOICE",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_voice_tts.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_active_docs.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_admin_high_risk_data_delete_gate.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_android_gateway_boundary_20260723.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_android_product_boundary.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_answer_review.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_baseline_approval_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_baseline_candidate.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_baseline_candidate_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_artifact_baseline_materialization_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_content_readiness_audit.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_independent_review_record_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_artifact_temporal_provenance_supplement_20260722.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_backup_integrity.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_backup_prune.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_control_bootstrap.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_decision_interview.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_design_deliverables.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_document_preparation.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_effective_baseline.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_effective_decision_register_alignment.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_environment_identity.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_b_trace_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_c_trace_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_d_legacy_web_closure_trace_20260723.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_e_android_gateway_trace_20260723.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_f_purpose_surfaces_trace_20260723.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic01_phase_g_no_destination_hazard_trace_20260723.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic02_phase_a_walk_session_lifecycle_trace_20260723.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic02_trace_v2_2_history.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_epic02_trace_v2_3_history.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_feature_policy_baseline_approval.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_feature_policy_baseline_review.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_feature_policy_document.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_feature_policy_report.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_feature_policy_resolution.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_aiml.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_deliverables_0_6.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_dev_test.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_management_discovery.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_rel_ops_cls.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_sec_ws.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_formal_trace_7_12.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp004_priority_user_trace_20260724.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp005_official_environment_trace_20260724.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp006_phone_mounting_trace_20260724.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_admin_review_delivery_trace_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_artifact_trace_successor_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_gap_backlog_r024_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_goal_completed_seq49_50_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_goal_seq45_46_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_goal_start_gate_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_goal_started_seq47_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_isolated_snapshot_fix_reconcile_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_isolated_snapshot_fix_reconcile_seq47b_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_isolated_snapshot_fix_reconcile_seq47c_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp008_policy_contract_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_session_resume_gate_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_session_snapshot_reconcile_20260808.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_strict_review_gate_20260803.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp008_work_session_resumed_seq48_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp010_first_run_registration_trace_20260725.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp011_long_lived_login_trace_20260725.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp012_multi_device_session_ledger_trace_20260726.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp013_integrated_consent_trace_20260725.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp014_permission_denial_revocation_trace_20260726.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp016_camera_centered_buttonless_screen_trace_20260726.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp018_walk_state_recovery_trace_20260724.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp035_correction_candidate.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_artifact_trace_successor_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_gap_backlog_r025_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_goal_completed_seq54_55_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_goal_seq51_52_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_goal_start_gate_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_goal_started_seq53_20260809.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp046_strict_review_gate_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_artifact_trace_successor_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_encryption_connection_security_incident_trace_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_gap_backlog_r023_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp048_goal_start_gate_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_goal_started_seq42_20260802.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_fp048_strict_review_gate_20260803.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_full_rc_tooling.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_gitleaks_report.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph_v2_2_history.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph_v2_3.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph_v2_3_history.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph_v2_4.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_goal_graph_v2_4_seq39_20260729.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "superseded-never-activated-package",
+      "path": "tests/test_walksafe_goal_package.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_implementation_gap_analysis_20260722.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_integrated_baseline.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_isolated_python_bootstrap.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_legacy_web_boundary_20260722.py"
+    },
+    {
+      "area": "TOOLING",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_node_toolchain_lock.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_npc_permission_session_trace_20260724.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_operator_attestation.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_phase1_exact257_successor_r011_20260729.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_phase1_exact257_successor_r012_20260802.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_phase1_exact257_successor_r013_20260803.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_phase1_exact257_successor_r014_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_plan_rebaseline_r022_candidate_20260730.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_private_evidence_modes.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_product_quality_receipt.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_project_continuation.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_project_continuation_v2_3.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "test-runner-active-session-array",
+      "path": "tests/test_walksafe_project_continuation_v2_4.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_project_questionnaire.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_requirements_draft.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_test_database_preflight.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_trace_integration_report.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_walksafe_w3_engineering_evidence_20260726.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_web_build_manifest.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_web_field_session_summary.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_web_runtime_trace_scope.py"
+    }
+  ],
+  "framework_counts": {
+    "ANDROID_INSTRUMENTATION_JUNIT": 2,
+    "JUNIT": 124,
+    "NODE_TEST": 12,
+    "PYTEST": 181,
+    "PYTHON_CLI": 2,
+    "TYPESCRIPT_POLICY": 20
+  },
+  "lifecycle_counts": {
+    "CURRENT": 216,
+    "HISTORICAL": 125
+  },
+  "path_count": 341,
+  "schema_version": "1.0",
+  "selection": [
+    "test_*.py",
+    "*Test.kt",
+    "*Test.java",
+    "apps/{android-gateway,web}/**/*.test.ts"
+  ],
+  "source_contract": {
+    "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
+    "git_input": "tracked paths excluding deletions plus nonignored untracked paths",
+    "path_format": "UTF-8 POSIX repository-relative",
+    "virtual_output_paths": [
+      "docs/catalogs/repository-paths.json",
+      "docs/catalogs/scripts.json",
+      "docs/catalogs/tests.json"
+    ]
+  },
+  "source_set_sha256": "8ef11f6a4368dd2fc2967f534875c0944fde999f30174b61575bd093b64928d6"
+}
