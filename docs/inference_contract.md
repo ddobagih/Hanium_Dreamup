@@ -1,5 +1,8 @@
 # 탐지 이벤트 계약
 
+> **문서 상태(2026-06-02): legacy v1.** 이 4-class `DetectionEvent` 계약은 PWA/v1 호환용이다. 현재 탐지 기준은 `docs/walksafe-v2/backend_api_contract.md`와 `docs/walksafe-v2/two_model_runtime_plan.md`다.
+
+
 작성 기준일: 2026-05-12
 
 ## 목적

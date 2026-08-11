@@ -38,7 +38,7 @@
 
 ## PWA server-mode static
 
-상세 문서: `docs/execution/2026-05-15_pwa_server_mode_followup.md`
+상세 문서: `docs/execution/2026-05-15_pwa_server_detection_e2e.md`, `docs/execution/2026-05-15_pwa_production_server_e2e.md`
 
 - `npm run lint`: PASS.
 - `npm run typecheck`: PASS.

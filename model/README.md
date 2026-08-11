@@ -1,11 +1,102 @@
 # 모델 개발
 
-이 폴더는 YOLO 기반 모델 개발을 위한 스크립트를 담습니다.
+이 폴더는 WalkSafe 모델 검증, 학습, v2 unified-primary/legacy-fallback runtime helper를 담습니다.
+
+## 현재 모델 방향
+
+- primary 후보: YOLO26n unified 13-class 단일 모델
+- legacy fallback 후보: YOLO26s custom tactile 3-class
+  - `normal_tactile_block`
+  - `damaged_tactile_block`
+  - `tactile_damage_area`
+- legacy COCO helper 후보: YOLO26n COCO pretrained, inference-only
+- v2 앱은 primary에서 `model_key=unified_walksafe`를 사용한다. legacy fallback에서만 custom/COCO 결과를 한 class-id 공간으로 합치지 않고 `model_key`, `source_model`, `class_name`을 유지한다.
+- 2026-05-22 기준 Stage1 `best.pt`는 legacy fallback/historical MVP 후보로만 기록한다. 현재 primary 방향은 unified 13-class이며, 실제 weight/run 산출물은 GitHub에 올리지 않는다.
+
+## unified YOLO26n COCO+AIHub source 학습/export 계약
+
+두 모델 순차 실행 지연을 줄이기 위한 현재 기본 경로는 **YOLO26n unified 13-class 단일 모델**입니다. 모바일 본명 후보 입력 크기는 2026-06-27부터 `768`로 갱신했다. 단, Android runtime config는 최종 768 TFLite asset이 생성되기 전까지 기존 640 unified asset path를 유지한다.
+
+현재 13-class class order:
+
+```yaml
+0: person
+1: bicycle
+2: car
+3: motorcycle
+4: bus
+5: truck
+6: traffic light
+7: normal_tactile_block
+8: damaged_tactile_block
+9: crosswalk
+10: curb_step
+11: uneven_sidewalk
+12: e_scooter_obstruction
+```
+
+관련 스크립트:
+
+```bash
+# 데이터셋 생성 초안: COCO allowlist + 현재 구현된 AIHub 513 road-facility adapter + 추가 커스텀 클래스 자리
+python data_sources/scripts/build_walksafe_unified_coco_tactile.py --dry-run
+
+# 학습 명령 확인. 실제 학습 전 data.yaml이 있어야 한다.
+bash scripts/run_walksafe_unified_yolo26n_20260601.sh --print-only
+
+# 2026-06-27 이후 모바일 본명 후보. 기본 imgsz=768.
+bash scripts/run_walksafe_unified_aihub183_png_yolo26n_768_20260627.sh --print-only
+
+# TFLite export 초안. 실제 export는 TensorFlow 가능한 export venv에서 실행한다.
+python scripts/export_walksafe_unified_tflite_20260601.py --help
+
+# 데이터셋 materialize 전 계획 정적 점검
+python scripts/check_walksafe_unified_training_plan_20260601.py --allow-missing-dataset
+
+# 다운로드된 AIHub zip을 압축 해제 없이 검사
+python data_sources/scripts/inspect_aihub_unified_sources.py --root ~/Downloads --max-json-per-zip 2000
+```
+
+AIHub source plan은 `docs/model_unified_13class_aihub_sources_20260602.md`와 `docs/execution/2026-06-27_walksafe_13class_aihub183_png_training_plan.md`를 기준으로 봅니다.
+
+- AIHub 186/189: 신규 학습 우선 source. tactile/crosswalk/curb/uneven sidewalk와 보행자 인도 도메인 보강.
+- AIHub 513: 현재 builder가 직접 지원하는 local/보조 source.
+- AIHub 189/614 또는 직접 촬영/수동 라벨링: `e_scooter_obstruction` source.
+
+`tactile_damage_area`는 1차 단일 모델에서는 제외합니다. 필요하면 데이터셋 빌더의 `--include-tactile-damage-area`로 14-class 비교안을 만들 수 있습니다.
+
+## v2 runtime helper
+
+`model/two_model_runtime.py`는 CPU-only helper입니다. Ultralytics/PIL/GPU runtime을 import하지 않고, 이미 생성된 detection payload를 필터링/병합합니다.
+
+```bash
+PATH="$PWD/.venv/bin:$PATH" python3 -m pytest model/test_two_model_runtime.py -q
+```
+
+관련 설정:
+
+- Android runtime source of truth: `apps/android/app/src/main/assets/model-config/two_model_runtime.json`
+- Backend/current runtime config: `configs/walksafe_two_model_runtime_stage1_mvp_20260523.json`
+- Legacy helper/base config: `configs/walksafe_two_model_runtime_20260522.yaml`
+- legacy custom tactile thresholds: 기본 0.25
+- legacy COCO allowlist: `person`, `car`, `bus`, `truck`, `bicycle`, `motorcycle`, `traffic light`, `bench`
+- cross-model NMS는 legacy fallback에서도 적용하지 않는다.
+
+## 2026-07-01 학습 상태
+
+현재 로컬에는 strict 768 e300 학습 run이 진행 중인 산출물이 있다.
+
+```text
+runs/detect/walksafe_unified_aihub183_png_yolo26n_img768_e300_open150_strict768_20260701_b8w2
+logs/walksafe_unified_aihub183_png_yolo26n_img768_e300_open150_strict768_20260701_b8w2_20260701_120341.log
+```
+
+`args.yaml` 기준 `imgsz: 768`, `epochs: 300`, `batch: 8`, `workers: 2`, `resume: false`다. `results.csv`에는 epoch 1 결과만 기록된 상태라 최종 metric 또는 export-ready 모델로 쓰지 않는다. 학습 로그에는 일부 truncated image warning이 있어, 학습 완료 후 데이터 품질 감사와 validation 결과를 별도 기록해야 한다.
 
 ## 데이터셋 검증
 
 ```bash
-python model/validate_yolo_dataset.py
+python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
 ```
 
 검증 항목:
@@ -17,71 +108,36 @@ python model/validate_yolo_dataset.py
 - 클래스 ID 범위
 - bbox 좌표가 0~1 사이인지 여부
 
-## 학습 실행
+## 학습 실행 예시
 
 ```bash
 python model/train_yolo.py \
-  --data datasets/walksafe_kr_v1/data.yaml \
+  --data datasets/walksafe_kr_v2/data.yaml \
   --model yolo11n.pt \
   --epochs 50 \
   --imgsz 640 \
   --batch 8
 ```
 
-AI Hub 513 전체 `TL8/TL9/TS8/TS9`로 만든 v2 데이터셋은 명시적으로 경로를 지정한다.
-
-```bash
-python model/validate_yolo_dataset.py --data datasets/walksafe_kr_v2/data.yaml
-python model/train_yolo.py \
-  --data datasets/walksafe_kr_v2/data.yaml \
-  --model yolo11n.pt \
-  --epochs 50 \
-  --imgsz 640 \
-  --batch 8 \
-  --name walksafe_kr_tactile_v2_full
-```
-
-학습 완료 후 test split 별도 검증은 새 run 이름으로 분리한다.
-
-```bash
-yolo detect val \
-  model=runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
-  data=datasets/walksafe_kr_v2/data.yaml \
-  split=test \
-  name=walksafe_kr_tactile_v2_test
-```
-
-## 실패 후보 샘플링
-
-full test split 실패 후보를 다시 볼 때는 prediction 이미지를 대량 저장하지 않고 CSV와 checkpoint만 남긴다.
-
-```bash
-.venv/bin/python model/sample_yolo_failures.py \
-  --model runs/detect/walksafe_kr_tactile_v2_full/weights/best.pt \
-  --data datasets/walksafe_kr_v2/data.yaml \
-  --split test \
-  --output-dir runs/failure_sampling/walksafe_kr_v2_test_stream_smoke_20260519 \
-  --max-images 80 \
-  --device cpu \
-  --overwrite
-```
-
-새 학습에 쓰기 전에는 생성 CSV의 `privacy_review_required=yes` 항목과 `small_or_far`/min-box 후보를 수동 검수한다.
-
-`ultralytics`가 설치되어 있지 않으면 `requirements-model.txt`를 먼저 설치합니다.
+`ultralytics`가 설치되어 있지 않으면 먼저 설치합니다.
 
 ```bash
 python -m pip install -r requirements-model.txt
 ```
 
-## 주의
+## tactile_damage_area 검수 상태
 
-데이터가 없는 상태에서는 학습을 실행하지 않습니다. 먼저 `datasets/walksafe_kr_v1` 또는 `datasets/walksafe_kr_v2`의 `images`와 `labels`에 한국 기준 YOLO 형식 데이터를 채웁니다.
+`tactile_damage_area` 검수 패키지는 `ai_tasks/walksafe_tactile_damage_area_review_20260522/`에 있습니다.
 
-`runs/`, `weights/`, `*.pt`, `*.onnx`, `*.engine`, `*.tflite`는 GitHub에 올리지 않습니다.
+- AI suggestion은 최종 label decision이 아니다.
+- 외부 검수 결과 CSV가 있어도 최종 decision 적용과 reviewed dataset build는 별도 단계다.
+- bbox 수정/추가 결정은 normalized bbox 좌표 검수 후 적용해야 한다.
 
-해외 공개 baseline 데이터셋은 다음처럼 명시적으로 지정할 때만 사용합니다.
+## GitHub 업로드 금지
 
-```bash
-python model/train_yolo.py --data datasets/walksafe_v1/data.yaml --epochs 1 --batch 4 --name walksafe_public_smoke
-```
+다음은 로컬 전용입니다.
+
+- `datasets/**/images/**`, `datasets/**/labels/**`
+- `runs/`, `weights/`
+- `*.pt`, `*.onnx`, `*.engine`, `*.tflite`
+- 원본 AI Hub zip과 대량 review 중간 산출물

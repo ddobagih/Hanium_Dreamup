@@ -27,7 +27,7 @@ git status --short --untracked-files=all
 ?? docs/execution/2026-05-15_wine_obs_snap_cleanup_result.md
 ```
 
-테스트 후 중간 재확인 시 `docs/execution/2026-05-15_pwa_server_mode_followup.md`가 추가로 보였으나, 이번 lane에서 만든 파일은 아니다.
+테스트 후 중간 재확인 시 별도 PWA server-mode follow-up 초안이 추가로 보였으나, 해당 초안은 이후 `docs/execution/2026-05-15_pwa_server_detection_e2e.md`와 `docs/execution/2026-05-15_pwa_production_server_e2e.md`로 대체되어 제거됐다.
 
 ## PostGIS 기동
 

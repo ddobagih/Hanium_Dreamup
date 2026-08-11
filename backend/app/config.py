@@ -16,6 +16,20 @@ DEFAULT_MODEL_CLASS_ORDER_ENV = ",".join(DEFAULT_MODEL_CLASS_ORDER)
 DEFAULT_MODEL_CONFIDENCE_THRESHOLD = 0.35
 DEFAULT_MODEL_IOU_THRESHOLD = 0.7
 DEFAULT_MODEL_IMAGE_SIZE = 640
+DEFAULT_DETECT_V2_MODE = "fake"
+DEFAULT_WALKING_ROUTE_PROVIDER = "tmap_pedestrian"
+DEFAULT_KAKAO_MOBILITY_WALKING_DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/affiliate/walking/v1/directions"
+DEFAULT_KAKAO_MOBILITY_SERVICE_NAME = "walksafe"
+DEFAULT_KAKAO_MOBILITY_TIMEOUT_SECONDS = 4.0
+DEFAULT_TMAP_PEDESTRIAN_ROUTE_URL = "https://apis.openapi.sk.com/tmap/routes/pedestrian"
+DEFAULT_TMAP_POI_SEARCH_URL = "https://apis.openapi.sk.com/tmap/pois"
+DEFAULT_TMAP_PEDESTRIAN_API_VERSION = "1"
+DEFAULT_TMAP_TIMEOUT_SECONDS = 4.0
+DEFAULT_TMAP_PEDESTRIAN_SPEED_KMH = 4.0
+DEFAULT_TMAP_POI_PROVIDER = "live"
+DEFAULT_MAX_REPORT_METADATA_BYTES = 64 * 1024
+DEFAULT_MAX_ANDROID_DEBUG_LOG_BYTES = 64 * 1024
+DEFAULT_ANDROID_DEBUG_LOG_ENABLED = "false"
 
 
 def _env_text(name: str, default: str = "") -> str:
@@ -59,6 +73,26 @@ def _parse_positive_int(name: str, default: int) -> int:
     return value
 
 
+def _parse_positive_float(name: str, default: float) -> float:
+    raw_value = _env_text(name, str(default))
+    if not raw_value:
+        return default
+
+    value = float(raw_value)
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+    return value
+
+
+def _parse_bool(name: str, default: str = "false") -> bool:
+    value = _env_text(name, default).lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off", ""}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 class Settings:
     def __init__(self) -> None:
         backend_root = Path(__file__).resolve().parents[1]
@@ -89,6 +123,82 @@ class Settings:
             DEFAULT_MODEL_IOU_THRESHOLD,
         )
         self.model_image_size = _parse_positive_int("MODEL_IMAGE_SIZE", DEFAULT_MODEL_IMAGE_SIZE)
+        self.detect_v2_mode = _env_text("DETECT_V2_MODE", DEFAULT_DETECT_V2_MODE).lower() or DEFAULT_DETECT_V2_MODE
+        detect_v2_custom_tactile_model_path = _env_text("DETECT_V2_CUSTOM_TACTILE_MODEL_PATH")
+        self.detect_v2_custom_tactile_model_path = (
+            Path(detect_v2_custom_tactile_model_path).expanduser().resolve()
+            if detect_v2_custom_tactile_model_path
+            else None
+        )
+        detect_v2_coco_model_path = _env_text("DETECT_V2_COCO_MODEL_PATH")
+        self.detect_v2_coco_model_path = (
+            Path(detect_v2_coco_model_path).expanduser().resolve()
+            if detect_v2_coco_model_path
+            else None
+        )
+        detect_v2_unified_model_path = _env_text("DETECT_V2_UNIFIED_MODEL_PATH")
+        self.detect_v2_unified_model_path = (
+            Path(detect_v2_unified_model_path).expanduser().resolve()
+            if detect_v2_unified_model_path
+            else None
+        )
+        detect_v2_runtime_config_path = _env_text("DETECT_V2_RUNTIME_CONFIG_PATH")
+        self.detect_v2_runtime_config_path = (
+            Path(detect_v2_runtime_config_path).expanduser().resolve()
+            if detect_v2_runtime_config_path
+            else None
+        )
+        self.walking_route_provider = _env_text("WALKING_ROUTE_PROVIDER", DEFAULT_WALKING_ROUTE_PROVIDER)
+        self.tmap_app_key = _env_text("TMAP_APP_KEY")
+        self.tmap_pedestrian_route_url = _env_text(
+            "TMAP_PEDESTRIAN_ROUTE_URL",
+            DEFAULT_TMAP_PEDESTRIAN_ROUTE_URL,
+        )
+        self.tmap_pedestrian_api_version = _env_text(
+            "TMAP_PEDESTRIAN_API_VERSION",
+            DEFAULT_TMAP_PEDESTRIAN_API_VERSION,
+        )
+        self.tmap_poi_search_url = _env_text(
+            "TMAP_POI_SEARCH_URL",
+            DEFAULT_TMAP_POI_SEARCH_URL,
+        )
+        self.tmap_poi_provider = _env_text("TMAP_POI_PROVIDER", DEFAULT_TMAP_POI_PROVIDER).lower() or DEFAULT_TMAP_POI_PROVIDER
+        self.tmap_timeout_seconds = _parse_positive_float(
+            "TMAP_TIMEOUT_SECONDS",
+            DEFAULT_TMAP_TIMEOUT_SECONDS,
+        )
+        self.tmap_pedestrian_speed_kmh = _parse_positive_float(
+            "TMAP_PEDESTRIAN_SPEED_KMH",
+            DEFAULT_TMAP_PEDESTRIAN_SPEED_KMH,
+        )
+        self.kakao_mobility_rest_api_key = _env_text("KAKAO_MOBILITY_REST_API_KEY")
+        self.kakao_mobility_walking_directions_url = _env_text(
+            "KAKAO_MOBILITY_WALKING_DIRECTIONS_URL",
+            DEFAULT_KAKAO_MOBILITY_WALKING_DIRECTIONS_URL,
+        )
+        self.kakao_mobility_service_name = _env_text(
+            "KAKAO_MOBILITY_SERVICE_NAME",
+            DEFAULT_KAKAO_MOBILITY_SERVICE_NAME,
+        )
+        self.kakao_mobility_timeout_seconds = _parse_positive_float(
+            "KAKAO_MOBILITY_TIMEOUT_SECONDS",
+            DEFAULT_KAKAO_MOBILITY_TIMEOUT_SECONDS,
+        )
+        self.max_report_metadata_bytes = _parse_positive_int(
+            "MAX_REPORT_METADATA_BYTES",
+            DEFAULT_MAX_REPORT_METADATA_BYTES,
+        )
+        self.android_debug_log_dir = Path(
+            os.getenv("ANDROID_DEBUG_LOG_DIR", str(backend_root / "android_debug_logs"))
+        ).resolve()
+        self.android_debug_log_enabled = _parse_bool(
+            "ANDROID_DEBUG_LOG_ENABLED",
+            DEFAULT_ANDROID_DEBUG_LOG_ENABLED,
+        )
+        self.max_android_debug_log_bytes = _parse_positive_int(
+            "MAX_ANDROID_DEBUG_LOG_BYTES",
+            DEFAULT_MAX_ANDROID_DEBUG_LOG_BYTES,
+        )
         self.cors_origins = [
             origin.strip()
             for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")

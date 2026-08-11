@@ -7,7 +7,7 @@ export const DETECTION_CLASS_NAMES = [
 
 export type ClassId = 0 | 1 | 2 | 3;
 export type DetectionClassName = (typeof DETECTION_CLASS_NAMES)[ClassId];
-export type DetectorSource = "fake" | "onnx" | "server";
+export type DetectorSource = "fake" | "onnx" | "server" | "android";
 
 export type NormalizedBBox = {
   x: number;
@@ -20,6 +20,7 @@ export type GpsFix = {
   latitude: number;
   longitude: number;
   accuracy_m: number | null;
+  speed_mps?: number | null;
 };
 
 export type DetectionEvent = {

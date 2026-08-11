@@ -1,5 +1,8 @@
 # 프론트엔드 인계 메모: 모델 연결 상태와 fallback
 
+> **문서 상태(2026-06-02): legacy PWA/v1.** 현재 주 사용자 앱은 Android native이며 PWA는 demo/API 보조 경로다. 최신 UI 정책은 `docs/walksafe-v2/frontend_display_policy.md`다.
+
+
 작성 기준일: 2026-05-12
 
 ## 2026-05-18 상태 보정
@@ -67,10 +70,10 @@ image=<camera frame image>
 ### 중복 확인
 
 ```http
-GET /reports/duplicate-check?class_name=damaged_tactile_block&captured_at=2026-05-12T12:00:00Z&lat=37.5665&lng=126.978&radius_m=25&minutes=10
+GET /reports/duplicate-check?class_name=damaged_tactile_block&captured_at=2026-05-12T12:00:00Z&lat=37.5665&lng=126.978&radius_m=10&minutes=1
 ```
 
-중복 확인은 위치가 있을 때만 호출한다. 위치가 없으면 바로 신고하되, 응답의 `review_flags`에 `missing_location`이 붙는다.
+중복 확인은 위치가 있을 때만 호출한다. v2 정책에서는 GPS가 없으면 신고 저장을 하지 않는다. 중복 후보여도 저장은 유지하고 `duplicate_candidate` tag와 후보 ID를 남긴다.
 
 ### 신고 생성
 

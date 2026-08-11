@@ -1,0 +1,1386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WalkSafe Assist 기능 인벤토리 및 구현 계획 - 2026-06-30</title>
+  <style>
+    :root {
+      --bg: #f4f6f5;
+      --ink: #17211d;
+      --muted: #65716c;
+      --panel: #ffffff;
+      --line: #d9e0dc;
+      --soft: #eef4f1;
+      --dark: #10231d;
+      --green: #176345;
+      --blue: #255f91;
+      --amber: #99620f;
+      --red: #9b2f2f;
+      --violet: #6950a5;
+      --shadow: 0 10px 24px rgba(23, 33, 29, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.62;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:focus {
+      text-decoration: underline;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    code {
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #edf1ef;
+      color: #25332e;
+      font-size: 0.9em;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 8px;
+      background: #12231e;
+      color: #eaf4ef;
+      line-height: 1.45;
+      font-size: 0.88rem;
+    }
+
+    header {
+      background: var(--dark);
+      color: #f7fbf8;
+      border-bottom: 6px solid #e0b04f;
+      padding: 40px 24px 28px;
+    }
+
+    .wrap {
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #bad2c8;
+      font-size: 0.94rem;
+      font-weight: 800;
+    }
+
+    h1 {
+      max-width: 1040px;
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 4rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 980px;
+      margin: 18px 0 0;
+      color: #dce8e3;
+      font-size: 1.05rem;
+    }
+
+    .meta-grid,
+    .summary-grid,
+    .domain-grid,
+    .two-col {
+      display: grid;
+      gap: 14px;
+    }
+
+    .meta-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 26px;
+    }
+
+    .meta {
+      padding: 14px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .meta b {
+      display: block;
+      margin-bottom: 4px;
+      color: #ffffff;
+      font-size: 0.9rem;
+    }
+
+    .meta span {
+      color: #cbd9d4;
+      font-size: 0.9rem;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      border-bottom: 1px solid var(--line);
+      background: rgba(244, 246, 245, 0.96);
+      backdrop-filter: blur(10px);
+    }
+
+    nav .wrap {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 20px;
+    }
+
+    nav a {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 0.88rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    main {
+      padding: 30px 0 56px;
+    }
+
+    section {
+      margin: 0 auto 22px;
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.62rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 1.12rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    ul,
+    ol {
+      margin: 8px 0 12px;
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .domain-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .two-col {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfc;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .callout {
+      margin: 16px 0;
+      padding: 16px;
+      border-left: 5px solid var(--green);
+      border-radius: 8px;
+      background: var(--soft);
+    }
+
+    .callout.warn {
+      border-left-color: var(--amber);
+      background: #fff7e8;
+    }
+
+    .callout.danger {
+      border-left-color: var(--red);
+      background: #fff0f0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      margin: 0 4px 4px 0;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 0.82rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .done {
+      border-color: #9ccfb0;
+      background: #edf8f1;
+      color: var(--green);
+    }
+
+    .partial {
+      border-color: #d7c08c;
+      background: #fff8e7;
+      color: var(--amber);
+    }
+
+    .missing {
+      border-color: #e7aaa7;
+      background: #fff2f1;
+      color: var(--red);
+    }
+
+    .gate {
+      border-color: #c0b0db;
+      background: #f5f0ff;
+      color: var(--violet);
+    }
+
+    .approval {
+      border-color: #aec4d6;
+      background: #eef6fb;
+      color: var(--blue);
+    }
+
+    .p0 {
+      color: var(--red);
+      font-weight: 900;
+    }
+
+    .p1 {
+      color: var(--amber);
+      font-weight: 900;
+    }
+
+    .p2 {
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    table {
+      width: 100%;
+      margin: 14px 0 22px;
+      border-collapse: collapse;
+      font-size: 0.93rem;
+    }
+
+    th,
+    td {
+      vertical-align: top;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+    }
+
+    th {
+      background: #edf3f0;
+      color: #17211d;
+      font-weight: 900;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: #fbfcfc;
+    }
+
+    .feature-table td:first-child {
+      width: 18%;
+      font-weight: 800;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .toc-note {
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 18px;
+      padding-left: 20px;
+    }
+
+    footer {
+      padding: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 940px) {
+      .meta-grid,
+      .summary-grid,
+      .domain-grid,
+      .two-col,
+      .source-list {
+        grid-template-columns: 1fr;
+      }
+
+      section {
+        padding: 20px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">WalkSafe Assist · 기능 전체 인벤토리 · PM 통합본</p>
+      <h1>시각장애인용 보행 보조 시스템 기능 현황과 구현 계획</h1>
+      <p class="lead">
+        2026-06-30 KST 기준으로 프로젝트 문서와 실제 코드 전체를 다시 조사해 기능 중심으로 재구성한 HTML입니다.
+        이전 문서의 문제였던 “기능이 흩어져 보이는 구조”를 고쳐, 기능군별로 현재 구현 여부·부족한 구현·권장 기술·검증 방법을 한 표에서 볼 수 있게 정리했습니다.
+        원본 240개 기능 항목은 검토 가능한 구현 결정 단위로 재분류했습니다.
+      </p>
+      <div class="meta-grid">
+        <div class="meta">
+          <b>프로젝트 경로</b>
+          <span><code>/home/ddobagi/Code/hanium-dreamup</code></span>
+        </div>
+        <div class="meta">
+          <b>주 사용자 앱</b>
+          <span>Android native ARCore/TFLite</span>
+        </div>
+        <div class="meta">
+          <b>현재 목표</b>
+          <span>최종 모델 제외 앱·API·운영 흐름 완성</span>
+        </div>
+        <div class="meta">
+          <b>가장 큰 미완료</b>
+          <span>Android 실기기 bbox-depth 정합</span>
+        </div>
+        <div class="meta">
+          <b>기능 정리 범위</b>
+          <span>240개 항목 → 28개 구현 묶음 + 113개 상세 기능</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav aria-label="문서 목차">
+    <div class="wrap">
+      <a href="#read">읽는 법</a>
+      <a href="#dashboard">대시보드</a>
+      <a href="#feature-map">기능군 전체</a>
+      <a href="#android">Android</a>
+      <a href="#pwa">PWA</a>
+      <a href="#backend">Backend</a>
+      <a href="#ops">Admin/Ops</a>
+      <a href="#voice">Voice</a>
+      <a href="#nav">Navigation</a>
+      <a href="#model">Model/Data</a>
+      <a href="#tests">테스트</a>
+      <a href="#priority">구현 순서</a>
+      <a href="#prompt">Goal 초안</a>
+      <a href="#sources">근거</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section id="read">
+      <h2>1. 읽는 법</h2>
+      <div class="callout">
+        이 문서의 주 목적은 “어떤 기능을 구현할지 가감하기”입니다.
+        따라서 첫 번째로 <a href="#feature-map">기능군 전체 인벤토리</a>를 보고, 필요한 기능을 남기거나 삭제한 다음,
+        <a href="#priority">구현 순서</a>와 <a href="#prompt">Goal 프롬프트 초안</a>을 수정하면 됩니다.
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>표기</th>
+            <th>의미</th>
+            <th>구현 판단</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge done">구현</span></td>
+            <td>코드 또는 문서+테스트 근거가 있음</td>
+            <td>그래도 Device/Release PASS와는 별도입니다.</td>
+          </tr>
+          <tr>
+            <td><span class="badge partial">부분</span></td>
+            <td>일부 lane에서만 동작하거나 정책/스캐폴드만 있음</td>
+            <td>대부분 실제 제품 연결 또는 실기기 검증이 남아 있습니다.</td>
+          </tr>
+          <tr>
+            <td><span class="badge missing">미구현</span></td>
+            <td>기능 요구는 있으나 현재 코드가 없음</td>
+            <td>구현 대상 후보입니다.</td>
+          </tr>
+          <tr>
+            <td><span class="badge gate">Gate</span></td>
+            <td>다른 기능을 켜기 전 반드시 통과해야 하는 조건</td>
+            <td>현재 최우선은 Android bbox-depth 정합입니다.</td>
+          </tr>
+          <tr>
+            <td><span class="badge approval">승인 필요</span></td>
+            <td>비용, 계정, 개인정보, 외부기관, 배포 영향을 가짐</td>
+            <td>goal에 넣기 전 사용자 명시 승인이 필요합니다.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>중요한 해석:</strong>
+        Web/PWA에 기능이 구현되어 있어도 Android 주 사용자 앱에 구현된 것은 아닙니다.
+        PWA는 demo, API contract 검증, admin 보조 경로로 유지하고, 실제 사용 앱은 Android native 기준으로 판단합니다.
+      </div>
+    </section>
+
+    <section id="dashboard">
+      <h2>2. 한눈에 보는 기능 대시보드</h2>
+      <div class="summary-grid">
+        <div class="card">
+          <h3>Android Core</h3>
+          <p><span class="badge partial">부분</span> <span class="badge gate">Device Gate</span></p>
+          <p>ARCore camera, depth, TFLite fallback, overlay, metadata log는 있음. TTS, haptic, GPS, report, navigation, accessibility는 Android 앱 기준 미구현 또는 보류.</p>
+        </div>
+        <div class="card">
+          <h3>Backend/API</h3>
+          <p><span class="badge done">구현</span> <span class="badge partial">보안 gap</span></p>
+          <p>detect v1/v2, report v1/v2, export, summary, duplicate, navigation, debug endpoint 존재. 인증/권한/rate limit은 없음.</p>
+        </div>
+        <div class="card">
+          <h3>PWA/Admin</h3>
+          <p><span class="badge partial">보조 경로</span></p>
+          <p>camera, risk, voice, navigation, settings, offline shell, admin이 넓게 구현됨. Android Device evidence 대체 불가.</p>
+        </div>
+        <div class="card">
+          <h3>Model/Data</h3>
+          <p><span class="badge partial">학습 중</span></p>
+          <p>13-class unified dataset과 training run 존재. unified Android TFLite asset은 아직 없고 640 config vs 768 학습 결정 필요.</p>
+        </div>
+      </div>
+
+      <h3>현재 진짜 P0</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>P0 기능</th>
+            <th>왜 먼저인가</th>
+            <th>완료 기준</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Android overlay 좌표 정합</td>
+            <td>bbox가 실제 객체 위에 맞아야 거리·경고·신고가 의미 있음</td>
+            <td>중앙/좌/우/상/하/회전/가장자리에서 실기기 PASS 기록</td>
+          </tr>
+          <tr>
+            <td>Android ARCore depth same-object 정합</td>
+            <td><code>N보</code> 안내가 엉뚱한 배경 depth를 잡으면 위험함</td>
+            <td>0.5m/1m/2m에서 bbox 내부 depth median/p20 추세가 일관됨</td>
+          </tr>
+          <tr>
+            <td>stale guard와 metadata-only evidence</td>
+            <td>오래된 detection으로 경고하지 않고 원인 분석 가능해야 함</td>
+            <td>stale 제외 reason과 transform/depth fallback reason이 metadata에 남음</td>
+          </tr>
+          <tr>
+            <td>Android report metadata 계약 확정</td>
+            <td>source와 depth 품질이 섞이면 운영 데이터 신뢰도가 깨짐</td>
+            <td><code>source=android</code> 여부, APK/model hash, depth quality allowlist 결정</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="feature-map">
+      <h2>3. 기능군 전체 인벤토리</h2>
+      <p class="toc-note">
+        아래 표는 <code>docs/evidence/feature_matrix.md</code>의 240개 항목, 20개 기능군, Android native gate 문서를 통합해
+        28개 구현 묶음으로 재분류한 기능 지도입니다. “구현할지 말지”를 판단해야 하는 단위이며,
+        세부 구현 항목은 바로 뒤의 Android/PWA/Backend/Admin/Voice/Navigation/Model 상세 표 113개 행에 풀어 두었습니다.
+      </p>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능군</th>
+            <th>현재 상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>권장 기술/구현</th>
+            <th>검증 방법</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Android camera/ARCore</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>ARCore session, camera preview, camera image acquire.</td>
+            <td>목걸이 착용 각도, 회전/crop 실기기 검증.</td>
+            <td>ARCore external OES, <code>GLSurfaceView</code>, lifecycle guard.</td>
+            <td>Gradle test/build + device checklist.</td>
+          </tr>
+          <tr>
+            <td>Android bbox/depth gate</td>
+            <td><span class="badge gate">최우선</span></td>
+            <td>Raw/Full Depth sampler, CoordinateMapper, overlay HUD.</td>
+            <td>실제 같은 객체를 보는지 Device PASS 없음.</td>
+            <td>ARCore <code>IMAGE_PIXELS -> TEXTURE_NORMALIZED -> VIEW</code>, median/p20, confidence map.</td>
+            <td>0.5/1/2m 거리, 중앙/가장자리/회전 체크.</td>
+          </tr>
+          <tr>
+            <td>Android detector runtime</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>TFLite parser/preprocess, unified primary 시도, legacy fallback.</td>
+            <td>unified TFLite asset 없음. 최종 모델 latency/FPS 미검증.</td>
+            <td>TFLite <code>[1,300,6]</code>, class threshold, sidecar config.</td>
+            <td><code>check_android_tflite_contract</code>, Gradle tests, device FPS.</td>
+          </tr>
+          <tr>
+            <td>Android feedback</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td><code>MessagePolicy</code>가 문구와 warning level만 계산.</td>
+            <td>TextToSpeech, Vibrator, TalkBack, rate-limit 실제 출력.</td>
+            <td>Android <code>TextToSpeech</code>, <code>VibrationEffect</code>, lifecycle/cooldown.</td>
+            <td>실폰 청취, 진동, TalkBack 충돌 테스트.</td>
+          </tr>
+          <tr>
+            <td>Android report upload</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>Backend <code>/reports/v2</code> 정책은 준비됨.</td>
+            <td>Android GPS, image capture, upload client, metadata allowlist.</td>
+            <td>damage-only upload, source metadata, retry policy.</td>
+            <td>damage 저장, general/normal/coco 거부, admin/export 확인.</td>
+          </tr>
+          <tr>
+            <td>Android navigation/location</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>Backend/PWA navigation은 구현. Android에는 route client 없음.</td>
+            <td>Fused Location, heading, route fetch, guide/reroute/arrival.</td>
+            <td>FusedLocationProvider, backend TMAP proxy, TTS priority.</td>
+            <td>mock route unit + 실폰 짧은 경로 field.</td>
+          </tr>
+          <tr>
+            <td>Android accessibility/offline</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>기본 View와 버튼. debug uploader memory queue.</td>
+            <td>contentDescription, large text, TalkBack flow, offline report queue.</td>
+            <td>Android accessibility labels, Room/WorkManager는 후순위.</td>
+            <td>TalkBack, font scale, 네트워크 차단 시나리오.</td>
+          </tr>
+          <tr>
+            <td>목적지 검색/geocoding</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>Backend TMAP POI search/mock, PWA 후보 검색.</td>
+            <td>Android 연결, 주소 geocoding provider, 별칭 사전.</td>
+            <td>Backend proxy, debounce/cancel, origin 거리 정렬.</td>
+            <td>navigation destination policy + backend pytest.</td>
+          </tr>
+          <tr>
+            <td>TMAP 후보 선택</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA 후보 선택, 더 보기, 음성 번호 선택.</td>
+            <td>Android UI/voice, 동명 후보 UX, 후보 TTS 반복.</td>
+            <td>candidate state machine, aria-live, voice slot.</td>
+            <td>후보 범위 초과/후보 없음/다시 검색 fixture.</td>
+          </tr>
+          <tr>
+            <td>길안내 시작/중지 정책</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA는 목적지 저장과 route start를 분리.</td>
+            <td>Android start/stop, route 교체 확인, in-flight UI.</td>
+            <td>prerequisite matrix, route request gate.</td>
+            <td>목적지 선택만으로 route fetch 0회 회귀.</td>
+          </tr>
+          <tr>
+            <td>경로 이탈/재탐색/도착</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA route projection, off-route, reroute cooldown, arrival.</td>
+            <td>Android field, GPS 도심 오차, live provider 검증.</td>
+            <td>GPS accuracy gate, jump guard, max reroute count.</td>
+            <td>route-progress/reroute scripts + 실폰 GPS field.</td>
+          </tr>
+          <tr>
+            <td>보폭 자동 측정</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA GPS + DeviceMotion 기반 추정, TTL 저장.</td>
+            <td>Android step counter, 실측 보폭 evidence.</td>
+            <td>GPS 이동거리, cadence, outlier filter, fallback 0.65m.</td>
+            <td>step-length policy + 실보행 로그.</td>
+          </tr>
+          <tr>
+            <td>거리/방향/행동 안내</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>Web risk guidance, Android MessagePolicy 문구.</td>
+            <td>Android 실제 TTS/haptic, class별 한국어 phrase 확정.</td>
+            <td>distance source/confidence, left/center/right, action matrix.</td>
+            <td>risk policy tests + device 청취.</td>
+          </tr>
+          <tr>
+            <td>ROI/IMU 충돌 필터</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA ROI lower-center, bbox approach, pseudo-depth.</td>
+            <td>Android SensorManager, route bearing 결합, field calibration.</td>
+            <td>class policy → ROI → tracking → trusted depth cascade.</td>
+            <td>motion ROI policy + 실기기 흔들림 테스트.</td>
+          </tr>
+          <tr>
+            <td>bbox 접근 판단</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA bbox history, TTC, stale reset. Android tracker 존재.</td>
+            <td>다중 객체 matching, 카메라 흔들림 억제, Android field.</td>
+            <td>IoU/center tracker, ByteTrack/SORT 후보는 P2.</td>
+            <td>tracking fixture + 실폰 jitter 샘플.</td>
+          </tr>
+          <tr>
+            <td>detect → report → export trace</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>Backend trace script, dry-run, v2 policy.</td>
+            <td>Android real upload trace, DB no-skip CI.</td>
+            <td>trace_id, payload/image hash, export deep field.</td>
+            <td>disposable DB에서 positive/negative trace.</td>
+          </tr>
+          <tr>
+            <td>Admin GeoJSON/export</td>
+            <td><span class="badge done">구현</span></td>
+            <td>CSV/JSON/GeoJSON, redacted, manifest, grid aggregate.</td>
+            <td>auth, submission history, reviewed-only guard 강화.</td>
+            <td>FastAPI export, no-store, CSV injection 방어.</td>
+            <td>backend reports tests, admin export DOM test.</td>
+          </tr>
+          <tr>
+            <td>Admin 지도/히트맵/클러스터</td>
+            <td><span class="badge partial">부분</span></td>
+            <td><code>/reports/summary</code>, grid cluster, admin summary panel.</td>
+            <td>실지도 SDK, 히트맵 UI, cluster click radius.</td>
+            <td>PostGIS or app memory grid, SVG/grid map 후보.</td>
+            <td>summary endpoint test, DOM fixture.</td>
+          </tr>
+          <tr>
+            <td>fake/demo 운영 분리</td>
+            <td><span class="badge done">구현</span></td>
+            <td>data_origin, performance_excluded, demo export filename/header.</td>
+            <td>모델 성능 리포트 자동 제외 검증.</td>
+            <td>backend/frontend fake 판정 통합.</td>
+            <td>report serialization tests, admin summary policy.</td>
+          </tr>
+          <tr>
+            <td>신고 검수 workflow</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>new/reviewed/resolved, note/reason, conflict, metadata history.</td>
+            <td>actor audit, audit table, bulk, assignee, duplicate merge.</td>
+            <td>transition guard, status_history JSONB, optimistic PATCH.</td>
+            <td>reports_v2 status tests.</td>
+          </tr>
+          <tr>
+            <td>긴급 연락처/초기 설정</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>PWA localStorage 최대 3개, 마스킹, 미전송 테스트.</td>
+            <td>Android 설정, 실제 전화/SMS는 제외 또는 승인 필요.</td>
+            <td>local-only settings, schema migration, privacy grep.</td>
+            <td>settings privacy script, TalkBack 수동.</td>
+          </tr>
+          <tr>
+            <td>PWA/offline</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>manifest, service worker, offline shell, opt-in queue utility.</td>
+            <td>오프라인 신고 UI 연결, Android offline queue.</td>
+            <td>no-store API, TTL/size limited queue.</td>
+            <td>PWA policy script + browser install/offline field.</td>
+          </tr>
+          <tr>
+            <td>개인정보/보존</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>metadata allowlist, EXIF 재인코딩, redacted export, retention dry-run.</td>
+            <td>실제 삭제 job, backup/approval workflow, admin auth.</td>
+            <td>dry-run manifest → explicit approval → backup → delete.</td>
+            <td>privacy checklist, retention dry-run.</td>
+          </tr>
+          <tr>
+            <td>STT/TTS/음성 명령</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>voice server, PWA MediaRecorder, intent, safe noop, TTS cache.</td>
+            <td>Android mic/TTS, noise field, PWA WAV playback.</td>
+            <td>faster-whisper, Qwen TTS, rule intent, confidence threshold.</td>
+            <td>voice pytest, voice contract, 실폰 mic.</td>
+          </tr>
+          <tr>
+            <td>NLU fallback</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>safe noop과 unknown/low-confidence policy.</td>
+            <td>실제 LLM/Cloud NLU는 미연결, 승인 필요.</td>
+            <td>disabled provider interface, should_execute=false.</td>
+            <td>negative command tests, privacy telemetry.</td>
+          </tr>
+          <tr>
+            <td>13-class model/data</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>196k images, 607k boxes, 13-class data.yaml, training run.</td>
+            <td>독립 test split, 최종 e300 결과, threshold sweep.</td>
+            <td>Ultralytics YOLO26n 768, source manifest, audit scripts.</td>
+            <td>dataset validation, results.csv, mAP/confusion.</td>
+          </tr>
+          <tr>
+            <td>TFLite export/drop-in</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>export scripts와 Android contract check 존재.</td>
+            <td>unified asset 생성/삽입, 640 vs 768 결정, device parity.</td>
+            <td>Ultralytics export <code>nms=True</code>, sidecar, config update.</td>
+            <td>contract script, Gradle, device FPS/thermal.</td>
+          </tr>
+          <tr>
+            <td>MLOps/field data/release</td>
+            <td><span class="badge approval">승인 필요</span></td>
+            <td>문서와 dry-run 수준.</td>
+            <td>S3/CI/CD/registry, opt-in field upload, domain/HTTPS, rollback.</td>
+            <td>명시 승인 후 별도 lane으로 분리.</td>
+            <td>release runbook, privacy approval, field protocol.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="android">
+      <h2>4. Android Native 기능 상세</h2>
+      <div class="callout danger">
+        Android 앱의 현재 중심 기능은 <strong>ARCore 카메라 + depth + TFLite detector + debug overlay/metadata</strong>입니다.
+        TTS, haptic, GPS, report upload, navigation, offline, 접근성은 Android 앱 기준 아직 미구현이거나 gate 이후 작업입니다.
+      </div>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현/결정</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>카메라 프리뷰</td>
+            <td><span class="badge done">구현</span></td>
+            <td>ARCore camera texture를 <code>GLSurfaceView</code>에 렌더링. 같은 frame의 camera image를 detector 입력으로 사용.</td>
+            <td>목걸이 착용 각도, 화면 회전, crop 검증.</td>
+            <td>ARCore external OES, OpenGL ES, YUV image.</td>
+            <td><code>./gradlew test</code>, 실폰 preview.</td>
+          </tr>
+          <tr>
+            <td>ARCore session/install</td>
+            <td><span class="badge done">구현</span></td>
+            <td>ARCore availability, Play Services for AR 설치 요청, <code>DepthMode.AUTOMATIC</code>.</td>
+            <td>미지원 기기 UX와 fallback 정책.</td>
+            <td>ARCore SDK <code>1.54.0</code>.</td>
+            <td>지원/미지원 기기 시작·중지.</td>
+          </tr>
+          <tr>
+            <td>Raw/Full Depth</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>Raw Depth + confidence 우선, Full Depth fallback.</td>
+            <td>기기별 정렬, same-object depth, 실측 거리.</td>
+            <td><code>acquireRawDepthImage16Bits</code>, confidence image.</td>
+            <td>0.5m/1m/2m device checklist.</td>
+          </tr>
+          <tr>
+            <td>Depth sampling/N보</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>polygon 내부 median/p20, confidence gate, MAD outlier, metric source만 steps 계산.</td>
+            <td>ARCore pose/intrinsics ground ray는 메인 UX에 미연결. 실측 PASS 없음.</td>
+            <td><code>DepthSampler</code>, <code>DepthEstimator</code>.</td>
+            <td>JVM tests + 실측 N보.</td>
+          </tr>
+          <tr>
+            <td>좌표 mapping</td>
+            <td><span class="badge gate">Gate</span></td>
+            <td><code>IMAGE_PIXELS -> VIEW</code>, <code>IMAGE_PIXELS -> TEXTURE_NORMALIZED</code> 경로.</td>
+            <td>overlay와 depth bbox가 같은 객체인지 실폰 검증.</td>
+            <td>ARCore <code>Frame.transformCoordinates2d</code>.</td>
+            <td>중앙/좌/우/상/하/회전.</td>
+          </tr>
+          <tr>
+            <td>TFLite detector</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>unified asset 우선, 없으면 custom tactile + COCO fallback, 모두 실패 시 Noop.</td>
+            <td>unified TFLite asset 없음. 실제 model latency 없음.</td>
+            <td>TFLite Interpreter, CPU/NNAPI fallback.</td>
+            <td>contract script, Android unit, device FPS.</td>
+          </tr>
+          <tr>
+            <td>YOLO preprocess/parser</td>
+            <td><span class="badge done">구현</span></td>
+            <td>YUV420 → ARGB/letterbox float buffer, <code>[1,300,6]</code> output parser.</td>
+            <td>segmentation mask 직접 추론 없음.</td>
+            <td>Kotlin preprocessor/parser.</td>
+            <td>preprocessor/parser unit tests.</td>
+          </tr>
+          <tr>
+            <td>Overlay/HUD</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>mapped bbox, label, 중심점, depth summary, tactile smoothing/hold.</td>
+            <td>실기기 RGB-bbox-depth PASS.</td>
+            <td>Android custom <code>View</code>, Canvas.</td>
+            <td>device overlay checklist.</td>
+          </tr>
+          <tr>
+            <td>Metadata capture</td>
+            <td><span class="badge done">구현</span></td>
+            <td>최근 30개 ring buffer, detector/depth/overlay/transform/fallback 필드.</td>
+            <td>planned fields 일부 미구현: detector input size, overlay bbox view, depth bbox pixels 등.</td>
+            <td>Kotlin ring buffer, JSON encoder.</td>
+            <td>metadata unit tests, schema 대조.</td>
+          </tr>
+          <tr>
+            <td>Debug metadata upload</td>
+            <td><span class="badge done">구현</span></td>
+            <td>debug build 버튼으로 <code>/android/debug/depth-logs</code> 전송. release는 Noop.</td>
+            <td>backend flag 기본 off. 운영 report와 분리 유지.</td>
+            <td><code>HttpURLConnection</code>, debug sourceSet.</td>
+            <td>backend debug tests + adb reverse.</td>
+          </tr>
+          <tr>
+            <td>Debug frame capture</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>debug-only JPEG 1장 + metadata multipart upload endpoint 존재.</td>
+            <td>raw image 저장 가능하므로 승인 전 field 사용 금지. 전용 테스트 부족.</td>
+            <td>scaled JPEG, multipart HTTP.</td>
+            <td>local/dev 수동, privacy review.</td>
+          </tr>
+          <tr>
+            <td>Permissions</td>
+            <td><span class="badge done">구현</span></td>
+            <td>main manifest는 CAMERA만. debug manifest만 INTERNET/cleartext.</td>
+            <td>GPS/mic/report/nav 기능을 붙이면 권한 UX 재설계 필요.</td>
+            <td>Android manifest split.</td>
+            <td>manifest static script.</td>
+          </tr>
+          <tr>
+            <td>Error/stale state</td>
+            <td><span class="badge partial">부분</span></td>
+            <td>permission denied, ARCore unsupported, camera unavailable, depth waiting, stale detection 표시.</td>
+            <td>사용자 복구 UX, 네트워크 실패 제품 UX.</td>
+            <td>MainActivity state text, snapshot freshness constants.</td>
+            <td>unit + 실기기 오류 케이스.</td>
+          </tr>
+          <tr>
+            <td>TTS</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td><code>MessagePolicy</code>가 한국어 메시지는 생성.</td>
+            <td>Android <code>TextToSpeech</code> 출력 없음.</td>
+            <td>TextToSpeech lifecycle, cooldown.</td>
+            <td>실폰 청취/TalkBack 충돌.</td>
+          </tr>
+          <tr>
+            <td>Haptic</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>warning level은 계산 가능.</td>
+            <td><code>Vibrator</code>/<code>VibrationEffect</code> 사용 없음.</td>
+            <td>패턴별 vibration, voice-off fallback.</td>
+            <td>실폰 진동 체감.</td>
+          </tr>
+          <tr>
+            <td>Accessibility</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>기본 TextView/Button 중심.</td>
+            <td>contentDescription, TalkBack flow, font scale, focus order.</td>
+            <td>Android accessibility label, live announcement 후보.</td>
+            <td>TalkBack/font scale 수동.</td>
+          </tr>
+          <tr>
+            <td>Sensors/IMU</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td><code>MotionContext</code> 데이터 모델 수준.</td>
+            <td>SensorManager, accelerometer/gyro, step detector 미연결.</td>
+            <td>SensorManager, TYPE_STEP_COUNTER 후보.</td>
+            <td>보행 field log.</td>
+          </tr>
+          <tr>
+            <td>GPS/location</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>Android manifest에 위치 권한 없음.</td>
+            <td>Fused Location, heading, GPS report metadata.</td>
+            <td>FusedLocationProvider, permission flow.</td>
+            <td>GPS accuracy field.</td>
+          </tr>
+          <tr>
+            <td>Report upload</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>damage는 report-only 정책으로 분류됨.</td>
+            <td>실제 Android upload 없음. GPS/image/source metadata 없음.</td>
+            <td>OkHttp/Retrofit 후보, multipart.</td>
+            <td>backend integration + admin/export.</td>
+          </tr>
+          <tr>
+            <td>Navigation/offline</td>
+            <td><span class="badge missing">미구현</span></td>
+            <td>normal tactile/crosswalk guidance 문구만 있음.</td>
+            <td>route API client, turn-by-turn, offline queue 없음.</td>
+            <td>backend navigation proxy, WorkManager/Room은 P2.</td>
+            <td>mock route + device field.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="pwa">
+      <h2>5. Web/PWA 기능 상세</h2>
+      <div class="callout warn">
+        PWA는 기능이 넓지만 주 사용자 앱이 아닙니다. 기능 아이디어와 backend contract 검증에는 유용하지만 Android 실기기 PASS를 대체하지 않습니다.
+      </div>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>PWA 보행 화면</td><td><span class="badge partial">보조</span></td><td>보행 보조 화면, fake/server 탐지, 신고, 음성, 길안내.</td><td>실제 안전 근거로 사용 금지.</td><td>Next.js client app.</td><td>lint/typecheck/build, 실폰 smoke.</td></tr>
+          <tr><td>Camera</td><td><span class="badge done">구현</span></td><td>후면 카메라 <code>getUserMedia</code>, 권한 상태, 재연결, JPEG 캡처.</td><td>목걸이 착용 검증, background 처리.</td><td>MediaDevices, canvas.</td><td>Android Chrome/HTTPS 수동.</td></tr>
+          <tr><td>Detector modes</td><td><span class="badge done">구현</span></td><td><code>fake</code>, <code>server</code>, <code>fake-v2</code>, <code>server-v2</code>, <code>camera-only</code>.</td><td>브라우저 ONNX 없음.</td><td>env mode, multipart fetch, parser audit.</td><td>mode별 browser smoke.</td></tr>
+          <tr><td>Overlay</td><td><span class="badge done">구현</span></td><td>v1/v2 bbox, object-fit cover 좌표 보정, depth/approach label.</td><td>AR world 정합, segmentation mask 없음.</td><td>ResizeObserver, normalized bbox projection.</td><td>visual + TestCapturePanel.</td></tr>
+          <tr><td>Risk evaluator</td><td><span class="badge partial">부분</span></td><td>damage report-only, surface/obstruction alert, general 객체는 ROI/depth/tracking 조건.</td><td>실폰 충돌 위험 검증.</td><td>RiskDecision, TTC, ROI.</td><td>risk evaluator policy script.</td></tr>
+          <tr><td>WebXR/pseudo-depth</td><td><span class="badge partial">실험</span></td><td>WebXR depth button, ROI median, bbox history pseudo-depth.</td><td>지원 기기 제한, Android ARCore depth와 별개.</td><td>WebXR depth API.</td><td>지원 브라우저 수동 + policy.</td></tr>
+          <tr><td>TTS/vibration</td><td><span class="badge done">구현</span></td><td>Web Speech API, Vibration API, 위험 cooldown, voice on/off.</td><td>voice server WAV playback 없음.</td><td><code>speechSynthesis</code>, <code>navigator.vibrate</code>.</td><td>실폰 음성/진동.</td></tr>
+          <tr><td>GPS/sensors</td><td><span class="badge done">구현</span></td><td>Geolocation watch, accuracy/speed, DeviceOrientation alpha.</td><td>compass 보정, background 위치.</td><td>Geolocation, DeviceOrientation.</td><td>권한 허용 후 좌표/방위 확인.</td></tr>
+          <tr><td>Step length</td><td><span class="badge partial">부분</span></td><td>GPS 거리 + DeviceMotion step peak, 7일 localStorage calibration.</td><td>field 보정 근거.</td><td>haversine, cadence/outlier gate.</td><td>step-length policy.</td></tr>
+          <tr><td>Auto report</td><td><span class="badge partial">부분</span></td><td><code>server-v2</code> damage만 <code>/reports/v2</code> 자동 저장. GPS 필수, cooldown.</td><td>offline queue UI, Android upload.</td><td>auto target selector, multipart report.</td><td>server-v2 + admin/export.</td></tr>
+          <tr><td>Voice command</td><td><span class="badge partial">부분</span></td><td>MediaRecorder 5초, <code>/speech/stt</code>, 신고/반복/위치/목적지/nav intent.</td><td>상시 E2E, NLU fallback.</td><td>MediaRecorder, FormData, confidence 0.7.</td><td>voice server + browser mic.</td></tr>
+          <tr><td>Navigation</td><td><span class="badge partial">부분</span></td><td>검색, 후보, TMAP route, STAIR_AVOID, guide TTS, off-route, reroute.</td><td>지도 시각화, 실보행 timing.</td><td>backend route APIs, route projection.</td><td>navigation policy scripts.</td></tr>
+          <tr><td>Settings</td><td><span class="badge partial">부분</span></td><td>긴급 연락처 최대 3개 local-only, 마스킹, 설정 접기.</td><td>실제 전화/SMS 없음. Android 설정 없음.</td><td>localStorage schema migration.</td><td>settings privacy script.</td></tr>
+          <tr><td>PWA install/offline</td><td><span class="badge partial">부분</span></td><td>manifest, service worker shell cache, online/offline banner, update apply.</td><td>오프라인 신고 UI 미연결.</td><td>Service Worker, Cache API.</td><td>PWA policy + browser install.</td></tr>
+          <tr><td>Test capture panel</td><td><span class="badge done">구현</span></td><td>기대 대상/거리/메모/판정과 frame/depth/GPS/audit metadata 저장.</td><td>운영 dashboard, 보존/동의 UX.</td><td>Next API route, FormData.</td><td>snapshot 저장 후 로그 확인.</td></tr>
+          <tr><td>API proxy</td><td><span class="badge partial">부분</span></td><td>Next proxy: detect v2, reports, uploads, test log.</td><td>navigation/voice/v1 detect는 직접 호출 중심. 호출 경로 혼재.</td><td>Next route handlers, backend base URL.</td><td>browser network/curl smoke.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="backend">
+      <h2>6. Backend/API 기능 상세</h2>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Health</td><td><span class="badge done">구현</span></td><td><code>GET /health</code>.</td><td>보강 필요 낮음.</td><td>FastAPI router.</td><td>basic API test.</td></tr>
+          <tr><td>Detect v1</td><td><span class="badge partial">legacy</span></td><td><code>/detect/health</code>, <code>POST /detect</code>, 4-class YOLO adapter.</td><td>운영 모델 없으면 503.</td><td>Ultralytics lazy cache.</td><td><code>backend/tests/test_detect.py</code>.</td></tr>
+          <tr><td>Detect v2</td><td><span class="badge done">구현</span></td><td>fake 기본, yolo/real에서 unified 우선, legacy fallback.</td><td>첫 요청 lazy load 실패 상태 분리 보강.</td><td>Fake provider, LazyYoloDetectV2Runtime.</td><td>detect_v2/yolo adapter tests.</td></tr>
+          <tr><td>Upload</td><td><span class="badge partial">부분</span></td><td>JPEG/PNG/WebP 검증, 크기 제한, EXIF 제거 시도, <code>/uploads/{filename}</code>.</td><td>인증 없는 파일 조회, signed URL 없음.</td><td>Pillow, MIME/signature validation.</td><td>uploads tests.</td></tr>
+          <tr><td>Report v1</td><td><span class="badge partial">legacy</span></td><td><code>POST /reports</code>, legacy 4-class 저장.</td><td>v2 운영 기준과 분리.</td><td>SQLAlchemy Report row, PostGIS.</td><td>reports tests.</td></tr>
+          <tr><td>Report v2</td><td><span class="badge done">구현</span></td><td><code>custom_tactile</code>/<code>unified_walksafe</code> damage만 GPS 필수 저장.</td><td>Android source enum/metadata 결정.</td><td>Pydantic, metadata allowlist, hash.</td><td>reports_v2/report_policy tests.</td></tr>
+          <tr><td>List/detail</td><td><span class="badge done">구현</span></td><td><code>GET /reports</code>, <code>GET /reports/{id}</code>, status/class/source/model_key/date/radius filter.</td><td>offset pagination 없음, limit max 100.</td><td>JSONB filter, PostGIS radius.</td><td>reports tests.</td></tr>
+          <tr><td>Export</td><td><span class="badge done">구현</span></td><td>CSV/JSON/GeoJSON, redacted, manifest, grid aggregate, BOM, no-store.</td><td>auth, 기관 제출 이력.</td><td>serialization, CSV escape.</td><td>reports_v2 export tests.</td></tr>
+          <tr><td>Summary</td><td><span class="badge partial">부분</span></td><td><code>/reports/summary</code>, count/status/source/location/grid cluster.</td><td>DB aggregate 최적화, 지도 UI.</td><td>PostGIS query 후 app memory summary.</td><td>summary tests.</td></tr>
+          <tr><td>Duplicate</td><td><span class="badge done">구현</span></td><td>class + 위치 25m + 전후 10분 후보.</td><td>자동 병합/삭제 없음.</td><td>PostGIS radius query.</td><td>duplicate tests.</td></tr>
+          <tr><td>Status workflow</td><td><span class="badge partial">부분</span></td><td>new/reviewed/resolved, expected_updated_at conflict, note/reason/history.</td><td>audit table, actor, bulk.</td><td>transition map, JSONB status_history.</td><td>status tests.</td></tr>
+          <tr><td>Navigation search</td><td><span class="badge done">구현</span></td><td>TMAP POI live/mock, origin distance, query normalization.</td><td>주소 geocoding 전용 provider.</td><td>backend proxy, provider error wrapping.</td><td>navigation routes tests.</td></tr>
+          <tr><td>Walking route</td><td><span class="badge done">구현</span></td><td>TMAP pedestrian proxy, Kakao fallback, priority mapping, guide_points.</td><td>Kakao guide_points 없음, Android 연결 없음.</td><td>TMAP GeoJSON normalization.</td><td>route pytest, TMAP smoke.</td></tr>
+          <tr><td>Android debug</td><td><span class="badge partial">부분</span></td><td>depth metadata JSONL endpoint, frame capture endpoint.</td><td>frame capture는 raw image 저장 가능하므로 local/dev 한정.</td><td>Pydantic extra forbid, size cap.</td><td>android debug tests.</td></tr>
+          <tr><td>DB/Alembic</td><td><span class="badge done">구현</span></td><td>single reports table, JSONB metadata, PostGIS geometry, GIST index.</td><td>status history table, retention 실행 API 없음.</td><td>PostgreSQL/PostGIS, Alembic.</td><td>DB integration tests.</td></tr>
+          <tr><td>Settings/env</td><td><span class="badge partial">부분</span></td><td>dotenv settings for DB, upload, detect, TMAP/Kakao, debug, CORS.</td><td>secret manager 없음.</td><td>Pydantic-like settings class.</td><td>monkeypatch tests.</td></tr>
+          <tr><td>Error contract</td><td><span class="badge partial">부분</span></td><td>주요 endpoint별 error code 있음.</td><td><code>detail.code</code>, string detail, validation list가 혼재.</td><td>standard error envelope 후보.</td><td>각 기능 테스트 + contract 문서 보강.</td></tr>
+          <tr><td>Security</td><td><span class="badge missing">미구현</span></td><td>입력 검증, EXIF 제거, redacted export, debug 기본 off.</td><td>인증, 인가, rate limit, CSRF, admin 보호 없음.</td><td>API auth middleware, RBAC, audit log.</td><td>auth 부재 grep, 배포 전 security tests.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="ops">
+      <h2>7. Admin/Ops/Privacy 기능 상세</h2>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Admin 신고 관리 UI</td><td><span class="badge partial">부분</span></td><td>목록, 필터, 상세, 이미지, 상태 변경.</td><td>인증/권한, 실지도 SDK, bulk/assignee.</td><td>Next.js client, report-api.</td><td>admin summary policy, browser.</td></tr>
+          <tr><td>필터/정렬/상세</td><td><span class="badge done">구현</span></td><td>status/class/source/model_key/trigger/auto/date/radius, 최신/신뢰도/상태 정렬.</td><td>Android source 전용 filter.</td><td>query params, client state.</td><td>GET /reports fixtures.</td></tr>
+          <tr><td>요약/클러스터</td><td><span class="badge partial">부분</span></td><td>summary panel, grid cluster, fake/source/status breakdown.</td><td>외부 지도/히트맵 UI.</td><td>backend summary endpoint.</td><td>summary tests.</td></tr>
+          <tr><td>상태 workflow</td><td><span class="badge partial">부분</span></td><td>note/reason, conflict guard, metadata status_history.</td><td>actor audit, audit table.</td><td>PATCH status, optimistic concurrency.</td><td>reports_v2 workflow tests.</td></tr>
+          <tr><td>v2 신고 생성</td><td><span class="badge done">구현</span></td><td>damage-only, GPS 필수, policy reject.</td><td>Android upload 미연결, Android metadata allowlist 미확정.</td><td>multipart, Pydantic schema.</td><td>report policy tests.</td></tr>
+          <tr><td>중복 후보</td><td><span class="badge done">구현</span></td><td>class/location/time 기준 후보 반환.</td><td>자동 merge/delete 없음.</td><td>PostGIS query.</td><td>duplicate tests.</td></tr>
+          <tr><td>Export</td><td><span class="badge done">구현</span></td><td>CSV/JSON/GeoJSON, manifest, redacted, aggregate.</td><td>export 접근권한, 제출 이력.</td><td>FastAPI streaming/serialization.</td><td>export tests.</td></tr>
+          <tr><td>운영자 내부 검토 export</td><td><span class="badge partial">부분</span></td><td>Admin redacted export 링크와 정책 문서.</td><td>자동 API connector, submissions table, 접수번호 sync.</td><td>manual_export connector부터 권장.</td><td>export URL 확인.</td></tr>
+          <tr><td>Fake/demo 분리</td><td><span class="badge done">구현</span></td><td>badge, filename/header, data_origin, performance_excluded.</td><td>metric report 자동 제외 검증.</td><td>backend/frontend fake 판정.</td><td>admin report summary tests.</td></tr>
+          <tr><td>Privacy payload</td><td><span class="badge partial">부분</span></td><td>allowlist, extra drop, metadata size, sha256.</td><td>Android 최종 metadata 미확정, auth 없음.</td><td>server-side enrichment.</td><td>reports/upload tests.</td></tr>
+          <tr><td>Image protection</td><td><span class="badge partial">부분</span></td><td>MIME/signature/size, EXIF 제거 시도, no-store, traversal 방어.</td><td>인증 없는 조회, signed URL 없음.</td><td>Pillow re-encode.</td><td>uploads tests.</td></tr>
+          <tr><td>Retention</td><td><span class="badge partial">문서+dry-run</span></td><td>fake 30d, active 180d, resolved 365d, export 7d 정책.</td><td>실제 delete job/scheduler 없음.</td><td>dry-run manifest, approval gate.</td><td>retention dry-run script.</td></tr>
+          <tr><td>Offline report queue</td><td><span class="badge partial">보조</span></td><td>PWA utility, opt-in, TTL 24h, max 20, payload 64KB.</td><td>실제 동기화 UX, Android offline 기능.</td><td>Indexed/local storage utility.</td><td>PWA policy tests.</td></tr>
+          <tr><td>보호자 연락처 privacy</td><td><span class="badge partial">부분</span></td><td>PWA localStorage, 마스킹, 최대 3개, payload 미전송.</td><td>OS secure storage, Android 설정.</td><td>settings hook.</td><td>settings privacy script.</td></tr>
+          <tr><td>Android debug privacy</td><td><span class="badge partial">부분</span></td><td>depth log metadata-only, 기본 off.</td><td>frame capture endpoint는 이미지 저장 가능. field 사용 승인 필요.</td><td>debug endpoint flag, size cap.</td><td>debug log tests.</td></tr>
+          <tr><td>Evidence 체계</td><td><span class="badge done">문서</span></td><td>feature matrix, privacy checklist, templates, final index.</td><td>Device/Release/외부 제출 PASS 없음.</td><td>PASS/BLOCKED/미검증 badge.</td><td>문서 link/static check.</td></tr>
+          <tr><td>Admin auth/security</td><td><span class="badge missing">미구현</span></td><td>현재 CORS/입력 검증 정도.</td><td>로그인, 세션, RBAC, API key, CSRF, rate limit, actor audit 없음.</td><td>backend endpoint 보호 우선.</td><td>auth 없는 접근 차단 테스트.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="voice">
+      <h2>8. Voice/Accessibility 기능 상세</h2>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>STT server</td><td><span class="badge done">구현</span></td><td><code>faster-whisper medium</code>, <code>/speech/stt</code>, 업로드 검증, intent 후처리.</td><td>실폰 잡음/보행 중 mic, Android native 연결.</td><td>FastAPI, faster-whisper.</td><td>voice intents, test_stt, voice contract.</td></tr>
+          <tr><td>TTS server</td><td><span class="badge partial">부분</span></td><td>Qwen3-TTS <code>/speech/tts</code>, cache/fallback.</td><td>PWA HTTP WAV playback, Android TTS 연결, 청취 평가.</td><td>Qwen3-TTS, WAV cache.</td><td>voice_tts tests, cache smoke.</td></tr>
+          <tr><td>Web TTS/haptic</td><td><span class="badge done">구현</span></td><td>Web Speech, Vibration, risk cooldown, 길안내보다 위험 우선.</td><td>실기기 스피커/진동 평가.</td><td>speechSynthesis, navigator.vibrate.</td><td>실폰 체감 + policy.</td></tr>
+          <tr><td>Intent policy</td><td><span class="badge done">구현</span></td><td>report, voice on/off, repeat, location, destination, candidate, start/reroute/stop nav.</td><td>자연어 확장, 운영 로그 정책.</td><td>rule/regex, slot, confidence 0.7.</td><td>test_voice_intents.</td></tr>
+          <tr><td>Phrase catalog</td><td><span class="badge partial">부분</span></td><td>핵심 phrase 7개와 <code>/speech/phrases</code>.</td><td>위험/오류/nav 문구 전체 catalog.</td><td>static catalog, phrase_id.</td><td>catalog unit.</td></tr>
+          <tr><td>Safe noop</td><td><span class="badge done">구현</span></td><td>“신고하지 마/신고 취소”는 unknown + safe_noop, 실행 안 함.</td><td>더 넓은 취소/되돌리기 UX.</td><td>should_execute=false.</td><td>negative command tests.</td></tr>
+          <tr><td>Voice on/off</td><td><span class="badge partial">Web 구현</span></td><td>PWA 버튼/음성 명령으로 state 변경, 진동 피드백.</td><td>Android on/off, 설정 영속화.</td><td>React state, Web Speech.</td><td>browser E2E.</td></tr>
+          <tr><td>Repeat last</td><td><span class="badge partial">Web 구현</span></td><td>최근 위험/신고/위치/nav 상태 반복.</td><td>Android 반복, history queue.</td><td>last status ref.</td><td>browser voice E2E.</td></tr>
+          <tr><td>Current location voice</td><td><span class="badge partial">Web 구현</span></td><td>GPS 오류/대기/좌표/정확도/방향 문장화.</td><td>역지오코딩, Android 위치 음성.</td><td>Geolocation + intent.</td><td>GPS permission field.</td></tr>
+          <tr><td>Voice report</td><td><span class="badge partial">Web 구현</span></td><td>v2 damage voice report는 cooldown 우회.</td><td>Android report upload, mic→신고 E2E.</td><td>report v2 + duplicate.</td><td>backend + browser mic.</td></tr>
+          <tr><td>Navigation voice</td><td><span class="badge partial">Web 구현</span></td><td>목적지 검색, 후보 선택, 시작/중지/reroute intent.</td><td>Android navigation, 실보행 TMAP.</td><td>TMAP proxy, route progress.</td><td>navigation tests + 실폰.</td></tr>
+          <tr><td>Web accessibility</td><td><span class="badge partial">부분</span></td><td>skip link, aria-live, aria-pressed, bbox aria-hidden, 48px touch policy.</td><td>TalkBack/VoiceOver 실제 순서 검증.</td><td>ARIA, DOM order.</td><td>accessibility static + TalkBack.</td></tr>
+          <tr><td>Android accessibility</td><td><span class="badge missing">미구현</span></td><td>기본 TextView/Button.</td><td>contentDescription, TalkBack, large text, focus.</td><td>Android accessibility APIs.</td><td>TalkBack/font scale device.</td></tr>
+          <tr><td>NLU fallback</td><td><span class="badge partial">확장점</span></td><td>unknown/low-confidence는 reprompt, safe noop.</td><td>실제 LLM/Cloud NLU 미연결, 승인 필요.</td><td>disabled provider interface.</td><td>should_execute=false tests.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="nav">
+      <h2>9. Navigation/Location/Sensors 기능 상세</h2>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Provider 정책</td><td><span class="badge partial">부분</span></td><td>기본 TMAP pedestrian. Kakao는 fallback 후보.</td><td>Kakao 운영 권한, 자동 fallback.</td><td>env switch, backend key 보관.</td><td>navigation routes tests.</td></tr>
+          <tr><td>POI search</td><td><span class="badge done">구현</span></td><td>TMAP POI live/mock, query normalize, origin distance.</td><td>주소 geocoding provider, Android 연결.</td><td>backend proxy, AbortController, debounce.</td><td>destination policy + pytest.</td></tr>
+          <tr><td>Route 생성</td><td><span class="badge done">구현</span></td><td><code>/navigation/walking</code>이 TMAP/Kakao route schema 반환.</td><td>Android route client, 지도 렌더링.</td><td>TMAP GeoJSON normalization.</td><td>TMAP smoke dry-run/live 승인.</td></tr>
+          <tr><td>Route priority</td><td><span class="badge partial">부분</span></td><td>Web 기본 <code>STAIR_AVOID</code>, TMAP searchOption 매핑.</td><td>사용자 선택 UI 없음.</td><td>priority enum mapping.</td><td>backend priority tests.</td></tr>
+          <tr><td>Guide points</td><td><span class="badge partial">부분</span></td><td>TMAP Point feature를 guide_points로 정규화, Web TTS prompt.</td><td>Kakao guide point 없음, 실폰 타이밍.</td><td>turnType/action mapping.</td><td>guidance policy + timing smoke.</td></tr>
+          <tr><td>Off-route</td><td><span class="badge partial">부분</span></td><td>polyline/steps projection, threshold 25m, accuracy unknown 처리.</td><td>Android, provider map matching, city canyon field.</td><td>haversine/local projection.</td><td>route-progress policy.</td></tr>
+          <tr><td>Reroute</td><td><span class="badge partial">부분</span></td><td>confirmed off-route 후 accuracy/jump/in-flight/cooldown/max-count gate.</td><td>Android, route option UI.</td><td>reroute state machine.</td><td>reroute gate script.</td></tr>
+          <tr><td>Arrival</td><td><span class="badge partial">부분</span></td><td>default 8m radius, accuracy 보정, 도착 시 route reset/TTS.</td><td>Android, 실제 GPS 오차.</td><td>route endpoint progress.</td><td>route-progress tests.</td></tr>
+          <tr><td>Heading</td><td><span class="badge partial">Web</span></td><td>DeviceOrientation alpha 수신, report/detect context.</td><td>absolute compass 품질, Android heading.</td><td>DeviceOrientation.</td><td>schema + field.</td></tr>
+          <tr><td>GPS accuracy</td><td><span class="badge partial">Web</span></td><td>Geolocation watch, accuracy 기반 reroute/off-route gate.</td><td>Android FusedLocation, 실내/도심 보정.</td><td>enableHighAccuracy, accuracy gate.</td><td>navigation tests + field.</td></tr>
+          <tr><td>Step length</td><td><span class="badge partial">Web</span></td><td>GPS + DeviceMotion, TTL 7일, fallback 0.65m.</td><td>Android step detector, 실측 N보.</td><td>step peak, cadence, outlier.</td><td>step policy + field log.</td></tr>
+          <tr><td>Sensor log schema</td><td><span class="badge partial">문서</span></td><td>local/headless/field schema, privacy rules.</td><td>자동 logger/upload 없음.</td><td>JSON schema 후보.</td><td>문서/static check.</td></tr>
+          <tr><td>Android gaps</td><td><span class="badge missing">미구현</span></td><td>Android는 camera/depth 중심.</td><td>위치 권한, GPS/heading, route fetch, guide/reroute/arrival, TTS/haptic.</td><td>FusedLocation + backend proxy.</td><td>Android device navigation test.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="model">
+      <h2>10. Model/Data/Runtime 기능 상세</h2>
+      <div class="callout warn">
+        정상 경로는 <code>unified_walksafe</code> 13-class입니다.
+        legacy tactile/COCO fallback은 asset missing 또는 호환 경로이며, 발표·테스트·threshold 근거와 섞으면 안 됩니다.
+      </div>
+      <table class="feature-table">
+        <thead>
+          <tr>
+            <th>기능</th>
+            <th>상태</th>
+            <th>현재 구현</th>
+            <th>빠진 구현</th>
+            <th>기술</th>
+            <th>테스트</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>13-class order</td><td><span class="badge done">구현</span></td><td>person, bicycle, car, motorcycle, bus, truck, traffic light, normal/damaged tactile, crosswalk, curb_step, uneven_sidewalk, e_scooter.</td><td><code>bench</code>, <code>tactile_damage_area</code>는 unified primary 아님.</td><td>fixed class list, config validation.</td><td>runtime tests, Android config tests.</td></tr>
+          <tr><td>Unified dataset</td><td><span class="badge done">구축</span></td><td>196,506 images, 607,814 boxes, train/val.</td><td>독립 test split, field holdout, leakage check.</td><td>COCO + AIHub 186/513/189/183 + manual.</td><td>validate/audit scripts.</td></tr>
+          <tr><td>e-scooter 보강</td><td><span class="badge done">구축</span></td><td>AIHub183 approved rows로 class12 19,758 boxes.</td><td>실제 obstruction 품질, FP/FN field.</td><td>approved CSV append, manifest validation.</td><td>append validation, final audit.</td></tr>
+          <tr><td>Dataset build contract</td><td><span class="badge done">정책</span></td><td>partial 12-class 금지, e-scooter approved CSV 없으면 strict block.</td><td>AIHub 614/71604/557은 후보 수준.</td><td>source parser, class mapping, preflight.</td><td>strict dry-run/preflight.</td></tr>
+          <tr><td>Training run</td><td><span class="badge partial">진행</span></td><td>YOLO26n 768 e300 run 진행 중. e100 완료 후보는 mAP50 약 0.547.</td><td>e300 완료, class별 분석, threshold sweep.</td><td>Ultralytics YOLO26n.</td><td>results.csv, confusion, PR/F1.</td></tr>
+          <tr><td>Legacy fallback</td><td><span class="badge partial">fallback</span></td><td>reviewed tactile3 YOLO26s Stage1 + COCO fallback.</td><td>reviewed 원본 test dataset 부재로 full rerun blocked.</td><td>custom tactile + COCO two-model.</td><td>legacy health/smoke.</td></tr>
+          <tr><td>Thresholds</td><td><span class="badge partial">부분</span></td><td>backend와 Android threshold 의도적 분리.</td><td>unified 13-class 최종 threshold decision.</td><td>per-class threshold, allowlist.</td><td>runtime config tests.</td></tr>
+          <tr><td>CPU runtime helper</td><td><span class="badge done">구현</span></td><td>unified primary와 legacy fallback filtering/serialization.</td><td>실제 YOLO 추론은 helper 밖.</td><td>dataclass, JSON/YAML config.</td><td><code>model/test_two_model_runtime.py</code>.</td></tr>
+          <tr><td>Android TFLite contract</td><td><span class="badge partial">부분</span></td><td>NMS output <code>[1,300,6]</code>, parser, legacy assets.</td><td>unified TFLite asset, device overlay/depth/N보 PASS.</td><td>TFLite, sidecar, CPU/NNAPI.</td><td>contract script + device.</td></tr>
+          <tr><td>Export pipeline</td><td><span class="badge partial">부분</span></td><td>unified/custom/COCO TFLite export scripts.</td><td>최신 best.pt export 결과물 없음. Python 3.12/TF env 필요.</td><td>Ultralytics export <code>nms=True</code>, float32 TFLite.</td><td>export + Android contract.</td></tr>
+          <tr><td>Backend YOLO mode</td><td><span class="badge partial">부분</span></td><td><code>DETECT_V2_MODE=fake</code> 기본, yolo/real lazy load.</td><td>production model path, first-load failure UX.</td><td>lazy Ultralytics load.</td><td>detect_v2 env tests.</td></tr>
+          <tr><td>Report policy</td><td><span class="badge done">구현</span></td><td>자동 report는 damage only, model_key custom_tactile/unified_walksafe.</td><td>Android source enum/metadata 확장.</td><td>class/model validation, GPS required.</td><td>report policy tests.</td></tr>
+          <tr><td>Web fake/runtime</td><td><span class="badge partial">보조</span></td><td>fake-v2/server-v2 schema support.</td><td>성능 근거로 사용 금지.</td><td>fake generator, parser.</td><td>server-v2 manual smoke.</td></tr>
+          <tr><td>Mock/no-op</td><td><span class="badge done">구현</span></td><td>backend fake, Web fake, Android Noop fallback.</td><td>fake와 real metric 운영 분리 강화.</td><td>deterministic fake, fail-open.</td><td>contract smoke.</td></tr>
+          <tr><td>성능 평가 gap</td><td><span class="badge partial">부족</span></td><td>dataset과 일부 benchmark 존재.</td><td>독립 test, Android TFLite parity, field evaluation, final retrain.</td><td>mAP, latency, FPS, thermal, field FP/FN.</td><td>Model/Device evidence.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="tests">
+      <h2>11. 테스트 가능/불가능 매트릭스</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>검증 대상</th>
+            <th>지금 자동 테스트 가능</th>
+            <th>부족한 테스트</th>
+            <th>대표 명령</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Android static/unit/build</td>
+            <td>가능</td>
+            <td>unified asset, device FPS/latency</td>
+            <td><code>python scripts/check_android_tflite_contract_20260531.py</code><br><code>python scripts/check_android_depth_scaffold_20260531.py</code><br><code>cd apps/android &amp;&amp; ./gradlew test --no-daemon</code></td>
+          </tr>
+          <tr>
+            <td>Android Device gate</td>
+            <td>자동 불가</td>
+            <td>bbox-depth same-object, N보 실측, TalkBack/haptic</td>
+            <td><code>adb install -r apps/android/app/build/outputs/apk/debug/app-debug.apk</code> 후 체크리스트 수동</td>
+          </tr>
+          <tr>
+            <td>Backend detect/report/export</td>
+            <td>가능, DB 테스트는 PostGIS 필요</td>
+            <td>real model full inference, Android upload trace</td>
+            <td><code>PYTHONPATH=. python -m pytest backend/tests/test_detect.py backend/tests/test_detect_v2.py backend/tests/test_reports_v2.py -q -rs</code></td>
+          </tr>
+          <tr>
+            <td>Web/PWA policy</td>
+            <td>가능</td>
+            <td>실폰 camera/GPS/TTS/vibration/PWA install</td>
+            <td><code>cd apps/web &amp;&amp; npm run lint &amp;&amp; npm run typecheck &amp;&amp; npm run build</code><br><code>bash scripts/check_frontend_risk_evaluator_policy_20260523.sh</code></td>
+          </tr>
+          <tr>
+            <td>Voice</td>
+            <td>부분 가능</td>
+            <td>실폰 mic, 잡음, 실제 청취, Android 연결</td>
+            <td><code>PYTHONPATH=. python -m pytest tests/test_voice_intents.py tests/test_voice_tts.py -q</code></td>
+          </tr>
+          <tr>
+            <td>Navigation</td>
+            <td>mock/dry-run 가능</td>
+            <td>live TMAP quota 승인, 실폰 GPS field, Android route</td>
+            <td><code>PYTHONPATH=. python -m pytest backend/tests/test_navigation_routes.py -q</code><br><code>python scripts/check_tmap_pedestrian_route_smoke_20260524.py</code></td>
+          </tr>
+          <tr>
+            <td>Model/static eval</td>
+            <td>부분 가능</td>
+            <td>최종 e300, 독립 test split, TFLite parity</td>
+            <td><code>python scripts/check_walksafe_unified_training_plan_20260601.py --allow-missing-dataset</code></td>
+          </tr>
+          <tr>
+            <td>Release/security</td>
+            <td>현재 없음</td>
+            <td>auth, domain/HTTPS, secret, rollback, 운영 DB</td>
+            <td>승인된 release runbook 작성 후 실행</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="priority">
+      <h2>12. 권장 구현 순서</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>순서</th>
+            <th>기능 묶음</th>
+            <th>작업 내용</th>
+            <th>검증</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="p0">P0-1</span></td>
+            <td>Android Device Gate</td>
+            <td>overlay 좌표, ARCore depth same-object, stale guard, metadata-only log를 먼저 닫음.</td>
+            <td>실폰 체크리스트, metadata evidence.</td>
+          </tr>
+          <tr>
+            <td><span class="p0">P0-2</span></td>
+            <td>Android metadata/report 계약</td>
+            <td><code>source=android</code> 여부, APK/model hash, depth quality, coordinate gate status allowlist 확정.</td>
+            <td>backend policy tests, redaction/export 확인.</td>
+          </tr>
+          <tr>
+            <td><span class="p1">P1-1</span></td>
+            <td>Android feedback</td>
+            <td>MessagePolicy 결과를 Android TTS/haptic으로 연결. damage report-only 유지.</td>
+            <td>실폰 청취/진동/TalkBack/cooldown.</td>
+          </tr>
+          <tr>
+            <td><span class="p1">P1-2</span></td>
+            <td>Android report upload</td>
+            <td>damage만 <code>/reports/v2</code>에 업로드, GPS/heading/source metadata 포함.</td>
+            <td>damage 저장, general/normal 거부, admin/export trace.</td>
+          </tr>
+          <tr>
+            <td><span class="p1">P1-3</span></td>
+            <td>모델 drop-in</td>
+            <td>최종 best.pt 검증 후 TFLite export, 640/768 config 결정, Android asset 삽입.</td>
+            <td>contract script, Gradle, device FPS/thermal.</td>
+          </tr>
+          <tr>
+            <td><span class="p1">P1-4</span></td>
+            <td>Admin/Ops 보안</td>
+            <td>admin/report/export/status/uploads 보호, actor audit, unified/android filters.</td>
+            <td>인증 없는 접근 차단, status/export tests.</td>
+          </tr>
+          <tr>
+            <td><span class="p2">P2</span></td>
+            <td>Navigation/Voice/Settings 확장</td>
+            <td>Android location/navigation, voice command, emergency contact, offline queue, public agency manual export.</td>
+            <td>field tests, privacy approval, live API 승인.</td>
+          </tr>
+          <tr>
+            <td><span class="p2">C</span></td>
+            <td>Release/MLOps/외부기관</td>
+            <td>HTTPS/domain, object storage, public submission connector, field data upload, retraining automation.</td>
+            <td>명시 승인 후 별도 release runbook.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="prompt">
+      <h2>13. 다음 구현용 Goal 프롬프트 초안</h2>
+      <p>아래 프롬프트에서 빼고 싶은 기능을 삭제하고, 추가할 기능을 넣으면 바로 다음 구현 작업 지시로 쓸 수 있습니다.</p>
+      <pre><code>/home/ddobagi/Code/hanium-dreamup 프로젝트에서 WalkSafe Assist를 Android native 주경로 기준으로 모델 제외 완성 상태에 가깝게 구현해줘.
+
+기준:
+- Web/PWA는 demo/admin/API 검증 보조 경로다. Android Device PASS를 대체하지 않는다.
+- 모델 학습/정확도 자체는 제외하되, 최종 TFLite 모델이 들어왔을 때 앱이 바로 연결될 수 있어야 한다.
+- raw image/depth/audio/GPS 과다 저장과 외부 전송은 금지한다. frame capture는 승인 전 field 기능으로 쓰지 않는다.
+
+P0:
+1. Android bbox overlay가 실제 객체와 맞는지 실기기 체크리스트 기준으로 검증/보강한다.
+2. ARCore Raw/Full Depth sample이 bbox와 같은 객체를 보도록 coordinate mapper와 metadata를 보강한다.
+3. detector stale guard와 metadata-only debug log를 검증 가능하게 만든다.
+4. Android report upload 전에 source=android 여부, APK/model/config hash, depth quality, coordinate gate status metadata allowlist를 확정한다.
+
+P1:
+1. gate 통과 후 Android TextToSpeech와 VibrationEffect를 MessagePolicy에 연결한다.
+2. damaged_tactile_block만 /reports/v2로 업로드하고, 일반 객체/normal tactile/coco는 report 생성하지 않는다.
+3. admin에서 Android/unified report를 필터링, 상태 변경, CSV/JSON/GeoJSON export할 수 있게 보강한다.
+4. 최종 best.pt가 준비되면 unified TFLite export, two_model_runtime.json 갱신, Android build/device FPS 검증을 수행한다.
+
+검증:
+- python scripts/check_android_tflite_contract_20260531.py
+- python scripts/check_android_depth_scaffold_20260531.py
+- cd apps/android && ./gradlew test --no-daemon && ./gradlew assembleDebug --no-daemon
+- backend detect/report/export pytest
+- Android 실기기 overlay/depth/stale/metadata evidence 기록
+
+주의:
+- 기존 사용자 변경을 되돌리지 않는다.
+- PWA/fake/headless 결과를 Android Device PASS로 쓰지 않는다.
+- 작업 후 daylog와 local-memory log-work를 남긴다.</code></pre>
+    </section>
+
+    <section id="sources">
+      <h2>14. 주요 근거 파일</h2>
+      <ul class="source-list">
+        <li><a href="../README.md">README.md</a></li>
+        <li><a href="current_status.md">docs/current_status.md</a></li>
+        <li><a href="../product/backlog.md">product/backlog.md</a></li>
+        <li><a href="../product/roadmap.md">product/roadmap.md</a></li>
+        <li><a href="../product/done-criteria.md">product/done-criteria.md</a></li>
+        <li><a href="evidence/feature_matrix.md">docs/evidence/feature_matrix.md</a></li>
+        <li><a href="../plans/features/2026-05-26_feature_followup_implementation_list.md">20개 기능 추가 구현 리스트</a></li>
+        <li><a href="../plans/features/2026-06-01_android_native_gate_execution_plan.md">Android native gate plan</a></li>
+        <li><a href="../apps/android/README.md">apps/android/README.md</a></li>
+        <li><a href="android/android_device_overlay_depth_checklist_20260601.md">Android device checklist</a></li>
+        <li><a href="android/arcore_depth_estimation_architecture.md">ARCore depth architecture</a></li>
+        <li><a href="../apps/android/app/src/main/assets/model-config/two_model_runtime.json">Android runtime config</a></li>
+        <li><a href="walksafe-v2/backend_api_contract.md">backend_api_contract.md</a></li>
+        <li><a href="walksafe-v2/frontend_display_policy.md">frontend_display_policy.md</a></li>
+        <li><a href="walksafe-v2/auto_report_policy.md">auto_report_policy.md</a></li>
+        <li><a href="report_operations.md">report_operations.md</a></li>
+        <li><a href="data_retention_policy.md">data_retention_policy.md</a></li>
+        <li><a href="sensor_log_schema.md">sensor_log_schema.md</a></li>
+        <li><a href="../backend/app/api/reports.py">backend reports API</a></li>
+        <li><a href="../backend/app/services/detect_v2.py">backend detect v2</a></li>
+        <li><a href="../apps/web/app/page.tsx">PWA page</a></li>
+        <li><a href="../apps/web/app/admin/page.tsx">Admin page</a></li>
+        <li><a href="../voice/intents.py">voice intents</a></li>
+        <li><a href="../voice/server.py">voice server</a></li>
+        <li><a href="../model/two_model_runtime.py">model runtime helper</a></li>
+        <li><a href="model_unified_13class_aihub_sources_20260602.md">unified model sources</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    WalkSafe Assist 기능 인벤토리 및 구현 계획 · 2026-06-30 KST · PM 통합본
+  </footer>
+</body>
+</html>

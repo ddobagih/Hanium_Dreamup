@@ -1,5 +1,6 @@
 const nextConfig = {
-  reactStrictMode: true
+  reactStrictMode: true,
+  allowedDevOrigins: ["dpi-nerve-opening-slideshow.trycloudflare.com"]
 };
 
 export default nextConfig;

@@ -114,9 +114,26 @@ class LocalTTSEngine:
             kwargs["attn_implementation"] = self.attn_implementation
         self._model = Qwen3TTSModel.from_pretrained(self._model_load_path(), **kwargs)
 
-    def _cache_path(self, text: str, mode: TTSMode, suffix: str = ".wav") -> Path:
+    def _cache_path(
+        self,
+        text: str,
+        mode: TTSMode,
+        suffix: str = ".wav",
+        *,
+        voice_instruct: str | None = None,
+        speaker: str | None = None,
+        ref_audio: str | None = None,
+        ref_text: str | None = None,
+    ) -> Path:
+        effective_voice_instruct = voice_instruct or self.voice_instruct
+        effective_speaker = speaker or self.speaker or ""
+        effective_ref_audio = ref_audio or self.ref_audio or ""
+        effective_ref_text = ref_text or self.ref_text or ""
         key = hashlib.sha256(
-            f"{self.model_id}|{self.language}|{mode}|{self.voice_instruct}|{text}".encode("utf-8")
+            (
+                f"{self.model_id}|{self.language}|{mode}|{effective_voice_instruct}|"
+                f"{effective_speaker}|{effective_ref_audio}|{effective_ref_text}|{text}"
+            ).encode("utf-8")
         ).hexdigest()[:20]
         return self.cache_dir / f"qwen3_tts_{key}{suffix}"
 
@@ -131,7 +148,17 @@ class LocalTTSEngine:
         ref_text: str | None = None,
     ) -> TTSResult:
         synth_mode: TTSMode = mode or self.mode
-        output = Path(output_path) if output_path else self._cache_path(text, synth_mode)
+        output = (
+            Path(output_path)
+            if output_path
+            else self._cache_path(
+                text,
+                synth_mode,
+                voice_instruct=voice_instruct,
+                ref_audio=ref_audio,
+                ref_text=ref_text,
+            )
+        )
         output.parent.mkdir(parents=True, exist_ok=True)
         if use_cache and output.exists() and output.stat().st_size > 0:
             return TTSResult(output, sample_rate=0, duration_sec=0.0, model=self.model_id, cached=True, mode=synth_mode)

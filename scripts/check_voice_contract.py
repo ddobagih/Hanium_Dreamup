@@ -27,6 +27,8 @@ INTENT_CASES = [
     ("다시 말해줘", "repeat_last"),
     ("목적지 서울역으로 설정해", "set_destination"),
     ("길 안내 시작해", "start_navigation"),
+    ("재탐색해줘", "reroute_navigation"),
+    ("길 안내 중지", "stop_navigation"),
     ("지금 어디야", "get_current_location"),
 ]
 
@@ -168,9 +170,77 @@ def check_intents(base_url: str, timeout: float) -> None:
             )
         if not isinstance(payload.get("slots"), dict):
             raise CheckFailure(f"/speech/intent for {transcript!r} returned invalid slots: {payload!r}")
+        if payload.get("action") != "execute" or payload.get("should_execute") is not True:
+            raise CheckFailure(f"/speech/intent for {transcript!r} should be executable: {payload!r}")
         if expected_intent == "set_destination" and payload["slots"].get("destination") != "서울역":
             raise CheckFailure(f"/speech/intent did not extract destination='서울역': {payload!r}")
         print(f"[PASS] /speech/intent transcript={transcript!r} intent={expected_intent}")
+
+    unknown = request_json("POST", f"{base_url}/speech/intent", {"transcript": "오늘 날씨 알려줘"}, timeout=timeout)
+    if unknown.status != 200:
+        raise CheckFailure(f"/speech/intent unknown fallback returned HTTP {unknown.status}: {unknown.raw_body}")
+    payload = require_record(unknown.payload, "/speech/intent unknown fallback")
+    if (
+        payload.get("intent") != "unknown"
+        or payload.get("action") != "reprompt"
+        or payload.get("should_execute") is not False
+        or payload.get("reason") != "unknown_intent"
+        or not isinstance(payload.get("prompt"), str)
+    ):
+        raise CheckFailure(f"/speech/intent unknown fallback did not return reprompt policy: {payload!r}")
+    print("[PASS] /speech/intent unknown fallback returns reprompt policy")
+
+
+def check_voice_metadata_endpoints(base_url: str, timeout: float) -> None:
+    intents = request("GET", f"{base_url}/speech/intents", timeout=timeout)
+    if intents.status != 200:
+        raise CheckFailure(f"/speech/intents returned HTTP {intents.status}: {intents.raw_body}")
+    intent_payload = require_record(intents.payload, "/speech/intents")
+    intent_names = {
+        item.get("name")
+        for item in intent_payload.get("intents", [])
+        if isinstance(item, dict)
+    }
+    expected = {"create_report", "set_destination", "reroute_navigation", "stop_navigation", "unknown"}
+    if not expected <= intent_names:
+        raise CheckFailure(f"/speech/intents missing expected intents {expected - intent_names}: {intent_payload!r}")
+    print("[PASS] /speech/intents returns executable schema")
+
+    telemetry = request("GET", f"{base_url}/speech/intent-telemetry/schema", timeout=timeout)
+    if telemetry.status != 200:
+        raise CheckFailure(f"/speech/intent-telemetry/schema returned HTTP {telemetry.status}: {telemetry.raw_body}")
+    telemetry_payload = require_record(telemetry.payload, "/speech/intent-telemetry/schema")
+    if telemetry_payload.get("stores_raw_audio") is not False or telemetry_payload.get("stores_transcript_text") is not False:
+        raise CheckFailure(f"/speech/intent-telemetry/schema must be privacy-minimized: {telemetry_payload!r}")
+    print("[PASS] /speech/intent-telemetry/schema excludes raw audio and transcript text")
+
+    phrases = request("GET", f"{base_url}/speech/phrases", timeout=timeout)
+    if phrases.status != 200:
+        raise CheckFailure(f"/speech/phrases returned HTTP {phrases.status}: {phrases.raw_body}")
+    phrase_payload = require_record(phrases.payload, "/speech/phrases")
+    phrase_ids = {
+        item.get("id")
+        for item in phrase_payload.get("phrases", [])
+        if isinstance(item, dict)
+    }
+    if not {"navigation.ready", "risk.blocking.stop"} <= phrase_ids:
+        raise CheckFailure(f"/speech/phrases missing core phrase ids: {phrase_payload!r}")
+    print("[PASS] /speech/phrases returns core phrase catalog")
+
+
+def check_cors_options(base_url: str, timeout: float) -> None:
+    result = request(
+        "OPTIONS",
+        f"{base_url}/speech/tts",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+        },
+        timeout=timeout,
+    )
+    if result.status not in {200, 204}:
+        raise CheckFailure(f"OPTIONS /speech/tts returned HTTP {result.status}: {result.raw_body}")
+    print("[PASS] OPTIONS /speech/tts CORS preflight accepted")
 
 
 def check_stt_error_contract(base_url: str, timeout: float) -> None:
@@ -228,6 +298,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Voice API contract check: {base_url}", flush=True)
         check_health(base_url, args.timeout)
         check_intents(base_url, args.timeout)
+        check_voice_metadata_endpoints(base_url, args.timeout)
+        check_cors_options(base_url, args.timeout)
         check_stt_error_contract(base_url, args.timeout)
         print("Voice API contract smoke check passed.")
         return 0

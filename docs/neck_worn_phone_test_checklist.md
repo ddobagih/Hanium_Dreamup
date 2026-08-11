@@ -1,5 +1,8 @@
 # 목걸이 착용 휴대폰 테스트 체크리스트
 
+> **문서 상태(2026-06-02): legacy PWA field checklist.** Android Device PASS 기준은 `docs/android/android_device_overlay_depth_checklist_20260601.md`를 본다.
+
+
 작성 기준일: 2026-05-12
 
 ## 2026-05-17 최신 보정

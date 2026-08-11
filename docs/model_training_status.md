@@ -1,5 +1,8 @@
 # YOLO 모델 및 데이터셋 진행 상태
 
+> **문서 상태(2026-06-02): historical snapshot.** 과거 tactile/v2/v3 학습 상태 기록이다. 새 수치 판단에는 최신 run/evidence와 unified 13-class 문서를 우선한다.
+
+
 작성 기준일: 2026-05-13 KST
 
 ## 2026-05-18 보정 요약

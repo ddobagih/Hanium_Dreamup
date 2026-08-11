@@ -1,5 +1,8 @@
 # WalkSafe v2 모델 현재 상태
 
+> **문서 상태(2026-06-02): historical snapshot.** 과거 YOLO tactile v2 결과 기록이다. 현재 모델 방향은 unified 13-class이며 `docs/model_unified_13class_aihub_sources_20260602.md`를 본다.
+
+
 작성 기준일: 2026-05-13
 
 ## 1. 현재 결론

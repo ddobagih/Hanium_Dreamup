@@ -1,5 +1,8 @@
 # Model Integration Plan
 
+> **문서 상태(2026-06-02): legacy v1.** `/detect` tactile v2 adapter 계획 기록이다. 현재 `/detect/v2`/unified 기준은 `docs/walksafe-v2/backend_model_integration_notes.md`다.
+
+
 작성 기준일: 2026-05-12
 
 ## 2026-05-17~2026-05-18 구현 반영

@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-22",
+  "status": "ai_suggestions_written_non_final",
+  "source_queue": "data_sources/manifests/walksafe_tactile3_damage_area_error_review_queue_2026-05-22.csv",
+  "suggestions_input": "data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestion_input_2026-05-22.csv",
+  "suggestions_out": "data_sources/manifests/walksafe_tactile3_damage_area_ai_suggestions_2026-05-22.csv",
+  "rows": 120,
+  "decision_counts": {
+    "fix_tactile_damage_area_bbox": 11,
+    "add_missing_tactile_damage_area": 37,
+    "accept_existing_labels": 48,
+    "exclude_unclear": 12,
+    "remove_false_damage_area_label": 12
+  },
+  "confidence_counts": {
+    "medium": 49,
+    "high": 59,
+    "low": 12
+  },
+  "issue_decision_counts": {
+    "mixed_fn_fp_damage_area|fix_tactile_damage_area_bbox": 5,
+    "mixed_fn_fp_damage_area|add_missing_tactile_damage_area": 17,
+    "mixed_fn_fp_damage_area|accept_existing_labels": 1,
+    "mixed_fn_fp_damage_area|exclude_unclear": 1,
+    "damage_block_ok_area_missed|accept_existing_labels": 17,
+    "damage_block_ok_area_missed|exclude_unclear": 5,
+    "damage_block_ok_area_missed|remove_false_damage_area_label": 11,
+    "damage_block_ok_area_missed|fix_tactile_damage_area_bbox": 2,
+    "damage_block_ok_area_missed|add_missing_tactile_damage_area": 1,
+    "false_negative_damage_area|accept_existing_labels": 24,
+    "false_negative_damage_area|fix_tactile_damage_area_bbox": 4,
+    "false_negative_damage_area|exclude_unclear": 5,
+    "false_negative_damage_area|remove_false_damage_area_label": 1,
+    "false_negative_damage_area|add_missing_tactile_damage_area": 2,
+    "hard_negative_false_positive_damage_area|accept_existing_labels": 6,
+    "hard_negative_false_positive_damage_area|add_missing_tactile_damage_area": 17,
+    "hard_negative_false_positive_damage_area|exclude_unclear": 1
+  },
+  "guardrail": "AI suggestions are not final review_decision values and require human confirmation before dataset build."
+}

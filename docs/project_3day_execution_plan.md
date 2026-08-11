@@ -1,5 +1,8 @@
 # WalkSafe Assist 3-Day Execution Plan
 
+> **문서 상태(2026-06-02): superseded.** 2026-05-14~16 기간 계획 기록이다. 현재 작업은 `docs/current_status.md`와 Android/unified 문서를 기준으로 한다.
+
+
 기준일: 2026-05-13
 실행 기간: 2026-05-14 ~ 2026-05-16
 기준 자료:

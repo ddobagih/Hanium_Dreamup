@@ -1,5 +1,8 @@
 # Frontend API Request Examples
 
+> **문서 상태(2026-06-02): legacy examples.** 최신 v2 API는 `docs/walksafe-v2/backend_api_contract.md`, 운영 reference는 `docs/api_reference.md`를 본다.
+
+
 작성 기준일: 2026-05-12
 
 ## 목적

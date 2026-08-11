@@ -1,831 +1,386 @@
 "use client";
 
-import { AlertTriangle, Camera, Loader2, MapPin, Mic, Navigation, RefreshCw, Send, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { detectFrame, DETECT_API_BASE, fetchDetectHealth } from "@/lib/detect-api";
-import { createFakeDetection } from "@/lib/detector";
-import { checkDuplicateReports, submitReport } from "@/lib/report-api";
-import { speechConfidence, uploadSpeechStt, VOICE_API_BASE, type VoiceIntent, type VoiceSttResponse } from "@/lib/voice-api";
-import { CLASS_LABELS, type DetectionClassName, type DetectionEvent, type GpsFix } from "@/types/inference";
+import type { DetectionEvent } from "@/types/inference";
+import type { DetectV2RequestAudit, TwoModelDetection } from "@/types/inference-v2";
+import type { RiskEvaluationContext } from "./_walksafe/risk-evaluator";
+import {
+  DETECTOR_MODE,
+  INITIAL_DETECTOR_MESSAGE,
+  IS_CAMERA_ONLY_MODE,
+  IS_FAKE_V2_MODE,
+  IS_SERVER_V2_MODE,
+  IS_V2_MODE
+} from "./_walksafe/config";
+import { useAutoReportV2 } from "./_walksafe/hooks/useAutoReportV2";
+import { useAutoStepLength } from "./_walksafe/hooks/useAutoStepLength";
+import { useCamera } from "./_walksafe/hooks/useCamera";
+import { useDetectionV1 } from "./_walksafe/hooks/useDetectionV1";
+import { useDetectionV2 } from "./_walksafe/hooks/useDetectionV2";
+import { useDepthSensor } from "./_walksafe/hooks/useDepthSensor";
+import { useManualReportV1, type ReportState } from "./_walksafe/hooks/useManualReportV1";
+import { useNavigationGuidance } from "./_walksafe/hooks/useNavigationGuidance";
+import { usePwaStatus } from "./_walksafe/hooks/usePwaStatus";
+import { useRiskFeedback } from "./_walksafe/hooks/useRiskFeedback";
+import { useSensors } from "./_walksafe/hooks/useSensors";
+import { useVoiceCommands } from "./_walksafe/hooks/useVoiceCommands";
+import { useWalkSafeSettings } from "./_walksafe/hooks/useWalkSafeSettings";
+import { AssistPanel } from "./_walksafe/components/AssistPanel";
+import { CameraSurface } from "./_walksafe/components/CameraSurface";
+import { TestCapturePanel } from "./_walksafe/components/TestCapturePanel";
+import { phraseForApproxSteps } from "./_walksafe/risk-guidance";
+import { formatPercent } from "./_walksafe/utils";
 
-const DETECTOR_MODE = process.env.NEXT_PUBLIC_DETECTOR_MODE ?? "fake";
-const SERVER_DETECT_INTERVAL_MS = 2800;
-const SPEECH_COOLDOWN_MS = 6000;
-const VOICE_RECORDING_MAX_MS = 5000;
-const VOICE_INTENT_CONFIDENCE_THRESHOLD = 0.7;
-const INITIAL_DETECTOR_MESSAGE =
-  DETECTOR_MODE === "server" ? `서버 ${DETECT_API_BASE}` : DETECTOR_MODE === "fake" ? "데모 탐지 대기" : `탐지 모드 확인 필요: ${DETECTOR_MODE}`;
+const TEST_CAPTURE_PANEL_ENABLED = process.env.NEXT_PUBLIC_WALKSAFE_TEST_CAPTURE_PANEL === "true";
+const TEST_CAPTURE_PANEL_CONSENT_STORAGE_KEY = "walksafe-test-capture-consent";
 
-type VoiceRecordState = "idle" | "recording" | "uploading" | "error";
-type DeviceOrientationEventWithPermission = typeof DeviceOrientationEvent & {
-  requestPermission?: () => Promise<PermissionState>;
-};
-
-const RISK_ALERTS: Record<DetectionClassName, { speech: string; vibration: VibratePattern; silentVibration: VibratePattern }> = {
-  damaged_tactile_block: {
-    speech: "점자블록 파손. 발밑 주의.",
-    vibration: [180, 80, 180],
-    silentVibration: [420, 120, 420, 120, 420]
-  },
-  parked_kickboard_bicycle: {
-    speech: "전방 장애물. 천천히 이동.",
-    vibration: [260, 120, 120],
-    silentVibration: [500, 160, 260, 160, 260]
-  },
-  construction_obstacle: {
-    speech: "공사 장애물. 우회하세요.",
-    vibration: [300, 100, 300],
-    silentVibration: [520, 140, 520, 140, 260]
-  },
-  pothole: {
-    speech: "노면 파임. 발밑 주의.",
-    vibration: [120, 70, 120, 70, 300],
-    silentVibration: [300, 100, 300, 100, 520]
-  }
-};
-
-function speak(message: string) {
-  if (!("speechSynthesis" in window)) {
-    return;
+function depthDistanceText(distanceM: number | null | undefined, stepLengthM: number | null | undefined): string | null {
+  if (typeof distanceM !== "number" || !Number.isFinite(distanceM)) {
+    return null;
   }
 
-  const utterance = new SpeechSynthesisUtterance(message);
-  utterance.lang = "ko-KR";
-  utterance.rate = 0.95;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  const stepText = phraseForApproxSteps(distanceM, stepLengthM);
+  return stepText ? `${distanceM.toFixed(1)}m · ${stepText}` : `${distanceM.toFixed(1)}m`;
 }
 
-function vibrate(pattern: VibratePattern) {
-  if ("vibrate" in navigator) {
-    navigator.vibrate(pattern);
-  }
-}
-
-function formatPercent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatGps(gps: GpsFix | null) {
-  if (!gps) {
-    return "위치 대기 중";
-  }
-  return `${gps.latitude.toFixed(5)}, ${gps.longitude.toFixed(5)}`;
-}
-
-function headingLabel(value: number | null) {
-  if (value === null) {
-    return "대기 중";
-  }
-
-  const normalized = ((value % 360) + 360) % 360;
-  const directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
-  return directions[Math.round(normalized / 45) % directions.length];
-}
-
-function alertForDetection(detection: DetectionEvent, speechEnabled: boolean) {
-  const alert = RISK_ALERTS[detection.class_name];
-  if (detection.confidence >= 0.9) {
+function depthStatusFromContext(
+  context: RiskEvaluationContext,
+  sensorMessage: string,
+  stepLengthM: number | null,
+  motionStability: number
+): { status: string; detail: string } {
+  if (context.depth?.source === "sensor_depth" && typeof context.depth.distance_m === "number") {
     return {
-      speech: `${alert.speech} 강한 위험 신호.`,
-      vibration: speechEnabled ? [...(alert.vibration as number[]), 120, 360] : [...(alert.silentVibration as number[]), 160, 520]
+      status: `WebXR 깊이 ${depthDistanceText(context.depth.distance_m, stepLengthM)}`,
+      detail: `WebXR depth · Android native ARCore는 앱 경로에서 별도 처리 · 신뢰도 ${formatPercent(context.depth.confidence ?? 0)} · 흔들림 안정도 ${formatPercent(motionStability)}`
+    };
+  }
+
+  const tracking = context.tracking;
+  if (tracking?.distance_source === "model_estimate" && typeof tracking.distance_m === "number") {
+    const approachText =
+      tracking.approach_state === "approaching"
+        ? "가까워지는 중"
+        : tracking.approach_state === "receding"
+          ? "멀어지는 중"
+          : tracking.approach_state === "stable"
+            ? "거리 안정"
+            : "접근 추정 중";
+    return {
+      status: approachText,
+      detail: `폴리곤/bbox 변화 기반 추세 · 신뢰도 ${formatPercent(tracking.distance_confidence ?? 0)} · 실제 depth가 아니므로 보폭 거리 안내는 보류`
     };
   }
 
   return {
-    speech: alert.speech,
-    vibration: speechEnabled ? alert.vibration : alert.silentVibration
+    status: sensorMessage,
+    detail: `실제 depth가 없으면 폴리곤/bbox 변화로 접근만 보조 추정합니다. 흔들림 안정도 ${formatPercent(motionStability)}`
   };
 }
 
-function preferredAudioMimeType() {
-  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") {
-    return "";
-  }
-
-  return (
-    ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? ""
-  );
-}
-
-function destinationFromSlots(slots: Record<string, unknown>) {
-  for (const key of ["destination", "place", "target"]) {
-    const value = slots[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return "";
-}
-
-function deviceOrientationEventWithPermission() {
-  if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) {
-    return null;
-  }
-
-  return window.DeviceOrientationEvent as DeviceOrientationEventWithPermission;
-}
-
 export default function Home() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const gpsWatchIdRef = useRef<number | null>(null);
   const detectionIndexRef = useRef(0);
-  const lastAlertRef = useRef<{ key: string; time: number }>({ key: "", time: 0 });
-  const reportStateRef = useRef<"idle" | "sending" | "sent" | "error">("idle");
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const voiceChunksRef = useRef<Blob[]>([]);
-  const voiceStreamRef = useRef<MediaStream | null>(null);
-  const voiceStopTimerRef = useRef<number | null>(null);
-  const lastStatusMessageRef = useRef<string | null>(null);
+  const reportStateRef = useRef<ReportState>("idle");
+  const [testCaptureConsent, setTestCaptureConsent] = useState(() => {
+    if (!TEST_CAPTURE_PANEL_ENABLED || typeof window === "undefined") {
+      return false;
+    }
+    return window.localStorage.getItem(TEST_CAPTURE_PANEL_CONSENT_STORAGE_KEY) === "true";
+  });
 
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [gps, setGps] = useState<GpsFix | null>(null);
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [heading, setHeading] = useState<number | null>(null);
-  const [headingMessage, setHeadingMessage] = useState("센서 대기");
   const [detection, setDetection] = useState<DetectionEvent | null>(null);
+  const [v2Detections, setV2Detections] = useState<TwoModelDetection[]>([]);
+  const [v2Primary, setV2Primary] = useState<TwoModelDetection | null>(null);
+  const [v2Secondary, setV2Secondary] = useState<TwoModelDetection | null>(null);
+  const [detectionV2Audit, setDetectionV2Audit] = useState<DetectV2RequestAudit | null>(null);
   const [detectorMessage, setDetectorMessage] = useState(INITIAL_DETECTOR_MESSAGE);
   const [detectorBusy, setDetectorBusy] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
-  const [reportState, setReportState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [reportState, setReportState] = useState<ReportState>("idle");
   const [reportMessage, setReportMessage] = useState("신고 대기 중");
   const [lastDuplicateCount, setLastDuplicateCount] = useState(0);
-  const [voiceSupported, setVoiceSupported] = useState(true);
-  const [voiceState, setVoiceState] = useState<VoiceRecordState>("idle");
   const [voiceMessage, setVoiceMessage] = useState("음성 명령 대기");
-  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
-  const [voiceIntent, setVoiceIntent] = useState<VoiceIntent | null>(null);
-  const [voiceConfidence, setVoiceConfidence] = useState<number | null>(null);
-  const [destination, setDestination] = useState("");
-  const [navigationActive, setNavigationActive] = useState(false);
+  const [permissionRequestMessage, setPermissionRequestMessage] = useState<string | null>(null);
+  const {
+    settingsForm,
+    settingsMessage,
+    settingsExpanded,
+    guardianSummary,
+    setupChecklist,
+    updateEmergencyContactName,
+    updateEmergencyContactPhone,
+    addEmergencyContact,
+    removeEmergencyContact,
+    saveSettings,
+    clearSettings,
+    toggleSettingsExpanded
+  } = useWalkSafeSettings();
+  const {
+    isOnline,
+    installMessage: pwaInstallMessage,
+    updateMessage: pwaUpdateMessage,
+    swVersion,
+    canInstallPwa,
+    canApplyServiceWorkerUpdate,
+    installApp,
+    applyServiceWorkerUpdate
+  } = usePwaStatus();
 
-  const detectionLabel = detection ? CLASS_LABELS[detection.class_name] : "탐지 대기";
-  const riskText = detection ? `${detectionLabel} ${formatPercent(detection.confidence)}` : "위험 요소 없음";
-  const directionLabel = headingLabel(heading);
-  const modeText = DETECTOR_MODE === "fake" ? "데모 탐지 모드" : DETECTOR_MODE === "server" ? "서버 탐지 모드" : "모델 연결 대기";
-  const detectorStatusText = DETECTOR_MODE === "server" && detectorBusy && !detection ? "서버 탐지 중" : detectorMessage;
-  const canReport = Boolean(detection) && cameraReady && reportState !== "sending";
-  const voiceResultText = voiceTranscript
-    ? `${voiceTranscript} · ${voiceIntent ?? "unknown"}${voiceConfidence === null ? "" : ` ${formatPercent(voiceConfidence)}`}`
-    : destination
-      ? `${navigationActive ? "안내 준비" : "목적지 저장"} · ${destination}`
-      : `서버 ${VOICE_API_BASE}`;
-  const reportDisabledReason = !cameraReady
-    ? "카메라가 준비되면 신고할 수 있습니다."
-    : !detection
-      ? "탐지된 위험이 없습니다. 위험이 감지되면 신고할 수 있습니다."
-      : "";
-  const reportHelpText = reportDisabledReason || reportMessage;
-
-  const getCurrentLocationMessage = useCallback(() => {
-    if (gpsError) {
-      return `현재 위치를 확인할 수 없습니다. ${gpsError}.`;
-    }
-    if (!gps) {
-      return "현재 위치를 기다리는 중입니다.";
-    }
-
-    const accuracyText =
-      gps.accuracy_m === null || gps.accuracy_m === undefined ? "정확도는 대기 중입니다." : `정확도는 ${gps.accuracy_m.toFixed(1)}미터입니다.`;
-    const headingText = heading === null ? "" : ` 방향은 ${directionLabel}입니다.`;
-    return `현재 위치는 위도 ${gps.latitude.toFixed(5)}, 경도 ${gps.longitude.toFixed(5)}입니다. ${accuracyText}${headingText}`;
-  }, [directionLabel, gps, gpsError, heading]);
-
-  const startGpsWatch = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGpsError("GPS 미지원");
-      return;
-    }
-
-    if (gpsWatchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-      gpsWatchIdRef.current = null;
-    }
-
-    setGpsError(null);
-    gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        setGps({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy_m: position.coords.accuracy
-        });
-        setGpsError(null);
-      },
-      () => {
-        setGpsError("위치 권한 필요");
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 3000,
-        timeout: 10000
-      }
-    );
+  const clearCameraDependentState = useCallback(() => {
+    setDetection(null);
+    setV2Detections([]);
+    setV2Primary(null);
+    setV2Secondary(null);
+    setDetectionV2Audit(null);
+    setReportMessage("카메라 준비 필요");
   }, []);
 
-  const requestHeadingPermission = useCallback(async () => {
-    const orientationEvent = deviceOrientationEventWithPermission();
-    if (!orientationEvent) {
-      setHeading(null);
-      setHeadingMessage("방향 센서 미지원");
-      return;
-    }
-
-    if (typeof orientationEvent.requestPermission !== "function") {
-      setHeadingMessage("방향 센서 대기");
-      return;
-    }
-
-    try {
-      const permission = await orientationEvent.requestPermission();
-      if (permission !== "granted") {
-        setHeading(null);
-      }
-      setHeadingMessage(permission === "granted" ? "방향 센서 대기" : "방향 센서 권한 필요");
-    } catch {
-      setHeading(null);
-      setHeadingMessage("방향 센서를 시작할 수 없습니다");
-    }
+  const enableTestCaptureConsent = useCallback(() => {
+    setTestCaptureConsent(true);
+    window.localStorage.setItem(TEST_CAPTURE_PANEL_CONSENT_STORAGE_KEY, "true");
   }, []);
 
-  const clearVoiceStopTimer = useCallback(() => {
-    if (voiceStopTimerRef.current !== null) {
-      window.clearTimeout(voiceStopTimerRef.current);
-      voiceStopTimerRef.current = null;
-    }
-  }, []);
+  const handleCameraError = useCallback(() => {
+    clearCameraDependentState();
+    setReportState("idle");
+  }, [clearCameraDependentState]);
 
-  const cleanupVoiceRecording = useCallback(() => {
-    clearVoiceStopTimer();
-    voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
-    voiceStreamRef.current = null;
-    mediaRecorderRef.current = null;
-  }, [clearVoiceStopTimer]);
+  const {
+    videoRef,
+    cameraReady,
+    cameraError,
+    cameraPermissionState,
+    refreshCameraPermissionState,
+    startCamera,
+    captureFrame
+  } = useCamera({
+    onCameraUnavailable: clearCameraDependentState,
+    onCameraError: handleCameraError
+  });
+  const {
+    gps,
+    gpsError,
+    heading,
+    headingMessage,
+    directionLabel,
+    startGpsWatch,
+    requestHeadingPermission,
+    getCurrentLocationMessage
+  } = useSensors();
+  const stepLengthEstimate = useAutoStepLength(gps);
+  const depthSensor = useDepthSensor({ motionStability: stepLengthEstimate.motionStability });
+  const {
+    autoReportStatus,
+    setAutoReportV2State,
+    submitV2ReportTarget,
+    handleVoiceReportV2
+  } = useAutoReportV2({
+    captureFrame,
+    gps,
+    heading,
+    speechEnabled,
+    v2Detections,
+    isServerV2Mode: IS_SERVER_V2_MODE,
+    setReportState,
+    setReportMessage,
+    setLastDuplicateCount,
+    setVoiceMessage
+  });
+  useDetectionV1({
+    cameraReady,
+    gps,
+    heading,
+    captureFrame,
+    reportStateRef,
+    detectionIndexRef,
+    setDetection,
+    setV2Detections,
+    setV2Primary,
+    setV2Secondary,
+    setDetectorMessage,
+    setDetectorBusy,
+    setReportState,
+    setLastDuplicateCount,
+    setReportMessage
+  });
+  useDetectionV2({
+    cameraReady,
+    gps,
+    heading,
+    captureFrame,
+    estimateDepthForDetection: depthSensor.estimateDepthForDetection,
+    detectionIndexRef,
+    reportStateRef,
+    submitV2ReportTarget,
+    setAutoReportV2State,
+    onDetectionV2Audit: setDetectionV2Audit,
+    setDetection,
+    setV2Detections,
+    setV2Primary,
+    setV2Secondary,
+    setDetectorMessage,
+    setDetectorBusy,
+    setReportState,
+    setLastDuplicateCount,
+    setReportMessage
+  });
+  const {
+    navigationActive,
+    navigationStatusText,
+    navigationInstructionText,
+    navigationDetailText,
+    navigationSpeechPrompt,
+    navigationSpeechKey,
+    navigationStatusMessage,
+    navigationDestinationCandidates,
+    navigationHiddenDestinationCandidateCount,
+    navigationCanShowMoreDestinations,
+    navigationSearchActive,
+    hasNavigationDestination,
+    setVoiceDestination,
+    selectDestinationCandidate,
+    selectDestinationCandidateByIndex,
+    showMoreDestinationCandidates,
+    cancelDestinationSearch,
+    retryDestinationSearch,
+    startNavigation,
+    stopNavigation
+  } = useNavigationGuidance({
+    gps,
+    heading,
+    v2Detections,
+    stepLengthM: stepLengthEstimate.stepLengthM
+  });
 
-  const startCamera = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("이 브라우저는 카메라 입력을 지원하지 않습니다.");
-      setDetection(null);
-      setReportMessage("카메라 준비 필요");
-      return;
-    }
-
-    try {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraReady(true);
-      setCameraError(null);
-    } catch {
-      setCameraReady(false);
-      setDetection(null);
-      setCameraError("카메라 권한을 허용해야 보행 화면을 사용할 수 있습니다.");
-      setReportState("idle");
-      setReportMessage("카메라 준비 필요");
-    }
-  }, []);
+  const {
+    v2PrimaryRiskContext,
+    v2SecondaryRiskContext,
+    riskActive,
+    detectionLabel,
+    riskText,
+    getLastStatusMessage,
+    setLastStatusMessage
+  } = useRiskFeedback({
+    detection,
+    v2Primary,
+    v2Secondary,
+    detectorMessage,
+    reportState,
+    reportMessage,
+    gps,
+    gpsError,
+    heading,
+    walkingSpeedMps: stepLengthEstimate.walkingSpeedMps,
+    motionStability: stepLengthEstimate.motionStability,
+    speechEnabled,
+    getCurrentLocationMessage,
+    stepLengthM: stepLengthEstimate.stepLengthM,
+    navigationSpeechPrompt,
+    navigationSpeechKey,
+    navigationStatusMessage
+  });
+  const modeText = IS_CAMERA_ONLY_MODE ? "실기기 카메라 테스트" : DETECTOR_MODE === "fake" ? "데모 탐지 모드" : DETECTOR_MODE === "server" ? "서버 탐지 모드" : IS_FAKE_V2_MODE ? "unified-v2 데모 모드" : IS_SERVER_V2_MODE ? "unified-v2 서버 모드" : "모델 연결 대기";
+  const detectorStatusText =
+    DETECTOR_MODE === "server" && detectorBusy && !detection
+      ? "서버 탐지 중"
+      : IS_SERVER_V2_MODE && detectorBusy && !v2Primary
+        ? "unified-v2 서버 탐지 중"
+        : detectorMessage;
+  const {
+    canReport,
+    reportDisabledReason,
+    reportHelpText,
+    handleReport
+  } = useManualReportV1({
+    detection,
+    cameraReady,
+    gps,
+    heading,
+    captureFrame,
+    speechEnabled,
+    isV2Mode: IS_V2_MODE,
+    reportState,
+    reportMessage,
+    setReportState,
+    setReportMessage,
+    setLastDuplicateCount
+  });
 
   const reconnectCameraAndSensors = useCallback(() => {
-    void startCamera();
+    const nextMessage = "버튼 입력 확인됨 · 카메라와 GPS 권한을 요청합니다. 브라우저 팝업이 뜨면 허용을 눌러주세요.";
+    setPermissionRequestMessage(nextMessage);
+    setVoiceMessage(nextMessage);
+
+    void refreshCameraPermissionState();
+    const cameraPermission = startCamera();
     startGpsWatch();
+
+    void cameraPermission.then((cameraReady) => {
+      setPermissionRequestMessage(
+        cameraReady
+          ? "카메라 연결 성공 · GPS/방향 센서 상태를 확인 중입니다."
+          : "카메라 연결 실패 · 위 안내 문구에 따라 브라우저 사이트 설정을 확인해 주세요."
+      );
+    });
+
     void requestHeadingPermission();
-  }, [requestHeadingPermission, startCamera, startGpsWatch]);
-
-  useEffect(() => {
-    const cameraTimer = window.setTimeout(() => {
-      void startCamera();
-    }, 0);
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    }
-
-    return () => {
-      window.clearTimeout(cameraTimer);
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, [startCamera]);
-
-  useEffect(() => {
-    return () => cleanupVoiceRecording();
-  }, [cleanupVoiceRecording]);
-
-  useEffect(() => {
-    const gpsTimer = window.setTimeout(() => startGpsWatch(), 0);
-    return () => {
-      window.clearTimeout(gpsTimer);
-      if (gpsWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-        gpsWatchIdRef.current = null;
-      }
-    };
-  }, [startGpsWatch]);
-
-  useEffect(() => {
-    if (!deviceOrientationEventWithPermission()) {
-      const orientationTimer = window.setTimeout(() => setHeadingMessage("방향 센서 미지원"), 0);
-      return () => window.clearTimeout(orientationTimer);
-    }
-
-    const onOrientation = (event: DeviceOrientationEvent) => {
-      if (typeof event.alpha === "number") {
-        setHeading(Math.round(event.alpha));
-        setHeadingMessage("방향 센서 수신 중");
-      }
-    };
-
-    window.addEventListener("deviceorientation", onOrientation);
-    return () => window.removeEventListener("deviceorientation", onOrientation);
-  }, []);
-
-  useEffect(() => {
-    if (DETECTOR_MODE !== "fake" || !cameraReady) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      detectionIndexRef.current += 1;
-      const nextDetection = createFakeDetection(detectionIndexRef.current, gps, heading);
-      setDetection(nextDetection);
-      setDetectorMessage(`${CLASS_LABELS[nextDetection.class_name]} 데모 감지`);
-      if (reportStateRef.current !== "sending") {
-        setReportState("idle");
-        setLastDuplicateCount(0);
-        setReportMessage(`${CLASS_LABELS[nextDetection.class_name]} 신고 가능`);
-      }
-    }, 2800);
-
-    return () => window.clearInterval(intervalId);
-  }, [cameraReady, gps, heading]);
-
-  useEffect(() => {
-    if (!detection) {
-      return;
-    }
-
-    lastStatusMessageRef.current = `현재 위험. ${CLASS_LABELS[detection.class_name]}. 신뢰도 ${formatPercent(detection.confidence)}.`;
-    const now = Date.now();
-    const key = detection.class_name;
-    if (lastAlertRef.current.key === key && now - lastAlertRef.current.time < SPEECH_COOLDOWN_MS) {
-      return;
-    }
-
-    lastAlertRef.current = { key, time: now };
-    const alert = alertForDetection(detection, speechEnabled);
-    vibrate(alert.vibration);
-    if (speechEnabled) {
-      speak(alert.speech);
-    }
-  }, [detection, speechEnabled]);
-
-  useEffect(() => {
-    if (!detection) {
-      lastStatusMessageRef.current = `탐지 상태. ${detectorMessage}.`;
-    }
-  }, [detection, detectorMessage]);
+    void stepLengthEstimate.requestMotionPermission();
+  }, [refreshCameraPermissionState, requestHeadingPermission, startCamera, startGpsWatch, stepLengthEstimate]);
 
   useEffect(() => {
     reportStateRef.current = reportState;
-    lastStatusMessageRef.current = `신고 상태. ${reportMessage}.`;
-  }, [reportMessage, reportState]);
+  }, [reportState]);
 
-  useEffect(() => {
-    if (gps || gpsError) {
-      lastStatusMessageRef.current = getCurrentLocationMessage();
-    }
-  }, [getCurrentLocationMessage, gps, gpsError]);
+  const isReportSending = useCallback(() => reportStateRef.current === "sending", []);
 
-  const captureFrame = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
-      throw new Error("카메라 프레임을 아직 캡처할 수 없습니다.");
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      throw new Error("캡처 캔버스를 만들 수 없습니다.");
-    }
-
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    return new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error("이미지 캡처에 실패했습니다."));
-          }
-        },
-        "image/jpeg",
-        0.86
-      );
-    });
-  }, []);
-
-  useEffect(() => {
-    if (DETECTOR_MODE !== "server" || !cameraReady) {
+  const onCreateReport = useCallback(async () => {
+    if (IS_V2_MODE) {
+      await handleVoiceReportV2();
       return;
     }
 
-    let stopped = false;
-    let inFlight = false;
-    let intervalId: number | null = null;
+    setVoiceMessage("음성 명령: 현재 위험 신고");
+    await handleReport();
+  }, [handleReport, handleVoiceReportV2]);
 
-    const setIdleReportMessage = (message: string) => {
-      if (reportStateRef.current !== "sending") {
-        setReportState("idle");
-        setLastDuplicateCount(0);
-        setReportMessage(message);
-      }
-    };
-
-    const clearServerDetection = (message: string) => {
-      setDetection(null);
-      setDetectorMessage(message);
-      setIdleReportMessage(message);
-    };
-
-    const runServerDetection = async () => {
-      if (inFlight) {
-        return;
-      }
-
-      inFlight = true;
-      setDetectorBusy(true);
-      try {
-        const health = await fetchDetectHealth();
-        if (stopped) {
-          return;
-        }
-        if (health.model_status !== "ready") {
-          clearServerDetection(health.reason ? `서버 모델 미준비: ${health.reason}` : "서버 모델 미준비");
-          return;
-        }
-
-        const capturedAt = new Date().toISOString();
-        const image = await captureFrame();
-        const result = await detectFrame(image, { captured_at: capturedAt, gps, heading });
-        if (stopped) {
-          return;
-        }
-
-        const nextDetection = result.detections.reduce<DetectionEvent | null>(
-          (bestDetection, currentDetection) => (!bestDetection || currentDetection.confidence > bestDetection.confidence ? currentDetection : bestDetection),
-          null
-        );
-        setDetection(nextDetection);
-
-        if (nextDetection) {
-          const message = `${CLASS_LABELS[nextDetection.class_name]} 서버 감지`;
-          setDetectorMessage(message);
-          setIdleReportMessage(`${CLASS_LABELS[nextDetection.class_name]} 신고 가능`);
-        } else {
-          const message = `서버 연결됨 · 위험 없음 (${result.model_version})`;
-          setDetectorMessage(message);
-          setIdleReportMessage("서버 탐지 결과 없음");
-        }
-      } catch (error) {
-        if (stopped) {
-          return;
-        }
-        clearServerDetection(error instanceof Error ? error.message : "서버 탐지 실패");
-      } finally {
-        inFlight = false;
-        if (!stopped) {
-          setDetectorBusy(false);
-        }
-      }
-    };
-
-    void runServerDetection();
-    intervalId = window.setInterval(() => {
-      void runServerDetection();
-    }, SERVER_DETECT_INTERVAL_MS);
-
-    return () => {
-      stopped = true;
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, [cameraReady, captureFrame, gps, heading]);
-
-  const handleReport = useCallback(async () => {
-    if (!detection || !cameraReady) {
-      setReportState("error");
-      setReportMessage(reportDisabledReason || "신고할 탐지 결과가 없습니다.");
-      return;
-    }
-
-    setReportState("sending");
-    setLastDuplicateCount(0);
-    setReportMessage(gps ? "유사 신고 확인 중" : "신고 전송 중");
-
-    try {
-      const reportSnapshot: DetectionEvent = {
-        ...detection,
-        captured_at: new Date().toISOString(),
-        gps,
-        heading
-      };
-      let duplicateCount = 0;
-      try {
-        const duplicateCheck = await checkDuplicateReports(reportSnapshot);
-        duplicateCount = duplicateCheck?.duplicate_report_ids.length ?? 0;
-      } catch {
-        setReportMessage("중복 확인 실패 · 신고 저장 중");
-      }
-
-      if (duplicateCount > 0) {
-        setLastDuplicateCount(duplicateCount);
-        setReportMessage(`유사 신고 ${duplicateCount}건 확인 · 저장 중`);
-        if (speechEnabled) {
-          speak("유사 신고 있음. 저장합니다.");
-        }
-      } else {
-        setReportMessage("신고 전송 중");
-      }
-
-      const image = await captureFrame();
-      const response = await submitReport(reportSnapshot, image);
-      const responseDuplicateCount = response.duplicate_report_ids.length || duplicateCount;
-      setLastDuplicateCount(responseDuplicateCount);
-      setReportState("sent");
-      setReportMessage(
-        responseDuplicateCount > 0
-          ? `신고 저장 완료 · 유사 신고 ${responseDuplicateCount}건`
-          : `신고 저장 완료: ${response.id.slice(0, 8)}`
-      );
-      vibrate(responseDuplicateCount > 0 ? [90, 70, 90, 70, 180] : [80, 70, 180]);
-      if (speechEnabled) {
-        speak(responseDuplicateCount > 0 ? "신고 저장 완료. 유사 신고 있음." : "신고 저장 완료");
-      }
-    } catch (error) {
-      setReportState("error");
-      setReportMessage(error instanceof Error ? `${error.message} · 다시 신고 가능` : "신고 전송 실패 · 다시 신고 가능");
-      vibrate([420, 160, 420]);
-      if (speechEnabled) {
-        speak("신고 실패. 다시 누르세요.");
-      }
-    }
-  }, [cameraReady, captureFrame, detection, gps, heading, reportDisabledReason, speechEnabled]);
-
-  const handleSpeechToggle = useCallback(() => {
-    setSpeechEnabled((current) => {
-      const next = !current;
-      vibrate(60);
-      speak(next ? "음성 안내 켜짐" : "음성 안내 꺼짐");
-      return next;
-    });
-  }, []);
-
-  const handleVoiceIntent = useCallback(
-    async (result: VoiceSttResponse) => {
-      const confidence = speechConfidence(result);
-      const intent = result.intent;
-
-      if (confidence < VOICE_INTENT_CONFIDENCE_THRESHOLD || intent === "unknown") {
-        const message = intent === "unknown" ? "명령을 이해하지 못했습니다." : "명령 신뢰도가 낮습니다.";
-        setVoiceMessage(`${message} 다시 말씀해 주세요.`);
-        vibrate([120, 80, 120]);
-        if (speechEnabled) {
-          speak("다시 말씀해 주세요.");
-        }
-        return;
-      }
-
-      if (intent === "create_report") {
-        if (reportStateRef.current === "sending") {
-          setVoiceMessage("이미 신고 전송 중입니다.");
-          vibrate(80);
-          return;
-        }
-        setVoiceMessage("음성 명령: 현재 위험 신고");
-        await handleReport();
-        return;
-      }
-
-      if (intent === "voice_on") {
-        setSpeechEnabled(true);
-        setVoiceMessage("음성 안내 켜짐");
-        vibrate(60);
-        speak("음성 안내 켜짐");
-        return;
-      }
-
-      if (intent === "voice_off") {
-        setVoiceMessage("음성 안내 꺼짐");
-        vibrate([80, 60, 80]);
-        speak("음성 안내 꺼짐");
-        setSpeechEnabled(false);
-        return;
-      }
-
-      if (intent === "repeat_last") {
-        const message = lastStatusMessageRef.current ?? "반복할 상태가 없습니다.";
-        setVoiceMessage("최근 상태 반복");
-        if (message === "반복할 상태가 없습니다.") {
-          vibrate([120, 80, 120]);
-        }
-        if (speechEnabled) {
-          speak(message);
-        }
-        return;
-      }
-
-      if (intent === "get_current_location") {
-        const message = getCurrentLocationMessage();
-        lastStatusMessageRef.current = message;
-        setVoiceMessage(gps ? "현재 위치 확인 완료" : "현재 위치 확인 대기");
-        vibrate(80);
-        if (speechEnabled) {
-          speak(message);
-        }
-        return;
-      }
-
-      if (intent === "set_destination") {
-        const nextDestination = destinationFromSlots(result.slots);
-        if (nextDestination) {
-          setDestination(nextDestination);
-          setNavigationActive(false);
-        }
-        const message = nextDestination ? `${nextDestination} 목적지 저장` : "목적지를 다시 말씀해 주세요.";
-        setVoiceMessage(message);
-        vibrate(70);
-        if (speechEnabled) {
-          speak(nextDestination ? `${nextDestination} 목적지를 저장했습니다.` : "목적지를 다시 말씀해 주세요.");
-        }
-        return;
-      }
-
-      if (intent === "start_navigation") {
-        if (!destination) {
-          setVoiceMessage("목적지를 먼저 말씀해 주세요.");
-          vibrate([120, 80, 120]);
-          if (speechEnabled) {
-            speak("목적지를 먼저 말씀해 주세요.");
-          }
-          return;
-        }
-
-        setNavigationActive(true);
-        setVoiceMessage(`${destination} 안내 시작 준비`);
-        vibrate([70, 50, 120]);
-        if (speechEnabled) {
-          speak("길 안내를 시작합니다.");
-        }
-      }
-    },
-    [destination, getCurrentLocationMessage, gps, handleReport, speechEnabled]
-  );
-
-  const handleVoiceRecordingStop = useCallback(async () => {
-    clearVoiceStopTimer();
-    voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
-    voiceStreamRef.current = null;
-    mediaRecorderRef.current = null;
-
-    const mimeType = voiceChunksRef.current[0]?.type || "audio/webm";
-    const audio = new Blob(voiceChunksRef.current, { type: mimeType });
-    voiceChunksRef.current = [];
-
-    if (audio.size === 0) {
-      setVoiceState("error");
-      setVoiceMessage("녹음이 비어 있습니다. 다시 말씀해 주세요.");
-      vibrate([120, 80, 120]);
-      return;
-    }
-
-    setVoiceState("uploading");
-    setVoiceMessage("음성 명령 분석 중");
-    setVoiceTranscript(null);
-    setVoiceIntent(null);
-    setVoiceConfidence(null);
-
-    try {
-      const result = await uploadSpeechStt(audio);
-      const confidence = speechConfidence(result);
-      setVoiceTranscript(result.transcript || "인식 문장 없음");
-      setVoiceIntent(result.intent);
-      setVoiceConfidence(confidence);
-      await handleVoiceIntent(result);
-      setVoiceState("idle");
-    } catch (error) {
-      setVoiceState("error");
-      setVoiceMessage(error instanceof Error ? error.message : "음성 명령 처리에 실패했습니다.");
-      vibrate([240, 120, 240]);
-    }
-  }, [clearVoiceStopTimer, handleVoiceIntent]);
-
-  const stopVoiceRecording = useCallback(() => {
-    const recorder = mediaRecorderRef.current;
-    if (!recorder || recorder.state === "inactive") {
-      cleanupVoiceRecording();
-      setVoiceState("idle");
-      return;
-    }
-
-    clearVoiceStopTimer();
-    recorder.stop();
-  }, [cleanupVoiceRecording, clearVoiceStopTimer]);
-
-  const startVoiceRecording = useCallback(async () => {
-    if (
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices ||
-      typeof navigator.mediaDevices.getUserMedia !== "function" ||
-      typeof MediaRecorder === "undefined"
-    ) {
-      setVoiceSupported(false);
-      setVoiceState("error");
-      setVoiceMessage("이 브라우저는 음성 녹음을 지원하지 않습니다.");
-      return;
-    }
-
-    setVoiceState("recording");
-    setVoiceMessage("말씀하세요");
-    setVoiceTranscript(null);
-    setVoiceIntent(null);
-    setVoiceConfidence(null);
-    voiceChunksRef.current = [];
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        },
-        video: false
-      });
-      const mimeType = preferredAudioMimeType();
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-
-      voiceStreamRef.current = stream;
-      mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          voiceChunksRef.current.push(event.data);
-        }
-      };
-      recorder.onerror = () => {
-        voiceChunksRef.current = [];
-        setVoiceState("error");
-        setVoiceMessage("녹음 중 오류가 발생했습니다.");
-        cleanupVoiceRecording();
-        vibrate([160, 90, 160]);
-      };
-      recorder.onstop = () => {
-        void handleVoiceRecordingStop();
-      };
-
-      recorder.start();
-      voiceStopTimerRef.current = window.setTimeout(() => {
-        if (mediaRecorderRef.current?.state === "recording") {
-          mediaRecorderRef.current.stop();
-        }
-      }, VOICE_RECORDING_MAX_MS);
-    } catch (error) {
-      cleanupVoiceRecording();
-      setVoiceState("error");
-      setVoiceMessage(error instanceof DOMException && error.name === "NotAllowedError" ? "마이크 권한이 필요합니다." : "마이크를 시작할 수 없습니다.");
-      vibrate([160, 90, 160]);
-    }
-  }, [cleanupVoiceRecording, handleVoiceRecordingStop]);
-
-  const handleVoiceCommandButton = useCallback(() => {
-    if (voiceState === "recording") {
-      stopVoiceRecording();
-      return;
-    }
-    if (voiceState === "uploading" || !voiceSupported) {
-      return;
-    }
-
-    void startVoiceRecording();
-  }, [startVoiceRecording, stopVoiceRecording, voiceState, voiceSupported]);
+  const {
+    voiceSupported,
+    voiceState,
+    voiceResultText,
+    voiceButtonLabel,
+    voiceButtonHelp,
+    handleSpeechToggle,
+    handleVoiceCommandButton
+  } = useVoiceCommands({
+    speechEnabled,
+    setSpeechEnabled,
+    setVoiceMessage,
+    isReportSending,
+    onCreateReport,
+    onSetDestination: setVoiceDestination,
+    onSelectDestinationCandidateByIndex: selectDestinationCandidateByIndex,
+    onStartNavigation: startNavigation,
+    onStopNavigation: stopNavigation,
+    getLastStatusMessage,
+    setLastStatusMessage,
+    getCurrentLocationMessage,
+    hasGps: Boolean(gps),
+    hasNavigationDestination
+  });
 
   const reportButtonLabel = useMemo(() => {
+    if (IS_V2_MODE) {
+      if (autoReportStatus === "sending") {
+        return "자동 신고 중";
+      }
+      if (autoReportStatus === "sent") {
+        return "자동 신고 완료";
+      }
+      if (autoReportStatus === "failed") {
+        return "자동 신고 실패";
+      }
+      return "자동 신고 모드";
+    }
     if (reportState === "sending") {
       return "전송 중";
     }
@@ -833,181 +388,191 @@ export default function Home() {
       return "다시 신고";
     }
     return "현재 위험 신고";
-  }, [reportState]);
+  }, [autoReportStatus, reportState]);
 
-  const voiceButtonLabel = useMemo(() => {
-    if (!voiceSupported) {
-      return "음성 명령 미지원";
+  const motionPermissionLabel = useMemo(() => {
+    switch (stepLengthEstimate.motionPermissionStatus) {
+      case "granted":
+        return "허용됨";
+      case "listening":
+        return "수집 중";
+      case "denied":
+        return "거부됨";
+      case "unsupported":
+        return "미지원";
+      default:
+        return "요청 필요";
     }
-    if (voiceState === "recording") {
-      return "녹음 종료";
-    }
-    if (voiceState === "uploading") {
-      return "분석 중";
-    }
-    if (voiceState === "error") {
-      return "다시 말하기";
-    }
-    return "음성 명령";
-  }, [voiceState, voiceSupported]);
+  }, [stepLengthEstimate.motionPermissionStatus]);
 
-  const voiceButtonHelp = useMemo(() => {
-    if (!voiceSupported) {
-      return "MediaRecorder 지원 브라우저가 필요합니다";
-    }
-    if (voiceState === "recording") {
-      return "짧게 말한 뒤 다시 누르세요";
-    }
-    if (voiceState === "uploading") {
-      return "STT 서버로 전송 중";
-    }
-    return "탭해서 한국어 명령을 녹음합니다";
-  }, [voiceState, voiceSupported]);
+  const stepLengthDetail = useMemo(() => {
+    const speedText =
+      stepLengthEstimate.walkingSpeedMps === null ? "속도 대기" : `속도 ${stepLengthEstimate.walkingSpeedMps.toFixed(1)}m/s`;
+    return `GPS ${stepLengthEstimate.gpsSampleCount}개 · 유효 구간 ${stepLengthEstimate.validSegmentCount}개 · GPS 튐 ${stepLengthEstimate.ignoredSegmentCount}개 제외 · ${speedText} · 흔들림 ${formatPercent(stepLengthEstimate.shakeScore)}`;
+  }, [
+    stepLengthEstimate.gpsSampleCount,
+    stepLengthEstimate.ignoredSegmentCount,
+    stepLengthEstimate.shakeScore,
+    stepLengthEstimate.validSegmentCount,
+    stepLengthEstimate.walkingSpeedMps
+  ]);
+  const depthStatus = useMemo(
+    () =>
+      depthStatusFromContext(
+        v2PrimaryRiskContext.depth || v2PrimaryRiskContext.tracking ? v2PrimaryRiskContext : v2SecondaryRiskContext,
+        IS_SERVER_V2_MODE || IS_CAMERA_ONLY_MODE
+          ? "실기기 테스트 중 · WebXR 깊이는 비활성화"
+          : depthSensor.message,
+        stepLengthEstimate.stepLengthM,
+        stepLengthEstimate.motionStability
+      ),
+    [
+      depthSensor.message,
+      stepLengthEstimate.motionStability,
+      stepLengthEstimate.stepLengthM,
+      v2PrimaryRiskContext,
+      v2SecondaryRiskContext
+    ]
+  );
 
   return (
-    <main className="assist-shell">
-      <section className="camera-surface" aria-label="보행 보조 카메라 화면">
-        <video ref={videoRef} className="camera-video" muted playsInline aria-label="후면 카메라 미리보기" />
-        <header className="app-header">
-          <div>
-            <strong>WalkSafe Assist</strong>
-            <span>목걸이 착용 보행 감지</span>
-          </div>
-          <div className="header-actions">
-            <span className="mode-pill demo">{modeText}</span>
-            <a href="/admin">관리자</a>
-          </div>
-        </header>
-        {!cameraReady ? (
-          <div className="camera-fallback">
-            <Camera aria-hidden="true" size={40} />
-            <strong>카메라 준비 중</strong>
-            <span>{cameraError ?? "후면 카메라 권한을 확인하고 있습니다."}</span>
-            <button className="control-button secondary" type="button" onClick={reconnectCameraAndSensors}>
-              <Camera aria-hidden="true" size={20} />
-              카메라/센서 다시 연결
-            </button>
-          </div>
-        ) : null}
-
-        {detection ? (
-          <div
-            className="detection-box"
-            style={{
-              left: `${detection.bbox.x * 100}%`,
-              top: `${detection.bbox.y * 100}%`,
-              width: `${detection.bbox.width * 100}%`,
-              height: `${detection.bbox.height * 100}%`
-            }}
-            aria-hidden="true"
-          >
-            <span>{CLASS_LABELS[detection.class_name]}</span>
-          </div>
-        ) : null}
-
-        <div className="top-status">
-          <div
-            className={`risk-pill ${detection ? "danger" : "safe"}`}
-            role={detection ? "alert" : "status"}
-            aria-live={detection ? "assertive" : "polite"}
-          >
-            <AlertTriangle aria-hidden="true" size={18} />
-            <span>{riskText}</span>
-          </div>
-          <span>{detection ? "전방 확인" : detectorStatusText}</span>
+    <main className={`assist-shell ${isOnline ? "online" : "offline"}`}>
+      <a className="skip-link" href="#assist-status">
+        보행 상태로 건너뛰기
+      </a>
+      {!isOnline ? (
+        <div className="offline-banner offline" role="status" aria-live="polite">
+          오프라인 상태 · 탐지/신고/길안내 API 요청을 보내지 않습니다.
         </div>
-      </section>
+      ) : null}
 
-      <section className="assist-panel" aria-label="보행 보조 상태와 신고">
-        <div className="status-grid">
-          <div className={`status-item current-risk ${detection ? "warning" : "safe"}`} aria-live="polite">
-            <span className="status-label">현재 위험</span>
-            <strong>{detectionLabel}</strong>
-            <small>{detection ? `신뢰도 ${formatPercent(detection.confidence)}` : detectorStatusText}</small>
-          </div>
-          <div className="status-item">
-            <span className="status-label">위치</span>
-            <strong>{gpsError ?? formatGps(gps)}</strong>
-            <small>{gps?.accuracy_m === null || gps?.accuracy_m === undefined ? "정확도 대기" : `정확도 ${gps.accuracy_m.toFixed(1)}m`}</small>
-          </div>
-          <div className="status-item">
-            <span className="status-label">방향</span>
-            <strong>{directionLabel}</strong>
-            <small>{heading === null ? headingMessage : `${heading}도`}</small>
-          </div>
-          <div className="status-item" aria-live="polite">
-            <span className="status-label">신고</span>
-            <strong>{reportMessage}</strong>
-            {lastDuplicateCount > 0 ? <small>중복 후보 {lastDuplicateCount}건</small> : null}
-          </div>
-          <div className="status-item" aria-live="polite">
-            <span className="status-label">음성 명령</span>
-            <strong>{voiceMessage}</strong>
-            <small>{voiceResultText}</small>
-          </div>
-        </div>
+      <CameraSurface
+        videoRef={videoRef}
+        cameraReady={cameraReady}
+        cameraError={cameraError}
+        cameraPermissionState={cameraPermissionState}
+        reconnectCameraAndSensors={reconnectCameraAndSensors}
+        permissionRequestMessage={permissionRequestMessage}
+        detection={detection}
+        v2Detections={v2Detections}
+        v2Primary={v2Primary}
+        riskActive={riskActive}
+        modeText={modeText}
+        isFakeV2Mode={IS_FAKE_V2_MODE}
+        riskText={riskText}
+        detectorStatusText={detectorStatusText}
+      />
 
-        <button
-          className="voice-button"
-          type="button"
-          aria-pressed={speechEnabled}
-          aria-label={speechEnabled ? "음성 안내 켜짐. 탭하면 꺼집니다." : "음성 안내 꺼짐. 탭하면 켜집니다."}
-          onClick={handleSpeechToggle}
-        >
-          <span>
-            {speechEnabled ? <Volume2 aria-hidden="true" size={22} /> : <VolumeX aria-hidden="true" size={22} />}
-            {speechEnabled ? "음성 켜짐" : "음성 꺼짐"}
-          </span>
-          <small>위험 탐지 시 음성으로 경고합니다</small>
-        </button>
+      <AssistPanel
+        panelId="assist-status"
+        detection={detection}
+        v2Detections={v2Detections}
+        v2Primary={v2Primary}
+        v2Secondary={v2Secondary}
+        riskActive={riskActive}
+        isV2Mode={IS_V2_MODE}
+        detectionLabel={detectionLabel}
+        detectorStatusText={detectorStatusText}
+        gps={gps}
+        gpsError={gpsError}
+        directionLabel={directionLabel}
+        heading={heading}
+        headingMessage={headingMessage}
+        reportMessage={reportMessage}
+        lastDuplicateCount={lastDuplicateCount}
+        voiceMessage={voiceMessage}
+        voiceResultText={voiceResultText}
+        navigationActive={navigationActive}
+        navigationStatusText={navigationStatusText}
+        navigationInstructionText={navigationInstructionText}
+        navigationDetailText={navigationDetailText}
+        navigationDestinationCandidates={navigationDestinationCandidates}
+        navigationHiddenDestinationCandidateCount={navigationHiddenDestinationCandidateCount}
+        navigationCanShowMoreDestinations={navigationCanShowMoreDestinations}
+        navigationSearchActive={navigationSearchActive}
+        onSelectNavigationCandidate={selectDestinationCandidate}
+        onShowMoreNavigationCandidates={showMoreDestinationCandidates}
+        onCancelNavigationSearch={cancelDestinationSearch}
+        onRetryNavigationSearch={() => void retryDestinationSearch()}
+        onStopNavigation={stopNavigation}
+        speechEnabled={speechEnabled}
+        handleSpeechToggle={handleSpeechToggle}
+        voiceState={voiceState}
+        voiceSupported={voiceSupported}
+        voiceButtonLabel={voiceButtonLabel}
+        voiceButtonHelp={voiceButtonHelp}
+        handleVoiceCommandButton={handleVoiceCommandButton}
+        handleReport={handleReport}
+        canReport={canReport}
+        reportDisabledReason={reportDisabledReason}
+        reportState={reportState}
+        reportButtonLabel={reportButtonLabel}
+        reportHelpText={reportHelpText}
+        reconnectCameraAndSensors={reconnectCameraAndSensors}
+        permissionRequestMessage={permissionRequestMessage}
+        guardianSummary={guardianSummary}
+        settingsMessage={settingsMessage}
+        settingsExpanded={settingsExpanded}
+        setupChecklist={setupChecklist}
+        settingsForm={settingsForm}
+        stepLengthSummary={stepLengthEstimate.message}
+        stepLengthDetail={stepLengthDetail}
+        motionPermissionLabel={motionPermissionLabel}
+        motionSampleCount={stepLengthEstimate.motionSampleCount}
+        stepLengthConfidence={stepLengthEstimate.confidence}
+        storedStepCalibrationActive={stepLengthEstimate.storedCalibrationActive}
+        depthStatusText={depthStatus.status}
+        depthDetailText={depthStatus.detail}
+        depthSensorStatus={depthSensor.status}
+        depthFrameCount={depthSensor.frameCount}
+        disableDepthSensorControls={IS_SERVER_V2_MODE || IS_CAMERA_ONLY_MODE}
+        isOnline={isOnline}
+        pwaInstallMessage={pwaInstallMessage}
+        pwaUpdateMessage={pwaUpdateMessage}
+        swVersion={swVersion}
+        canInstallPwa={canInstallPwa}
+        canApplyPwaUpdate={canApplyServiceWorkerUpdate}
+        onEmergencyContactNameChange={updateEmergencyContactName}
+        onEmergencyContactPhoneChange={updateEmergencyContactPhone}
+        onAddEmergencyContact={addEmergencyContact}
+        onRemoveEmergencyContact={removeEmergencyContact}
+        onRequestMotionPermission={() => void stepLengthEstimate.requestMotionPermission()}
+        onResetStepLengthCalibration={stepLengthEstimate.resetCalibration}
+        onRequestDepthSensor={() => void depthSensor.startDepthSensor()}
+        onStopDepthSensor={() => void depthSensor.stopDepthSensor()}
+        onInstallPwa={() => void installApp()}
+        onApplyPwaUpdate={applyServiceWorkerUpdate}
+        onSaveSettings={saveSettings}
+        onClearSettings={clearSettings}
+        onToggleSettingsExpanded={toggleSettingsExpanded}
+      />
 
-        <button
-          className="voice-button"
-          type="button"
-          aria-pressed={voiceState === "recording"}
-          aria-label={`${voiceButtonLabel}. ${voiceButtonHelp}`}
-          onClick={handleVoiceCommandButton}
-          disabled={!voiceSupported || voiceState === "uploading"}
-        >
-          <span>
-            {voiceState === "uploading" ? <Loader2 className="spin" aria-hidden="true" size={22} /> : <Mic aria-hidden="true" size={22} />}
-            {voiceButtonLabel}
-          </span>
-          <small>{voiceButtonHelp}</small>
-        </button>
+      {TEST_CAPTURE_PANEL_ENABLED && testCaptureConsent ? (
+        <TestCapturePanel
+          cameraReady={cameraReady}
+          captureFrame={captureFrame}
+          detection={detection}
+          v2Detections={v2Detections}
+          v2Primary={v2Primary}
+          detectorStatusText={detectorStatusText}
+          riskText={riskText}
+          depthStatusText={depthStatus.status}
+          depthDetailText={depthStatus.detail}
+          gps={gps}
+          heading={heading}
+          stepLengthDetail={stepLengthDetail}
+          detectionV2Audit={detectionV2Audit}
+        />
+      ) : TEST_CAPTURE_PANEL_ENABLED ? (
+        <section className="test-capture-panel" aria-label="실기기 테스트 기록 동의">
+          <p>실기기 테스트 로그 저장을 사용하려면 동의가 필요합니다.</p>
+          <p>이 패널은 이미지/메타데이터를 저장하므로 기본 비활성 상태입니다.</p>
+          <button type="button" onClick={enableTestCaptureConsent}>
+            동의 후 활성화
+          </button>
+        </section>
+      ) : null}
 
-        <button
-          className="report-button"
-          type="button"
-          onClick={handleReport}
-          disabled={!canReport}
-          aria-describedby="report-button-help"
-          aria-label={reportDisabledReason || "현재 탐지된 위험을 신고합니다."}
-        >
-          {reportState === "sending" ? (
-            <Loader2 className="spin" aria-hidden="true" size={24} />
-          ) : (
-            <Send aria-hidden="true" size={24} />
-          )}
-          <span className="button-stack">
-            <span>{reportButtonLabel}</span>
-            <small id="report-button-help">{reportHelpText}</small>
-          </span>
-        </button>
-
-        <button className="control-button secondary sensor-action" type="button" onClick={reconnectCameraAndSensors}>
-          <RefreshCw aria-hidden="true" size={20} />
-          카메라/센서 재연결
-        </button>
-        <p className="assist-note">
-          <MapPin aria-hidden="true" size={16} />
-          {gpsError ? "위치 없음 상태" : `위치 정확도 ${gps?.accuracy_m?.toFixed(1) ?? "대기"}m`}
-        </p>
-        <p className="assist-note">
-          <Navigation aria-hidden="true" size={16} />
-          목걸이 착용 · {modeText}
-        </p>
-      </section>
     </main>
   );
 }

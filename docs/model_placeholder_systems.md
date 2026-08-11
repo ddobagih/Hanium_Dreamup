@@ -1,5 +1,8 @@
 # 모델 임시 대체 시스템 관리
 
+> **문서 상태(2026-06-02): legacy v1.** fake/server placeholder 관리 기록이다. 현재 demo/fake 분리 기준은 `docs/current_status.md`와 `docs/walksafe-v2/README.md`다.
+
+
 작성 기준일: 2026-05-12
 
 ## 목적

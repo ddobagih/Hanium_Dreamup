@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
@@ -53,6 +54,31 @@ def matches_image_signature(content: bytes, content_type: str) -> bool:
     return any(content.startswith(signature) for signature in IMAGE_SIGNATURES.get(content_type, ()))
 
 
+def strip_image_metadata(content: bytes, content_type: str) -> bytes:
+    try:
+        from PIL import Image  # type: ignore[import-not-found]
+    except ModuleNotFoundError:
+        return content
+
+    try:
+        with Image.open(io.BytesIO(content)) as image:
+            image.load()
+            output = io.BytesIO()
+            if content_type == "image/jpeg":
+                image.convert("RGB").save(output, format="JPEG", quality=92, optimize=True)
+            elif content_type == "image/png":
+                image.save(output, format="PNG", optimize=True)
+            elif content_type == "image/webp":
+                image.save(output, format="WEBP", quality=90, method=4)
+            else:
+                return content
+            sanitized = output.getvalue()
+    except Exception:
+        return content
+
+    return sanitized if matches_image_signature(sanitized, content_type) else content
+
+
 async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[bytes, str]:
     content_type = upload.content_type or "application/octet-stream"
     supported_content_types = set(IMAGE_SUFFIXES)
@@ -90,7 +116,7 @@ async def read_image_upload(upload: UploadFile, settings: Settings) -> tuple[byt
             },
         )
 
-    return content, content_type
+    return strip_image_metadata(content, content_type), content_type
 
 
 def write_image_file(destination: Path, content: bytes) -> None:
