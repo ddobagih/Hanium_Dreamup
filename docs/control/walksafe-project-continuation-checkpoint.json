@@ -37751,7 +37751,7 @@
     ],
     "source_commit_or_snapshot": {
       "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
-      "content_set_sha256": "e8508176cbc00811ffce561841477356d11908e6fbb62f00ae4d3df07d141676",
+      "content_set_sha256": "5cb991999ba1bd882027c6203fb0b6365b916de3b5887f2875ac3cb1decd6bc9",
       "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
       "file_count": 818,
       "path_set_sha256": "a92ca456869315d43939ffd3a46295ca8f405dc7acc3613384d08d70e4868f45"
@@ -37947,7 +37947,7 @@
   "working_tree_snapshot": {
     "base_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
     "checkpoint_self_exclusion": "EXCLUDED_TO_AVOID_CIRCULAR_CONTENT_HASH; VALIDATED_SEMANTICALLY",
-    "content_set_sha256": "e8508176cbc00811ffce561841477356d11908e6fbb62f00ae4d3df07d141676",
+    "content_set_sha256": "5cb991999ba1bd882027c6203fb0b6365b916de3b5887f2875ac3cb1decd6bc9",
     "managed_changed_path_count": 818,
     "managed_changed_paths": [
       ".github/workflows/quality.yml",

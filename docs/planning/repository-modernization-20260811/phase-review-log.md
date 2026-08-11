@@ -234,3 +234,11 @@
 - 기능 분담표의 인쇄 CSS가 담당자·완료 입력을 숨기던 문제를 교정해 PDF/인쇄에서도 분담 정보가 유지되도록 했다.
 - 정책 추적 재검토에서 기관 제출용 최소정보 파일의 생성·내보내기·판본 결속 작업이 분담표에서 빠진 것을 발견해 `AD-08`로 추가했다.
 - 수용 기준은 source 경로 대조, 링크·catalog·active docs, 119개 unique ID·브라우저 동작과 인쇄 표면 재검증으로 정했다.
+
+게시 및 exact-SHA CI 교정:
+
+- 현대화 commit `3506e3afd113d1350ed74e82e0791b53161870a3`을 `current`에 게시하고 원격 `main`·archive branch·보존 tag가 그대로임을 확인했다.
+- 첫 exact-SHA quality run `31495903939`는 setup-node toolcache가 공식 Node archive와 byte·mode exact하지 않아 `Run commit-stable test layers`의 root closure 검사에서 실패했다. 실패 전 secret·OpenAPI·continuation·checkpoint·catalog·문서·inventory·model 검사는 통과했다.
+- 수정 전 계획 검토에서 `GITHUB_PATH`는 다음 step부터 적용되므로 같은 dependency install step의 npm이 ambient Node를 쓸 수 있는 문제와, restrictive umask에서 tar 권한이 달라지는 문제를 확인했다.
+- CI가 공식 `node-v22.23.1-linux-x64.tar.xz`를 고정 URL·SHA-256으로 내려받아 `--same-permissions`로 추출하고, lock checker를 통과한 root만 쓰도록 교정했다. 같은 step은 PATH를 즉시 공식 root로 고정하고 다음 step은 `GITHUB_PATH`·`WALKSAFE_NODE_BIN_DIR`를 사용한다.
+- 독립 임시 재현에서 archive SHA-256, Node 22.23.1, npm 10.9.8, 5,866-entry root closure와 npm closure가 lock과 exact 일치했다. 새 commit 게시 뒤 exact-SHA CI 성공을 최종 종료 조건으로 유지한다.

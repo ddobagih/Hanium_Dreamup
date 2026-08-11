@@ -91,12 +91,31 @@ jobs:
           cache: gradle
       - name: Install Node regression dependencies
         shell: bash
+        env:
+          WALKSAFE_NODE_ARCHIVE_URL: https://nodejs.org/dist/v22.23.1/node-v22.23.1-linux-x64.tar.xz
+          WALKSAFE_NODE_ARCHIVE_SHA256: 9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578
         run: |
           set -euo pipefail
-          node_bin_dir="$(dirname "$(command -v node)")"
+          archive="${RUNNER_TEMP:?}/node-v22.23.1-linux-x64.tar.xz"
+          node_root="${RUNNER_TEMP:?}/walksafe-node-v22.23.1-linux-x64"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --tlsv1.2 \
+            --output "${archive}" \
+            "${WALKSAFE_NODE_ARCHIVE_URL:?}"
+          printf '%s  %s\n' "${WALKSAFE_NODE_ARCHIVE_SHA256:?}" "${archive}" | \
+            sha256sum --check --strict
+          mkdir --mode=0755 "${node_root}"
+          tar --extract --xz --same-permissions --file "${archive}" \
+            --directory "${node_root}" --strip-components=1
+          python -I -S -B scripts/check_walksafe_node_toolchain_20260715.py \
+            --node-root "${node_root}" \
+            --lock configs/walksafe_node_toolchain_lock_20260715.json
+          node_bin_dir="${node_root}/bin"
           echo "WALKSAFE_NODE_BIN_DIR=${node_bin_dir}" >> "${GITHUB_ENV}"
-          npm --prefix apps/web ci
-          npm --prefix apps/android-gateway ci
+          echo "${node_bin_dir}" >> "${GITHUB_PATH}"
+          export PATH="${node_bin_dir}:/usr/bin:/bin"
+          "${node_bin_dir}/npm" --prefix apps/web ci
+          "${node_bin_dir}/npm" --prefix apps/android-gateway ci
       - name: Verify closed Legacy Web and independent Android Gateway
         shell: bash
         run: |

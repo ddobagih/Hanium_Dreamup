@@ -257,10 +257,57 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
     assert "WEB_QUALITY_PYTHON" not in workflow
     assert "WALKSAFE_RUN_BROWSER_E2E" not in workflow
     assert "artifacts/ci/" not in workflow
-    assert "npm --prefix apps/web ci" in workflow[regression_install:general_install]
-    assert "npm --prefix apps/android-gateway ci" in workflow[regression_install:general_install]
-    assert "npm --prefix apps/android-gateway test" in workflow[regression_install:general_install]
-    assert "WALKSAFE_NODE_BIN_DIR" in workflow[regression_install:general_install]
+    regression_steps = workflow[regression_install:general_install]
+    node_lock = json.loads(
+        Path("configs/walksafe_node_toolchain_lock_20260715.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    archive = node_lock["official_archive"]
+    assert f'WALKSAFE_NODE_ARCHIVE_URL: {archive["url"]}' in regression_steps
+    assert f'WALKSAFE_NODE_ARCHIVE_SHA256: {archive["sha256"]}' in regression_steps
+    assert "${RUNNER_TEMP:?}" in regression_steps
+    assert "--proto '=https' --tlsv1.2" in regression_steps
+    assert "sha256sum --check --strict" in regression_steps
+    assert "tar --extract --xz --same-permissions" in regression_steps
+    assert "--strip-components=1" in regression_steps
+    assert "scripts/check_walksafe_node_toolchain_20260715.py" in regression_steps
+    assert '--node-root "${node_root}"' in regression_steps
+    assert '"${node_bin_dir}/npm" --prefix apps/web ci' in regression_steps
+    assert '"${node_bin_dir}/npm" --prefix apps/android-gateway ci' in regression_steps
+    assert "npm --prefix apps/android-gateway test" in regression_steps
+    assert 'echo "${node_bin_dir}" >> "${GITHUB_PATH}"' in regression_steps
+    assert 'export PATH="${node_bin_dir}:/usr/bin:/bin"' in regression_steps
+    assert regression_steps.index('export PATH="${node_bin_dir}:/usr/bin:/bin"') < (
+        regression_steps.index('"${node_bin_dir}/npm" --prefix apps/web ci')
+    )
+    download = regression_steps.index("curl --fail --location")
+    checksum = regression_steps.index("sha256sum --check --strict")
+    create_root = regression_steps.index('mkdir --mode=0755 "${node_root}"')
+    extract = regression_steps.index("tar --extract --xz --same-permissions")
+    checker = regression_steps.index("scripts/check_walksafe_node_toolchain_20260715.py")
+    export_environment = regression_steps.index(
+        'echo "WALKSAFE_NODE_BIN_DIR=${node_bin_dir}" >> "${GITHUB_ENV}"'
+    )
+    export_path = regression_steps.index('echo "${node_bin_dir}" >> "${GITHUB_PATH}"')
+    current_path = regression_steps.index('export PATH="${node_bin_dir}:/usr/bin:/bin"')
+    web_install = regression_steps.index('"${node_bin_dir}/npm" --prefix apps/web ci')
+    gateway_install = regression_steps.index(
+        '"${node_bin_dir}/npm" --prefix apps/android-gateway ci'
+    )
+    assert (
+        download
+        < checksum
+        < create_root
+        < extract
+        < checker
+        < export_environment
+        < export_path
+        < current_path
+        < web_install
+        < gateway_install
+    )
+    assert 'node_bin_dir="$(dirname "$(command -v node)")"' not in regression_steps
     assert 'echo "WALKSAFE_NODE_BIN_DIR=${node_bin_dir}" >> "${GITHUB_ENV}"' in workflow[
         regression_install:general_install
     ]
