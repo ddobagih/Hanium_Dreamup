@@ -16,6 +16,7 @@ ADMIN_BUILD_PATH = ADMIN_ROOT / "build.gradle.kts"
 ADMIN_MANIFEST_PATH = ADMIN_ROOT / "src/main/AndroidManifest.xml"
 ADMIN_ACTIVITY_PATH = ADMIN_ROOT / "src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java"
 ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
+VERIFICATION_METADATA_PATH = REPO_ROOT / "apps/android/gradle/verification-metadata.xml"
 
 
 def load_strict_json(path: Path) -> dict:
@@ -80,6 +81,31 @@ class WalkSafeAndroidProductBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(self.user["signing"]["configuration_state"], "NOT_CONFIGURED")
         self.assertEqual(self.admin["signing"]["configuration_state"], "NOT_CONFIGURED")
+
+    def test_dependency_verification_covers_guava_android_parent_pom(self) -> None:
+        root = ET.parse(VERIFICATION_METADATA_PATH).getroot()
+        namespace = root.tag.removesuffix("verification-metadata")
+        components = [
+            component
+            for component in root.findall(f".//{namespace}component")
+            if component.attrib
+            == {
+                "group": "com.google.guava",
+                "name": "guava-parent",
+                "version": "33.3.1-android",
+            }
+        ]
+        self.assertEqual(len(components), 1)
+        artifacts = components[0].findall(f"{namespace}artifact")
+        self.assertEqual(
+            [artifact.attrib for artifact in artifacts],
+            [{"name": "guava-parent-33.3.1-android.pom"}],
+        )
+        checksums = artifacts[0].findall(f"{namespace}sha256")
+        self.assertEqual(
+            [checksum.attrib["value"] for checksum in checksums],
+            ["6e11986ea7250b51f847157e2dc937f32a306804dfce0007a5e81ddb9b95c579"],
+        )
 
     def test_lifecycle_stage_and_distribution_cohort_are_separate_and_closed(self) -> None:
         control = self.config["release_control"]

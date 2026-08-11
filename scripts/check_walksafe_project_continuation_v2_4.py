@@ -489,6 +489,23 @@ FP046_START_GATE_RUNTIME_PATHS = [
     "apps/android-gateway/package-lock.json",
     "configs/walksafe_node_toolchain_lock_20260715.json",
 ]
+START_GATE_RUNTIME_BINDING_AMENDMENTS = {
+    event_id: {
+        "apps/android/gradle/verification-metadata.xml": {
+            "sealed_sha256": (
+                "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+            ),
+            "current_sha256": (
+                "eaa662a434257a71c595ab510889657579e5e5a107041813338a257b56674d17"
+            ),
+        }
+    }
+    for event_id in (
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-002",
+        "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005",
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005",
+    )
+}
 FP008_GATE_ROOT_RELATIVE = Path("docs/control/execution/goal-gates")
 FP008_PRIVATE_EVENT_DIRECTORY_MODE = 0o700
 FP008_PRIVATE_EVIDENCE_FILE_MODE = 0o600
@@ -3492,22 +3509,70 @@ def _fp008_start_gate_contract(
     return errors, checks, binding, ready
 
 
+def _validate_start_gate_runtime_bindings(
+    root: Path,
+    value: Any,
+    *,
+    event_id: str,
+    expected_paths: list[str],
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(value, list) or len(value) != len(expected_paths):
+        return [f"{label} start gate runtime bindings differ"]
+    for index, relative in enumerate(expected_paths):
+        item = value[index]
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"path", "file_sha256"}
+            or item.get("path") != relative
+        ):
+            errors.append(f"{label} start gate runtime bindings differ")
+            continue
+        path = resolve_repo_file(root, relative)
+        if path is None or _contains_symlink(root, relative):
+            errors.append(
+                f"{label} start gate runtime binding is missing or unsafe: "
+                f"{relative}"
+            )
+            continue
+        current_sha256 = sha256_file(path)
+        amendment = START_GATE_RUNTIME_BINDING_AMENDMENTS.get(
+            event_id,
+            {},
+        ).get(relative)
+        if amendment is None:
+            sealed_sha256 = current_sha256
+        else:
+            sealed_sha256 = amendment["sealed_sha256"]
+            _require_equal(
+                errors,
+                f"{label} start gate current runtime binding {relative}",
+                current_sha256,
+                amendment["current_sha256"],
+            )
+        _require_equal(
+            errors,
+            f"{label} start gate sealed runtime binding {relative}",
+            item,
+            {"path": relative, "file_sha256": sealed_sha256},
+        )
+    return errors
+
+
 def _validate_fp008_runtime_bindings(
     root: Path,
     value: Any,
+    *,
+    event_id: str,
 ) -> list[str]:
-    errors: list[str] = []
-    if not isinstance(value, list) or len(value) != len(FP008_START_GATE_RUNTIME_PATHS):
-        return ["FP008 start gate runtime bindings differ"]
-    expected: list[dict[str, str]] = []
-    for relative in FP008_START_GATE_RUNTIME_PATHS:
-        path = resolve_repo_file(root, relative)
-        if path is None or _contains_symlink(root, relative):
-            errors.append(f"FP008 start gate runtime binding is missing or unsafe: {relative}")
-            continue
-        expected.append({"path": relative, "file_sha256": sha256_file(path)})
-    _require_equal(errors, "FP008 start gate runtime bindings", value, expected)
-    return errors
+    return _validate_start_gate_runtime_bindings(
+        root,
+        value,
+        event_id=event_id,
+        expected_paths=FP008_START_GATE_RUNTIME_PATHS,
+        label="FP008",
+    )
 
 
 def _fp046_start_gate_contract(
@@ -3675,19 +3740,16 @@ def _fp046_start_gate_contract(
 def _validate_fp046_runtime_bindings(
     root: Path,
     value: Any,
+    *,
+    event_id: str,
 ) -> list[str]:
-    errors: list[str] = []
-    if not isinstance(value, list) or len(value) != len(FP046_START_GATE_RUNTIME_PATHS):
-        return ["FP046 start gate runtime bindings differ"]
-    expected: list[dict[str, str]] = []
-    for relative in FP046_START_GATE_RUNTIME_PATHS:
-        path = resolve_repo_file(root, relative)
-        if path is None or _contains_symlink(root, relative):
-            errors.append(f"FP046 start gate runtime binding is missing or unsafe: {relative}")
-            continue
-        expected.append({"path": relative, "file_sha256": sha256_file(path)})
-    _require_equal(errors, "FP046 start gate runtime bindings", value, expected)
-    return errors
+    return _validate_start_gate_runtime_bindings(
+        root,
+        value,
+        event_id=event_id,
+        expected_paths=FP046_START_GATE_RUNTIME_PATHS,
+        label="FP046",
+    )
 
 
 def _validate_start_gate(
@@ -3878,7 +3940,13 @@ def _validate_start_gate(
             if fp008_scoped
             else _validate_fp046_runtime_bindings
         )
-        errors.extend(runtime_validator(root, receipt.get("runtime_bindings")))
+        errors.extend(
+            runtime_validator(
+                root,
+                receipt.get("runtime_bindings"),
+                event_id=event_id,
+            )
+        )
     else:
         contract_version = contract.get("check_command_contract_version")
         contract_sha256 = _check_contract_sha256(

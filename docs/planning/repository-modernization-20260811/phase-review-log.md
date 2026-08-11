@@ -258,3 +258,22 @@
 - 첫 로컬 release packaging의 일시적 incremental 실패 뒤 같은 task 재실행과 전체 `all` 재실행이 모두 성공했다. 제품 코드 변경 없이 깨끗한 단일 전체 실행을 최종 근거로 채택했다.
 - 독립 최종 lifecycle·exact-env 검수, checkpoint reconcile, staged index 검사와 새 exact-SHA GitHub CI만 최종 게시 종료 조건으로 남겼다.
 - lifecycle 독립 검수는 P0/P1/P2 0이었다. exact-env 독립 검수의 비차단 P2 1건인 초기 setup-python PATH 의존도 첫 action의 공식 `python-path` 출력 저장·절대경로 사용으로 제거했다. 관련 workflow meta 회귀와 실제 CI로 최종 확인한다.
+
+세 번째 exact-SHA CI의 fresh Gradle dependency verification:
+
+- run `31500636819`는 모든 환경·정적 gate와 model audit를 통과한 뒤 최초 Android fresh dependency resolution에서 중단됐다.
+- 실패 artifact는 `com.google.guava:guava-parent:33.3.1-android:guava-parent-33.3.1-android.pom` 한 개다. 같은 Android Guava의 JAR·module과 JRE parent는 metadata에 있으나 Android parent POM만 빠져 있었다.
+- Maven Central HTTPS payload, 게시 SHA-1, 별도 로컬 Gradle cache payload를 대조해 20,632 bytes와 SHA-256 `6e11986ea7250b51f847157e2dc937f32a306804dfce0007a5e81ddb9b95c579`를 확인했다.
+- 다른 dependency trust 항목은 바꾸지 않고 해당 component·artifact·checksum 하나와 current exact 회귀만 추가한다. 빈 Gradle user home에서 CI 실패 task를 통과시킨 뒤 전체 메타·checkpoint·index 검사를 다시 수행한다.
+- 빈 Gradle user home에서 동일한 `:app:processDebugNavigationResources --rerun-tasks`가 PASS했고 current Unit은 Python 744 PASS·8 SKIP, Gateway 88 PASS, Web 정책 suite와 Android 양 앱 JVM 테스트까지 PASS했다.
+- 독립 검수는 공식 Maven Central 두 경로·게시 SHA-1·fresh Gradle cache의 일치, metadata +5/-0과 component/artifact/SHA 각각 +1, lock/build/settings diff 0을 확인했다. 최종 판정은 P0/P1/P2 0이다.
+
+봉인된 runtime binding 승계 검토:
+
+- 과거 FP008·FP046 receipt와 seq47·48·53 event는 당시 verification metadata SHA를 일관되게 봉인한다. 이를 현재 SHA로 고치면 이후 event chain을 소급 재작성하므로 금지했다.
+- 기존 FP047 remediation의 exact predecessor/successor 패턴을 따라 실제 과거 event 3개에서만 `apps/android/gradle/verification-metadata.xml`의 `0f2fc21a…c0084` → `eaa662a4…d17` 한 쌍을 continuation checker에 승인한다.
+- 공용 validator는 event ID·binding 수·순서·exact 필드·비-symlink를 유지하고, 승인 경로의 역사 receipt SHA와 현재 live SHA를 각각 고정한다. 다른 event·경로·digest·순서·live drift는 계속 기존 규칙으로 검증한다.
+- 실제 FP008 시작·재개와 FP046 시작 receipt PASS, sealed digest 대체·임의 digest·순서 변경·다른 경로 재사용·제3 live digest FAIL을 회귀로 고정했다. 과거 receipt·event·repository-state log 변경은 0건이다.
+- 독립 회귀가 최초 path-global 구현의 새 gate 호환성 결함을 발견해 event-scoped로 축소했다. 비대상 synthetic/current gate의 receipt==live PASS와 기존 FP008 start-gate 회귀를 다시 확인했다.
+- 최종 회귀는 CPython 3.12.13 관련 116 PASS, strict continuation+active singleton 42 PASS였다. 비대상 event의 과거 sealed SHA 재사용 FAIL도 직접 고정해 독립 최종 판정을 P0/P1/P2 0으로 닫았다.
+- catalog·runner validate·active docs와 XML 구조·유일성·origin 검사를 통과했다. 과거 receipt·repository-state log·transition history·anchor diff는 0건이다.

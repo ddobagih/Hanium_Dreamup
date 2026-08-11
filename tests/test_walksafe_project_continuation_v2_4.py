@@ -23,6 +23,39 @@ V23_ARCHIVE = V24_PACKAGE / "superseded-v2.3.0-active-checkpoint.json"
 V23_SUPERSESSION_RECORD = (
     V24_PACKAGE / "active-supersession-record-v2.3.0.json"
 )
+GRADLE_VERIFICATION_METADATA_RELATIVE = (
+    "apps/android/gradle/verification-metadata.xml"
+)
+GRADLE_VERIFICATION_METADATA_SEALED_SHA256 = (
+    "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+)
+GRADLE_VERIFICATION_METADATA_CURRENT_SHA256 = (
+    "eaa662a434257a71c595ab510889657579e5e5a107041813338a257b56674d17"
+)
+FP008_START_GATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-002"
+)
+FP008_RESUME_GATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-FP008-20260809-005"
+)
+FP046_START_GATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005"
+)
+FP008_START_GATE_RECEIPT = ROOT / (
+    "docs/control/execution/goal-gates/"
+    f"{FP008_START_GATE_EVENT_ID}/"
+    "implementation-start-gate-receipt.json"
+)
+FP008_RESUME_GATE_RECEIPT = ROOT / (
+    "docs/control/execution/goal-gates/"
+    f"{FP008_RESUME_GATE_EVENT_ID}/"
+    "implementation-resume-gate-receipt.json"
+)
+FP046_START_GATE_RECEIPT = ROOT / (
+    "docs/control/execution/goal-gates/"
+    f"{FP046_START_GATE_EVENT_ID}/"
+    "implementation-start-gate-receipt.json"
+)
 
 V24_PACKAGE_ID = "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4"
 V24_PLAN_VERSION = "2.4.0"
@@ -967,6 +1000,156 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
 
         self.assertIsNone(payload)
         self.assertTrue(any("count differs" in error for error in errors))
+
+    def test_runtime_binding_amendment_accepts_only_sealed_receipts(self) -> None:
+        self.assertEqual(
+            set(continuation.START_GATE_RUNTIME_BINDING_AMENDMENTS),
+            {
+                FP008_START_GATE_EVENT_ID,
+                FP008_RESUME_GATE_EVENT_ID,
+                FP046_START_GATE_EVENT_ID,
+            },
+        )
+        for amendment in (
+            continuation.START_GATE_RUNTIME_BINDING_AMENDMENTS.values()
+        ):
+            self.assertEqual(
+                amendment,
+                {
+                    GRADLE_VERIFICATION_METADATA_RELATIVE: {
+                        "sealed_sha256": (
+                            GRADLE_VERIFICATION_METADATA_SEALED_SHA256
+                        ),
+                        "current_sha256": (
+                            GRADLE_VERIFICATION_METADATA_CURRENT_SHA256
+                        ),
+                    }
+                },
+            )
+        cases = (
+            (
+                FP008_START_GATE_EVENT_ID,
+                FP008_START_GATE_RECEIPT,
+                continuation._validate_fp008_runtime_bindings,
+            ),
+            (
+                FP008_RESUME_GATE_EVENT_ID,
+                FP008_RESUME_GATE_RECEIPT,
+                continuation._validate_fp008_runtime_bindings,
+            ),
+            (
+                FP046_START_GATE_EVENT_ID,
+                FP046_START_GATE_RECEIPT,
+                continuation._validate_fp046_runtime_bindings,
+            ),
+        )
+        for event_id, receipt_path, validator in cases:
+            with self.subTest(receipt=receipt_path.name):
+                bindings = continuation.load_json(receipt_path)[
+                    "runtime_bindings"
+                ]
+                self.assertEqual(
+                    bindings[2],
+                    {
+                        "path": GRADLE_VERIFICATION_METADATA_RELATIVE,
+                        "file_sha256": (
+                            GRADLE_VERIFICATION_METADATA_SEALED_SHA256
+                        ),
+                    },
+                )
+                self.assertEqual(
+                    validator(ROOT, bindings, event_id=event_id),
+                    [],
+                )
+
+    def test_runtime_binding_amendment_does_not_change_new_gate_rules(
+        self,
+    ) -> None:
+        bindings = continuation.load_json(FP008_START_GATE_RECEIPT)[
+            "runtime_bindings"
+        ]
+        current_bindings = copy.deepcopy(bindings)
+        current_bindings[2]["file_sha256"] = (
+            GRADLE_VERIFICATION_METADATA_CURRENT_SHA256
+        )
+        synthetic_event_id = "WS-SYNTHETIC-NEW-FP008-START-GATE"
+
+        self.assertTrue(
+            continuation._validate_fp008_runtime_bindings(
+                ROOT,
+                bindings,
+                event_id=synthetic_event_id,
+            )
+        )
+        self.assertEqual(
+            continuation._validate_fp008_runtime_bindings(
+                ROOT,
+                current_bindings,
+                event_id=synthetic_event_id,
+            ),
+            [],
+        )
+
+    def test_runtime_binding_amendment_rejects_receipt_tampering(self) -> None:
+        bindings = continuation.load_json(FP008_START_GATE_RECEIPT)[
+            "runtime_bindings"
+        ]
+        mutations = {}
+        successor = copy.deepcopy(bindings)
+        successor[2]["file_sha256"] = (
+            GRADLE_VERIFICATION_METADATA_CURRENT_SHA256
+        )
+        mutations["successor substituted into sealed receipt"] = successor
+        arbitrary = copy.deepcopy(bindings)
+        arbitrary[2]["file_sha256"] = "0" * 64
+        mutations["arbitrary metadata digest"] = arbitrary
+        reordered = copy.deepcopy(bindings)
+        reordered[0], reordered[1] = reordered[1], reordered[0]
+        mutations["reordered bindings"] = reordered
+        other_path = copy.deepcopy(bindings)
+        other_path[0]["file_sha256"] = (
+            GRADLE_VERIFICATION_METADATA_SEALED_SHA256
+        )
+        mutations["amendment reused for other path"] = other_path
+
+        for label, value in mutations.items():
+            with self.subTest(label=label):
+                self.assertTrue(
+                    continuation._validate_fp008_runtime_bindings(
+                        ROOT,
+                        value,
+                        event_id=FP008_START_GATE_EVENT_ID,
+                    )
+                )
+
+    def test_runtime_binding_amendment_rejects_unapproved_live_digest(
+        self,
+    ) -> None:
+        bindings = continuation.load_json(FP046_START_GATE_RECEIPT)[
+            "runtime_bindings"
+        ]
+        real_sha256_file = continuation.sha256_file
+
+        def changed_sha256(path: Path) -> str:
+            if path == ROOT / GRADLE_VERIFICATION_METADATA_RELATIVE:
+                return "f" * 64
+            return real_sha256_file(path)
+
+        with mock.patch.object(
+            continuation,
+            "sha256_file",
+            side_effect=changed_sha256,
+        ):
+            errors = continuation._validate_fp046_runtime_bindings(
+                ROOT,
+                bindings,
+                event_id=FP046_START_GATE_EVENT_ID,
+            )
+
+        self.assertTrue(
+            any("current runtime binding" in error for error in errors),
+            errors,
+        )
 
     @staticmethod
     def _create_fp008_private_gate_fixture(
