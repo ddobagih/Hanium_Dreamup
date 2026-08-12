@@ -1265,6 +1265,30 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
             FP046_PRIVACY_RIGHTS_TEST_CURRENT_SHA256,
         )
 
+    def test_quality_workflow_fetches_fp046_successor_commit_before_checks(
+        self,
+    ) -> None:
+        workflow = (ROOT / ".github/workflows/quality.yml").read_text(
+            encoding="utf-8"
+        )
+        expected_step = f'''      - name: Fetch FP046 successor source commit
+        shell: bash
+        env:
+          FP046_SUCCESSOR_SOURCE_COMMIT: "{goal_graph.FP046_FINAL_SOURCE_SUCCESSOR_COMMIT}"
+        run: |
+          set -euo pipefail
+          test "${{FP046_SUCCESSOR_SOURCE_COMMIT:?}}" = "{goal_graph.FP046_FINAL_SOURCE_SUCCESSOR_COMMIT}"
+          git fetch --no-tags --no-write-fetch-head --depth=1 \\
+            origin "${{FP046_SUCCESSOR_SOURCE_COMMIT:?}}"
+          test "$(git cat-file -t "${{FP046_SUCCESSOR_SOURCE_COMMIT:?}}")" = commit
+'''
+
+        self.assertIn(expected_step, workflow)
+        self.assertLess(
+            workflow.index(expected_step),
+            workflow.index("Run current checkpoint control tests"),
+        )
+
     def test_fp046_final_source_amendment_requires_compatibility_record(
         self,
     ) -> None:

@@ -37,6 +37,16 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Fetch FP046 successor source commit
+        shell: bash
+        env:
+          FP046_SUCCESSOR_SOURCE_COMMIT: "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
+        run: |
+          set -euo pipefail
+          test "${FP046_SUCCESSOR_SOURCE_COMMIT:?}" = "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
+          git fetch --no-tags --no-write-fetch-head --depth=1 \
+            origin "${FP046_SUCCESSOR_SOURCE_COMMIT:?}"
+          test "$(git cat-file -t "${FP046_SUCCESSOR_SOURCE_COMMIT:?}")" = commit
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         id: general_base_python
         with:
