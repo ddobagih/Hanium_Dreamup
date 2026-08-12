@@ -11,9 +11,9 @@
   },
   "classification_counts": {
     "CURRENT_PRODUCT": 284,
-    "EVIDENCE": 2115,
+    "EVIDENCE": 2116,
     "GENERATED": 4,
-    "GOVERNANCE": 250,
+    "GOVERNANCE": 251,
     "LEGACY_REFERENCE": 214,
     "SUPPORT": 607
   },
@@ -18007,6 +18007,32 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "daylog",
       "path": "daylog/2026-08-11.md",
+      "path_kind": "FILE",
+      "reason": "repository rule daylog"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "daylog",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "daylog",
+      "path": "daylog/2026-08-12.md",
       "path_kind": "FILE",
       "reason": "repository rule daylog"
     },
@@ -75660,6 +75686,32 @@
       },
       "movement": "KEEP",
       "movement_basis": "docs-planning",
+      "path": "docs/planning/repository-modernization-20260811/fp046-final-source-compatibility-binding-20260812.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-planning"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "GOVERNANCE",
+      "classification_rule": "docs-planning",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP",
+      "movement_basis": "docs-planning",
       "path": "docs/planning/repository-modernization-20260811/phase-review-log.md",
       "path_kind": "FILE",
       "reason": "repository rule docs-planning"
@@ -90591,11 +90643,11 @@
   ],
   "movement_counts": {
     "ARCHIVE_AFTER_DECOUPLING": 199,
-    "KEEP": 624,
+    "KEEP": 625,
     "KEEP_AS_STUB": 2,
-    "KEEP_AT_PATH": 2649
+    "KEEP_AT_PATH": 2650
   },
-  "path_count": 3474,
+  "path_count": 3476,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -90607,5 +90659,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "937ca5152d501dd4d6bc51f0ca61b049c880707d0f17d478aedff784539f6b0f"
+  "source_set_sha256": "1d62c3b6db29ab4f9f5c6e496832de8afcc0a91f36a3233c0e826d77e7a13ff7"
 }

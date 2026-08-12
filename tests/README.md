@@ -55,14 +55,12 @@ python3.12 -m venv .venv-tests
 export PYTHON_BIN="$PWD/.venv-tests/bin/python"
 "$PYTHON_BIN" -m pip install --require-hashes --only-binary=:all: --no-compile \
   -r tests/general-quality-cp312-linux-x86_64-cpu.lock
-node_executable="$(command -v node)"
-test -n "$node_executable"
-export WALKSAFE_NODE_BIN_DIR="$(dirname "$(readlink -f "$node_executable")")"
+test -x "${WALKSAFE_NODE_BIN_DIR:?}/node"
 PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh validate
 PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh unit
 ```
 
-`unit` 실행 전에 Node 22.23.1과 Web·Gateway의 `npm ci`, Java 21·Android SDK가 준비돼 있어야 한다. runner는 `WALKSAFE_NODE_BIN_DIR`의 실제 toolchain hash를 검사하고 다른 Node를 거부한다. 전체 준비 순서는 [개발 환경 가이드](../docs/guides/development-environment-guide.md)를 따른다.
+`unit` 실행 전에 [개발 환경 가이드의 exact Node.js 절차](../docs/guides/development-environment-guide.md#nodejs)로 만든 `WALKSAFE_NODE_BIN_DIR`과 Web·Gateway의 `npm ci`, Java 21·Android SDK가 준비돼 있어야 한다. runner는 Node 22.23.1이라는 버전 문자열만 보지 않고 지정한 root의 전체 toolchain hash를 검사하므로 ambient `command -v node` 경로를 대신 사용하지 않는다.
 
 `integration`과 `all`은 `tests/test_walksafe_backup_integrity.py`를 일반 CPython 3.12 묶음과 분리해 실행한다. `tests/backup-integrity-cp314.lock`만 설치한 정확한 CPython 3.14.6/Linux venv의 절대경로를 `WALKSAFE_BACKUP_PYTHON_BIN`에 지정해야 하며, 누락되거나 memfd sealing preflight가 실패하면 일반 `PYTHON_BIN`으로 대체하지 않고 실패한다.
 

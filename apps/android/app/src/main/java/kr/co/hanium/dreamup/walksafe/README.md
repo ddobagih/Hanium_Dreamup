@@ -13,7 +13,8 @@ ARCore camera/depth frame
   -> report/damage-only upload
 
 trusted GPS + step sensor
-  -> navigation/backend route
+  -> navigation/Gateway route
+  -> Backend provider
   -> route progress and guidance
 ```
 
@@ -29,7 +30,7 @@ trusted GPS + step sensor
 | `inference/` | runtime JSON과 TFLite 전처리/추론/파싱 |
 | `device/` | 센서 결과를 사용자 동작으로 올리기 전 readiness gate |
 | `feedback/` | TTS, TalkBack, 진동과 반복 억제 |
-| `navigation/` | GPS 신뢰도, 보폭, backend 경로와 경로 진행 상태 |
+| `navigation/` | GPS 신뢰도, 보폭, Gateway가 중계하는 Backend 경로와 경로 진행 상태 |
 | `report/` | 손상 점자블록 신고 후보와 multipart upload |
 | `debuglog/` | debug/release source set이 교체하는 진단 업로더 계약 |
 
@@ -39,7 +40,7 @@ trusted GPS + step sensor
 - detector bbox, preview view, depth image는 좌표계가 다르다. mapper를 우회해 normalized 좌표를 직접 섞지 않는다.
 - pseudo-depth 추세는 metric 거리가 아니므로 `N보` 안내나 신고 근거로 쓰지 않는다.
 - TTS, 진동, 신고 후보는 `DeviceGateState`를 통과한 결과만 사용한다.
-- `reporter_user_id`는 현재 로컬 입력값이며 서버 인증 주체가 아니다.
+- `reporter_user_id`는 검증된 첫 실행 actor binding에서 유도되고 활성 Gateway session actor와 일치해야 한다. 이 metadata는 인증 credential 자체가 아니다.
 - JVM 테스트와 APK 빌드는 실기기 ARCore/보행 검증을 대체하지 않는다.
 
 현행 빌드와 검증 한계는 [Android 사용자 앱 코드 지도](../../../../../../../../../../../docs/guides/code/android-user.md)를 먼저 본다. `apps/android/README.md`는 hash로 결속된 과거 snapshot이므로 현행 절차로 사용하지 않는다.

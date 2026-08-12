@@ -7,10 +7,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
+from scripts import check_walksafe_goal_graph_v2_4 as goal_graph
 from scripts import check_walksafe_project_continuation_v2_4 as continuation
 from scripts import materialize_walksafe_fp048_goal_20260802 as fp048_goal
 
@@ -55,6 +58,18 @@ FP046_START_GATE_RECEIPT = ROOT / (
     "docs/control/execution/goal-gates/"
     f"{FP046_START_GATE_EVENT_ID}/"
     "implementation-start-gate-receipt.json"
+)
+FP046_PRIVACY_RIGHTS_TEST_RELATIVE = (
+    "apps/android-gateway/test/privacy-rights.test.ts"
+)
+FP046_PRIVACY_RIGHTS_TEST_START_SHA256 = (
+    "6aa105f228a98432bb6b7940dd5521200fd1455104044e50031a0e0e8a4f16da"
+)
+FP046_PRIVACY_RIGHTS_TEST_SEALED_SHA256 = (
+    "fa49e585a2faf063250df8c88fa8fdad4dbe1f767c1d072d4c9d409d4cbc80a6"
+)
+FP046_PRIVACY_RIGHTS_TEST_CURRENT_SHA256 = (
+    "dffc386d5183ef7e517778d676fe2dd0cfd033631817306f347cc632d6aae566"
 )
 
 V24_PACKAGE_ID = "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4"
@@ -1149,6 +1164,190 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         self.assertTrue(
             any("current runtime binding" in error for error in errors),
             errors,
+        )
+
+    def test_fp046_final_source_amendment_preserves_seal_and_reaches_live(
+        self,
+    ) -> None:
+        self.assertEqual(
+            goal_graph.FP046_FINAL_SOURCE_BINDING_AMENDMENTS,
+            {
+                FP046_PRIVACY_RIGHTS_TEST_RELATIVE: {
+                    "sealed_byte_length": 19931,
+                    "sealed_sha256": FP046_PRIVACY_RIGHTS_TEST_SEALED_SHA256,
+                    "current_byte_length": 20540,
+                    "current_sha256": FP046_PRIVACY_RIGHTS_TEST_CURRENT_SHA256,
+                }
+            },
+        )
+        implementation = continuation.load_json(
+            ROOT / goal_graph.FP046_IMPLEMENTATION_PATH
+        )
+        sealed_rows = [
+            row
+            for row in implementation["final_content_manifest"]["files"]
+            if row["path"] == FP046_PRIVACY_RIGHTS_TEST_RELATIVE
+        ]
+        self.assertEqual(len(sealed_rows), 1)
+        self.assertEqual(sealed_rows[0]["byte_length"], 19931)
+        self.assertEqual(
+            sealed_rows[0]["sha256"],
+            FP046_PRIVACY_RIGHTS_TEST_SEALED_SHA256,
+        )
+
+        errors, _, transitions = (
+            goal_graph.validate_fp046_r014_successor_authority(
+                ROOT,
+                continuation.load_json(CHECKPOINT),
+            )
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(transitions), 67)
+        self.assertEqual(
+            transitions[FP046_PRIVACY_RIGHTS_TEST_RELATIVE],
+            (
+                FP046_PRIVACY_RIGHTS_TEST_START_SHA256,
+                FP046_PRIVACY_RIGHTS_TEST_CURRENT_SHA256,
+            ),
+        )
+
+        compatibility_path = (
+            ROOT / goal_graph.FP046_FINAL_SOURCE_COMPATIBILITY_PATH
+        )
+        self.assertEqual(
+            compatibility_path.stat().st_size,
+            goal_graph.FP046_FINAL_SOURCE_COMPATIBILITY_BYTE_COUNT,
+        )
+        self.assertEqual(
+            sha256_file(compatibility_path),
+            goal_graph.FP046_FINAL_SOURCE_COMPATIBILITY_SHA256,
+        )
+        compatibility = continuation.load_json(compatibility_path)
+        self.assertEqual(
+            compatibility["record_status"],
+            "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+        )
+        self.assertEqual(
+            compatibility["claim_boundary"],
+            {
+                "actual_device_credit_added": 0,
+                "formal_test_credit_added": 0,
+                "goal_completion_credit_added": 0,
+                "goal_event_created": False,
+                "historical_control_modified": False,
+                "release_credit_added": 0,
+            },
+        )
+        self.assertEqual(
+            compatibility["amendments"][0]["source_commit"],
+            goal_graph.FP046_FINAL_SOURCE_SUCCESSOR_COMMIT,
+        )
+        committed_source = subprocess.run(
+            [
+                "git",
+                "cat-file",
+                "blob",
+                (
+                    goal_graph.FP046_FINAL_SOURCE_SUCCESSOR_COMMIT
+                    + ":"
+                    + FP046_PRIVACY_RIGHTS_TEST_RELATIVE
+                ),
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        ).stdout
+        self.assertEqual(len(committed_source), 20540)
+        self.assertEqual(
+            sha256_bytes(committed_source),
+            FP046_PRIVACY_RIGHTS_TEST_CURRENT_SHA256,
+        )
+
+    def test_fp046_final_source_amendment_requires_compatibility_record(
+        self,
+    ) -> None:
+        target = ROOT / goal_graph.FP046_FINAL_SOURCE_COMPATIBILITY_PATH
+        real_sha256_file = goal_graph.continuation.sha256_file
+
+        def changed_sha256(path: Path) -> str:
+            if path == target:
+                return "f" * 64
+            return real_sha256_file(path)
+
+        with mock.patch.object(
+            goal_graph.continuation,
+            "sha256_file",
+            side_effect=changed_sha256,
+        ):
+            errors, artifact_bindings, transitions = (
+                goal_graph.validate_fp046_r014_successor_authority(
+                    ROOT,
+                    continuation.load_json(CHECKPOINT),
+                )
+            )
+
+        self.assertEqual(
+            errors,
+            ["FP046 final source compatibility binding differs"],
+        )
+        self.assertEqual(artifact_bindings, {})
+        self.assertEqual(transitions, {})
+
+    def test_fp046_final_source_amendment_rejects_third_live_digest(
+        self,
+    ) -> None:
+        target = ROOT / FP046_PRIVACY_RIGHTS_TEST_RELATIVE
+        real_sha256_file = goal_graph.continuation.sha256_file
+
+        def changed_sha256(path: Path) -> str:
+            if path == target:
+                return "f" * 64
+            return real_sha256_file(path)
+
+        with mock.patch.object(
+            goal_graph.continuation,
+            "sha256_file",
+            side_effect=changed_sha256,
+        ):
+            errors, artifact_bindings, transitions = (
+                goal_graph.validate_fp046_r014_successor_authority(
+                    ROOT,
+                    continuation.load_json(CHECKPOINT),
+                )
+            )
+
+        self.assertEqual(
+            errors,
+            [
+                "FP046 final source binding differs: "
+                + FP046_PRIVACY_RIGHTS_TEST_RELATIVE
+            ],
+        )
+        self.assertEqual(artifact_bindings, {})
+        self.assertEqual(transitions, {})
+
+    def test_known_standalone_goal_graph_failure_set_is_exact(self) -> None:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(ROOT / "scripts/check_walksafe_goal_graph_v2_4.py"),
+                "--skip-continuation",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(completed.stdout, b"")
+        self.assertEqual(completed.stderr.count(b"\n"), 64)
+        self.assertEqual(
+            hashlib.sha256(completed.stderr).hexdigest(),
+            "bfab9a20b8ab621f94b45dc27d153a03d0c9062c398fb9ac51a96e13ee098417",
         )
 
     @staticmethod

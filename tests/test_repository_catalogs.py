@@ -4,6 +4,7 @@ import importlib.util
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -276,6 +277,37 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
         two_model = catalogs.resolve_classification("ai_tasks/walksafe_two_model_runtime_20260522/README.md")
         self.assertEqual(two_model.movement, "ARCHIVE_READY")
         self.assertEqual(catalogs.resolve_classification("samples/example.json").movement, "KEEP_AS_STUB")
+
+    def test_team_feature_catalog_assignment_exchange_is_bound_and_fail_closed(self) -> None:
+        text = (
+            ROOT / "docs/planning/walksafe_feature_implementation_catalog.html"
+        ).read_text(encoding="utf-8")
+        feature_ids = re.findall(r'\{id:"([^"]+)",domain:', text)
+
+        self.assertEqual(len(feature_ids), 119)
+        self.assertEqual(len(set(feature_ids)), 119)
+        for required in (
+            'const assignmentSchemaVersion = "walksafe.feature-assignments.v1";',
+            "JSON.stringify({schema_version: assignmentSchemaVersion, catalog_date: catalogDate, features})",
+            "payload.catalog_sha256 !== await currentCatalogSha256()",
+            "payload.assignments.length !== features.length",
+            "hasExactKeys(payload, assignmentPayloadKeys)",
+            "hasExactKeys(entry, assignmentRowKeys)",
+            "seen.has(entry.id)",
+            "seen.size !== features.length",
+            "generation !== importGeneration",
+            "startingRevision !== stateRevision",
+            'aria-label="기능 목록 필터" aria-busy="true"',
+            "setInterfaceBusy(false);",
+            "saved = await validateAssignmentPayload(JSON.parse(stored));",
+            "JSON.stringify(await assignmentPayload())",
+            'name="feature_search"',
+            'autocomplete="off"',
+            "touch-action: manipulation;",
+            "button:hover",
+        ):
+            self.assertIn(required, text)
+        self.assertNotIn("if (!entry || !validIds.has(entry.id)) continue;", text)
 
     def test_phase4_movement_policy_is_exact(self) -> None:
         repository = json.loads(catalogs.build_catalog_bytes(ROOT)[catalogs.OUTPUT_PATHS[0]])

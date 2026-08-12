@@ -209,11 +209,27 @@ jobs:
           general_python="${WALKSAFE_GENERAL_PYTHON_BIN:?}"
           test "$("${general_python}" -I -S -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = "3.12.13"
           PYTHON_BIN="${general_python}" scripts/run_walksafe_test_layers_current.sh all
+      - name: Verify Android quality artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s apps/android/app/build/reports/lint-results-release.xml
+          test -s apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s apps/android/adminapp/build/reports/lint-results-release.xml
+          test -s apps/android/adminapp/build/outputs/apk/release/adminapp-release-unsigned.apk
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
+        if: success()
         with:
           name: walksafe-quality-${{ github.sha }}
           path: |
             apps/android/app/build/reports/
             apps/android/app/build/outputs/apk/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: walksafe-admin-quality-${{ github.sha }}
+          path: |
+            apps/android/adminapp/build/reports/
+            apps/android/adminapp/build/outputs/apk/
           if-no-files-found: error

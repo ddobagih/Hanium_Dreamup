@@ -1932,6 +1932,29 @@ FP046_IMPLEMENTATION_SHA256 = (
     "ab15bcb8c733b10ba2465a5a6922293968f84db452c5a83094a0bc0112eb8bb6"
 )
 FP046_IMPLEMENTATION_BYTE_COUNT = 36254
+FP046_FINAL_SOURCE_BINDING_AMENDMENTS = {
+    "apps/android-gateway/test/privacy-rights.test.ts": {
+        "sealed_byte_length": 19931,
+        "sealed_sha256": (
+            "fa49e585a2faf063250df8c88fa8fdad4dbe1f767c1d072d4c9d409d4cbc80a6"
+        ),
+        "current_byte_length": 20540,
+        "current_sha256": (
+            "dffc386d5183ef7e517778d676fe2dd0cfd033631817306f347cc632d6aae566"
+        ),
+    }
+}
+FP046_FINAL_SOURCE_COMPATIBILITY_PATH = (
+    "docs/planning/repository-modernization-20260811/"
+    "fp046-final-source-compatibility-binding-20260812.json"
+)
+FP046_FINAL_SOURCE_COMPATIBILITY_BYTE_COUNT = 1518
+FP046_FINAL_SOURCE_COMPATIBILITY_SHA256 = (
+    "2fee724d9ae9e7af556bd0025ae345df90e7098d63e820fc4d68213b7a24b1c1"
+)
+FP046_FINAL_SOURCE_SUCCESSOR_COMMIT = (
+    "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
+)
 FP046_COMPLETION_PATH = f"{FP046_RESULT_DIRECTORY}/completion-receipt.json"
 FP046_COMPLETION_SHA256 = (
     "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f"
@@ -4408,6 +4431,97 @@ def _fp046_completion_is_declared(
     )
 
 
+def _validate_fp046_final_source_compatibility_binding(root: Path) -> list[str]:
+    relative = "apps/android-gateway/test/privacy-rights.test.ts"
+    amendment = FP046_FINAL_SOURCE_BINDING_AMENDMENTS[relative]
+    expected = {
+        "amendments": [
+            {
+                "path": relative,
+                "reason": (
+                    "Commit 1e976419 stabilized the Gateway lock-contention "
+                    "regression without changing the FP046 product contract. "
+                    "The sealed completion evidence remains immutable and this "
+                    "record binds only the exact live test successor."
+                ),
+                "reason_code": "POST_COMPLETION_TEST_RELIABILITY_SUCCESSOR",
+                "sealed_source": {
+                    "byte_length": amendment["sealed_byte_length"],
+                    "sha256": amendment["sealed_sha256"],
+                },
+                "source_commit": FP046_FINAL_SOURCE_SUCCESSOR_COMMIT,
+                "successor_source": {
+                    "byte_length": amendment["current_byte_length"],
+                    "sha256": amendment["current_sha256"],
+                },
+            }
+        ],
+        "claim_boundary": {
+            "actual_device_credit_added": 0,
+            "formal_test_credit_added": 0,
+            "goal_completion_credit_added": 0,
+            "goal_event_created": False,
+            "historical_control_modified": False,
+            "release_credit_added": 0,
+        },
+        "record_id": "WS-FP046-FINAL-SOURCE-COMPATIBILITY-BINDING-20260812-001",
+        "record_status": "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+        "recorded_on": "2026-08-12",
+        "schema_version": "walksafe.fp046-final-source-compatibility-binding.v1",
+        "verification": {
+            "expected_issue_count": 63,
+            "expected_return_code": 1,
+            "expected_stderr_line_count": 64,
+            "expected_stderr_sha256": (
+                "bfab9a20b8ab621f94b45dc27d153a03d0c9062c398fb9ac51a96e13ee098417"
+            ),
+            "expected_stdout_byte_count": 0,
+        },
+    }
+    record_path = _exact_repo_file(root, FP046_FINAL_SOURCE_COMPATIBILITY_PATH)
+    record = _load_exact_json(root, FP046_FINAL_SOURCE_COMPATIBILITY_PATH)
+    if (
+        record_path is None
+        or record_path.stat().st_size
+        != FP046_FINAL_SOURCE_COMPATIBILITY_BYTE_COUNT
+        or continuation.sha256_file(record_path)
+        != FP046_FINAL_SOURCE_COMPATIBILITY_SHA256
+        or record != expected
+    ):
+        return ["FP046 final source compatibility binding differs"]
+
+    try:
+        continuation._v23_utility._reject_gate_git_environment_overrides()
+        commit = _run_git_bytes(
+            root,
+            [
+                "cat-file",
+                "-e",
+                f"{FP046_FINAL_SOURCE_SUCCESSOR_COMMIT}^{{commit}}",
+            ],
+            accepted_returncodes=(0,),
+        )
+        blob = _run_git_bytes(
+            root,
+            [
+                "cat-file",
+                "blob",
+                f"{FP046_FINAL_SOURCE_SUCCESSOR_COMMIT}:{relative}",
+            ],
+            accepted_returncodes=(0,),
+        )
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        return ["FP046 final source successor commit cannot be verified"]
+    if (
+        commit.returncode != 0
+        or blob.returncode != 0
+        or len(blob.stdout) != amendment["current_byte_length"]
+        or continuation.sha256_bytes(blob.stdout) != amendment["current_sha256"]
+    ):
+        return ["FP046 final source successor commit binding differs"]
+    return []
+
+
 def validate_fp046_r014_successor_authority(
     root: Path,
     checkpoint: dict[str, Any],
@@ -4421,6 +4535,9 @@ def validate_fp046_r014_successor_authority(
         return [], {}, {}
     if not _fp046_completion_is_declared(root, checkpoint):
         return ["FP046 R014 successor declaration differs"], {}, {}
+    compatibility_errors = _validate_fp046_final_source_compatibility_binding(root)
+    if compatibility_errors:
+        return compatibility_errors, {}, {}
 
     expected_source_bindings = [
         {
@@ -4657,20 +4774,44 @@ def validate_fp046_r014_successor_authority(
     for row in rows:
         relative = row["path"]
         path = _exact_repo_file(root, relative)
+        amendment = FP046_FINAL_SOURCE_BINDING_AMENDMENTS.get(relative)
+        actual_size = path.stat().st_size if path is not None else None
+        actual_sha256 = (
+            continuation.sha256_file(path) if path is not None else None
+        )
         if (
             path is None
-            or path.stat().st_size != row["byte_length"]
-            or continuation.sha256_file(path) != row["sha256"]
+            or (
+                amendment is None
+                and (
+                    actual_size != row["byte_length"]
+                    or actual_sha256 != row["sha256"]
+                )
+            )
+            or (
+                amendment is not None
+                and (
+                    row["byte_length"] != amendment["sealed_byte_length"]
+                    or row["sha256"] != amendment["sealed_sha256"]
+                    or actual_size != amendment["current_byte_length"]
+                    or actual_sha256 != amendment["current_sha256"]
+                )
+            )
         ):
             return [f"FP046 final source binding differs: {relative}"], {}, {}
-        final_bindings[relative] = row["sha256"]
+        final_sha256 = (
+            amendment["current_sha256"]
+            if amendment is not None
+            else row["sha256"]
+        )
+        final_bindings[relative] = final_sha256
         before = before_by_path.get(relative)
         if before is None:
             missing += 1
-        elif before == row["sha256"]:
+        elif before == final_sha256:
             unchanged += 1
         else:
-            transitions[relative] = (before, row["sha256"])
+            transitions[relative] = (before, final_sha256)
     if (len(final_bindings), len(transitions), missing, unchanged) != (103, 67, 29, 7):
         return ["FP046 start-to-final source split differs"], {}, {}
 

@@ -1,0 +1,37 @@
+{
+  "amendments": [
+    {
+      "path": "apps/android-gateway/test/privacy-rights.test.ts",
+      "reason": "Commit 1e976419 stabilized the Gateway lock-contention regression without changing the FP046 product contract. The sealed completion evidence remains immutable and this record binds only the exact live test successor.",
+      "reason_code": "POST_COMPLETION_TEST_RELIABILITY_SUCCESSOR",
+      "sealed_source": {
+        "byte_length": 19931,
+        "sha256": "fa49e585a2faf063250df8c88fa8fdad4dbe1f767c1d072d4c9d409d4cbc80a6"
+      },
+      "source_commit": "1e976419dc98a2ee336c02e1d08ccbd62e4625c0",
+      "successor_source": {
+        "byte_length": 20540,
+        "sha256": "dffc386d5183ef7e517778d676fe2dd0cfd033631817306f347cc632d6aae566"
+      }
+    }
+  ],
+  "claim_boundary": {
+    "actual_device_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "goal_completion_credit_added": 0,
+    "goal_event_created": false,
+    "historical_control_modified": false,
+    "release_credit_added": 0
+  },
+  "record_id": "WS-FP046-FINAL-SOURCE-COMPATIBILITY-BINDING-20260812-001",
+  "record_status": "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+  "recorded_on": "2026-08-12",
+  "schema_version": "walksafe.fp046-final-source-compatibility-binding.v1",
+  "verification": {
+    "expected_issue_count": 63,
+    "expected_return_code": 1,
+    "expected_stderr_line_count": 64,
+    "expected_stderr_sha256": "bfab9a20b8ab621f94b45dc27d153a03d0c9062c398fb9ac51a96e13ee098417",
+    "expected_stdout_byte_count": 0
+  }
+}

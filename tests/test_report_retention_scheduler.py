@@ -23,6 +23,29 @@ CONFIG = ROOT / "deploy/config/walksafe-report-retention.env.example"
 TEST_LAYERS = ROOT / "scripts/run_walksafe_test_layers_current.sh"
 
 
+def _process_state_and_start_time(pid: int) -> tuple[str, str]:
+    stat_fields = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    process_fields = stat_fields[stat_fields.rfind(")") + 2 :].split()
+    return process_fields[0], process_fields[19]
+
+
+def _process_identity_has_exited(pid: int, expected_start_time: str) -> bool:
+    try:
+        state, start_time = _process_state_and_start_time(pid)
+    except (FileNotFoundError, ProcessLookupError):
+        return True
+    return start_time != expected_start_time or state in {"X", "Z"}
+
+
+def _wait_for_process_identity_exit(pid: int, expected_start_time: str) -> bool:
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline:
+        if _process_identity_has_exited(pid, expected_start_time):
+            return True
+        time.sleep(0.01)
+    return _process_identity_has_exited(pid, expected_start_time)
+
+
 def _write_fake_python(path: Path) -> None:
     driver = path.with_name("fake-retention-driver.py")
     publisher_interceptor = path.with_name("fake-publisher-interceptor.py")
@@ -333,6 +356,17 @@ def _launch_gap_runner(tmp_path: Path) -> Path:
     runner.write_text(source, encoding="utf-8")
     runner.chmod(0o700)
     return runner
+
+
+def test_process_identity_lookup_race_is_treated_as_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def process_was_reaped(_path: Path, **_kwargs: object) -> str:
+        raise ProcessLookupError(3, "No such process")
+
+    monkeypatch.setattr(Path, "read_text", process_was_reaped)
+
+    assert _process_identity_has_exited(12345, "67890") is True
 
 
 @pytest.mark.parametrize(
@@ -765,6 +799,8 @@ def test_sigterm_kills_stubborn_descendant_after_child_leader_exits(
     assert ready.exists() and child_pid_path.exists() and descendant_pid_path.exists()
     child_pid = int(child_pid_path.read_text(encoding="utf-8"))
     descendant_pid = int(descendant_pid_path.read_text(encoding="utf-8"))
+    child_start_time = _process_state_and_start_time(child_pid)[1]
+    descendant_start_time = _process_state_and_start_time(descendant_pid)[1]
 
     if signal_target == "runner_group":
         os.killpg(process.pid, signal.SIGTERM)
@@ -774,8 +810,8 @@ def test_sigterm_kills_stubborn_descendant_after_child_leader_exits(
 
     assert process.returncode == 143
     assert "TOP_SECRET" not in stdout + stderr
-    assert not Path(f"/proc/{child_pid}").exists()
-    assert not Path(f"/proc/{descendant_pid}").exists()
+    assert _wait_for_process_identity_exit(child_pid, child_start_time)
+    assert _wait_for_process_identity_exit(descendant_pid, descendant_start_time)
     pending = list(manifest_dir.glob(".report-retention-*.json"))
     assert len(pending) == 1
     assert pending[0].stat().st_size > 0

@@ -258,6 +258,46 @@ def test_quality_workflow_keeps_web_regression_but_not_a_web_release_artifact() 
     assert "WEB_QUALITY_PYTHON" not in workflow
     assert "WALKSAFE_RUN_BROWSER_E2E" not in workflow
     assert "artifacts/ci/" not in workflow
+    assert """      - name: Verify Android quality artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s apps/android/app/build/reports/lint-results-release.xml
+          test -s apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s apps/android/adminapp/build/reports/lint-results-release.xml
+          test -s apps/android/adminapp/build/outputs/apk/release/adminapp-release-unsigned.apk
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+""" in workflow
+    artifact_verification = workflow[workflow.index("Verify Android quality artifacts") :]
+    for required in (
+        "test -s apps/android/app/build/reports/lint-results-release.xml",
+        "test -s apps/android/app/build/outputs/apk/release/app-release-unsigned.apk",
+        "test -s apps/android/adminapp/build/reports/lint-results-release.xml",
+        "test -s apps/android/adminapp/build/outputs/apk/release/adminapp-release-unsigned.apk",
+    ):
+        assert required in artifact_verification[
+            : artifact_verification.index("actions/upload-artifact@")
+        ]
+    assert """      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: walksafe-quality-${{ github.sha }}
+          path: |
+            apps/android/app/build/reports/
+            apps/android/app/build/outputs/apk/
+          if-no-files-found: error
+""" in artifact_verification
+    assert """      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: success()
+        with:
+          name: walksafe-admin-quality-${{ github.sha }}
+          path: |
+            apps/android/adminapp/build/reports/
+            apps/android/adminapp/build/outputs/apk/
+          if-no-files-found: error
+""" in artifact_verification
+    assert "if: always()" not in artifact_verification
+    assert "apps/web/" not in artifact_verification
     regression_steps = workflow[regression_install:general_install]
     node_lock = json.loads(
         Path("configs/walksafe_node_toolchain_lock_20260715.json").read_text(

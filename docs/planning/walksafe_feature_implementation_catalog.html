@@ -144,9 +144,13 @@
       color: white;
       cursor: pointer;
       font-weight: 700;
+      touch-action: manipulation;
     }
 
     button.secondary { background: white; color: var(--brand); }
+    button:hover { background: #1d49b5; }
+    button.secondary:hover { background: var(--brand-soft); }
+    button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: .62; }
 
     :focus-visible { outline: 3px solid #0b3c91; outline-offset: 2px; }
 
@@ -299,18 +303,18 @@
       </div>
     </section>
 
-    <section class="controls" aria-label="기능 목록 필터">
+    <section id="assignment-controls" class="controls" aria-label="기능 목록 필터" aria-busy="true">
       <label>검색
-        <input id="search" type="search" placeholder="기능, 다음 작업, 담당 검색">
+        <input id="search" name="feature_search" type="search" autocomplete="off" spellcheck="false" placeholder="기능, 다음 작업, 담당 검색…" disabled>
       </label>
       <label>분야
-        <select id="domain-filter"><option value="">전체 분야</option></select>
+        <select id="domain-filter" name="domain_filter" disabled><option value="">전체 분야</option></select>
       </label>
       <label>상태
-        <select id="status-filter"><option value="">전체 상태</option></select>
+        <select id="status-filter" name="status_filter" disabled><option value="">전체 상태</option></select>
       </label>
       <label>우선순위
-        <select id="priority-filter">
+        <select id="priority-filter" name="priority_filter" disabled>
           <option value="">전체 우선순위</option>
           <option value="P0">P0 · 출시 차단</option>
           <option value="P1">P1 · 핵심 제품</option>
@@ -318,10 +322,10 @@
           <option value="P3">P3 · 후속 개선</option>
         </select>
       </label>
-      <button id="print-button" class="secondary" type="button">인쇄 / PDF</button>
-      <button id="import-button" class="secondary" type="button">분담 정보 불러오기</button>
-      <input id="import-file" type="file" accept="application/json,.json" hidden>
-      <button id="export-button" type="button">분담 정보 저장</button>
+      <button id="print-button" class="secondary" type="button" disabled>인쇄 / PDF</button>
+      <button id="import-button" class="secondary" type="button" disabled>분담 정보 불러오기</button>
+      <input id="import-file" name="assignment_file" type="file" accept="application/json,.json" hidden disabled>
+      <button id="export-button" type="button" disabled>분담 정보 저장</button>
     </section>
 
     <p id="result-line" class="result-line" aria-live="polite"></p>
@@ -331,7 +335,7 @@
       <h2 id="table-title" style="position:absolute;left:-9999px">세부 기능 목록</h2>
       <div class="table-scroll" tabindex="0" aria-label="가로로 스크롤할 수 있는 기능 표">
         <table>
-          <caption>실제 담당자와 완료 표시는 이 브라우저에 자동 저장됩니다. 팀 공유용 JSON은 “분담 정보 저장”으로 내보내고 “분담 정보 불러오기”로 이어서 편집하세요.</caption>
+          <caption>실제 담당자와 완료 표시는 현재 기능 목록의 지문과 함께 이 브라우저에 자동 저장됩니다. 팀 공유용 JSON은 “분담 정보 저장”으로 내보내고 “분담 정보 불러오기”로 이어서 편집하세요. 목록이 다른 파일은 적용되지 않습니다.</caption>
           <thead>
             <tr>
               <th scope="col">ID</th>
@@ -500,16 +504,14 @@
     };
 
     const storageKey = "walksafe-feature-catalog-assignments-v1";
+    const assignmentSchemaVersion = "walksafe.feature-assignments.v1";
+    const catalogDate = "2026-08-11";
+    const assignmentPayloadKeys = ["assignments", "catalog_date", "catalog_sha256", "feature_count", "schema_version"];
+    const assignmentRowKeys = ["assigned_owner", "assignment_done", "domain", "feature", "group", "id", "next", "priority", "status", "suggested_owner"];
+    let catalogSha256Promise;
     let saved = {};
-    let storageReadFailed = false;
-    try {
-      const stored = localStorage.getItem(storageKey);
-      const parsed = stored === null ? {} : JSON.parse(stored);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) saved = parsed;
-      else storageReadFailed = true;
-    } catch (_) {
-      storageReadFailed = true;
-    }
+    let stateRevision = 0;
+    let importGeneration = 0;
 
     const body = document.getElementById("feature-body");
     const search = document.getElementById("search");
@@ -519,6 +521,7 @@
     const resultLine = document.getElementById("result-line");
     const actionMessage = document.getElementById("action-message");
     const importFile = document.getElementById("import-file");
+    const controls = document.getElementById("assignment-controls");
 
     function showActionMessage(message, kind = "info") {
       actionMessage.textContent = message;
@@ -526,24 +529,124 @@
       actionMessage.hidden = !message;
     }
 
-    if (storageReadFailed) {
-      showActionMessage("저장된 분담 정보 형식이 올바르지 않아 빈 상태로 열었습니다.", "error");
-    }
-
     function escapeHtml(value) {
       return String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"})[char]);
     }
 
-    function persist() {
-      let persisted = true;
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(saved));
-      } catch (_) {
-        persisted = false;
-        showActionMessage("이 브라우저에는 분담 정보를 저장할 수 없습니다. JSON 파일로 내보내 보관하세요.", "error");
+    function hasExactKeys(value, keys) {
+      return value !== null
+        && typeof value === "object"
+        && !Array.isArray(value)
+        && Object.keys(value).length === keys.length
+        && keys.every(key => Object.hasOwn(value, key));
+    }
+
+    function setInterfaceBusy(busy) {
+      controls.setAttribute("aria-busy", String(busy));
+      for (const control of controls.querySelectorAll("input, select, button")) control.disabled = busy;
+      for (const control of body.querySelectorAll("input, button")) control.disabled = busy;
+    }
+
+    function currentCatalogSha256() {
+      if (!globalThis.crypto?.subtle) {
+        return Promise.reject(new Error("SHA-256 unavailable"));
       }
+      if (!catalogSha256Promise) {
+        const source = JSON.stringify({schema_version: assignmentSchemaVersion, catalog_date: catalogDate, features});
+        catalogSha256Promise = crypto.subtle.digest("SHA-256", new TextEncoder().encode(source)).then(buffer =>
+          [...new Uint8Array(buffer)].map(value => value.toString(16).padStart(2, "0")).join("")
+        );
+      }
+      return catalogSha256Promise;
+    }
+
+    function assignmentRows() {
+      return features.map(item => ({
+        id: item.id,
+        domain: item.domain,
+        group: item.group,
+        feature: item.feature,
+        status: item.status,
+        next: item.next,
+        suggested_owner: item.owner,
+        priority: item.priority,
+        assigned_owner: saved[item.id]?.owner || "",
+        assignment_done: Boolean(saved[item.id]?.done)
+      }));
+    }
+
+    async function assignmentPayload() {
+      return {
+        schema_version: assignmentSchemaVersion,
+        catalog_date: catalogDate,
+        catalog_sha256: await currentCatalogSha256(),
+        feature_count: features.length,
+        assignments: assignmentRows()
+      };
+    }
+
+    async function validateAssignmentPayload(payload) {
+      if (
+        !hasExactKeys(payload, assignmentPayloadKeys)
+        || payload.schema_version !== assignmentSchemaVersion
+        || payload.catalog_date !== catalogDate
+        || payload.catalog_sha256 !== await currentCatalogSha256()
+        || payload.feature_count !== features.length
+        || !Array.isArray(payload.assignments)
+        || payload.assignments.length !== features.length
+      ) throw new Error("invalid catalog binding");
+
+      const featureById = new Map(features.map(item => [item.id, item]));
+      const imported = {};
+      const seen = new Set();
+      for (const entry of payload.assignments) {
+        const item = entry && featureById.get(entry.id);
+        if (
+          !hasExactKeys(entry, assignmentRowKeys)
+          || !item
+          || seen.has(entry.id)
+          || entry.domain !== item.domain
+          || entry.group !== item.group
+          || entry.feature !== item.feature
+          || entry.status !== item.status
+          || entry.next !== item.next
+          || entry.suggested_owner !== item.owner
+          || entry.priority !== item.priority
+          || typeof entry.assigned_owner !== "string"
+          || entry.assigned_owner.length > 40
+          || typeof entry.assignment_done !== "boolean"
+        ) throw new Error("invalid assignment row");
+        seen.add(entry.id);
+        imported[entry.id] = {
+          owner: entry.assigned_owner,
+          done: entry.assignment_done
+        };
+      }
+      if (seen.size !== features.length) throw new Error("incomplete assignments");
+      return imported;
+    }
+
+    async function restoreSaved() {
+      try {
+        const stored = localStorage.getItem(storageKey);
+        if (stored !== null) {
+          saved = await validateAssignmentPayload(JSON.parse(stored));
+        }
+      } catch (_) {
+        saved = {};
+        showActionMessage("이전 목록 또는 올바르지 않은 분담 정보는 적용하지 않고 빈 상태로 열었습니다.", "error");
+      }
+    }
+
+    async function persist() {
       updateSummary();
-      return persisted;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(await assignmentPayload()));
+        return true;
+      } catch (_) {
+        showActionMessage("이 브라우저에는 분담 정보를 저장할 수 없습니다. JSON 파일로 내보내 보관하세요.", "error");
+        return false;
+      }
     }
 
     function renderRows() {
@@ -567,8 +670,8 @@
           <td class="next">${escapeHtml(item.next)}</td>
           <td class="owner">${escapeHtml(item.owner)}</td>
           <td><span class="badge priority-${item.priority}">${escapeHtml(item.priority)}</span></td>
-          <td class="assignment"><label for="owner-${item.id}" style="position:absolute;left:-9999px">${item.id} 실제 담당</label><input id="owner-${item.id}" type="text" maxlength="40" placeholder="이름 / 팀"></td>
-          <td class="done-cell"><label for="done-${item.id}" style="position:absolute;left:-9999px">${item.id} 분담 완료</label><input id="done-${item.id}" type="checkbox"></td>`;
+          <td class="assignment"><label for="owner-${item.id}" style="position:absolute;left:-9999px">${item.id} 실제 담당</label><input id="owner-${item.id}" name="owner-${item.id}" type="text" maxlength="40" autocomplete="off" placeholder="이름 / 팀…"></td>
+          <td class="done-cell"><label for="done-${item.id}" style="position:absolute;left:-9999px">${item.id} 분담 완료</label><input id="done-${item.id}" name="done-${item.id}" type="checkbox"></td>`;
 
         const ownerInput = row.querySelector("input[type='text']");
         const doneInput = row.querySelector("input[type='checkbox']");
@@ -576,14 +679,16 @@
         doneInput.checked = Boolean(state.done);
 
         ownerInput.addEventListener("input", () => {
+          stateRevision += 1;
           saved[item.id] = {...(saved[item.id] || {}), owner: ownerInput.value};
-          persist();
+          void persist();
           applyFilters();
         });
         doneInput.addEventListener("change", () => {
+          stateRevision += 1;
           saved[item.id] = {...(saved[item.id] || {}), done: doneInput.checked};
           row.dataset.done = String(doneInput.checked);
-          persist();
+          void persist();
         });
         body.appendChild(row);
       }
@@ -620,70 +725,82 @@
       document.getElementById("assigned-count").textContent = features.filter(item => Boolean(saved[item.id]?.done)).length;
     }
 
-    function exportAssignments() {
-      const result = features.map(item => ({
-        id: item.id,
-        domain: item.domain,
-        group: item.group,
-        feature: item.feature,
-        status: item.status,
-        next: item.next,
-        suggested_owner: item.owner,
-        priority: item.priority,
-        assigned_owner: saved[item.id]?.owner || "",
-        assignment_done: Boolean(saved[item.id]?.done)
-      }));
-      const blob = new Blob([JSON.stringify({catalog_date:"2026-08-11", assignments:result}, null, 2)], {type:"application/json"});
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "walksafe_feature_assignments.json";
-      link.click();
-      URL.revokeObjectURL(url);
-      showActionMessage("분야·기능·상태·다음 할 일·우선순위와 분담 정보를 JSON으로 저장했습니다.");
+    async function exportAssignments() {
+      try {
+        const payload = await assignmentPayload();
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "walksafe_feature_assignments.json";
+        link.click();
+        URL.revokeObjectURL(url);
+        showActionMessage("현재 기능 목록에 결속된 분담 정보를 JSON으로 저장했습니다.");
+      } catch (_) {
+        showActionMessage("이 브라우저에서는 기능 목록 지문을 만들 수 없어 JSON을 저장하지 못했습니다.", "error");
+      }
     }
 
     async function importAssignments() {
       const file = importFile.files?.[0];
       if (!file) return;
+      const generation = ++importGeneration;
+      const startingRevision = stateRevision;
+      setInterfaceBusy(true);
       try {
         if (file.size > 5 * 1024 * 1024) throw new Error("too large");
         const payload = JSON.parse(await file.text());
-        if (!payload || !Array.isArray(payload.assignments)) throw new Error("invalid format");
-
-        const validIds = new Set(features.map(item => item.id));
-        let imported = 0;
-        for (const entry of payload.assignments) {
-          if (!entry || !validIds.has(entry.id)) continue;
-          saved[entry.id] = {
-            owner: typeof entry.assigned_owner === "string" ? entry.assigned_owner.slice(0, 40) : "",
-            done: entry.assignment_done === true
-          };
-          imported += 1;
+        const imported = await validateAssignmentPayload(payload);
+        if (
+          generation !== importGeneration
+          || startingRevision !== stateRevision
+        ) {
+          if (generation === importGeneration) {
+            showActionMessage("분담 정보를 읽는 동안 목록이 변경되어 파일을 적용하지 않았습니다.");
+          }
+          return;
         }
-        if (imported === 0) throw new Error("no assignments");
 
-        const persisted = persist();
+        saved = imported;
+        stateRevision += 1;
+        let persisted = true;
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch (_) {
+          persisted = false;
+          showActionMessage("이 브라우저에는 분담 정보를 저장할 수 없습니다. JSON 파일로 내보내 보관하세요.", "error");
+        }
         renderRows();
         applyFilters();
-        if (persisted) showActionMessage(`${imported}개 기능의 분담 정보를 불러왔습니다.`);
+        if (persisted) showActionMessage(`${features.length}개 기능의 분담 정보를 불러왔습니다.`);
       } catch (_) {
-        showActionMessage("분담 JSON 파일을 읽지 못했습니다. 이 목록에서 저장한 파일인지 확인하세요.", "error");
+        if (generation === importGeneration) {
+          showActionMessage("분담 JSON 파일을 읽지 못했습니다. 현재 기능 목록에서 저장한 전체 파일인지 확인하세요.", "error");
+        }
       } finally {
-        importFile.value = "";
+        if (generation === importGeneration) {
+          importFile.value = "";
+          setInterfaceBusy(false);
+        }
       }
     }
 
-    renderRows();
-    fillFilters();
-    updateSummary();
-    applyFilters();
+    async function initialize() {
+      await restoreSaved();
+      renderRows();
+      fillFilters();
+      updateSummary();
+      applyFilters();
 
-    [search, domainFilter, statusFilter, priorityFilter].forEach(control => control.addEventListener("input", applyFilters));
-    document.getElementById("print-button").addEventListener("click", () => window.print());
-    document.getElementById("import-button").addEventListener("click", () => importFile.click());
-    importFile.addEventListener("change", importAssignments);
-    document.getElementById("export-button").addEventListener("click", exportAssignments);
+      [search, domainFilter, statusFilter, priorityFilter].forEach(control => control.addEventListener("input", applyFilters));
+      document.getElementById("print-button").addEventListener("click", () => window.print());
+      document.getElementById("import-button").addEventListener("click", () => importFile.click());
+      importFile.addEventListener("change", importAssignments);
+      document.getElementById("export-button").addEventListener("click", exportAssignments);
+      setInterfaceBusy(false);
+    }
+
+    void initialize();
   </script>
 </body>
 </html>

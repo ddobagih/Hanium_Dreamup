@@ -7,6 +7,9 @@ import pytest
 from scripts import check_walksafe_active_docs as subject
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def test_active_document_discovery_excludes_control_and_deliverable_evidence(
     tmp_path: Path,
 ) -> None:
@@ -23,6 +26,134 @@ def test_active_document_discovery_excludes_control_and_deliverable_evidence(
     assert Path("docs/control/goals/README.md") in selected
     assert Path("docs/control/history.md") not in selected
     assert Path("docs/deliverables/evidence.md") not in selected
+
+
+def test_active_document_discovery_includes_mutable_android_readmes() -> None:
+    selected = subject.active_documents(ROOT)
+
+    assert Path("apps/android/app/README.md") in selected
+    assert Path("apps/android/adminapp/README.md") in selected
+    assert (
+        Path(
+            "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+            "walksafe/report/README.md"
+        )
+        in selected
+    )
+    assert Path("apps/android/README.md") not in selected
+
+
+def test_current_status_contracts_follow_checkpoint(tmp_path: Path) -> None:
+    paths = (subject.CHECKPOINT, *subject.CURRENT_STATUS_DOCUMENTS)
+    for relative in paths:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+
+    assert subject._check_current_status_contracts(tmp_path) == []
+
+    readme = tmp_path / "README.md"
+    correct_release = "- 출시 상태: `NOT_ELIGIBLE`"
+    readme.write_text(
+        readme.read_text(encoding="utf-8").replace(
+            "Goal package: v2.4 `ACTIVE`",
+            "Goal package: v2.4 `STALE`",
+        ),
+        encoding="utf-8",
+    )
+
+    assert any(
+        "README.md: current status values conflict with checkpoint" in error
+        for error in subject._check_current_status_contracts(tmp_path)
+    )
+
+    readme.write_bytes((ROOT / "README.md").read_bytes())
+    readme.write_text(
+        readme.read_text(encoding="utf-8").replace(
+            correct_release,
+            correct_release + " → `ELIGIBLE`",
+        ),
+        encoding="utf-8",
+    )
+
+    assert any(
+        "README.md: current status values conflict with checkpoint" in error
+        for error in subject._check_current_status_contracts(tmp_path)
+    )
+
+    readme.write_bytes((ROOT / "README.md").read_bytes())
+    readme.write_text(
+        readme.read_text(encoding="utf-8").replace(
+            correct_release,
+            "- 출시 상태: `ELIGIBLE`",
+        )
+        + f"\n<!-- {correct_release} -->\n"
+        + "과거 상태 기록: 출시 상태: `NOT_ELIGIBLE`\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        "README.md: current status values conflict with checkpoint" in error
+        for error in subject._check_current_status_contracts(tmp_path)
+    )
+
+
+def test_current_operational_docs_keep_exact_environment_and_source_facts() -> None:
+    development = (
+        ROOT / "docs/guides/development-environment-guide.md"
+    ).read_text(encoding="utf-8")
+    tests_readme = (ROOT / "tests/README.md").read_text(encoding="utf-8")
+    workflow = (ROOT / ".github/workflows/quality.yml").read_text(encoding="utf-8")
+    for token in (
+        "https://nodejs.org/dist/v22.23.1/node-v22.23.1-linux-x64.tar.xz",
+        "9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578",
+        "tar --extract --xz --same-permissions",
+        "scripts/check_walksafe_node_toolchain_20260715.py",
+    ):
+        assert token in development
+        assert token in workflow
+    for token in (
+        'test "$(uname -s)" = "Linux"',
+        'test "$(uname -m)" = "x86_64"',
+        'WALKSAFE_NODE_ROOT="$(mktemp -d)" || exit 1',
+        'WALKSAFE_NODE_ARCHIVE="$(mktemp)" || exit 1',
+        'test -d "${WALKSAFE_NODE_ROOT:?}"',
+        'test -f "${WALKSAFE_NODE_ARCHIVE:?}"',
+    ):
+        assert token in development
+    assert 'test -x "${WALKSAFE_NODE_BIN_DIR:?}/node"' in tests_readme
+    assert 'node_executable="$(command -v node)"' not in tests_readme
+
+    package_readme = (
+        ROOT
+        / "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+        "walksafe/README.md"
+    ).read_text(encoding="utf-8")
+    report_readme = (
+        ROOT
+        / "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+        "walksafe/report/README.md"
+    ).read_text(encoding="utf-8")
+    navigation_readme = (
+        ROOT
+        / "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+        "walksafe/navigation/README.md"
+    ).read_text(encoding="utf-8")
+    assert "navigation/Gateway route" in package_readme
+    assert "검증된 첫 실행 actor binding" in package_readme
+    assert "현재 로컬 입력값" not in package_readme
+    assert "활성 Gateway session actor와 일치하는 `reporter_user_id`" in report_readme
+    assert "비어 있지 않은 local `reporter_user_id`" not in report_readme
+    assert "Gateway 경로 client" in navigation_readme
+    assert "현재 구현은 GPS 필터와 보폭 보정이다" not in navigation_readme
+
+    phase_log = (
+        ROOT
+        / "docs/planning/repository-modernization-20260811/phase-review-log.md"
+    ).read_text(encoding="utf-8")
+    assert "5단계 게시 종료 확인:" in phase_log
+    assert "`31506054781`" in phase_log
+    assert "저장소 현대화 5단계는 `PASS`로 닫는다" in phase_log
 
 
 def test_active_docs_accept_valid_relative_links_scripts_and_runner_selectors(

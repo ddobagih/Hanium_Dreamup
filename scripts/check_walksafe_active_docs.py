@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 import shlex
@@ -14,6 +15,15 @@ from urllib.parse import unquote, urlsplit
 
 RUNNER = Path("scripts/run_walksafe_test_layers_current.sh")
 HISTORICAL_RUNNER = Path("scripts/run_walksafe_test_layers_20260711.sh")
+CHECKPOINT = Path("docs/control/walksafe-project-continuation-checkpoint.json")
+CURRENT_STATUS_DOCUMENTS = (
+    Path("README.md"),
+    Path("AGENTS.md"),
+    Path("docs/README.md"),
+    Path("docs/guides/README.md"),
+    Path("docs/control/README.md"),
+    Path("docs/control/goals/README.md"),
+)
 FIXED_ACTIVE_DOCS = (
     Path("README.md"),
     Path("AGENTS.md"),
@@ -59,6 +69,7 @@ RUNNER_FAMILY_RE = re.compile(r"run_walksafe_test_layers_")
 TABLE_SELECTOR_RE = re.compile(r"^\|\s*`([a-z][a-z0-9_-]*)`\s*\|", re.MULTILINE)
 CASE_SELECTOR_RE = re.compile(r"^\s{2}([a-z][a-z0-9_-]*)\)\s*", re.MULTILINE)
 USAGE_SELECTORS_RE = re.compile(r"Usage:.*\{([a-z0-9_|-]+)\}")
+STATUS_CODE_RE = re.compile(r"`([A-Z][A-Z0-9_]*)`")
 
 
 @dataclass(frozen=True)
@@ -75,7 +86,164 @@ def active_documents(root: Path) -> tuple[Path, ...]:
         path.relative_to(root)
         for path in sorted((root / "docs" / "guides").rglob("*.md"))
     )
-    return (*FIXED_ACTIVE_DOCS, *guides)
+    android_source_docs = tuple(
+        path.relative_to(root)
+        for path in sorted(
+            (
+                root
+                / "apps"
+                / "android"
+                / "app"
+                / "src"
+                / "main"
+                / "java"
+            ).rglob("README.md")
+        )
+    )
+    return (
+        *FIXED_ACTIVE_DOCS,
+        Path("apps/android/app/README.md"),
+        Path("apps/android/adminapp/README.md"),
+        *android_source_docs,
+        *guides,
+    )
+
+
+def _check_current_status_contracts(root: Path) -> list[str]:
+    try:
+        checkpoint = json.loads((root / CHECKPOINT).read_text(encoding="utf-8"))
+        approved = checkpoint["approved_state"]
+        goal = checkpoint["goal_execution"]
+        verification = checkpoint["verification_boundary"]
+        package_status = goal["package_status"]
+        focus_goal_id = goal["focus_goal_id"]
+        goal_status = goal["goal_status"]
+        formal_total = approved["formal_test_count"]
+        formal_not_run = approved["formal_test_not_run_count"]
+        release_status = approved["release_status"]
+        gate_count = approved["remaining_gate_count"]
+        gate_status = verification["all_remaining_gate_status"]
+        gates_waived = approved["remaining_gates_waived"]
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return [f"{CHECKPOINT}: cannot read current status contract: {exc}"]
+
+    if (
+        formal_total != verification.get("formal_test_total")
+        or formal_not_run != verification.get("formal_test_not_run_count")
+        or (release_status == "NOT_ELIGIBLE")
+        != (verification.get("release_eligible") is False)
+        or gates_waived is not False
+    ):
+        return [f"{CHECKPOINT}: current status fields are inconsistent"]
+
+    line_contracts = {
+        Path("README.md"): (
+            ("- Goal package:", (f"v2.4 `{package_status}`",)),
+            ("- 정식 시험:", (f"{formal_total}/{formal_not_run} `{gate_status}`",)),
+            (
+                "- 출시 gate:",
+                (f"{gate_count}/{gate_count} `{gate_status}`", "면제 없음"),
+            ),
+            ("- 출시 상태:", (f"`{release_status}`",)),
+        ),
+        Path("AGENTS.md"): (
+            (
+                "재개 안내서, v2.4 내부 README",
+                (
+                    "`PREPARED_NOT_ACTIVATED`",
+                    f"v2.4 package는 `{package_status}`",
+                    f"focus는 `{focus_goal_id}` Goal `{goal_status}`",
+                    f"내부 시작 gate는 `{gate_status}`",
+                ),
+            ),
+            (
+                "- 정식 시험 ",
+                (
+                    f"정식 시험 {formal_total}건",
+                    f"{gate_count}개 출시 gate",
+                    f"출시는 `{release_status}`",
+                ),
+            ),
+        ),
+        Path("docs/README.md"): (
+            ("- 정식 시험:", (f"{formal_total}/{formal_not_run} `{gate_status}`",)),
+            (
+                "- 출시 gate:",
+                (f"{gate_count}/{gate_count} `{gate_status}`", "미면제"),
+            ),
+            ("- 출시:", (f"`{release_status}`",)),
+        ),
+        Path("docs/guides/README.md"): (
+            (
+                "저장소 내부 구현과 자동 검사가 존재해도",
+                (
+                    f"예정된 정식 시험은 `{formal_total}/{formal_not_run} {gate_status}`",
+                    f"출시 gate {gate_count}개는 모두 `{gate_status}`·미면제",
+                    f"출시는 `{release_status}`",
+                ),
+            ),
+        ),
+        Path("docs/control/README.md"): (
+            (
+                "현재 checkpoint의 package는 ",
+                (
+                    f"package는 v2.4 `{package_status}`",
+                    f"focus는 `{focus_goal_id}`이고 Goal은 `{goal_status}`",
+                    f"내부 시작 gate는 `{gate_status}`",
+                    f"정식 시험 {formal_total}개와 release gate {gate_count}개는 "
+                    f"모두 `{gate_status}`",
+                    f"출시는 `{release_status}`",
+                ),
+            ),
+        ),
+        Path("docs/control/goals/README.md"): (
+            (
+                "현재 checkpoint의 package는 ",
+                (
+                    f"package는 v2.4 `{package_status}`",
+                    f"focus는 `{focus_goal_id}`이고 Goal은 `{goal_status}`",
+                    f"내부 시작 gate는 `{gate_status}`",
+                    f"정식 시험 {formal_total}개와 release gate {gate_count}개는 "
+                    f"모두 `{gate_status}`",
+                    f"출시는 `{release_status}`",
+                ),
+            ),
+        ),
+    }
+    errors: list[str] = []
+    for relative, required_lines in line_contracts.items():
+        path = root / relative
+        if not path.is_file():
+            errors.append(f"{relative}: current status document does not exist")
+            continue
+        visible_lines = _without_html_comments(
+            path.read_text(encoding="utf-8")
+        ).splitlines()
+        for prefix, required_tokens in required_lines:
+            matching_lines = [line for line in visible_lines if line.startswith(prefix)]
+            if len(matching_lines) != 1:
+                errors.append(
+                    f"{relative}: expected one current status line: {prefix}"
+                )
+                continue
+            expected_statuses = [
+                status
+                for token in required_tokens
+                for status in STATUS_CODE_RE.findall(token)
+            ]
+            actual_statuses = STATUS_CODE_RE.findall(matching_lines[0])
+            if actual_statuses != expected_statuses:
+                errors.append(
+                    f"{relative}: current status values conflict with checkpoint: "
+                    f"{prefix}"
+                )
+                continue
+            for token in required_tokens:
+                if token not in matching_lines[0]:
+                    errors.append(
+                        f"{relative}: current status differs from checkpoint: {token}"
+                    )
+    return errors
 
 
 def _without_html_comments(text: str) -> str:
@@ -546,6 +714,8 @@ def check_active_docs(root: Path, documents: tuple[Path, ...] | None = None) -> 
         documented_selectors.update(TABLE_SELECTOR_RE.findall(text))
     runner_errors, runner_selectors = _runner_contract(root, documented_selectors)
     errors.extend(runner_errors)
+    if documents is None:
+        errors.extend(_check_current_status_contracts(root))
     return CheckResult(
         errors=tuple(sorted(set(errors))),
         document_count=len(selected),

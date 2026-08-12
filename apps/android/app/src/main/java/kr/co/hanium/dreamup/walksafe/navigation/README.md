@@ -10,6 +10,6 @@
 - `BackendWalkingRouteClient`: 인증된 Gateway의 `/api/navigation/destinations/search`와 `/api/navigation/walking`만 호출한다.
 - `RouteNavigator`: 안내 지점, 이탈 확인, 재탐색 cooldown과 도착을 관리한다. turn guide와 cooldown은 caller가 실제 발화를 acknowledge한 뒤에만 소비한다.
 
-현재 구현은 GPS 필터와 보폭 보정이다. gyroscope/Kalman filter/dead reckoning 기반 GPS 정밀 보정은 구현돼 있지 않다. TMAP key는 Android나 Gateway에 두지 않고 backend proxy가 소유한다.
+현재 구현은 GPS 필터·보폭 보정, Gateway 경로 client, 경로 진행 상태와 route-bound 점자블록 관측을 포함한다. gyroscope/Kalman filter/dead reckoning 기반 GPS 정밀 보정은 구현돼 있지 않다. TMAP key는 Android나 Gateway에 두지 않고 backend proxy가 소유한다.
 
 TMAP 보행 경로가 전역 경로다. production `AndroidTactileRouteObservationSupplier`는 ARCore physical camera pose, 같은 capture frame의 metric depth, trusted GPS와 현재 TMAP route projection을 route/frame ID에 결합한다. 하나라도 없거나 불일치하면 observation을 버리고 TMAP 안내를 유지한다. 이 연결은 CODE·JVM AUTO 근거이며 camera calibration/EIS, GPS drift와 실외 local steering 품질은 아직 Field 검증하지 않았다.

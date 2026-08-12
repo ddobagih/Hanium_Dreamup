@@ -285,3 +285,25 @@
 - 제품 timeout 증가·racer 축소·runner 중복 제거는 범위 밖이며 계약을 바꿀 수 있어 채택하지 않았다. test child가 `busy`만 10초 안에서 25ms 간격으로 재시도하고, all-settled 뒤 거부 사유를 전파하는 최소 수정만 적용했다.
 - exact Node 22.23.1 typecheck와 Gateway 88 PASS 연속 2회, diff-check를 확인했다. 독립 검수는 다른 오류 은폐 0, 무한 대기 0, orphan child 0, 기존 actor·ledger·tamper assertions 유지로 P0/P1/P2 0이다.
 - 동일한 단일 CPU·강한 부하 재현 조건에서 패치 전 `busy` 실패를 확인한 뒤, 패치 후 5/5 PASS와 모든 후속 ledger assertions 실행을 확인했다. 진단 child·부하 프로세스와 임시 로그는 남지 않았다.
+
+5단계 게시 종료 확인:
+
+- 최종 현대화 commit은 `1e976419dc98a2ee336c02e1d08ccbd62e4625c0`, tree는 `520d4e0b1178da1dadc3d66fc5d973c95e10e0c1`이다.
+- 이 exact SHA에 결속된 quality run `31506054781`은 2026-08-12 00:15:41 KST에 시작해 00:38:01 KST에 `SUCCESS`로 종료했다.
+- 종료 확인 시 원격 `current`는 `1e976419dc98a2ee336c02e1d08ccbd62e4625c0`, `main`은 `c38b2591270b4650ec3376d11ef2c42bb9a1ae01`, archive branch와 peeled preservation tag는 모두 `f0093863e82bfc80d9f11915cef33a51d44b8730`이었다.
+- 따라서 위 commit에 대한 저장소 현대화 5단계는 `PASS`로 닫는다. 이 판정은 정식 시험 279건, 실제 기기·현장·배포·외부 검토 또는 출시 gate를 승격하지 않으며, 이 후속 기록을 포함한 새 변경의 CI 결과를 대신하지 않는다.
+
+## 2026-08-12 후속 적대 검수와 보완
+
+- 직전 Gateway 경합 테스트 변경이 FP046의 봉인된 103-source manifest와 현재 source 사이의 정식 승계 없이 반영돼 Goal graph 기존 63건에 새 실패 27건을 추가한 사실을 commit별로 재현했다. 과거 implementation record·receipt·event는 보존하고, `privacy-rights.test.ts` 한 경로의 봉인 크기/SHA와 현재 크기/SHA만 허용하는 forward amendment를 추가했다.
+- 활성 회귀는 봉인 row 불변, 시작 SHA에서 승인된 현재 SHA로 이어지는 67개 transition, 제3 digest 거부와 standalone Goal graph의 기존 64줄/63건/SHA `bfab9a20b8ab621f94b45dc27d153a03d0c9062c398fb9ac51a96e13ee098417`을 exact하게 고정한다. 이 실패 집합을 Goal graph PASS로 해석하지 않는다.
+- 팀 기능 분담표의 JSON과 localStorage를 schema·날짜·119개 전체 기능 metadata SHA-256·exact ID/field set에 결속했다. 오래된/부분/중복/추가 key 파일은 상태를 바꾸지 않고 거부하며, import generation·편집 revision과 busy UI로 느린 과거 import가 최신 import나 사용자 편집을 덮지 못하게 했다.
+- quality workflow는 사용자 앱뿐 아니라 관리자 앱의 release lint report와 unsigned APK가 실제 존재해야 성공하고, 두 제품의 reports/APK를 함께 보존하도록 보완했다.
+- 활성 문서 검사는 수정 가능한 Android source-near README와 checkpoint의 package/focus/Goal/279개 시험/5개 gate/출시 상태를 함께 검사한다. reporter actor와 Gateway→Backend navigation 설명을 source에 맞추고, current runner용 official Node 22.23.1 root 재현 절차를 fail-closed로 문서화했다.
+- 실제 Chromium에서 정상 119개 round-trip, 구 지문·누락·추가·중복·초과 owner·다른 schema·추가/누락 key 거부, 느린 old/빠른 new import의 new 유지, import 중 후행 편집 유지, 초기 digest 동안 `disabled`·`aria-busy`, console error 0을 확인했다.
+- 이 후속 작업도 정식 시험 279건, 실제 기기·현장·배포·외부 검토, 출시 gate 5개를 실행하거나 면제하지 않는다. 상태는 계속 `NOT_RUN`·`NOT_ELIGIBLE`이다.
+- 독립 재검수에서 checker 내부 상수만으로는 FP046 post-completion test 변경의 승계 근거가 부족하다는 P1을 확인했다. 추가 전용 compatibility binding은 봉인·현재 tuple, 실제 source commit `1e976419dc98a2ee336c02e1d08ccbd62e4625c0`의 blob, 변경 사유와 기존 63건 진단을 결속하며 `NOT_GOAL_EVENT_NO_COMPLETION_CREDIT` 경계를 둔다. checker는 기록 자체의 exact path·byte·SHA·field와 commit blob·live file을 함께 검사하고, 과거 implementation·receipt·event는 변경하지 않는다.
+- 전체 회귀 재실행은 report-retention SIGTERM 테스트가 종료된 손자 프로세스의 `/proc` 회수 시점에 의존하는 간헐 실패를 발견했다. 강제 child-subreaper 환경에서 해당 손자는 `SIGKILL(9)`로 종료된 `Z` 상태임을 재현했으므로 제품 runner는 유지하고, 테스트가 PID start time으로 identity를 고정한 뒤 absent·PID 재사용·`X/Z`를 bounded wait로 종료 판정하게 했다.
+- strict continuation은 현재 checkpoint의 managed 818경로와 transition을 검증하지만, standalone 저장소에 `a3ad7eead6b5d834d3e0675422475a9aad351e3d` 객체가 없고 handoff HEAD도 과거 값이어서 공식 gate repository-state capture는 종료 코드 2다. 이는 이번 문서·CI·협업 도구 게시의 회귀는 아니지만 다음 제품 Goal start/resume와 completion credit을 차단한다. seq58이나 base/head를 임의 변경하지 않고, 다음 제품 Goal 전에 별도 승인된 zero-credit standalone snapshot re-anchor가 필요하다.
+- 최종 독립 검수에서 실패 실행의 부분 Android artifact 업로드와 기존 사용자 artifact 내부 경로 변경 가능성을 P2로 확인했다. 검증 성공 뒤에만 업로드하고 기존 사용자 artifact에는 사용자 앱 경로만 유지하며, 관리자 앱은 별도 artifact로 분리했다. 회귀는 두 upload step의 exact action·`success()` 조건·이름·경로를 고정한다.
+- 활성 문서 상태 검사가 raw 문서 전체의 과거 문장이나 HTML 주석으로도 만족될 수 있다는 후속 P2를 반영했다. 주석을 제거한 뒤 문서별 지정 현재 상태 줄이 정확히 하나이고 그 줄 자체가 checkpoint-derived package/focus/Goal/시험/gate/출시 값을 포함해야 한다. 상태 code span의 순서와 개수도 exact 비교해 같은 줄에 올바른 값과 모순 값을 함께 두는 우회를 거부한다.

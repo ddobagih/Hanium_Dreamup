@@ -23,12 +23,49 @@ CI의 정확한 도구와 lock은 [quality workflow](../../.github/workflows/qua
 umask 077
 git status --short --branch
 python3 --version
-node --version
 java -version
 docker compose version
 ```
 
 작업 시작 규칙은 [저장소 작업 지침](../../AGENTS.md), 현재 focus와 통제 검사는 [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)와 checkpoint가 가리키는 focus Goal 계약을 먼저 확인합니다. hash로 봉인된 과거 재개 안내서의 gate 명령은 현행 절차로 실행하지 않습니다.
+
+## Node.js
+
+Linux x86_64에서 current 계층 runner를 실행할 때는 공식 Node.js 22.23.1 archive의 전체 toolchain bytes와 mode가 잠금 파일에 일치해야 합니다. package manager, `nvm`, `actions/setup-node` 또는 ambient `node`의 경로는 버전 문자열이 같아도 이 검사를 통과한다고 가정하지 않습니다.
+
+```bash
+test "$(uname -s)" = "Linux"
+test "$(uname -m)" = "x86_64"
+WALKSAFE_NODE_ROOT="$(mktemp -d)" || exit 1
+WALKSAFE_NODE_ARCHIVE="$(mktemp)" || exit 1
+test -n "${WALKSAFE_NODE_ROOT:?}"
+test -n "${WALKSAFE_NODE_ARCHIVE:?}"
+test -d "${WALKSAFE_NODE_ROOT:?}"
+test -f "${WALKSAFE_NODE_ARCHIVE:?}"
+export WALKSAFE_NODE_ROOT
+chmod 0755 "${WALKSAFE_NODE_ROOT:?}"
+curl --fail --location --silent --show-error \
+  --proto '=https' --tlsv1.2 \
+  --output "${WALKSAFE_NODE_ARCHIVE:?}" \
+  https://nodejs.org/dist/v22.23.1/node-v22.23.1-linux-x64.tar.xz
+printf '%s  %s\n' \
+  9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578 \
+  "${WALKSAFE_NODE_ARCHIVE:?}" | sha256sum --check --strict
+tar --extract --xz --same-permissions \
+  --file "${WALKSAFE_NODE_ARCHIVE:?}" \
+  --directory "${WALKSAFE_NODE_ROOT:?}" --strip-components=1
+python3 -I -S -B scripts/check_walksafe_node_toolchain_20260715.py \
+  --node-root "${WALKSAFE_NODE_ROOT:?}" \
+  --lock configs/walksafe_node_toolchain_lock_20260715.json
+WALKSAFE_NODE_BIN_DIR="${WALKSAFE_NODE_ROOT:?}/bin"
+test -d "${WALKSAFE_NODE_BIN_DIR:?}"
+export WALKSAFE_NODE_BIN_DIR
+export PATH="${WALKSAFE_NODE_BIN_DIR:?}:/usr/bin:/bin"
+npm --prefix apps/web ci
+npm --prefix apps/android-gateway ci
+```
+
+`WALKSAFE_NODE_ROOT`와 `WALKSAFE_NODE_BIN_DIR`은 이 셸에서만 유지됩니다. 새 셸이나 새 임시 root에서는 archive 검증·추출·toolchain 검사를 다시 수행합니다. 위 절차는 CI와 같은 Linux x86_64 경로이며 다른 OS·architecture에는 해당 플랫폼용 별도 잠금 계약 없이는 current 전체 계층 재현을 주장하지 않습니다.
 
 ## Python과 Backend
 
