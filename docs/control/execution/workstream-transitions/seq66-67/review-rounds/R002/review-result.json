@@ -1,0 +1,195 @@
+{
+  "assignment_binding": {
+    "byte_length": 7889,
+    "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/review-assignment.json",
+    "sha256": "106f22a96ee9cf976b74e2b33cf92b9f14fd9009e38e5463e8fc462bd3b0e523"
+  },
+  "decision": "APPROVED",
+  "evidence_type": "FP022_SEQ66_67_REVIEWER_AUTHORED_RESULT",
+  "finding_dispositions": [],
+  "findings": {
+    "blocking": [],
+    "major_open": [],
+    "minor_open": []
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "atomic_checkpoint_publication_is_fail_closed": true,
+      "goal_and_initial_start_gate_contract_are_exact": true,
+      "no_device_external_formal_deployment_or_release_credit_is_added": true,
+      "no_goal_started_or_completion_credit_is_added": true,
+      "predecessor_and_ready_dependency_are_distinct_and_exact": true,
+      "private_start_gate_remains_unrun": true,
+      "projected_seq67_passes_continuation_and_goal_graph": true,
+      "seq66_materializes_only_fp022_as_planned": true,
+      "seq67_makes_only_fp022_ready": true,
+      "source_checkpoint_is_exact_seq65": true
+    },
+    "goal_evidence": {
+      "byte_length": 5970,
+      "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
+      "sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b"
+    },
+    "predecessor_review_bindings": [
+      {
+        "byte_length": 19307,
+        "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R003/review-assignment.json",
+        "sha256": "b5f5b512286ad70b9a0833126dadd71bb5a11fc0244d22acc27b82c289626b09"
+      },
+      {
+        "byte_length": 25434,
+        "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R003/review-result.json",
+        "sha256": "92666a5536e9b1abce5b9f141d5438328b2859c321e9c681906207bf14876b81"
+      },
+      {
+        "byte_length": 25714,
+        "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R003/independent-review.json",
+        "sha256": "c4c54175acf47b8823d9d22fa5833b423a42ea3d6726c2133c45e8725c700e4e"
+      }
+    ],
+    "projected_transition": {
+      "final_focus_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+      "final_ready_frontier_goal_ids": [
+        "WS-GOAL-EPIC-04-FP-022-R001",
+        "WS-GOAL-EPIC-04",
+        "WS-GOAL-EPIC-12"
+      ],
+      "materialized": {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-MATERIALIZED-FP022-20260813-001",
+        "sequence": 66,
+        "to_status": "PLANNED"
+      },
+      "ready": {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP022-20260813-001",
+        "sequence": 67,
+        "to_status": "READY"
+      }
+    },
+    "required_finding_ids": [],
+    "reviewed_control_code_cohort": [
+      {
+        "byte_length": 257014,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "6288b5bfd0b73f1baba2811d40a05c341baa2ad2c995efae0466b15fba14e250"
+      },
+      {
+        "byte_length": 79216,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "9b31f233b8011a363f5747e91b33e98420965645b478d28db18ff551007e1ef7"
+      },
+      {
+        "byte_length": 529834,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "f8b9561f190bf1adc09a8158d9f94353c3bd98c13b2a7a7cc251df09429c5919"
+      },
+      {
+        "byte_length": 277588,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "47794ba41dad29388899c61f79b5d29b6e1fab05b075fd0347536f1fd75579cd"
+      },
+      {
+        "byte_length": 65241,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "2237f2730dacb7af6fba043591e7985aab61d230f4f0b85152caf4fa1114fa91"
+      },
+      {
+        "byte_length": 36600,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "e73721a4829270cb29092e763f3ce79894c52607cdf230e1bfd13879992e3778"
+      },
+      {
+        "byte_length": 24097,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "6e0a9848517ce640384aa68b062f13720ca768f0d92b0054ed571826c79ef6f4"
+      },
+      {
+        "byte_length": 12898,
+        "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "cd243a024ab370bd279a9e07570cc41b64787492b3360ac2f741471c58266be3"
+      },
+      {
+        "byte_length": 47604,
+        "path": "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "d38dd3930b61dfc6a7d0bf485d420f428930777b5984cb7f46c13a38323fed2f"
+      },
+      {
+        "byte_length": 13843,
+        "path": "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "fc9c39497d382bdca98481a2caf992e77ac0b7befbb0a9eb76c4cd4089d36a73"
+      },
+      {
+        "byte_length": 16216,
+        "path": "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "50e91e72b867d5976b758e8da4d4c702924d5fa81cf59bb5b5d8dff5d3f2e885"
+      },
+      {
+        "byte_length": 10679,
+        "path": "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "2c8bd82be3189a91ea98f4d53ed79a3b0d0764da6298273a812519868d4209e6"
+      },
+      {
+        "byte_length": 23485,
+        "path": "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "58ab72a029601efe750e91b9b25c207f3e013cf9c7f6d0c341671aabd1ab81f7"
+      },
+      {
+        "byte_length": 6390,
+        "path": "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "f0595a4864f631bf4e0902b9adbebf5190abbb0fd917a13451096b8a6e8119d3"
+      }
+    ],
+    "reviewed_control_code_cohort_sha256": "bea50b3e50264da1439920b9c9755a4b658d9eb41058f576c03efefb21522bc8",
+    "source_checkpoint": {
+      "byte_length": 1922305,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 65,
+      "sha256": "25ff4d3f630ccbaffe1aa9e4eb5a1c922050d1705171bbaa162e6dad0d692644",
+      "tail_event_sha256": "c8eb9b6b90f546af6960fa929c93b1c97b6115d690938c09a33dd9a4155f0a49"
+    },
+    "start_gate_contract_evidence": {
+      "byte_length": 2912,
+      "canonical_contract_sha256": "a5d39ea4a1c7f919e4d3d08f3a429f7de0bdadec9d03756df7f32f4bbef074ab",
+      "contract_id": "WS-FP022-INTERNAL-START-GATE-R001",
+      "contract_version": "2026-08-13.1",
+      "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260813-001",
+      "file_sha256": "14ad8eee8a6c972c1e9091c2065b0779acdde427d0176b84fb83b18840865c25",
+      "ordered_check_ids": [
+        "CONTINUATION",
+        "V24_ARTIFACT_WORK_QUEUE",
+        "TEST_LAYER_REGISTRY_VALIDATE",
+        "BACKEND_NAVIGATION_INTERNAL",
+        "ANDROID_USER_INTERNAL",
+        "ROOT_FP022_CONTROL_REGRESSION",
+        "REPOSITORY_STATE"
+      ],
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json"
+    },
+    "superseded_review_assignments": [
+      {
+        "byte_length": 7295,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R001/review-assignment.json",
+        "reason": "AGGREGATE_R003_CONTROL_SUCCESSOR_WAS_OMITTED",
+        "sha256": "65c7dd40c37293ef0331d2585f939665473c82f8fcbe84c6c800ff9154880bf0",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      }
+    ]
+  },
+  "reviewed_at": "2026-08-13T16:27:05+00:00",
+  "reviewer": {
+    "agent_instance_id": "codex-fp022-seq66-67-reviewer-20260814",
+    "canonical_task": "/root/fp022_seq66_67_r002_reviewer",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP022-SEQ66-67-REVIEW-20260814-R002",
+  "schema_version": "1.0"
+}

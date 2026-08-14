@@ -1,0 +1,51 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ADMIN_ANDROID_ASSEMBLE_LINT-RECEIPT-20260812-001",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "observation": {
+    "command": [
+      "./gradlew --offline --no-daemon --max-workers=1 :adminapp:assembleDebug :adminapp:lintDebug --rerun-tasks"
+    ],
+    "cwd": "apps/android",
+    "ended_at": "2026-08-13T07:02:38.619746+09:00",
+    "exit_code": 0,
+    "lane_id": "ADMIN_ANDROID_ASSEMBLE_LINT",
+    "log_byte_count": 4224,
+    "log_header_marker": "WALKSAFE_NPC_VERIFICATION_LOG_BEGIN",
+    "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_assemble_lint.log",
+    "log_sha256": "6a73bcffd5a14d371e3ea7f3f84cc5d4db86df88b2d1e2bb60362cc64957e41d",
+    "log_tail_marker": "WALKSAFE_NPC_VERIFICATION_LOG_END",
+    "run_id": "NPC-RECOVERY-8e477a558daf63a5d0584e774a1e82f9",
+    "source_content_set_sha256": "d9185bb5eef23838dd2036be668adbc0d5c841859d9035f8e294208d35d0029e",
+    "started_at": "2026-08-13T07:02:27.115344+09:00",
+    "status": "PASS"
+  },
+  "raw_output_binding": {
+    "byte_length": 4224,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_assemble_lint.log",
+    "sha256": "6a73bcffd5a14d371e3ea7f3f84cc5d4db86df88b2d1e2bb60362cc64957e41d"
+  },
+  "receipt_content_sha256": "2ca0186a7f629da3b90e629d83b1737a5b3b4b5453812b0176f241996e89b197",
+  "schema_version": "1.0",
+  "status": "PASS"
+}

@@ -1,0 +1,1458 @@
+{
+  "schema_version": "walksafe.git-history-witness.v1",
+  "witness_id": "WS-GIT-HISTORY-WITNESS-A3AD7EE-20260812-001",
+  "status": "BYTE_PINNED_ADD_ONLY_FIXTURE",
+  "generated_on": "2026-08-12",
+  "source_bundle_provenance": [
+    {
+      "source_id": "PRIVATE_BACKUP_20260802T0125KST",
+      "bundle_sha256": "56a95dd2b43612d27b5140dddb2857830cd2ce82571cad3748f7886dade10751",
+      "bundle_byte_count": 430056267,
+      "commit_ref": "refs/heads/codex/walksafe-rc2-hardening-20260715"
+    },
+    {
+      "source_id": "PRE_STANDALONE_RECOVERY_20260810",
+      "bundle_sha256": "2c966e841f5be2a195c1690d11c29f21104c284f75ec5276a36ecc38abb7bf9c",
+      "bundle_byte_count": 430057800,
+      "commit_ref": "refs/heads/codex/walksafe-rc2-hardening-20260715"
+    }
+  ],
+  "source_agreement": {
+    "independent_source_count": 2,
+    "commit_tree_path_blob_bytes_equal": true
+  },
+  "commit": {
+    "object_format": "sha1",
+    "object_id": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "tree_object_id": "743d92ee9f65fdee544c692e0890f91b3481919c",
+    "parent_object_ids": [
+      "68cdaa255146ff5fee83a7e979bfd40f73bdc533"
+    ]
+  },
+  "start_head_paths": [
+    "apps/android-gateway/src/integrated-consent.ts",
+    "apps/android-gateway/src/privacy-rights.ts",
+    "apps/android-gateway/test/integrated-consent.test.ts",
+    "apps/android-gateway/test/privacy-rights.test.ts",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+    "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalStaticTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportPurposeHeaderStaticTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyAccountDeletionTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicyTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentWithdrawalTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+    "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+    "scripts/build_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+    "scripts/build_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+    "tests/test_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+    "tests/test_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py"
+  ],
+  "historical_artifact_refs": [
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 0,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "75823ce80cb181d704195ff3a9bb74c9727210cf7b1fb799631fc5abfe297754"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 7,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "2c703ae451dda201384d0eb3b275a048b059d5e3a6e784642fe22d177219f685"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 8,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "6060de77579559b43acbc2785e95d0199566dd1b0b4cbe51340b30e5cf7a5869"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 9,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "e54609115635462b5af5daa4c013823d8d9f015ced136adead7f05147249a0bc"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 11,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "155de4c6cd4b3363aee6e81460c9989400ce2cdbde8c98596e012d7157a061d0"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 12,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "after_sha256": "d1a21313f73dd8b18418cf06bf5a985f6c71566978d3f01163a418e9f8202f05"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 18,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "after_sha256": "df01fac8e8a6060ce9d0c68ada8b8b3f2109b416e874f0fc44855987a7fade5f"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+      "artifact_index": 19,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "2aa0c0ef40f822db993518c06b8fa239f282ce13aaa5a85229d40520ae547efe"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 0,
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "d1aaab83217c88c6d86161172575ad4d42fcbf0c0c30063d7619b27a3256e61d"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 1,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "dc08c1ef35fc5d4bb84fcddc36388e0ecb1fa87249a6a22d95656747ae8a1591"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 4,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "379cb4ad1fc5f4ce581b738f39382884fc5a231b5abf6d1b32716c9868e43a09"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 5,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "after_sha256": "d3952ddcb4c072048f05b00869c0c4fe976dc565cca607dda37cceb24c660535"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 9,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "8f4e8d8b3996ca8fe648ead073877fd41ea601756bbca2af958c04c0470b59da"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+      "artifact_index": 10,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "e9c10fcec7436dd8b28df4fafc1df1f415adaf75f70398b6b896485c5ab5aaf5"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 0,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "fd7cf3d01999fa69db3d333145ba6ecb8b9aad8597643cb29e2b9e34c340221a"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 2,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "22cd4d135deebaf27196e313e9fc11196d405db4febb678e31b29e804c3e3c99"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 3,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+      "after_sha256": "a8afa921b66a038ac600aacf9594c6c3ee4f9b0401fb1824e153dfab5cd9be1e"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 5,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "after_sha256": "1d878ab8862a4949e174296c5d866782c53819c9541ab508912649f8214bfe13"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 7,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "b8fec270095f2187263ab8bb7fd364f753c2b80067dee232cfcef329d34146ac"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 8,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "after_sha256": "f5d383abdce0095276d8c13925d570254bebed543430d0863b14d5bdd235bf3f"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+      "artifact_index": 10,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "636ff9420a7ad6b0c842807d1246f7e1ce45155a505be73eeb13375fcdea9007"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 0,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "562e3843c2eadec531bfb9084478629e8fc5d1347fe48fb0b8e9ea113b78e883"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 4,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "after_sha256": "2a539912516c337c2acb346dacd3a9694368bd7ae1dbc7ee1be0df54be9b0d06"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 5,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "after_sha256": "98a4e4758164317bc2a76d01ea3d76cab8fd9e5ae25d2f33b86e9eda63553a57"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 7,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "703e31d8752f57de658eda174245b0550ddad9ba1dc70b3ccc9d0b0580b2b83e"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 8,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+      "after_sha256": "167360607687607a30bd94fbc9a2e3efa6971a7d6b7b68a9f161341141700f83"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 9,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "after_sha256": "3bb4b06a2615aa60b62345b6b867216ec0b05b053f58799f5cd723bd73a8cec4"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 10,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+      "after_sha256": "b81bfd2c81f9fc9a5f63b414fc13e439a34397e89399fb06d9c05bbc2b5dd4a6"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 11,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "d45a9ea330a6dbd4a7fb2eb8c4d4061e2c88ee2287dec02e635dc0842e41a941"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 14,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "after_sha256": "3d840e3706c88f4ddd479dca672670df2e8544b09d448913a1a0dccc54407e65"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+      "artifact_index": 16,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "0bcb928ccb7d30d76fd0fddf7b2cec3299068271ed5bece7b5ae23be96a4f1dc"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 1,
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "101f5c44c7693852081aa8a7520e88bef8405aab8e6ef184e94d18e13774b368"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 2,
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "after_sha256": "d181a96cd46c9d1fc48b1acd54548e522d2af68d52aadc5236149939c1ad7d52"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 3,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "4ff2d1034acc5910b1310dd5947b0676cb2863dc25b90e990c78cf4f816b7b74"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 4,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "after_sha256": "8a7c6cdab0b94d4b7172bfbe10d213840aee8719326e5f8c0edcecb595c15dae"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 5,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "after_sha256": "5579d99f737f434d050ad5fe79b14d15d7b1f86f8a86df58c4963708c50b0502"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 6,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "after_sha256": "59688fff65b7b613fe814235f7ac8ee2578db7f18577a7f364da1a9860ca3d7d"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 7,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+      "after_sha256": "272d1122e67f106934f49aa2ce0555cb85e498da790342f7f96e8a42ded2d995"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 8,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "after_sha256": "fd42fa8001180547b1ba1ece425adf628bb5926898e2e62b10d3736b140f5982"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 9,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "after_sha256": "2fc06aeab1776a2347b8eb646e845d4b55b7d3678b54279a99fe97fde82ee7a8"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 10,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "after_sha256": "75cd31e0c2d99590c3f35c7218a7cbbdab7b46191ef4ba2831707f216647f6d5"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 11,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "after_sha256": "93f6d183ac3e2c46e03f01f60d437c30f75a6f9d2cc4320a21348efa445b3563"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 12,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "after_sha256": "98dddc0297e187c89a4f65c93784a968a50cd6eac9b3ed3ae987cc8c5a334ab7"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 13,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "after_sha256": "9b0419c5e055860c960ff6c5297860bff97cf4b2368feba188cc6af4bd3df63d"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 14,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "after_sha256": "64ca718b81d7e215931a0611c67377b672dba4f12e62a66732c7865df4bf3abe"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 15,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "after_sha256": "1b7a5e093f8835154ce802f07735bec9793c8281f52659b833791146fec51341"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 16,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "after_sha256": "bb5895b79d09b00f836d08ec3dd8ff729d280364924cd91009d3b21a19aa94cb"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 17,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "after_sha256": "eb8a09646210ad57965e2f72e5e813c68d745bfd31ba008d68fb9f7ae5bed542"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 18,
+      "path": "apps/android-gateway/README.md",
+      "after_sha256": "b89ed746a788b519b3f54897cd40a5fb0a0c2cf5687a89cd6d83d5f157a1c43a"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 19,
+      "path": "apps/android-gateway/server.ts",
+      "after_sha256": "79fbadd7d7bde3839484f7ad6a9d87a3b09a8831e7bc8e0bc548474c604289fd"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 20,
+      "path": "apps/android-gateway/src/config.ts",
+      "after_sha256": "374360f7e324901dcad48397f4d6f96c26945cb45d8e5ba41c4bf8c023e6ff67"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 21,
+      "path": "apps/android-gateway/src/routes.ts",
+      "after_sha256": "4fb388ae97f7b8171f1ab8d17e22c7abe72ef901c64ac7dcfaf2a2e95a447e99"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 22,
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "after_sha256": "9dd04f01e6fac76d48c5cd80fa57722c9510688f068edf5005123fa05d150bf1"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 23,
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "after_sha256": "d314cbce598c1fce797f24ae807f2d67ea1f448fda1ac9674ed4efd34b7f0e56"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 25,
+      "path": "deploy/config/walksafe-android-gateway.env.example",
+      "after_sha256": "b9c1f41466e2970156ec170a44226ce78e11b79d58a781f6ed11031c487ebf64"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 26,
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "after_sha256": "10f27296803d2f5155e69c767734f8723ae761cfed75e2b3d603da4fcbee782c"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+      "artifact_index": 27,
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "after_sha256": "a0ec591c7f31cd29ee3c5bf4df8b97fc28969578c2bbd77bf05f7b30bd298fc3"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+      "artifact_index": 1,
+      "path": "apps/android/USER_GUIDE.md",
+      "after_sha256": "649c21e5d5ee78a31cb674111d64c8b532b26df346b0a30a589758e094dedc1c"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+      "artifact_index": 2,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "after_sha256": "87d937c73491f050625ea9941b1713718a4da7be6e5f1c6ea7af9f93fe5f3e11"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+      "artifact_index": 5,
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "after_sha256": "ae0834115453f67b8b9c0523781d94e19c7d556ac41f30577011e67ec2d9a838"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+      "artifact_index": 6,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "after_sha256": "e13fab9b1f6ed2dfdf73a181f334ffd7a42e861047b42188642bfdadd0215ac5"
+    },
+    {
+      "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+      "artifact_index": 8,
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "after_sha256": "52437497f6c2474aef4bef07ac02076c918f3b69fd5af86c473529e29fb55662"
+    }
+  ],
+  "paths": [
+    {
+      "path": "apps/android-gateway/README.md",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/server.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/src/config.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/src/integrated-consent.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/src/privacy-rights.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/src/routes.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/test/gateway-contract.test.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/test/integrated-consent.test.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android-gateway/test/privacy-rights.test.ts",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/USER_GUIDE.md",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/AndroidManifest.xml",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "c1eaf73b5880dd875637923bf82a23fe14121f3f",
+      "blob_byte_count": 1998,
+      "blob_sha256": "30efe0264c2d27512e9b63b96a8838ae560809902e41a348975baaf07ff592c2"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "0e532328820dd6b63ff3770b7b240dacfdc5f3f1",
+      "blob_byte_count": 249865,
+      "blob_sha256": "ed9c8df7e7402a6214871a099d9994b182a01030bb01fab7662f062025887803"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionLog.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "START_HEAD"
+      ],
+      "mode": "100644",
+      "blob_object_id": "9e53e7a10e3776da78fa7270066024c5ae14de70",
+      "blob_byte_count": 22838,
+      "blob_sha256": "79557faedcfdc0e393180c9dfd0061df12538e5177ed2c8e76f66b54881c3003"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidStepTracker.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "9c2e3e2e1c5c61bcc15576e4eab4888a1412552c",
+      "blob_byte_count": 2425,
+      "blob_sha256": "b2ef8821017b4e31048e0dd7247d0dc60b9e4f4e8d34e2dcb976396f2e9762de"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStore.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidIntegratedConsentClient.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicy.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionClient.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSession.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "8672efec3e3caf438da42bf0db762355211c594b",
+      "blob_byte_count": 10943,
+      "blob_sha256": "2e65eb3faa370834c5c7d1fe92696966296d995d82e4cbe920a220d747b67869"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploader.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "START_HEAD"
+      ],
+      "mode": "100644",
+      "blob_object_id": "f77cad35e1229e9f3c03049a6ea9b9413efaa634",
+      "blob_byte_count": 7931,
+      "blob_sha256": "ac8186277ec3f88e0ff848818ef15059a6512ff5f8a7bd24deb1f00dd9259205"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSession.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "372f1e370f39bdee5cd1c777f0add32809a02759",
+      "blob_byte_count": 1931,
+      "blob_sha256": "3a883073e02a8c69ea489d6b1efcec17d87f64bf077c856bcdb0415dc8828305"
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicy.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicy.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionPolicy.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadiness.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/CameraXFallbackCompositionStaticTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "c506ab76cccbe317410b2b34d94ff0ab3e5debce",
+      "blob_byte_count": 17116,
+      "blob_sha256": "f1d3c18ceb3eea91c3ce2aa4ef6d1806f94967a3240003946a8054d38cc44168"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccessibilityStaticTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "c5e23cee3a1315ac6ba5b452bb113e21dc347753",
+      "blob_byte_count": 15364,
+      "blob_sha256": "644711ff82b9aae3ffde503f81bcc0a4bcfe5e056dee5dcf506d6aae514135b1"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityAccountDeletionStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityFirstRunRegistrationStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityIntegratedConsentStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "f2c1188b98ad1faca8b77d7499a62d5f41009f60",
+      "blob_byte_count": 7053,
+      "blob_sha256": "f7ac4a5a242b7f25dc9c084fc209da1cfa7cf952085ab8aeedaa039b55c60ae6"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityPhoneMountingStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWalkSessionLifecycleStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalRestartStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityWithdrawalStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PermissionSessionLifecycleStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/PriorityUserOnboardingStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/RuntimeMetricMainActivityStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/fieldlog/PersistentFieldSessionLogTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "START_HEAD"
+      ],
+      "mode": "100644",
+      "blob_object_id": "6875eaf118bbb7a460d5e5085e1c42276217955c",
+      "blob_byte_count": 19701,
+      "blob_sha256": "f284085e3daa7d9ffed1ffab11c07c012787bf79642b9ad6ee4ef95a7287e8c2"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidGatewaySessionStoreStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidNetworkTransferPolicyTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionAccountDeletionTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/AndroidPrivacyDeletionOriginHardeningTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/network/GatewayFieldSessionTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "e8d7399df83a5136c06cc8ed11900b40bf2b24c1",
+      "blob_byte_count": 5144,
+      "blob_sha256": "9f96b580d6114c2510cf47284e4b55925d8a63d88b5549dd4e039a09f82a1491"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportPurposeHeaderStaticTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/AndroidReportUploaderTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "START_HEAD"
+      ],
+      "mode": "100644",
+      "blob_object_id": "43f01268bc542d42b432f9a838566195722dd9b0",
+      "blob_byte_count": 7706,
+      "blob_sha256": "90eec1b85493bbc359f85654d2ea3ae1c422b8eb9be7bd34e7104cb2d74c6b46"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/MainActivityReportUploadStaticTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "898701bf3999703fd7472d9c24b282a58b6f23c0",
+      "blob_byte_count": 8737,
+      "blob_sha256": "0e72079807f34da793c0d3492f6d462cdc096aaf0e5830e9e7de4340cad23c62"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyAccountDeletionTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/report/ReportPrivacyConsentSessionTest.kt",
+      "state": "PRESENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ],
+      "mode": "100644",
+      "blob_object_id": "0079a15b74261723cad65ad623d06c72fe9c778d",
+      "blob_byte_count": 16793,
+      "blob_sha256": "6d259909d1664a5d75f5ff03bf69ea3a8dfc44aed49d1db0cfc70d89e13777bc"
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentPolicyTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentRevisionHardeningTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/IntegratedConsentWithdrawalTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PermissionSessionPolicyTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyAccountDeletionPolicyTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/PrivacyDeletionHardeningTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/session/WalkSessionReadinessTest.kt",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "configs/walksafe_product_boundary_20260722.json",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "deploy/config/walksafe-android-gateway.env.example",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "deploy/nginx/walksafe-android-gateway.conf.example",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "scripts/build_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "scripts/build_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "scripts/check_walksafe_android_gateway_boundary_20260723.py",
+      "state": "ABSENT",
+      "consumers": [
+        "FROZEN_CHANGED_ARTIFACT"
+      ]
+    },
+    {
+      "path": "tests/test_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    },
+    {
+      "path": "tests/test_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+      "state": "ABSENT",
+      "consumers": [
+        "START_HEAD"
+      ]
+    }
+  ],
+  "objects": [
+    {
+      "object_type": "tree",
+      "object_id": "003b459f377d6f5ee04504aec4a6a3b5ec808ae3",
+      "raw_byte_count": 29,
+      "raw_sha256": "eb7b6c14a3743a78fe8da1d13932ccfc36b26a9dc9e9c7578f743ed9d2266e2f",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/003b459f377d6f5ee04504aec4a6a3b5ec808ae3.gz.b64",
+      "fixture_byte_count": 69,
+      "fixture_sha256": "6d087f66508c59e3a2cbe64be2a67dd4148420eba583a287c4152d3d1601a52e"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "0079a15b74261723cad65ad623d06c72fe9c778d",
+      "raw_byte_count": 16793,
+      "raw_sha256": "6d259909d1664a5d75f5ff03bf69ea3a8dfc44aed49d1db0cfc70d89e13777bc",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/0079a15b74261723cad65ad623d06c72fe9c778d.gz.b64",
+      "fixture_byte_count": 5133,
+      "fixture_sha256": "954f69a4453fcda725b549736a1ba06e17caa869da34fdfc37b938e4bb33c968"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "01777c65391c8ddb882b68aaa95605487b87cbc1",
+      "raw_byte_count": 8120,
+      "raw_sha256": "47bec29f66d3553e250ac835e1cde9925b8e46fdd9395806b7f44c23bdfe3f71",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/01777c65391c8ddb882b68aaa95605487b87cbc1.gz.b64",
+      "fixture_byte_count": 5773,
+      "fixture_sha256": "1ff265a7338b73a19fb9276d7ec86d1daa800a3c225aa6156adfba1fc682b99e"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "0e532328820dd6b63ff3770b7b240dacfdc5f3f1",
+      "raw_byte_count": 249865,
+      "raw_sha256": "ed9c8df7e7402a6214871a099d9994b182a01030bb01fab7662f062025887803",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/0e532328820dd6b63ff3770b7b240dacfdc5f3f1.gz.b64",
+      "fixture_byte_count": 62293,
+      "fixture_sha256": "3df5011db8c2e488b036595a47e75f4b5a491ac212e1136dd712db2756e2edd6"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "15376ea25bf9b5cd816a27982a7cb8e46dd98f17",
+      "raw_byte_count": 68,
+      "raw_sha256": "ad5d3682d4d1ace59305103c34d7510ad23210f33a332e21ed58adaa20fc1c6c",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/15376ea25bf9b5cd816a27982a7cb8e46dd98f17.gz.b64",
+      "fixture_byte_count": 121,
+      "fixture_sha256": "e710f60544efb57fbf864f1c312b43630b41030b7e813a64e09b12d575b29c42"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "1dbf2d704adfbe859eb18937a241312690fd1810",
+      "raw_byte_count": 34,
+      "raw_sha256": "dc3190f5f16a7e131af289033e8df6069332e67fb3844b3d82a972dfa96db19c",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/1dbf2d704adfbe859eb18937a241312690fd1810.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "c6150f63595cd4a1a5fc9ea707267cb69a26b53507c4b2f98cbe69e08920c51c"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "238a43898aed2601acc12387b7d80625ea5d40d7",
+      "raw_byte_count": 99,
+      "raw_sha256": "5c70b10aad14dfb38a726cc6431d21838ebf198a3483a9dc1b1790f18f75f234",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/238a43898aed2601acc12387b7d80625ea5d40d7.gz.b64",
+      "fixture_byte_count": 153,
+      "fixture_sha256": "bdaa5f1a83b4b62150b95d75fa51b02e2693368394bdbab3ff958c9cd7b0267f"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "27c175ff57acaacad37d0766f8e1cfb482997d58",
+      "raw_byte_count": 2667,
+      "raw_sha256": "89ef480647a103a09ba266531fa938468ac55601459062a55c361de8f25c4910",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/27c175ff57acaacad37d0766f8e1cfb482997d58.gz.b64",
+      "fixture_byte_count": 2257,
+      "fixture_sha256": "260eae02df9363c13e087298111c137fc6d0753c33f9fb8c6acee5b76f8c1d9b"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "3707d98d74706e9e3d152cd2297104e5563cbe97",
+      "raw_byte_count": 33,
+      "raw_sha256": "9a8f796c7f7433df6b0ebc9dbc4bba07a1a3135e774993dec997873c1a021154",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/3707d98d74706e9e3d152cd2297104e5563cbe97.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "9d716a2a2de4d88308ae575ed11a7030b4a94e224bee940b2c8219729fb14fcc"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "372f1e370f39bdee5cd1c777f0add32809a02759",
+      "raw_byte_count": 1931,
+      "raw_sha256": "3a883073e02a8c69ea489d6b1efcec17d87f64bf077c856bcdb0415dc8828305",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/372f1e370f39bdee5cd1c777f0add32809a02759.gz.b64",
+      "fixture_byte_count": 1237,
+      "fixture_sha256": "c6be639ef9fe5578a5160a3c8a1d54e14634b846729335a95c854efc204fbbf5"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "3b0494b6a3fe0f6b01af834591d137eadb71183b",
+      "raw_byte_count": 303,
+      "raw_sha256": "d71ddd0e659348f5ff40d26069c72240165425b99212be225d1e0dd9cf692ac3",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/3b0494b6a3fe0f6b01af834591d137eadb71183b.gz.b64",
+      "fixture_byte_count": 381,
+      "fixture_sha256": "7c1976b6957324f95034a8ac428235646e772b462c006a748ad54618a2b26d41"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "43f01268bc542d42b432f9a838566195722dd9b0",
+      "raw_byte_count": 7706,
+      "raw_sha256": "90eec1b85493bbc359f85654d2ea3ae1c422b8eb9be7bd34e7104cb2d74c6b46",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/43f01268bc542d42b432f9a838566195722dd9b0.gz.b64",
+      "fixture_byte_count": 2809,
+      "fixture_sha256": "ebdb275d99017df1554b54520005e5944daf15b091777469971e740b9eba8804"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "4ea563ec850298571cb11745d554ef961991acf1",
+      "raw_byte_count": 101,
+      "raw_sha256": "e6da616e493c91abe3b964720a1f661fa5695a69551da3a4be86964f801d14c6",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/4ea563ec850298571cb11745d554ef961991acf1.gz.b64",
+      "fixture_byte_count": 161,
+      "fixture_sha256": "64b86e0bbbeb9b6419a0bfbc93c76794a53b15bbca4993ae922caed1a3641051"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "54cb6ac5622ab88e63da1a06b3b01b5150603101",
+      "raw_byte_count": 141,
+      "raw_sha256": "798de73f09d4e8eaf0e9b85d75620d3ca30cc174db08bab5abb670e49bdd4ca8",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/54cb6ac5622ab88e63da1a06b3b01b5150603101.gz.b64",
+      "fixture_byte_count": 209,
+      "fixture_sha256": "f59bb1b8c98524b0fbc835a4580f49a2ea44c9e2ced3518e57d9bb8e66605746"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "6587d8a91e24ca0468fcf8f7298fe9bd385b2a67",
+      "raw_byte_count": 53,
+      "raw_sha256": "ae616f43bccf7b77655b706f73ce6512ddd46cf173514299ac0c12bcfe1bb33b",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/6587d8a91e24ca0468fcf8f7298fe9bd385b2a67.gz.b64",
+      "fixture_byte_count": 101,
+      "fixture_sha256": "30b6d5517d85385e5e6a6ea84eccbc68fab192e84414235f4cc809bd1e00d75d"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "6686f010616948c55d1f36acee1844bc76bbe7d0",
+      "raw_byte_count": 29,
+      "raw_sha256": "997d165a41d1c9ff0f0d19d751129c5c6c35b3cd91c69960c5df9e9def16b8a2",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/6686f010616948c55d1f36acee1844bc76bbe7d0.gz.b64",
+      "fixture_byte_count": 65,
+      "fixture_sha256": "cb953c6ed59697962c884fa759660df937a067f4825d6d5d9d00a71edf32f07d"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "6875eaf118bbb7a460d5e5085e1c42276217955c",
+      "raw_byte_count": 19701,
+      "raw_sha256": "f284085e3daa7d9ffed1ffab11c07c012787bf79642b9ad6ee4ef95a7287e8c2",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/6875eaf118bbb7a460d5e5085e1c42276217955c.gz.b64",
+      "fixture_byte_count": 5153,
+      "fixture_sha256": "48195aa209d516f40db27e211ab5a8528a51244a323692d3209bed1c80f0ab3d"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "743d92ee9f65fdee544c692e0890f91b3481919c",
+      "raw_byte_count": 761,
+      "raw_sha256": "404ec3699b8f62866750d204800170b34122d5b4053f83d45d22c53e7c72a7a0",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/743d92ee9f65fdee544c692e0890f91b3481919c.gz.b64",
+      "fixture_byte_count": 941,
+      "fixture_sha256": "5580d8ddcb643d761d49e7814819662c73b2d73409006b2cd99ddd16eb6d6118"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "757dcf39afafabca51a319de3d17253310e2861e",
+      "raw_byte_count": 227,
+      "raw_sha256": "c3150f0f8e610dafc76e25280200dd04718f2de3a9227090e93faf5b17c4f8de",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/757dcf39afafabca51a319de3d17253310e2861e.gz.b64",
+      "fixture_byte_count": 237,
+      "fixture_sha256": "f82aa3d9720bad27a5539523c4f24f527ccb4318694d9d49a358911330752e5d"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "7a838d6abd6edfd5eb5d566679668c81b23813d7",
+      "raw_byte_count": 740,
+      "raw_sha256": "0a59006322fb59f4a60ea939127fe7b88349da25cd27845c28baa9b143f47ca5",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/7a838d6abd6edfd5eb5d566679668c81b23813d7.gz.b64",
+      "fixture_byte_count": 821,
+      "fixture_sha256": "f82a80504335e2462aa254a387a2e646e1d8279e3832da8cef4c2ad8a88e54df"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "8672efec3e3caf438da42bf0db762355211c594b",
+      "raw_byte_count": 10943,
+      "raw_sha256": "2e65eb3faa370834c5c7d1fe92696966296d995d82e4cbe920a220d747b67869",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/8672efec3e3caf438da42bf0db762355211c594b.gz.b64",
+      "fixture_byte_count": 4181,
+      "fixture_sha256": "5b0c5ead6f8a1fa0db9cfa7e67cab3413859e4f662f7b40c5336147fe0780ece"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "88c5e802fe377a718dc29712a05532981967e60e",
+      "raw_byte_count": 264,
+      "raw_sha256": "6cf1ea9930b1079836d6561460dadc105d6d7cadb2f0890624cd422d557cabf2",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/88c5e802fe377a718dc29712a05532981967e60e.gz.b64",
+      "fixture_byte_count": 305,
+      "fixture_sha256": "c11e67462758cdf8641b1fcc9ea16d240d0525f39b0801eab92797414ccde5f1"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "898701bf3999703fd7472d9c24b282a58b6f23c0",
+      "raw_byte_count": 8737,
+      "raw_sha256": "0e72079807f34da793c0d3492f6d462cdc096aaf0e5830e9e7de4340cad23c62",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/898701bf3999703fd7472d9c24b282a58b6f23c0.gz.b64",
+      "fixture_byte_count": 3085,
+      "fixture_sha256": "d0312b1cc373dd71065c39a2875a68fc6d5ce519422851b0dce279996a694c1b"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "9c2e3e2e1c5c61bcc15576e4eab4888a1412552c",
+      "raw_byte_count": 2425,
+      "raw_sha256": "b2ef8821017b4e31048e0dd7247d0dc60b9e4f4e8d34e2dcb976396f2e9762de",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/9c2e3e2e1c5c61bcc15576e4eab4888a1412552c.gz.b64",
+      "fixture_byte_count": 1137,
+      "fixture_sha256": "8fb51d9163859a32db70329e7ebac1bb136c03eaef87fb7e4baf603cd999b5e6"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "9e53e7a10e3776da78fa7270066024c5ae14de70",
+      "raw_byte_count": 22838,
+      "raw_sha256": "79557faedcfdc0e393180c9dfd0061df12538e5177ed2c8e76f66b54881c3003",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/9e53e7a10e3776da78fa7270066024c5ae14de70.gz.b64",
+      "fixture_byte_count": 7201,
+      "fixture_sha256": "ef0fbe880af05a87bd3a222444e33720f9de982ff453557ef0aaaff77bda9b3b"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "a06158f5a79ce0e8a98fbf44e5b3da87fd62b2ed",
+      "raw_byte_count": 60,
+      "raw_sha256": "c323691a61b7d29d26d5c9c1cfbde5b9e64fc08f8ba11e4dce9887d13599b0b9",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/a06158f5a79ce0e8a98fbf44e5b3da87fd62b2ed.gz.b64",
+      "fixture_byte_count": 109,
+      "fixture_sha256": "aea9b28d7796b5c8598fd2fa6ef6cdc2136fc22f09f26b0640db5cdedf852d10"
+    },
+    {
+      "object_type": "commit",
+      "object_id": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+      "raw_byte_count": 250,
+      "raw_sha256": "bdad7f54190d7445ac60d3f0b11c6170709c1e947496ff5df40597c7502d38a3",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/a3ad7eead6b5d834d3e0675422475a9aad351e3d.gz.b64",
+      "fixture_byte_count": 245,
+      "fixture_sha256": "0f1eddda419344a865814f7f1ab221ac1dd6efc8bf836ab620ff77e90b62d0d9"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "b765761cfed06bc182145251eb67225235d16a59",
+      "raw_byte_count": 596,
+      "raw_sha256": "7ba337fe9c5dc42a187f45540fc848e8d4af2c1fe6f5381689d0b0d4e6309490",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/b765761cfed06bc182145251eb67225235d16a59.gz.b64",
+      "fixture_byte_count": 577,
+      "fixture_sha256": "58ea0cb837357efb9bc5646d409cb69e38111ae7164f220842d8a7143fb0448e"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "b76720fc3af47133011da8bbf8fa1bf1cba2a578",
+      "raw_byte_count": 678,
+      "raw_sha256": "cd8adccd5325b53d0958ac2f3f613fa007d90fb2c7ceb22c0331421e4f144e19",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/b76720fc3af47133011da8bbf8fa1bf1cba2a578.gz.b64",
+      "fixture_byte_count": 709,
+      "fixture_sha256": "a9a9788fda466f12e0006b918465994c09c3a646a3263a55d3edec1e6b83f47d"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "b7f730dc76a6fc784015e5a5cd87fda9726cb28f",
+      "raw_byte_count": 35,
+      "raw_sha256": "c9dbbae3f3bacbed94e5f15f1285849c754eff0ade4052e1daba0dde203140ed",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/b7f730dc76a6fc784015e5a5cd87fda9726cb28f.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "93c538e38e27b865acb1a9f0581021e1b84736f8eb192957f0b4db47364b8a29"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "bade96d97d3e2a4ffa676518df3a3ca97ef58802",
+      "raw_byte_count": 34,
+      "raw_sha256": "b31f073fd4246a0b0a0e4f3f6a2495fc1bb2c37b1390838e644fe916818a20b5",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/bade96d97d3e2a4ffa676518df3a3ca97ef58802.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "3a2a117831dd595051ef7aea57e3d5d5675ec9d352316bb4dda60f436f3f8d81"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "bba3b7650cfbe04e82f5b68cfb4be9c257185f43",
+      "raw_byte_count": 308,
+      "raw_sha256": "6b784a4ac041b11d0db70818e6287696d23e158c5f3774338f8fd1c8e6604bd6",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/bba3b7650cfbe04e82f5b68cfb4be9c257185f43.gz.b64",
+      "fixture_byte_count": 325,
+      "fixture_sha256": "94ef01d024a53c7e6e9c64acbecdb0a8e6b5b4ed9bd60b1e5a05f2209bc8a8b8"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "c0400bc3068abc4a7615c0fe6f26aea184be8249",
+      "raw_byte_count": 29,
+      "raw_sha256": "69f12fd91f2d051e8cddfbfadb562ba6c0200318fa71c35afd1396628f61b9ed",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/c0400bc3068abc4a7615c0fe6f26aea184be8249.gz.b64",
+      "fixture_byte_count": 65,
+      "fixture_sha256": "fea83edc1aec0a320f8cd63002a57db0fd12872303036a065a5146e66d46a7b9"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "c1eaf73b5880dd875637923bf82a23fe14121f3f",
+      "raw_byte_count": 1998,
+      "raw_sha256": "30efe0264c2d27512e9b63b96a8838ae560809902e41a348975baaf07ff592c2",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/c1eaf73b5880dd875637923bf82a23fe14121f3f.gz.b64",
+      "fixture_byte_count": 825,
+      "fixture_sha256": "cd3820d45ff38c2c6b52b51fae3366e46ff8f246cba112d9a2be6085eb86eff2"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "c4adcc950cdc1aafe5f8789d943fb56e363f3ded",
+      "raw_byte_count": 29,
+      "raw_sha256": "18bd6014c76f5059fa1f6d627bb8c828ea54833c79d37b062a08613bc201826b",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/c4adcc950cdc1aafe5f8789d943fb56e363f3ded.gz.b64",
+      "fixture_byte_count": 65,
+      "fixture_sha256": "88f5b4236d5dc11c681ccce1003682bf652764f9dea3bc7d1a8fa1318a82d6e9"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "c506ab76cccbe317410b2b34d94ff0ab3e5debce",
+      "raw_byte_count": 17116,
+      "raw_sha256": "f1d3c18ceb3eea91c3ce2aa4ef6d1806f94967a3240003946a8054d38cc44168",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/c506ab76cccbe317410b2b34d94ff0ab3e5debce.gz.b64",
+      "fixture_byte_count": 4565,
+      "fixture_sha256": "e743bbe547203a732b4c656a7978d813cb875c01b023083fd5fa1399f6e400a5"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "c5e23cee3a1315ac6ba5b452bb113e21dc347753",
+      "raw_byte_count": 15364,
+      "raw_sha256": "644711ff82b9aae3ffde503f81bcc0a4bcfe5e056dee5dcf506d6aae514135b1",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/c5e23cee3a1315ac6ba5b452bb113e21dc347753.gz.b64",
+      "fixture_byte_count": 4301,
+      "fixture_sha256": "7331f39bd20d4bfc12213f81dbfb1c2dec37345b926b410ad8610d1fcc8dceda"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "d0a87340f02fb0e76b77cdd441eb636e81c7199c",
+      "raw_byte_count": 33,
+      "raw_sha256": "8d2e1203143b4f16abc14eeb2f6fb2a3471d578c7d1b59030acef146105b3e0d",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/d0a87340f02fb0e76b77cdd441eb636e81c7199c.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "31d3ec808c153daf88a2c27dc3eecdd430ceb3647369a8da9e4f45bd244e9216"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "d331c239d6ecaee8c295bbb7a607b6e9757d0cff",
+      "raw_byte_count": 160,
+      "raw_sha256": "0a817b8ed0396ea7d061519fd594002623d92c0f2c3d522f255a409ecd65a30f",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/d331c239d6ecaee8c295bbb7a607b6e9757d0cff.gz.b64",
+      "fixture_byte_count": 213,
+      "fixture_sha256": "592f0bbe93c72420f784e7736a5e97c1bd7c994afbbf6e296c630abcc06bd621"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "de954af9278dfdbd6f648082feb63b8bfe886784",
+      "raw_byte_count": 200,
+      "raw_sha256": "55ff3dba01c668c97d58883a47be05579b94d765bf7e9f5ef7797750b39b4a1f",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/de954af9278dfdbd6f648082feb63b8bfe886784.gz.b64",
+      "fixture_byte_count": 273,
+      "fixture_sha256": "9b5fc4cf6bbc1eb65413415dc2a53925625e60177cd136f9bcac3aefc911c944"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "e1752d3b1366797ec33c0fa41ba6b9650f6d6a11",
+      "raw_byte_count": 155,
+      "raw_sha256": "ee3c41c90f8510f84dec2516c6d380d7f55d582961a274566c95a70a5fcf5159",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/e1752d3b1366797ec33c0fa41ba6b9650f6d6a11.gz.b64",
+      "fixture_byte_count": 213,
+      "fixture_sha256": "7dcd2b6efee6d24e70aab60c40b2fa40181f5c5702fb83585ff4bfd07bdbc863"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "e8d7399df83a5136c06cc8ed11900b40bf2b24c1",
+      "raw_byte_count": 5144,
+      "raw_sha256": "9f96b580d6114c2510cf47284e4b55925d8a63d88b5549dd4e039a09f82a1491",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/e8d7399df83a5136c06cc8ed11900b40bf2b24c1.gz.b64",
+      "fixture_byte_count": 1917,
+      "fixture_sha256": "fad403d0eb4d276433978d85874d82c686975c9edcaeb5b6596270a3a7a85213"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "f1d07c05b23dde1be90afc3faa905c0a2a093c26",
+      "raw_byte_count": 35,
+      "raw_sha256": "bdc638bfeb4f500dd01e3b47e8abcb1509cefbc87b36aaf9a903bfa004c65e45",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/f1d07c05b23dde1be90afc3faa905c0a2a093c26.gz.b64",
+      "fixture_byte_count": 73,
+      "fixture_sha256": "6ad5acf70f5089a6ead33fc02b2011d32f5607b3201f0160c174dd6a71899380"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "f2c1188b98ad1faca8b77d7499a62d5f41009f60",
+      "raw_byte_count": 7053,
+      "raw_sha256": "f7ac4a5a242b7f25dc9c084fc209da1cfa7cf952085ab8aeedaa039b55c60ae6",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/f2c1188b98ad1faca8b77d7499a62d5f41009f60.gz.b64",
+      "fixture_byte_count": 2269,
+      "fixture_sha256": "1e4b1bb9627193b14f72534b469b9a5a66d93af40d342aa85c19b3afa0d003bc"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "f44f98f15c7297b1ee1aaf5b54e724603b7f4348",
+      "raw_byte_count": 83,
+      "raw_sha256": "e007ce43b3643fdd44291b30159f559909fb75e58e6228b80be539b9b0653115",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/f44f98f15c7297b1ee1aaf5b54e724603b7f4348.gz.b64",
+      "fixture_byte_count": 137,
+      "fixture_sha256": "65ed385ff6973cd13bf4cd3bf273032fe51c442f4c47df9ce54270c4d06cf9a3"
+    },
+    {
+      "object_type": "blob",
+      "object_id": "f77cad35e1229e9f3c03049a6ea9b9413efaa634",
+      "raw_byte_count": 7931,
+      "raw_sha256": "ac8186277ec3f88e0ff848818ef15059a6512ff5f8a7bd24deb1f00dd9259205",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/f77cad35e1229e9f3c03049a6ea9b9413efaa634.gz.b64",
+      "fixture_byte_count": 3169,
+      "fixture_sha256": "c9ceb41c5cce1487d337cb5f021bba52aeadc270a9721ea48d611e87f34331a4"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "f84e5c6a79e86d8b9ed73cc2e70d497d418add07",
+      "raw_byte_count": 657,
+      "raw_sha256": "8df4c07369acd513eeebcd4f45e9e66876bfa0fc9145ab1152dced5c7db1fd10",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/f84e5c6a79e86d8b9ed73cc2e70d497d418add07.gz.b64",
+      "fixture_byte_count": 801,
+      "fixture_sha256": "3e0b0682a6c11d76ed9753ebe3c85f09dfb6687009b5a93c5bae7aaebf430118"
+    },
+    {
+      "object_type": "tree",
+      "object_id": "fc902d399cf29f361482894512cb5716630cd7ba",
+      "raw_byte_count": 166,
+      "raw_sha256": "b540c292b4841d190cd490c146edb42cfb3cc2fdbcc9a13a4441d6e66d6084f2",
+      "encoding": "GZIP_BASE64_RFC4648_MTIME_0",
+      "fixture_path": "docs/control/history/git-witnesses/a3ad7ee-20260812/objects/fc902d399cf29f361482894512cb5716630cd7ba.gz.b64",
+      "fixture_byte_count": 233,
+      "fixture_sha256": "e8cde411d3390566edd891e8ef0aa95bd6d39c2fb9c2ca153143c8818a465494"
+    }
+  ],
+  "integrity": {
+    "path_count": 65,
+    "present_path_count": 15,
+    "absent_path_count": 50,
+    "start_head_path_count": 30,
+    "historical_artifact_ref_count": 62,
+    "object_count": 48,
+    "commit_object_count": 1,
+    "tree_object_count": 32,
+    "blob_object_count": 15
+  },
+  "claim_boundary": {
+    "external_bundle_required_at_runtime": false,
+    "git_history_fetched_or_grafted": false,
+    "historical_control_modified": false,
+    "goal_completion_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "use": "READ_ONLY_HISTORICAL_COMMIT_PATH_BLOB_WITNESS"
+  }
+}

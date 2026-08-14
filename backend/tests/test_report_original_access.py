@@ -6,12 +6,14 @@ import hashlib
 import os
 from pathlib import Path
 import threading
+from types import SimpleNamespace
 import uuid
 
 from alembic import command
 from alembic.config import Config
 import pytest
 from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.app.database import SessionLocal
 from backend.app.main import report_image_key_manager
@@ -24,7 +26,11 @@ from backend.app.models import (
     ReportOriginalAccessAudit,
     ReportOriginalAccessGrant,
 )
-from backend.app.services.admin_security import AdminSessionIdentity
+from backend.app.services.admin_security import (
+    AdminSecurityService,
+    AdminSessionIdentity,
+    provision_admin_security,
+)
 from backend.app.services.report_image_crypto import encrypt_report_image
 from backend.app.services.report_image_keys import ReportImageKeyUnavailable
 from backend.app.services.report_original_access import (
@@ -38,6 +44,8 @@ from backend.app.uploads import write_image_file
 
 ROOT = Path(__file__).resolve().parents[2]
 TEST_DATABASE_CONFIGURED = bool(os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip())
+TEST_CREDENTIAL_ISSUER_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -93,6 +101,9 @@ def test_original_access_revalidates_control_before_session_row_lock() -> None:
             return self.value
 
     class FakeSession:
+        def get_bind(self):
+            return type("Bind", (), {"dialect": type("Dialect", (), {"name": "sqlite"})()})()
+
         def execute(self, statement):
             statements.append(str(statement))
             if len(statements) == 1:
@@ -166,17 +177,18 @@ def _store_encrypted_report(upload_root: Path, plaintext: bytes = b"private-repo
 
 def _issue(report_id: uuid.UUID, identity: AdminSessionIdentity, *, now: datetime | None = None):
     observed_at = now or datetime.now(timezone.utc)
-    with SessionLocal.begin() as db:
+    with SessionLocal() as db:
         if db.get(AdminSecurityControl, identity.admin_id) is None:
-            db.add(
-                AdminSecurityControl(
-                    admin_id=identity.admin_id,
-                    password_hash="test-password-hash",
-                    totp_secret_fingerprint="0" * 64,
-                    security_state="NORMAL",
-                    state_version=1,
-                )
+            provision_admin_security(
+                db,
+                admin_id=identity.admin_id,
+                password="report original test password",
+                totp_secret=TEST_TOTP_SECRET,
+                recovery_codes=["REPORT-ORIGINAL-RECOVERY-0001"],
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                now=observed_at,
             )
+    with SessionLocal.begin() as db:
         if db.get(AdminSecuritySession, identity.session_id) is None:
             db.add(
                 AdminSecuritySession(
@@ -192,6 +204,23 @@ def _issue(report_id: uuid.UUID, identity: AdminSessionIdentity, *, now: datetim
                     step_up_verified_at=identity.step_up_verified_at,
                     last_seen_at=observed_at,
                 )
+            )
+    with SessionLocal() as db:
+        control = db.get(AdminSecurityControl, identity.admin_id)
+        assert control is not None
+        if control.recovery_custody_state != "ATTESTED":
+            service = AdminSecurityService(
+                db,
+                SimpleNamespace(admin_totp_secret=TEST_TOTP_SECRET),
+            )
+            service._cached_credential_issuer_key = TEST_CREDENTIAL_ISSUER_KEY
+            service.attest_recovery_custody(
+                identity,
+                custody_reference=TEST_CREDENTIAL_ISSUER_KEY,
+                material_kind="RECOVERY_CODE",
+                storage_location="OFF_PHONE",
+                separate_encrypted_backup_confirmed=True,
+                now=observed_at,
             )
     with SessionLocal() as db:
         return issue_report_original_access_grant(
@@ -220,6 +249,8 @@ def test_purpose_bound_grant_returns_original_once_and_audits_before_release(tmp
             raw_access_token=grant.access_token,
             identity=identity,
             key_manager=report_image_key_manager,
+            runtime_totp_secret=TEST_TOTP_SECRET,
+            credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
         )
     assert accessed.content == b"private-report-image"
 
@@ -232,6 +263,8 @@ def test_purpose_bound_grant_returns_original_once_and_audits_before_release(tmp
                 raw_access_token=grant.access_token,
                 identity=identity,
                 key_manager=report_image_key_manager,
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
             )
         audits = list(
             db.scalars(
@@ -246,6 +279,137 @@ def test_purpose_bound_grant_returns_original_once_and_audits_before_release(tmp
         "ACCESS_GRANTED",
         "ACCESS_DENIED",
     ]
+
+
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+def test_runtime_role_accesses_original_without_direct_admin_update_privilege(
+    tmp_path: Path,
+) -> None:
+    report_id = _store_encrypted_report(tmp_path)
+    identity = _identity("runtime-role")
+    grant = _issue(report_id, identity)
+    engine = SessionLocal.kw["bind"]
+
+    with engine.connect() as connection:
+        connection.execute(text("SET SESSION AUTHORIZATION walksafe_backend_runtime"))
+        connection.commit()
+        try:
+            with SessionLocal(bind=connection) as db:
+                accessed = access_report_original(
+                    db,
+                    upload_root=tmp_path,
+                    filename=f"{report_id}.jpg",
+                    raw_access_token=grant.access_token,
+                    identity=identity,
+                    key_manager=report_image_key_manager,
+                    runtime_totp_secret=TEST_TOTP_SECRET,
+                    credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                )
+        finally:
+            if connection.in_transaction():
+                connection.rollback()
+            connection.execute(text("RESET SESSION AUTHORIZATION"))
+            connection.commit()
+
+    assert accessed.content == b"private-report-image"
+    with engine.connect() as privilege_connection:
+        runtime_direct_update_privileges = privilege_connection.execute(
+            text(
+                "SELECT "
+                "has_table_privilege('walksafe_backend_runtime', "
+                "'public.admin_security_controls', 'UPDATE'), "
+                "has_table_privilege('walksafe_backend_runtime', "
+                "'public.admin_security_sessions', 'UPDATE'), "
+                "has_table_privilege('walksafe_backend_runtime', "
+                "'public.report_image_keyring_events', 'UPDATE')"
+            )
+        ).one()
+    assert tuple(runtime_direct_update_privileges) == (False, False, False)
+    with SessionLocal() as db:
+        stored_grant = db.get(ReportOriginalAccessGrant, grant.grant_id)
+        access_audit = db.scalar(
+            select(ReportOriginalAccessAudit).where(
+                ReportOriginalAccessAudit.grant_id == grant.grant_id,
+                ReportOriginalAccessAudit.action == "ACCESS_GRANTED",
+            )
+        )
+    assert stored_grant is not None and stored_grant.consumed_at is not None
+    assert access_audit is not None
+
+
+@pytest.mark.parametrize(
+    ("runtime_totp_secret", "credential_issuer_key"),
+    (
+        (TEST_TOTP_SECRET, "_" * 43),
+        ("A" * 32, TEST_CREDENTIAL_ISSUER_KEY),
+    ),
+)
+@pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
+def test_runtime_role_original_access_rejects_wrong_capability_without_locking(
+    tmp_path: Path,
+    runtime_totp_secret: str,
+    credential_issuer_key: str,
+) -> None:
+    report_id = _store_encrypted_report(tmp_path)
+    identity = _identity("runtime-wrong-issuer")
+    grant = _issue(report_id, identity)
+    engine = SessionLocal.kw["bind"]
+
+    with engine.connect() as connection, engine.connect() as legitimate_connection:
+        for candidate in (connection, legitimate_connection):
+            candidate.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            candidate.commit()
+        attack = connection.begin()
+        try:
+            with pytest.raises(SQLAlchemyError):
+                connection.execute(
+                    text(
+                        "SELECT public."
+                        "walksafe_lock_admin_original_access_session("
+                        "CAST(:admin_id AS text), CAST(:session_id AS uuid), "
+                        "CAST(:device_id AS text), "
+                        "CAST(:observed_at AS timestamptz), "
+                        "CAST(:runtime_totp_secret AS text), "
+                        "CAST(:credential_issuer_key AS text))"
+                    ),
+                    {
+                        "admin_id": identity.admin_id,
+                        "session_id": identity.session_id,
+                        "device_id": identity.device_id,
+                        "observed_at": datetime.now(timezone.utc),
+                        "runtime_totp_secret": runtime_totp_secret,
+                        "credential_issuer_key": credential_issuer_key,
+                    },
+                )
+            # Leave the failed transaction open deliberately. A mismatched issuer
+            # must not acquire control/session tuple locks before it is rejected.
+            with SessionLocal(bind=legitimate_connection) as db:
+                db.execute(text("SET LOCAL lock_timeout = '250ms'"))
+                accessed = access_report_original(
+                    db,
+                    upload_root=tmp_path,
+                    filename=f"{report_id}.jpg",
+                    raw_access_token=grant.access_token,
+                    identity=identity,
+                    key_manager=report_image_key_manager,
+                    runtime_totp_secret=TEST_TOTP_SECRET,
+                    credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
+                )
+        finally:
+            if attack.is_active:
+                attack.rollback()
+            for candidate in (connection, legitimate_connection):
+                if candidate.in_transaction():
+                    candidate.rollback()
+                candidate.execute(text("RESET SESSION AUTHORIZATION"))
+                candidate.commit()
+
+    assert accessed.content == b"private-report-image"
+    with SessionLocal() as db:
+        stored_grant = db.get(ReportOriginalAccessGrant, grant.grant_id)
+    assert stored_grant is not None and stored_grant.consumed_at is not None
 
 
 @pytest.mark.skipif(not TEST_DATABASE_CONFIGURED, reason="WALKSAFE_TEST_DATABASE_URL is not configured")
@@ -264,6 +428,8 @@ def test_grant_is_bound_to_report_admin_session_device_and_expiry(tmp_path: Path
                 raw_access_token=grant.access_token,
                 identity=_identity("other"),
                 key_manager=report_image_key_manager,
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                 now=issued_at + timedelta(seconds=1),
             )
     assert mismatch.value.status_code == 403
@@ -277,6 +443,8 @@ def test_grant_is_bound_to_report_admin_session_device_and_expiry(tmp_path: Path
                 raw_access_token=grant.access_token,
                 identity=identity,
                 key_manager=report_image_key_manager,
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                 now=issued_at + timedelta(seconds=121),
             )
     assert expired.value.status_code == 403
@@ -302,6 +470,8 @@ def test_tamper_or_key_loss_consumes_grant_and_withholds_plaintext(tmp_path: Pat
                 raw_access_token=grant.access_token,
                 identity=identity,
                 key_manager=report_image_key_manager,
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
             )
     assert failure.value.status_code == 503
     with SessionLocal() as db:
@@ -334,6 +504,8 @@ def test_tamper_or_key_loss_consumes_grant_and_withholds_plaintext(tmp_path: Pat
                 raw_access_token=second_grant.access_token,
                 identity=identity,
                 key_manager=UnavailableKeyManager(),  # type: ignore[arg-type]
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
             )
     assert missing_key.value.status_code == 503
 
@@ -354,6 +526,8 @@ def test_concurrent_one_time_grant_has_exactly_one_success(tmp_path: Path) -> No
                     raw_access_token=grant.access_token,
                     identity=identity,
                     key_manager=report_image_key_manager,
+                    runtime_totp_secret=TEST_TOTP_SECRET,
+                    credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                 )
                 return "success"
             except ReportOriginalAccessError as exc:
@@ -391,7 +565,7 @@ def test_revoke_or_recovery_committed_first_withholds_original_plaintext(
             ).scalar_one()
             if security_change == "revoke":
                 session.revoked_at = datetime.now(timezone.utc)
-                session.revoked_reason = "test_race"
+                session.revoked_reason = "administrator_revoked"
             else:
                 control.security_state = "RECOVERY_IN_PROGRESS"
                 control.state_version += 1
@@ -408,6 +582,8 @@ def test_revoke_or_recovery_committed_first_withholds_original_plaintext(
                     raw_access_token=grant.access_token,
                     identity=identity,
                     key_manager=report_image_key_manager,
+                    runtime_totp_secret=TEST_TOTP_SECRET,
+                    credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
                 )
             except ReportOriginalAccessError as exc:
                 return f"denied:{exc.status_code}"
@@ -455,6 +631,8 @@ def test_audit_commit_failure_withholds_decrypted_original(tmp_path: Path, monke
                 raw_access_token=grant.access_token,
                 identity=identity,
                 key_manager=report_image_key_manager,
+                runtime_totp_secret=TEST_TOTP_SECRET,
+                credential_issuer_key=TEST_CREDENTIAL_ISSUER_KEY,
             )
 
     assert withheld.value.status_code == 503

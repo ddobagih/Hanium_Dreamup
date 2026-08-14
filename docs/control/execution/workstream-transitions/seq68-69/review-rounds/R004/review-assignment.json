@@ -1,0 +1,249 @@
+{
+  "assigned_at": "2026-08-13T17:33:38+00:00",
+  "assigner": {
+    "agent_instance_id": "codex-root-fp022-seq68-69-r004-assigner-20260814",
+    "canonical_task": "/root",
+    "role": "INTERNAL_REVIEW_ASSIGNER"
+  },
+  "evidence_type": "FP022_SEQ68_69_REVIEW_ASSIGNMENT",
+  "executor": {
+    "agent_instance_id": "codex-root-fp022-seq68-69-r004-executor-20260814",
+    "canonical_task": "/root",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR"
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "approval_credit_added": 0,
+    "artifact_completion_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "product_implementation_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "atomic_checkpoint_publication_is_fail_closed": true,
+      "no_product_artifact_formal_device_external_deployment_approval_or_release_credit_is_added": true,
+      "private_seven_check_gate_runs_only_after_seq68": true,
+      "projected_seq68_and_seq69_pass_continuation_and_goal_graph": true,
+      "r002_contract_exactly_supersedes_r001": true,
+      "seq66_67_r002_predecessor_review_is_exact": true,
+      "seq68_is_add_only_ready_to_ready_control_reanchor": true,
+      "seq68_status_changes_are_empty": true,
+      "seq69_changes_only_fp022_ready_to_in_progress": true,
+      "seq69_started_requires_the_exact_pass_receipt": true,
+      "source_checkpoint_is_exact_seq67": true
+    },
+    "predecessor_review_bindings": [
+      {
+        "byte_length": 7889,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/review-assignment.json",
+        "sha256": "106f22a96ee9cf976b74e2b33cf92b9f14fd9009e38e5463e8fc462bd3b0e523"
+      },
+      {
+        "byte_length": 7951,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/review-result.json",
+        "sha256": "734801f30e1d977806e5ec19751117b4d3c13a2467f8b3d5caea21a42e40246b"
+      },
+      {
+        "byte_length": 8228,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/independent-review.json",
+        "sha256": "0a882fb03cb9918cdb153d9df5ce1c148bfbb9fd4442325d82226b9bf4b4f101"
+      }
+    ],
+    "projected_transition": {
+      "control_reanchor": {
+        "contract_id": "WS-FP022-INTERNAL-START-GATE-R002",
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP022-20260814-001",
+        "event_type": "GOAL_START_CONTROL_REANCHORED",
+        "from_status": "READY",
+        "occurred_at": "2026-08-14T01:54:30+09:00",
+        "sequence": 68,
+        "status_changes": {},
+        "to_status": "READY"
+      },
+      "final_focus_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+      "final_status": "IN_PROGRESS",
+      "goal_started": {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001",
+        "event_type": "GOAL_STARTED",
+        "from_status": "READY",
+        "sequence": 69,
+        "start_gate_required_status": "PASS",
+        "to_status": "IN_PROGRESS"
+      }
+    },
+    "required_finding_ids": [],
+    "reviewed_control_code_cohort": [
+      {
+        "byte_length": 265995,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "44c4cd2b2a526f91303ef03e6d2952b4e1fd43b923da1c541ca7b1addbb0a745"
+      },
+      {
+        "byte_length": 79216,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "9b31f233b8011a363f5747e91b33e98420965645b478d28db18ff551007e1ef7"
+      },
+      {
+        "byte_length": 533096,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "d62f98bcbce9b4bc389f896da44cbe46b51d6017989bf71206fc1027de75e77e"
+      },
+      {
+        "byte_length": 277588,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "47794ba41dad29388899c61f79b5d29b6e1fab05b075fd0347536f1fd75579cd"
+      },
+      {
+        "byte_length": 65466,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "1966c7719ca92ecd6e6ad8b09b62c3d31e58f301d7b2d8af453eab16f5cebaef"
+      },
+      {
+        "byte_length": 36837,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "d02798e42003a2cbd5eeba20a307f5d314b0f4346b62aee46b413a358b42f065"
+      },
+      {
+        "byte_length": 24304,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "eb074f51cebb41d071e6533385b9b73c622e521c82ecf7700d5ee695b4e69fe9"
+      },
+      {
+        "byte_length": 12898,
+        "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "cd243a024ab370bd279a9e07570cc41b64787492b3360ac2f741471c58266be3"
+      },
+      {
+        "byte_length": 47604,
+        "path": "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "d38dd3930b61dfc6a7d0bf485d420f428930777b5984cb7f46c13a38323fed2f"
+      },
+      {
+        "byte_length": 14335,
+        "path": "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "dd20a5442b40a3c40d0a813bc678529d894c3dfd2b1f57cbec5d24407aee7171"
+      },
+      {
+        "byte_length": 26312,
+        "path": "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "423f10fd49479256ba2cdc9ab05265b3e6d3b30679a6e8063e7d7d7c92a46447"
+      },
+      {
+        "byte_length": 7127,
+        "path": "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "f57978ae59db20a46c63bd2bdf8ae25eabd329c7036ad2d408af7b7778025fce"
+      },
+      {
+        "byte_length": 24748,
+        "path": "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "039144ac0970004bbc69c17346a87a70179fdfdd22b9a7dfe53a667f84388560"
+      },
+      {
+        "byte_length": 13990,
+        "path": "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "54f60a6088ed4637773b2c123a04feb0f04eb787ebc72fffabef34820179a1a5"
+      },
+      {
+        "byte_length": 40324,
+        "path": "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "sha256": "7ff205b1061382b024f77a9e824f5077126008ce19308947de2b10b0c3719853"
+      },
+      {
+        "byte_length": 12464,
+        "path": "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "sha256": "5567061c0b5efc1804df1eebcb742074007c2d876d94d2b49bbe7078168b1538"
+      },
+      {
+        "byte_length": 37218,
+        "path": "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        "sha256": "8ce979a616679224d70a5a24cc1485bb86583f615c0458834791a64b3df62409"
+      },
+      {
+        "byte_length": 20178,
+        "path": "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        "sha256": "c2fa0e2784fb64924f5b8ba590aacd2a3e330dc2d75b3e41ff9d8076342f36fe"
+      },
+      {
+        "byte_length": 29380,
+        "path": "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+        "sha256": "ab500be9b8de6bf3a116e87884c5101d4f18b157e82bd0f8d36cf853bc6a0e1e"
+      },
+      {
+        "byte_length": 9023,
+        "path": "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py",
+        "sha256": "526e15fed48697bfb1c030f524601fd9dfdc0c9460ab3f5cae08388478cf83d1"
+      }
+    ],
+    "reviewed_control_code_cohort_sha256": "8a2731f6771e6ed5859407b7e5735559441b4b1f0b8dd4518b1d181985111cb1",
+    "source_checkpoint": {
+      "byte_length": 1994168,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 67,
+      "sha256": "87990596835e0ed3dad48c4a974fb2521a28d9dfdfe076a1ec10596306179354",
+      "tail_event_sha256": "37207b4393dd5820de6b71c7e167885f8592875f8b54d9d75d650aef230a87a2"
+    },
+    "successor_start_gate_contract_evidence": {
+      "byte_length": 4496,
+      "canonical_contract_sha256": "f31af2282de92f84c9b87c0f465ea330fa57661238f9777d45bd00b44bb0c464",
+      "contract_id": "WS-FP022-INTERNAL-START-GATE-R002",
+      "contract_version": "2026-08-14.1",
+      "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260814-002",
+      "file_sha256": "b18a7b90b4dbd848c2226a0825ebdbe97a4cab9d03b471759a855bf25814f832",
+      "ordered_check_ids": [
+        "CONTINUATION",
+        "V24_ARTIFACT_WORK_QUEUE",
+        "TEST_LAYER_REGISTRY_VALIDATE",
+        "BACKEND_NAVIGATION_INTERNAL",
+        "ANDROID_USER_INTERNAL",
+        "ROOT_FP022_CONTROL_REGRESSION",
+        "REPOSITORY_STATE"
+      ],
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r002.json",
+      "successor_reason_code": "SEQ67_READY_TRUST_ANCHOR_AND_CURRENT_CONTROL_COHORT_REQUIRED"
+    },
+    "superseded_review_assignments": [
+      {
+        "byte_length": 9610,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R001/review-assignment.json",
+        "reason": "SEQ69_FULL_CHECKERS_WERE_NOT_REVALIDATED_AT_PUBLICATION",
+        "sha256": "99b3c11342a7b0fc4f2ec191f07e1182071ff425bbcdc6b7381be4506ee35fb5",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 10052,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R002/review-assignment.json",
+        "reason": "SEQ66_67_PREDECESSOR_REVIEW_WAS_REVALIDATED_AGAINST_LIVE_CONTROLS",
+        "sha256": "18fc4e5453d0a53f0a21aa5ecf15f87edd8448fe7bd7620f4b716ae8a19b7364",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 10440,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R003/review-assignment.json",
+        "reason": "SEQ66_67_POSTPUBLICATION_TEST_EXPECTED_ONLY_THE_SYNTHETIC_REVIEW_BINDING",
+        "sha256": "06813200f1b0de4cba73a10aac9954a9ae1e61dadf274a2ed3664e7f0490767c",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      }
+    ],
+    "superseded_start_gate_contract_evidence": {
+      "byte_length": 2912,
+      "canonical_contract_sha256": "a5d39ea4a1c7f919e4d3d08f3a429f7de0bdadec9d03756df7f32f4bbef074ab",
+      "contract_id": "WS-FP022-INTERNAL-START-GATE-R001",
+      "contract_version": "2026-08-13.1",
+      "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260813-001",
+      "file_sha256": "14ad8eee8a6c972c1e9091c2065b0779acdde427d0176b84fb83b18840865c25",
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json"
+    }
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-fp022-seq68-69-r004-reviewer-20260814",
+    "canonical_task": "/root/fp022_seq68_69_r004_reviewer",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP022-SEQ68-69-REVIEW-20260814-R004",
+  "schema_version": "1.0"
+}

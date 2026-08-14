@@ -11,7 +11,7 @@ Group=walksafe-backend
 WorkingDirectory=/srv/walksafe/backend
 Environment=PYTHONPATH=/srv/walksafe/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
-EnvironmentFile=/etc/walksafe/backend.env
+EnvironmentFile=/etc/walksafe/backend-runtime.env
 RuntimeDirectory=walksafe-backend
 RuntimeDirectoryMode=0700
 StateDirectory=walksafe/uploads walksafe/android-debug-logs
@@ -28,7 +28,8 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-ReadOnlyPaths=/etc/walksafe/report-image-keyring.json
+ReadOnlyPaths=/etc/walksafe/report-image-keyring.json /etc/walksafe/admin-credential-issuer.key
+InaccessiblePaths=/etc/walksafe/backend-migration.env /etc/walksafe/backend.env
 ReadWritePaths=/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs /run/walksafe-backend
 
 [Install]

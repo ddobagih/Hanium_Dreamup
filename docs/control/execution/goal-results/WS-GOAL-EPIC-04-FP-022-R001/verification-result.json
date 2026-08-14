@@ -1,0 +1,60 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_independence_claimed": false,
+    "external_review_status": "NOT_RUN",
+    "external_tmap_status": "NOT_RUN",
+    "field_gps_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_ids": [
+      "TC-FP-022-01",
+      "TC-FP-022-02",
+      "TC-FP-022-03",
+      "TC-FP-022-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "credit_scope": "REPOSITORY_INTERNAL_ONLY",
+  "document_id": "WS-FP022-NAVIGATION-VERIFICATION-20260814-001",
+  "executor": {
+    "id": "codex-fp022-navigation-implementer-20260814",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "task": "/root"
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "implementation_content_set_sha256": "4ef7df96c5edf35864b81b637fcf8406009ab32f61cb97cae1e88763166c24f3",
+  "implementation_record_sha256": "62821b96edd5a5b8f671c70707082f2151682041cc46b304bf400a2cc6adf10b",
+  "internal_lane_count": 3,
+  "kind": "VERIFICATION_RESULT",
+  "lane_log_bindings": [
+    {
+      "byte_length": 531,
+      "lane_id": "BACKEND_NAVIGATION_INTERNAL",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/backend-navigation-internal.log",
+      "sha256": "249031160869dc49edbec23a88808d17dadda9e174a1d5e97a0568361123d951"
+    },
+    {
+      "byte_length": 3701,
+      "lane_id": "ANDROID_USER_INTERNAL",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/android-user-internal.log",
+      "sha256": "cdf1a98a74eb416ed30689d71e509f44155596ceb8d05a3df9c211014c904838"
+    },
+    {
+      "byte_length": 421,
+      "lane_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/test-layer-registry-validate.log",
+      "sha256": "e6502409d2de507ce23ef8dff787545a5b835d3862f3f1f362a326df71190e02"
+    }
+  ],
+  "observed_at": "2026-08-14T14:46:19.617604+09:00",
+  "schema_version": "walksafe.fp022-verification-result.v1",
+  "status": "PASS",
+  "verification_observations_sha256": "ae32c95d6034ec234d8a0c9c9e94039d16bb22f62c641565dbe668d9c516c93d",
+  "verification_result_content_sha256": "8c6744769967cd1d28cdaaeac642a5478772dde9673ce6da4edf1d7824be97af"
+}

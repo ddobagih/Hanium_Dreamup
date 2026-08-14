@@ -4,6 +4,8 @@ import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import os
+from pathlib import Path
+from types import SimpleNamespace
 import uuid
 
 from alembic.autogenerate import compare_metadata
@@ -11,13 +13,15 @@ from alembic.migration import MigrationContext
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 import pytest
-from sqlalchemy import create_engine, func, select, update
+from sqlalchemy import create_engine, delete, func, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.models import (
     AdminDeviceKey,
     AdminSecurityAudit,
+    AdminSecurityControl,
+    AdminSecurityRecoveryCode,
     Base,
     Report,
     ReportInstitutionDeliveryEvent,
@@ -44,6 +48,7 @@ from backend.app.services.admin_report_workflow import (
 from backend.app.services.admin_security import (
     AdminSecurityError,
     AdminSessionIdentity,
+    provision_admin_security,
     record_admin_security_failure,
 )
 
@@ -85,7 +90,7 @@ def _rfc3339_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
+def test_fp008_postgres_schema_device_key_and_single_use_proof(tmp_path: Path) -> None:
     engine, SessionFactory = _session_factory()
     table_names = {
         "admin_device_keys",
@@ -111,12 +116,56 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
         )
     assert differences == []
 
+    def run_as_runtime(callback):
+        with engine.connect() as connection:
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            connection.commit()
+            try:
+                with SessionFactory(bind=connection) as db:
+                    return callback(db)
+            finally:
+                connection.rollback()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+
     suffix = uuid.uuid4().hex[:12]
-    admin_id = f"fp008.admin.{suffix}"
+    requested_admin_id = f"fp008.admin.{suffix}"
     device_id = f"fp008-device-{suffix}"
-    identity = _identity(admin_id, device_id)
     private_key = ec.generate_private_key(ec.SECP256R1())
     spki = _spki(private_key)
+    provision_time = datetime.now(timezone.utc)
+    with SessionFactory() as db:
+        controls = db.execute(select(AdminSecurityControl)).scalars().all()
+    created_control = not controls
+    if created_control:
+        admin_id = requested_admin_id
+        credential_issuer_key = base64.urlsafe_b64encode(
+            hashlib.sha256(b"fp008-integration-issuer-key").digest()
+        ).decode("ascii").rstrip("=")
+        with SessionFactory() as db:
+            provision_admin_security(
+                db,
+                admin_id=admin_id,
+                password="fp008 integration password",
+                totp_secret="JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+                recovery_codes=[f"FP008-RECOVERY-{suffix}-0001"],
+                credential_issuer_key=credential_issuer_key,
+                now=provision_time,
+            )
+    else:
+        assert len(controls) == 1
+        admin_id = controls[0].admin_id
+        pytest.skip("the shared database already has another administrator control")
+    issuer_key_file = tmp_path / "issuer.key"
+    issuer_key_file.write_text(credential_issuer_key, encoding="ascii")
+    issuer_key_file.chmod(0o600)
+    proof_settings = SimpleNamespace(
+        admin_totp_secret="JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+        admin_credential_issuer_key_file=issuer_key_file,
+    )
+    identity = _identity(admin_id, device_id)
     with SessionFactory() as db:
         provisioned = provision_admin_device_key(
             db,
@@ -129,9 +178,9 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
     report_id = uuid.uuid4()
     correlation_id = uuid.uuid4()
     body = b'{"decision":"APPROVED"}'
-    now = datetime.now(timezone.utc)
-    with SessionFactory() as db:
-        response = AdminDeviceProofService(db).issue_challenge(
+    now = provision_time + timedelta(seconds=1)
+    response = run_as_runtime(
+        lambda db: AdminDeviceProofService(db, proof_settings).issue_challenge(
             purpose="ACTION",
             action="report.review.decide",
             admin_id=admin_id,
@@ -148,6 +197,7 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
             identity=identity,
             now=now,
         )
+    )
     signature = base64.urlsafe_b64encode(
         private_key.sign(
             response["signing_payload"].encode("utf-8"),
@@ -155,8 +205,8 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
         )
     ).decode("ascii").rstrip("=")
 
-    with SessionFactory.begin() as db:
-        verified = verify_admin_device_proof(
+    def verify_action(db):
+        result = verify_admin_device_proof(
             db,
             challenge_id=response["challenge_id"],
             signature=signature,
@@ -171,13 +221,19 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
             expected_read_purpose=None,
             raw_body=body,
             raw_query_string=b"",
+            runtime_totp_secret=proof_settings.admin_totp_secret,
+            credential_issuer_key=credential_issuer_key,
             now=now + timedelta(seconds=1),
         )
+        db.commit()
+        return result
+
+    verified = run_as_runtime(verify_action)
     assert verified.challenge_id == uuid.UUID(response["challenge_id"])
 
     with pytest.raises(AdminSecurityError, match="already consumed"):
-        with SessionFactory.begin() as db:
-            verify_admin_device_proof(
+        run_as_runtime(
+            lambda db: verify_admin_device_proof(
                 db,
                 challenge_id=response["challenge_id"],
                 signature=signature,
@@ -192,8 +248,93 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
                 expected_read_purpose=None,
                 raw_body=body,
                 raw_query_string=b"",
+                runtime_totp_secret=proof_settings.admin_totp_secret,
+                credential_issuer_key=credential_issuer_key,
                 now=now + timedelta(seconds=2),
             )
+        )
+
+    for proof_case in (
+        {
+            "purpose": "LOGIN",
+            "action": None,
+            "method": "POST",
+            "path": "/admin/security/sessions",
+            "read_purpose": None,
+            "session_id": None,
+            "identity": None,
+            "body": b'{"login":true}',
+            "query": b"",
+        },
+        {
+            "purpose": "ACTION",
+            "action": None,
+            "method": "GET",
+            "path": f"/reports/{report_id}/review-decisions",
+            "read_purpose": "report.review_decisions",
+            "session_id": str(identity.session_id),
+            "identity": identity,
+            "body": b"",
+            "query": b"view=full",
+        },
+    ):
+        case_correlation_id = uuid.uuid4()
+        case_response = run_as_runtime(
+            lambda db, case=proof_case: AdminDeviceProofService(
+                db,
+                proof_settings,
+            ).issue_challenge(
+                purpose=case["purpose"],
+                action=case["action"],
+                admin_id=admin_id,
+                body_sha256=raw_body_sha256(case["body"]),
+                correlation_id=str(case_correlation_id),
+                device_id=device_id,
+                device_key_marker=provisioned.key_marker,
+                device_key_version=1,
+                method=case["method"],
+                path=case["path"],
+                query_sha256=canonical_admin_query_sha256(case["query"]),
+                read_purpose=case["read_purpose"],
+                session_id=case["session_id"],
+                identity=case["identity"],
+                now=now,
+            )
+        )
+        case_signature = base64.urlsafe_b64encode(
+            private_key.sign(
+                case_response["signing_payload"].encode("utf-8"),
+                ec.ECDSA(hashes.SHA256()),
+            )
+        ).decode("ascii").rstrip("=")
+
+        def verify_case(db, case=proof_case):
+            result = verify_admin_device_proof(
+                db,
+                challenge_id=case_response["challenge_id"],
+                signature=case_signature,
+                correlation_id=str(case_correlation_id),
+                expected_purpose=case["purpose"],
+                expected_action=case["action"],
+                expected_admin_id=admin_id,
+                expected_device_id=device_id,
+                expected_session_id=(
+                    identity.session_id if case["session_id"] is not None else None
+                ),
+                expected_method=case["method"],
+                expected_path=case["path"],
+                expected_read_purpose=case["read_purpose"],
+                raw_body=case["body"],
+                raw_query_string=case["query"],
+                runtime_totp_secret=proof_settings.admin_totp_secret,
+                credential_issuer_key=credential_issuer_key,
+                now=now + timedelta(seconds=1),
+            )
+            db.commit()
+            return result
+
+        case_verified = run_as_runtime(verify_case)
+        assert case_verified.challenge_id == uuid.UUID(case_response["challenge_id"])
 
     second_private_key = ec.generate_private_key(ec.SECP256R1())
     second_spki = _spki(second_private_key)
@@ -220,6 +361,19 @@ def test_fp008_postgres_schema_device_key_and_single_use_proof() -> None:
             )
         )
     assert active_count == 1
+    with SessionFactory.begin() as db:
+        db.execute(delete(AdminDeviceKey).where(AdminDeviceKey.admin_id == admin_id))
+        if created_control:
+            db.execute(
+                delete(AdminSecurityRecoveryCode).where(
+                    AdminSecurityRecoveryCode.admin_id == admin_id
+                )
+            )
+            db.execute(
+                delete(AdminSecurityControl).where(
+                    AdminSecurityControl.admin_id == admin_id
+                )
+            )
     engine.dispose()
 
 

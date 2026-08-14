@@ -27,7 +27,7 @@ import stat
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -329,8 +329,227 @@ V24_SEQ39_AUTHORIZED_CHECKPOINT_MUTATIONS = [
 
 # Reuse the frozen v2.3 implementation for deterministic read-only utilities.
 working_snapshot_hashes = _v23_utility.working_snapshot_hashes
-capture_gate_repository_state = _v23_utility.capture_gate_repository_state
+def capture_gate_repository_state(
+    root: Path,
+    checkpoint_path: Path,
+    gate_event_id: str,
+    *,
+    ephemeral_exact_exclusion: str | None = None,
+    controlled_snapshot_transitions: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    if (
+        ephemeral_exact_exclusion is None
+        and controlled_snapshot_transitions is None
+    ):
+        return _v23_utility.capture_gate_repository_state(
+            root,
+            checkpoint_path,
+            gate_event_id,
+        )
+    utility = _load_frozen_v23_utility()
+    original_exclusion = utility._gate_exclusion_kind
+
+    def exclusion(relative: str, event_id: str) -> str | None:
+        if relative == ephemeral_exact_exclusion:
+            return "EPHEMERAL_EXACT_PATH"
+        return original_exclusion(relative, event_id)
+
+    if ephemeral_exact_exclusion is not None:
+        utility._gate_exclusion_kind = exclusion
+    transition_rows: tuple[dict[str, Any], ...] = ()
+    initial_phase: int | None = None
+    if controlled_snapshot_transitions is not None:
+        transition_rows = tuple(copy.deepcopy(dict(row)) for row in controlled_snapshot_transitions)
+        if not transition_rows:
+            raise ValueError("controlled snapshot transitions are empty")
+        paths = tuple(row.get("path") for row in transition_rows)
+        if (
+            not all(isinstance(path, str) and path for path in paths)
+            or len(set(paths)) != len(paths)
+            or not all(
+                set(row) == {"path", "predecessor_worktree", "candidate_worktree"}
+                and isinstance(row.get("predecessor_worktree"), dict)
+                and isinstance(row.get("candidate_worktree"), dict)
+                for row in transition_rows
+            )
+        ):
+            raise ValueError("controlled snapshot transitions are invalid")
+
+        def transition_phase(identities: Mapping[str, Any]) -> int:
+            states: list[str] = []
+            for row in transition_rows:
+                identity = identities.get(row["path"])
+                if identity == row["predecessor_worktree"]:
+                    states.append("P")
+                elif identity == row["candidate_worktree"]:
+                    states.append("C")
+                else:
+                    raise ValueError(
+                        "controlled snapshot transition worktree differs: "
+                        f"{row['path']}"
+                    )
+            phase = states.count("C")
+            if states != ["C"] * phase + ["P"] * (len(states) - phase):
+                raise ValueError("controlled snapshot transition order differs")
+            return phase
+
+        def stable_transition_observation(
+            snapshot_root: Path,
+        ) -> tuple[dict[str, Any], dict[str, tuple[int, ...]]]:
+            identities: dict[str, Any] = {}
+            signatures: dict[str, tuple[int, ...]] = {}
+            for row in transition_rows:
+                relative = row["path"]
+                parent_descriptor, name = utility._open_repo_parent_directory(
+                    snapshot_root,
+                    relative,
+                )
+                if parent_descriptor is None:
+                    raise ValueError(
+                        f"controlled snapshot transition path is missing: {relative}"
+                    )
+                try:
+                    before = os.stat(
+                        name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        not stat.S_ISREG(before.st_mode)
+                        or stat.S_IMODE(before.st_mode) != 0o600
+                        or before.st_uid != os.geteuid()
+                        or before.st_nlink != 1
+                    ):
+                        raise ValueError(
+                            "controlled snapshot transition authority differs: "
+                            f"{relative}"
+                        )
+                    identity = utility._stable_regular_file_identity(
+                        parent_descriptor,
+                        name,
+                        before,
+                    )
+                    after = os.stat(
+                        name,
+                        dir_fd=parent_descriptor,
+                        follow_symlinks=False,
+                    )
+                finally:
+                    os.close(parent_descriptor)
+                signature = (
+                    after.st_dev,
+                    after.st_ino,
+                    after.st_mode,
+                    after.st_uid,
+                    after.st_gid,
+                    after.st_nlink,
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                )
+                if signature != (
+                    before.st_dev,
+                    before.st_ino,
+                    before.st_mode,
+                    before.st_uid,
+                    before.st_gid,
+                    before.st_nlink,
+                    before.st_size,
+                    before.st_mtime_ns,
+                    before.st_ctime_ns,
+                ):
+                    raise ValueError(
+                        "controlled snapshot transition identity changed: "
+                        f"{relative}"
+                    )
+                identities[relative] = identity
+                signatures[relative] = signature
+            return identities, signatures
+
+        initial_identities, initial_signatures = stable_transition_observation(root)
+        initial_phase = transition_phase(initial_identities)
+
+        def working_snapshot_hashes_with_overrides(
+            snapshot_root: Path,
+            paths: list[str],
+        ) -> tuple[str, str]:
+            normalized = sorted(paths)
+            transition_paths = {row["path"] for row in transition_rows}
+            if not transition_paths.issubset(normalized):
+                raise ValueError(
+                    "controlled snapshot transition path is unmanaged"
+                )
+            identities, signatures = stable_transition_observation(snapshot_root)
+            if (
+                transition_phase(identities) != initial_phase
+                or signatures != initial_signatures
+            ):
+                raise ValueError("controlled snapshot transition phase changed")
+            path_digest = hashlib.sha256(
+                ("\n".join(normalized) + "\n").encode("utf-8")
+            ).hexdigest()
+            content_digest = hashlib.sha256()
+            for relative in normalized:
+                transition = next(
+                    (row for row in transition_rows if row["path"] == relative),
+                    None,
+                )
+                if transition is None:
+                    path = utility.resolve_safe_repo_file(snapshot_root, relative)
+                    if path is None:
+                        raise ValueError(
+                            "unsafe or missing working snapshot path: "
+                            f"{relative}"
+                        )
+                    digest = utility.sha256_file(path)
+                else:
+                    digest = transition["predecessor_worktree"].get("sha256")
+                    if not isinstance(digest, str) or re.fullmatch(
+                        r"[0-9a-f]{64}", digest
+                    ) is None:
+                        raise ValueError(
+                            "controlled snapshot predecessor SHA-256 is invalid"
+                        )
+                content_digest.update(relative.encode("utf-8"))
+                content_digest.update(b"\0")
+                content_digest.update(digest.encode("ascii"))
+                content_digest.update(b"\n")
+            return path_digest, content_digest.hexdigest()
+
+        utility.working_snapshot_hashes = working_snapshot_hashes_with_overrides
+    payload = utility.capture_gate_repository_state(
+        root,
+        checkpoint_path,
+        gate_event_id,
+    )
+    if transition_rows:
+        dirty = payload.get("dirty_snapshot")
+        dirty_paths = dirty.get("paths") if isinstance(dirty, dict) else None
+        if not isinstance(dirty_paths, list):
+            raise ValueError("repository dirty snapshot is missing")
+        captured_by_path = {
+            row.get("path"): row.get("worktree")
+            for row in dirty_paths
+            if isinstance(row, dict) and isinstance(row.get("path"), str)
+        }
+        if transition_phase(captured_by_path) != initial_phase:
+            raise ValueError("captured snapshot transition phase changed")
+        identities, signatures = stable_transition_observation(root)
+        if (
+            transition_phase(identities) != initial_phase
+            or signatures != initial_signatures
+        ):
+            raise ValueError("controlled snapshot transition phase changed")
+    if ephemeral_exact_exclusion is not None:
+        exclusions = payload.get("transaction_exclusions")
+        if not isinstance(exclusions, dict):
+            raise ValueError("repository transaction exclusions are missing")
+        exclusions["allowed_rule_count"] = 3
+        exclusions["ephemeral_exact_path"] = ephemeral_exact_exclusion
+    return payload
 current_head = _v23_utility.current_head
+current_branch = _v23_utility.current_branch
+is_commit_ancestor = _v23_utility.is_commit_ancestor
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -350,6 +569,7 @@ ALLOWED_EVENT_TYPES = {
     "CANONICAL_BINDINGS_UPDATED",
     "GOAL_MATERIALIZED",
     "GOAL_READY",
+    "GOAL_START_CONTROL_REANCHORED",
     "GOAL_STARTED",
     "WORK_SESSION_RESUMED",
     "GOAL_COMPLETED",
@@ -358,6 +578,68 @@ ALLOWED_EVENT_TYPES = {
     "BLOCKER_RECORDED",
     "BLOCKER_RESOLVED",
     "PACKAGE_COMPLETED",
+}
+GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS = {
+    "sequence",
+    "event_id",
+    "event_type",
+    "occurred_on",
+    "occurred_at",
+    "previous_focus_goal_id",
+    "previous_focus_content_sha256",
+    "focus_goal_id",
+    "focus_goal_content_sha256",
+    "subject_goal_id",
+    "from_status",
+    "to_status",
+    "static_plan_manifest_sha256",
+    "status_changes",
+    "runtime_after",
+    "blockers_after",
+    "blocker_resolution_ids_after",
+    "source_checkpoint_version",
+    "evidence_refs",
+    "source_ready_event_binding",
+    "contract_supersession",
+    "repository_context_reanchor",
+    "authorization_binding",
+    "independent_review_binding",
+    "claim_boundary",
+    "unchanged_control_projection",
+    "previous_event_sha256",
+    "event_sha256",
+}
+FP022_GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS = {
+    "sequence",
+    "event_id",
+    "event_type",
+    "occurred_on",
+    "occurred_at",
+    "previous_focus_goal_id",
+    "previous_focus_content_sha256",
+    "focus_goal_id",
+    "focus_goal_content_sha256",
+    "subject_goal_id",
+    "from_status",
+    "to_status",
+    "static_plan_manifest_sha256",
+    "status_changes",
+    "runtime_after",
+    "blockers_after",
+    "blocker_resolution_ids_after",
+    "source_checkpoint_version",
+    "evidence_refs",
+    "source_checkpoint_binding",
+    "source_ready_event_binding",
+    "contract_supersession",
+    "start_gate_runner_binding",
+    "transition_control_review_binding",
+    "repository_context_reanchor",
+    "claim_boundary",
+    "unchanged_control_projection",
+    "canonical_binding_snapshot_after",
+    "previous_event_sha256",
+    "event_sha256",
 }
 V24_ACTIVATION_EVENT_FIELDS = {
     "sequence",
@@ -489,6 +771,293 @@ FP046_START_GATE_RUNTIME_PATHS = [
     "apps/android-gateway/package-lock.json",
     "configs/walksafe_node_toolchain_lock_20260715.json",
 ]
+FP022_GOAL_ID = "WS-GOAL-EPIC-04-FP-022-R001"
+FP022_GOAL_SHA256 = (
+    "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b"
+)
+FP022_START_GATE_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/"
+    "initial-start-gate-contract-r002.json"
+)
+FP022_READY_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP022-20260813-001"
+)
+FP022_READY_EVENT_SHA256 = (
+    "37207b4393dd5820de6b71c7e167885f8592875f8b54d9d75d650aef230a87a2"
+)
+FP022_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "FP022-20260814-001"
+)
+FP022_STARTED_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001"
+)
+FP022_COMPLETION_UPDATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP022-20260814-001"
+)
+FP022_COMPLETION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP022-20260814-001"
+)
+FP022_COMPLETION_ROLE = f"WORK_ITEM_COMPLETION::{FP022_GOAL_ID}"
+FP022_COMPLETION_DOCUMENT_ID = (
+    "WS-FP022-NAVIGATION-WORK-ITEM-COMPLETION-20260814-001"
+)
+FP022_COMPLETION_PATH = (
+    "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/"
+    "completion-receipt.json"
+)
+FP022_R028_GAP_PATH = (
+    "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json"
+)
+FP022_R028_BACKLOG_PATH = (
+    "docs/control/audits/"
+    "walksafe-implementation-remediation-backlog-20260814-r028.json"
+)
+FP022_PARENT_GOAL_ID = "WS-GOAL-EPIC-04"
+FP022_PARENT_GOAL_PATH = (
+    "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/"
+    "epic-04-navigation-arrival-deviation.md"
+)
+FP022_PARENT_GOAL_SHA256 = (
+    "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d"
+)
+FP022_START_GATE_CHECK_IDS = [
+    "CONTINUATION",
+    "V24_ARTIFACT_WORK_QUEUE",
+    "TEST_LAYER_REGISTRY_VALIDATE",
+    "BACKEND_NAVIGATION_INTERNAL",
+    "ANDROID_USER_INTERNAL",
+    "ROOT_FP022_CONTROL_REGRESSION",
+    "REPOSITORY_STATE",
+]
+FP022_START_GATE_RUNTIME_PATHS = [
+    "apps/android/gradle/wrapper/gradle-wrapper.properties",
+    "apps/android/gradle/wrapper/gradle-wrapper.jar",
+    "apps/android/gradle/verification-metadata.xml",
+    "apps/android/app/gradle.lockfile",
+]
+NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID = (
+    "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256 = (
+    "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d"
+)
+NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-READY-"
+    "NPC-SINGLE-ADMIN-RECOVERY-20260810-001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256 = (
+    "08e25cd9808e2301a4af7a3b463d5a1cda795caf41eed57a35de29676f2210ef"
+)
+NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "NPC-20260812-001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+    "NPC-CORRECTION-20260812-001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_R001_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    f"{NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID}/"
+    "initial-start-gate-contract-r001.json"
+)
+NPC_SINGLE_ADMIN_RECOVERY_R002_CONTRACT_PATH = (
+    "docs/control/execution/goal-contracts/"
+    f"{NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID}/"
+    "initial-start-gate-contract-r002.json"
+)
+NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING = {
+    "document_id": (
+        "WS-NPC-SINGLE-ADMIN-RECOVERY-INITIAL-START-GATE-CONTRACT-"
+        "20260810-001"
+    ),
+    "contract_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-START-GATE-R001",
+    "contract_version": "2026-08-10.1",
+    "path": NPC_SINGLE_ADMIN_RECOVERY_R001_CONTRACT_PATH,
+    "file_sha256": (
+        "0e9b80005e3ad206af6d43d724dfc70688e6d7ef8907ad6ee2c72da2e60679d1"
+    ),
+    "canonical_sha256": (
+        "b6a8ada662716ee963f1248ffdf5fdd730c545640a35a7fc11ed134016321186"
+    ),
+}
+NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING = {
+    "schema_version": "1.1",
+    "document_id": (
+        "WS-NPC-SINGLE-ADMIN-RECOVERY-INITIAL-START-GATE-CONTRACT-"
+        "20260812-002"
+    ),
+    "path": NPC_SINGLE_ADMIN_RECOVERY_R002_CONTRACT_PATH,
+    "file_sha256": (
+        "37b843953a5c8089ae2b23224804fbef0c21150c2f2bbf876a57cb4cd3083227"
+    ),
+    "contract_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-START-GATE-R002",
+    "contract_version": "2026-08-12.1",
+    "canonical_contract_sha256": (
+        "1ca0369ac5be15375514d800b1c5a66f9a3ff3af4c487df6e379f57a54ca67de"
+    ),
+}
+NPC_SINGLE_ADMIN_RECOVERY_START_GATE_CHECK_IDS = [
+    "CONTINUATION",
+    "V24_ARTIFACT_WORK_QUEUE",
+    "TEST_LAYER_REGISTRY_VALIDATE",
+    "BACKEND_TEST_DATABASE_PREFLIGHT",
+    "BACKEND_ADMIN_SECURITY_RECOVERY_POSTGRES",
+    "ANDROID_ADMIN_INTERNAL",
+    "ROOT_NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REGRESSION",
+    "REPOSITORY_STATE",
+]
+NPC_SINGLE_ADMIN_RECOVERY_START_GATE_RUNTIME_PATHS = [
+    "apps/android/gradle/wrapper/gradle-wrapper.properties",
+    "apps/android/gradle/wrapper/gradle-wrapper.jar",
+    "apps/android/gradle/verification-metadata.xml",
+    "apps/android/adminapp/gradle.lockfile",
+]
+NPC_SINGLE_ADMIN_RECOVERY_AUTHORIZATION_BINDING = {
+    "document_id": (
+        "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-NPC-"
+        "AUTHORIZATION-20260812-001"
+    ),
+    "path": (
+        "docs/control/execution/goal-start-control-reanchors/"
+        f"{NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID}/"
+        "authorization.md"
+    ),
+    "file_sha256": (
+        "1fe494dc36160fae2c6cd4ed344bd1515a23faad3f4f3c2004baf9375ec3e819"
+    ),
+    "byte_count": 12634,
+    "recorded_at": "2026-08-12T22:30:24+09:00",
+}
+NPC_SINGLE_ADMIN_RECOVERY_REVIEW_BINDING = {
+    "document_id": (
+        "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-NPC-"
+        "INDEPENDENT-REVIEW-20260812-001"
+    ),
+    "path": (
+        "docs/control/execution/goal-start-control-reanchors/"
+        f"{NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID}/"
+        "independent-review.md"
+    ),
+    "file_sha256": (
+        "3f7b4be0d4687001d2caf9e7c8a2524f928e45c960e60fd6dad0119e68557047"
+    ),
+    "byte_count": 14182,
+    "reviewed_at": "2026-08-12T22:32:19+09:00",
+}
+NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_AUTHORIZATION_BINDING = {
+    "document_id": (
+        "WS-GOAL-GRAPH-V2-4-NPC-START-CONTROL-CORRECTION-"
+        "AUTHORIZATION-20260812-001"
+    ),
+    "path": (
+        "docs/control/execution/goal-start-control-reanchors/"
+        f"{NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID}/"
+        "authorization.md"
+    ),
+    "file_sha256": (
+        "d12ce6bc2b741cb583ea3ddefae2ea3b09852d215cf49f488c4e4550fc0deb8f"
+    ),
+    "byte_count": 5273,
+    "recorded_at": "2026-08-12T23:15:00+09:00",
+}
+NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_REVIEW_BINDING = {
+    "document_id": (
+        "WS-GOAL-GRAPH-V2-4-NPC-START-CONTROL-CORRECTION-"
+        "REVIEW-20260812-001"
+    ),
+    "path": (
+        "docs/control/execution/goal-start-control-reanchors/"
+        f"{NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID}/"
+        "independent-review.md"
+    ),
+    "file_sha256": (
+        "8d2ce430e4b002ca8dc38969858a4d3adf4789268157af969ce7f737e91ccaeb"
+    ),
+    "byte_count": 3304,
+    "reviewed_at": "2026-08-12T23:18:01+09:00",
+}
+NPC_SINGLE_ADMIN_RECOVERY_SOURCE_REPOSITORY_CONTEXT = {
+    "checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "checkpoint_file_sha256": (
+        "de3ffafa2d8ff151beedc28e7b5f45296382dcdf93e41280f43136532e54358e"
+    ),
+    "checkpoint_byte_count": 1796959,
+    "branch": "codex/walksafe-rc2-hardening-20260715",
+    "base_commit": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "current_head": "a3ad7eead6b5d834d3e0675422475a9aad351e3d",
+    "managed_changed_path_count": 818,
+    "path_set_sha256": (
+        "a92ca456869315d43939ffd3a46295ca8f405dc7acc3613384d08d70e4868f45"
+    ),
+    "content_set_sha256": (
+        "7419a29ef7d1b4e1347c9111dde2b39e7abcdf3e7efb05ad28ee1f39df30242e"
+    ),
+}
+NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_SOURCE_REPOSITORY_CONTEXT = {
+    "checkpoint_path": "docs/control/walksafe-project-continuation-checkpoint.json",
+    "checkpoint_file_sha256": (
+        "55b2a209679ddb9573abfeb97b0b24112151884e756133a4faef34879257d2d4"
+    ),
+    "checkpoint_byte_count": 1770409,
+    "branch": "current",
+    "base_commit": "f0093863e82bfc80d9f11915cef33a51d44b8730",
+    "current_head": "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c",
+    "managed_changed_path_count": 639,
+    "path_set_sha256": (
+        "fcf3627f3beb8675930c990fa9ac336f48012e95b19bf9c78dbf6f26bf4add10"
+    ),
+    "content_set_sha256": (
+        "279899fa496301f3c5339fa2f61e43983e25d224e964348ef67c5b76b995c5a3"
+    ),
+}
+NPC_SINGLE_ADMIN_RECOVERY_FAILED_GATE_LOG_BINDING = {
+    "path": (
+        "docs/control/execution/goal-gates/"
+        "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-NPC-SINGLE-ADMIN-RECOVERY-"
+        "20260812-001/07-ROOT_NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REGRESSION.log"
+    ),
+    "file_sha256": (
+        "d6a2657c3848d292eea440adeb3afc68f210ae3bcc0a60c0a0eb1d1b888bb05b"
+    ),
+    "byte_count": 2324,
+}
+NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT = (
+    "f0093863e82bfc80d9f11915cef33a51d44b8730"
+)
+NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT = (
+    "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
+)
+NPC_SINGLE_ADMIN_RECOVERY_UNCHANGED_CONTROL_SHA256 = {
+    "artifact": "86f6ea0814924165caf6a79ed3b47ef0989806c463ae4696c3dfc42cecd21b2a",
+    "canonical": "f3de1183e57bbeff58d758b5dfc076f7a80696e7001fce359ee14d0f6700b489",
+    "completion": "6d40a80353384f59c6e9f10653a1a92e7c51e7b31135d97bb8779fd54a18d1d6",
+    "current_work": "c07e8b352186720ed575c562c31655ff3c90586c058093c5276dd1f5cf6663d9",
+    "runtime": "e0e959210e6523e7082e9b3e5bd7ed2fa21a8e07d396623a2995285d5e738bb8",
+    "status": "e3d38b7859d6ebbf4fab2cd708e77510eb17b83d57035a64f7bcb5af05fb0283",
+    "verification": "406f4ec4b66dd3672e1fc2246c5ec2ce4c1ea6fa388549e6dabb52e49f2ac11c",
+}
+NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_CLAIM_BOUNDARY = {
+    "implementation_start_authorized": False,
+    "goal_status_change_count": 0,
+    "product_implementation_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "test_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "external_action_credit_delta": 0,
+    "actual_device_credit_delta": 0,
+    "deployment_credit_delta": 0,
+    "signing_credit_delta": 0,
+    "release_credit_delta": 0,
+    "final_completion_credit_delta": 0,
+    "formal_test_not_run_count": 279,
+    "remaining_gate_count": 5,
+    "remaining_gates_waived": False,
+    "release_status": "NOT_ELIGIBLE",
+}
 START_GATE_RUNTIME_BINDING_AMENDMENTS = {
     event_id: {
         "apps/android/gradle/verification-metadata.xml": {
@@ -2109,6 +2678,839 @@ def _load_direct_binding(
     return errors, payload
 
 
+def _validate_regular_file_binding(
+    root: Path,
+    value: Any,
+    *,
+    expected: dict[str, Any],
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    if value != expected:
+        errors.append(f"{label} binding differs")
+        return errors
+    relative = expected["path"]
+    path = resolve_repo_file(root, relative)
+    if path is None or _contains_symlink(root, relative):
+        return [f"{label} path is missing or unsafe"]
+    try:
+        metadata = path.stat()
+    except OSError as exc:
+        return [f"{label} metadata cannot be read: {exc}"]
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_size != expected["byte_count"]
+        or sha256_file(path) != expected["file_sha256"]
+    ):
+        errors.append(f"{label} physical file differs")
+    return errors
+
+
+def _load_npc_single_admin_recovery_r002_contract(
+    root: Path,
+) -> tuple[list[str], list[dict[str, str]], dict[str, Any]]:
+    errors: list[str] = []
+    binding = NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING
+    relative = binding["path"]
+    path = resolve_repo_file(root, relative)
+    if path is None or _contains_symlink(root, relative):
+        return ["NPC R002 start-gate contract path is missing or unsafe"], [], {}
+    if sha256_file(path) != binding["file_sha256"]:
+        errors.append("NPC R002 start-gate contract file SHA-256 differs")
+    try:
+        contract = load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return errors + [f"NPC R002 start-gate contract cannot be loaded: {exc}"], [], {}
+    if canonical_json_sha256(contract) != binding["canonical_contract_sha256"]:
+        errors.append("NPC R002 start-gate canonical SHA-256 differs")
+    expected_fields = {
+        "schema_version",
+        "document_id",
+        "contract_id",
+        "contract_version",
+        "target_goal_id",
+        "target_goal_content_sha256",
+        "gate_purpose",
+        "successor_reason_code",
+        "supersedes",
+        "ordered_checks",
+        "claim_boundary",
+    }
+    if set(contract) != expected_fields:
+        errors.append("NPC R002 start-gate contract field set differs")
+    for label, actual, expected in (
+        ("schema", contract.get("schema_version"), "1.1"),
+        ("document ID", contract.get("document_id"), binding["document_id"]),
+        ("contract ID", contract.get("contract_id"), binding["contract_id"]),
+        ("version", contract.get("contract_version"), binding["contract_version"]),
+        ("target Goal", contract.get("target_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        (
+            "target Goal SHA-256",
+            contract.get("target_goal_content_sha256"),
+            NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256,
+        ),
+        ("purpose", contract.get("gate_purpose"), "INITIAL_START"),
+        (
+            "reason",
+            contract.get("successor_reason_code"),
+            "CURRENT_TEST_LAYER_REGISTRY_RUNNER_REQUIRED",
+        ),
+    ):
+        _require_equal(errors, f"NPC R002 start-gate {label}", actual, expected)
+    expected_supersedes = {
+        **NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING,
+        "source_ready_event_sequence": 57,
+        "source_ready_event_id": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID,
+        "source_ready_event_sha256": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256,
+    }
+    _require_equal(
+        errors,
+        "NPC R002 start-gate predecessor binding",
+        contract.get("supersedes"),
+        expected_supersedes,
+    )
+    raw_checks = contract.get("ordered_checks")
+    checks: list[dict[str, str]] = []
+    if not isinstance(raw_checks, list):
+        errors.append("NPC R002 start-gate ordered checks are missing")
+    else:
+        for index, item in enumerate(raw_checks, start=1):
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"check_id", "command"}
+                or not isinstance(item.get("check_id"), str)
+                or not isinstance(item.get("command"), str)
+                or not item["command"]
+            ):
+                errors.append(f"NPC R002 start-gate ordered check {index} differs")
+                continue
+            checks.append({"check_id": item["check_id"], "command": item["command"]})
+    _require_equal(
+        errors,
+        "NPC R002 start-gate ordered check IDs",
+        [item["check_id"] for item in checks],
+        NPC_SINGLE_ADMIN_RECOVERY_START_GATE_CHECK_IDS,
+    )
+    forbidden = (
+        "apps/web",
+        "android-gateway",
+        "connecteddebugandroidtest",
+        " adb ",
+        "device",
+        "external",
+        "formal",
+        "deploy",
+        "release",
+    )
+    if any(
+        token in item["command"].lower()
+        for item in checks
+        for token in forbidden
+    ):
+        errors.append("NPC R002 start-gate contract contains forbidden command scope")
+    return errors, checks, contract
+
+
+def _validate_npc_single_admin_recovery_control_reanchor_seq58(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    if set(event) != GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS:
+        errors.append("NPC start-control reanchor event field set differs")
+    if event.get("sequence") != 58 or len(history) < 58:
+        return errors + ["NPC start-control reanchor sequence differs"]
+    ready = history[56]
+    if not isinstance(ready, dict):
+        return errors + ["NPC start-control reanchor READY source is missing"]
+    expected_source_ready = {
+        "sequence": 57,
+        "event_id": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID,
+        "event_sha256": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256,
+        "goal_id": NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+        "status": "READY",
+    }
+    for label, actual, expected in (
+        ("event ID", event.get("event_id"), NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID),
+        ("event type", event.get("event_type"), "GOAL_START_CONTROL_REANCHORED"),
+        ("occurred on", event.get("occurred_on"), "2026-08-12"),
+        ("occurred at", event.get("occurred_at"), "2026-08-12T22:32:20+09:00"),
+        ("previous focus", event.get("previous_focus_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("previous focus content", event.get("previous_focus_content_sha256"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256),
+        ("focus", event.get("focus_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("focus content", event.get("focus_goal_content_sha256"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256),
+        ("subject", event.get("subject_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("from status", event.get("from_status"), "READY"),
+        ("to status", event.get("to_status"), "READY"),
+        ("status changes", event.get("status_changes"), {}),
+        ("source checkpoint version", event.get("source_checkpoint_version"), "1.25.0"),
+        ("source READY binding", event.get("source_ready_event_binding"), expected_source_ready),
+        ("previous event", event.get("previous_event_sha256"), NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256),
+        ("runtime", event.get("runtime_after"), ready.get("runtime_after")),
+        ("blockers", event.get("blockers_after"), ready.get("blockers_after")),
+        (
+            "blocker resolutions",
+            event.get("blocker_resolution_ids_after"),
+            ready.get("blocker_resolution_ids_after"),
+        ),
+        (
+            "evidence refs",
+            event.get("evidence_refs"),
+            [
+                "GOAL_START_CONTROL_REANCHOR_AUTHORIZATION",
+                "GOAL_START_CONTROL_REANCHOR_INDEPENDENT_REVIEW",
+                "INITIAL_START_GATE_CONTRACT_SUCCESSOR",
+            ],
+        ),
+        (
+            "claim boundary",
+            event.get("claim_boundary"),
+            NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_CLAIM_BOUNDARY,
+        ),
+    ):
+        _require_equal(errors, f"NPC start-control reanchor {label}", actual, expected)
+    if (
+        ready.get("sequence") != 57
+        or ready.get("event_id") != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID
+        or ready.get("event_type") != "GOAL_READY"
+        or ready.get("subject_goal_id") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        or ready.get("event_sha256") != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256
+        or ready.get("event_sha256") != event_sha256(ready)
+        or ready.get("implementation_start_gate_contract_binding")
+        != NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING
+    ):
+        errors.append("NPC start-control reanchor seq57 source differs")
+    expected_supersession = {
+        "previous_contract_binding": NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING,
+        "replacement_contract_binding": NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING,
+        "reason_code": "CURRENT_TEST_LAYER_REGISTRY_RUNNER_REQUIRED",
+    }
+    _require_equal(
+        errors,
+        "NPC start-control reanchor contract supersession",
+        event.get("contract_supersession"),
+        expected_supersession,
+    )
+    contract_errors, _, _ = _load_npc_single_admin_recovery_r002_contract(root)
+    errors.extend(contract_errors)
+    errors.extend(
+        _validate_regular_file_binding(
+            root,
+            event.get("authorization_binding"),
+            expected=NPC_SINGLE_ADMIN_RECOVERY_AUTHORIZATION_BINDING,
+            label="NPC start-control reanchor authorization",
+        )
+    )
+    errors.extend(
+        _validate_regular_file_binding(
+            root,
+            event.get("independent_review_binding"),
+            expected=NPC_SINGLE_ADMIN_RECOVERY_REVIEW_BINDING,
+            label="NPC start-control reanchor independent review",
+        )
+    )
+    expected_unchanged = {
+        name: {"before_sha256": digest, "after_sha256": digest}
+        for name, digest in sorted(
+            NPC_SINGLE_ADMIN_RECOVERY_UNCHANGED_CONTROL_SHA256.items()
+        )
+    }
+    _require_equal(
+        errors,
+        "NPC start-control reanchor unchanged projection",
+        event.get("unchanged_control_projection"),
+        expected_unchanged,
+    )
+    repository_context = event.get("repository_context_reanchor")
+    before = repository_context.get("before") if isinstance(repository_context, dict) else None
+    after = repository_context.get("after") if isinstance(repository_context, dict) else None
+    _require_equal(
+        errors,
+        "NPC start-control reanchor repository before",
+        before,
+        NPC_SINGLE_ADMIN_RECOVERY_SOURCE_REPOSITORY_CONTEXT,
+    )
+    expected_after_fields = {
+        "branch",
+        "base_commit",
+        "current_head",
+        "managed_changed_path_count",
+        "path_set_sha256",
+        "content_set_sha256",
+    }
+    if not isinstance(after, dict) or set(after) != expected_after_fields:
+        errors.append("NPC start-control reanchor repository after field set differs")
+        after = {}
+    for label, actual, expected in (
+        ("branch", after.get("branch"), "current"),
+        ("base commit", after.get("base_commit"), NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT),
+        ("current HEAD", after.get("current_head"), NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT),
+    ):
+        _require_equal(errors, f"NPC start-control reanchor repository {label}", actual, expected)
+    required_after_paths = set(EXPECTED_CONTROLLED_PATHS) | set(
+        expected_goal_paths(checkpoint.get("goal_execution", {}))
+    )
+    if (
+        not isinstance(after.get("managed_changed_path_count"), int)
+        or after.get("managed_changed_path_count", 0) < len(required_after_paths)
+        or not isinstance(after.get("path_set_sha256"), str)
+        or SHA256_RE.fullmatch(after.get("path_set_sha256", "")) is None
+        or not isinstance(after.get("content_set_sha256"), str)
+        or SHA256_RE.fullmatch(after.get("content_set_sha256", "")) is None
+    ):
+        errors.append("NPC start-control reanchor repository snapshot summary differs")
+    ancestor = is_commit_ancestor(
+        root,
+        NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT,
+        NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT,
+    )
+    if ancestor is not True:
+        errors.append("NPC start-control reanchor repository ancestry differs")
+    if event.get("event_sha256") != event_sha256(event):
+        errors.append("NPC start-control reanchor event seal differs")
+
+    # While seq58 is the live tail, the event, checkpoint, and live repository
+    # must describe one exact repository state.  Later execution events retain
+    # this event as immutable historical start-control evidence.
+    if len(history) == 58:
+        repository = checkpoint.get("repository")
+        snapshot = checkpoint.get("working_tree_snapshot")
+        handoff = checkpoint.get("session_handoff")
+        source_snapshot = (
+            handoff.get("source_commit_or_snapshot")
+            if isinstance(handoff, dict)
+            else None
+        )
+        paths = snapshot.get("managed_changed_paths") if isinstance(snapshot, dict) else None
+        if not isinstance(paths, list):
+            errors.append("NPC start-control reanchor managed paths are missing")
+        else:
+            try:
+                path_digest, content_digest = working_snapshot_hashes(root, paths)
+            except (OSError, RuntimeError, ValueError) as exc:
+                errors.append(f"NPC start-control reanchor snapshot cannot be reproduced: {exc}")
+            else:
+                expected_live_after = {
+                    "branch": "current",
+                    "base_commit": NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT,
+                    "current_head": NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT,
+                    "managed_changed_path_count": len(paths),
+                    "path_set_sha256": path_digest,
+                    "content_set_sha256": content_digest,
+                }
+                _require_equal(
+                    errors,
+                    "NPC start-control reanchor live repository context",
+                    after,
+                    expected_live_after,
+                )
+                if (
+                    not isinstance(repository, dict)
+                    or repository.get("branch") != "current"
+                    or repository.get("snapshot_base_head")
+                    != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or snapshot.get("base_head")
+                    != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or snapshot.get("managed_changed_path_count") != len(paths)
+                    or snapshot.get("path_set_sha256") != path_digest
+                    or snapshot.get("content_set_sha256") != content_digest
+                    or not isinstance(source_snapshot, dict)
+                    or handoff.get("branch") != "current"
+                    or handoff.get("changed_files") != paths
+                    or source_snapshot.get("base_commit")
+                    != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or source_snapshot.get("current_head")
+                    != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT
+                    or source_snapshot.get("file_count") != len(paths)
+                    or source_snapshot.get("path_set_sha256") != path_digest
+                    or source_snapshot.get("content_set_sha256") != content_digest
+                ):
+                    errors.append("NPC start-control reanchor checkpoint repository projection differs")
+        if current_branch(root) != "current" or current_head(root) != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT:
+            errors.append("NPC start-control reanchor live Git identity differs")
+    return errors
+
+
+def _validate_npc_single_admin_recovery_control_correction_seq59(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    label = "NPC start-control correction"
+    if set(event) != GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS:
+        errors.append(f"{label} event field set differs")
+    if event.get("sequence") != 59 or len(history) < 59:
+        return errors + [f"{label} sequence differs"]
+    ready = history[56]
+    reanchor = history[57]
+    if not isinstance(ready, dict) or not isinstance(reanchor, dict):
+        return errors + [f"{label} source lineage is missing"]
+
+    expected_source_ready = {
+        "sequence": 57,
+        "event_id": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID,
+        "event_sha256": NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256,
+        "goal_id": NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+        "status": "READY",
+    }
+    for item_label, actual, expected in (
+        ("event ID", event.get("event_id"), NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID),
+        ("event type", event.get("event_type"), "GOAL_START_CONTROL_REANCHORED"),
+        ("occurred on", event.get("occurred_on"), "2026-08-12"),
+        ("occurred at", event.get("occurred_at"), "2026-08-12T23:18:02+09:00"),
+        ("previous focus", event.get("previous_focus_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("previous focus content", event.get("previous_focus_content_sha256"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256),
+        ("focus", event.get("focus_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("focus content", event.get("focus_goal_content_sha256"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256),
+        ("subject", event.get("subject_goal_id"), NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID),
+        ("from status", event.get("from_status"), "READY"),
+        ("to status", event.get("to_status"), "READY"),
+        ("status changes", event.get("status_changes"), {}),
+        ("source checkpoint version", event.get("source_checkpoint_version"), "1.25.0"),
+        ("source READY binding", event.get("source_ready_event_binding"), expected_source_ready),
+        ("previous event", event.get("previous_event_sha256"), "929ff8b16ec13ad9bd697148f6cee600e4491e627339fdf4d2aa325b6a64c38b"),
+        ("runtime", event.get("runtime_after"), reanchor.get("runtime_after")),
+        ("blockers", event.get("blockers_after"), reanchor.get("blockers_after")),
+        (
+            "blocker resolutions",
+            event.get("blocker_resolution_ids_after"),
+            reanchor.get("blocker_resolution_ids_after"),
+        ),
+        (
+            "evidence refs",
+            event.get("evidence_refs"),
+            [
+                "FAILED_START_GATE_001_CORRECTION",
+                "GOAL_START_CONTROL_CORRECTION_AUTHORIZATION",
+                "GOAL_START_CONTROL_CORRECTION_INDEPENDENT_REVIEW",
+                "INITIAL_START_GATE_CONTRACT_SUCCESSOR",
+            ],
+        ),
+        ("claim boundary", event.get("claim_boundary"), NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_CLAIM_BOUNDARY),
+    ):
+        _require_equal(errors, f"{label} {item_label}", actual, expected)
+
+    if (
+        ready.get("sequence") != 57
+        or ready.get("event_id") != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID
+        or ready.get("event_type") != "GOAL_READY"
+        or ready.get("subject_goal_id") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        or ready.get("event_sha256") != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256
+        or ready.get("event_sha256") != event_sha256(ready)
+        or ready.get("implementation_start_gate_contract_binding")
+        != NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING
+    ):
+        errors.append(f"{label} seq57 source differs")
+    if (
+        reanchor.get("sequence") != 58
+        or reanchor.get("event_id") != NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or reanchor.get("event_type") != "GOAL_START_CONTROL_REANCHORED"
+        or reanchor.get("subject_goal_id") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        or reanchor.get("event_sha256")
+        != "929ff8b16ec13ad9bd697148f6cee600e4491e627339fdf4d2aa325b6a64c38b"
+        or reanchor.get("event_sha256") != event_sha256(reanchor)
+    ):
+        errors.append(f"{label} seq58 source differs")
+
+    expected_supersession = {
+        "previous_contract_binding": NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING,
+        "replacement_contract_binding": NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING,
+        "reason_code": "CURRENT_TEST_LAYER_REGISTRY_RUNNER_REQUIRED",
+    }
+    _require_equal(
+        errors,
+        f"{label} contract supersession",
+        event.get("contract_supersession"),
+        expected_supersession,
+    )
+    contract_errors, _, _ = _load_npc_single_admin_recovery_r002_contract(root)
+    errors.extend(contract_errors)
+    errors.extend(
+        _validate_regular_file_binding(
+            root,
+            event.get("authorization_binding"),
+            expected=NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_AUTHORIZATION_BINDING,
+            label=f"{label} authorization",
+        )
+    )
+    errors.extend(
+        _validate_regular_file_binding(
+            root,
+            event.get("independent_review_binding"),
+            expected=NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_REVIEW_BINDING,
+            label=f"{label} independent review",
+        )
+    )
+    expected_unchanged = {
+        name: {"before_sha256": digest, "after_sha256": digest}
+        for name, digest in sorted(
+            NPC_SINGLE_ADMIN_RECOVERY_UNCHANGED_CONTROL_SHA256.items()
+        )
+    }
+    _require_equal(
+        errors,
+        f"{label} unchanged projection",
+        event.get("unchanged_control_projection"),
+        expected_unchanged,
+    )
+
+    repository_context = event.get("repository_context_reanchor")
+    before = repository_context.get("before") if isinstance(repository_context, dict) else None
+    after = repository_context.get("after") if isinstance(repository_context, dict) else None
+    _require_equal(
+        errors,
+        f"{label} repository before",
+        before,
+        NPC_SINGLE_ADMIN_RECOVERY_CORRECTION_SOURCE_REPOSITORY_CONTEXT,
+    )
+    expected_after_fields = {
+        "branch",
+        "base_commit",
+        "current_head",
+        "managed_changed_path_count",
+        "path_set_sha256",
+        "content_set_sha256",
+    }
+    if not isinstance(after, dict) or set(after) != expected_after_fields:
+        errors.append(f"{label} repository after field set differs")
+        after = {}
+    for item_label, actual, expected in (
+        ("branch", after.get("branch"), "current"),
+        ("base commit", after.get("base_commit"), NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT),
+        ("current HEAD", after.get("current_head"), NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT),
+    ):
+        _require_equal(errors, f"{label} repository {item_label}", actual, expected)
+    required_after_paths = set(EXPECTED_CONTROLLED_PATHS) | set(
+        expected_goal_paths(checkpoint.get("goal_execution", {}))
+    )
+    if (
+        not isinstance(after.get("managed_changed_path_count"), int)
+        or after.get("managed_changed_path_count", 0) < len(required_after_paths)
+        or not isinstance(after.get("path_set_sha256"), str)
+        or SHA256_RE.fullmatch(after.get("path_set_sha256", "")) is None
+        or not isinstance(after.get("content_set_sha256"), str)
+        or SHA256_RE.fullmatch(after.get("content_set_sha256", "")) is None
+    ):
+        errors.append(f"{label} repository snapshot summary differs")
+
+    failed_log = NPC_SINGLE_ADMIN_RECOVERY_FAILED_GATE_LOG_BINDING
+    failed_path = resolve_repo_file(root, failed_log["path"])
+    if failed_path is None or _contains_symlink(root, failed_log["path"]):
+        errors.append(f"{label} failed-gate log is missing or unsafe")
+    else:
+        try:
+            metadata = failed_path.stat()
+        except OSError as exc:
+            errors.append(f"{label} failed-gate log metadata cannot be read: {exc}")
+        else:
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or metadata.st_size != failed_log["byte_count"]
+                or sha256_file(failed_path) != failed_log["file_sha256"]
+            ):
+                errors.append(f"{label} failed-gate log differs")
+
+    failed_directory = failed_path.parent if failed_path is not None else None
+    expected_failed_entries = {
+        "01-CONTINUATION.log",
+        "02-V24_ARTIFACT_WORK_QUEUE.log",
+        "03-TEST_LAYER_REGISTRY_VALIDATE.log",
+        "04-BACKEND_TEST_DATABASE_PREFLIGHT.log",
+        "05-BACKEND_ADMIN_SECURITY_RECOVERY_POSTGRES.log",
+        "06-ANDROID_ADMIN_INTERNAL.log",
+        "07-ROOT_NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REGRESSION.log",
+    }
+    if failed_directory is not None:
+        try:
+            actual_failed_entries = {item.name for item in failed_directory.iterdir()}
+        except OSError as exc:
+            errors.append(f"{label} failed-gate directory cannot be read: {exc}")
+        else:
+            if actual_failed_entries != expected_failed_entries:
+                errors.append(f"{label} failed-gate inventory differs")
+
+    if event.get("event_sha256") != event_sha256(event):
+        errors.append(f"{label} event seal differs")
+    if is_commit_ancestor(
+        root,
+        NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT,
+        NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT,
+    ) is not True:
+        errors.append(f"{label} repository ancestry differs")
+
+    if len(history) == 59:
+        repository = checkpoint.get("repository")
+        snapshot = checkpoint.get("working_tree_snapshot")
+        handoff = checkpoint.get("session_handoff")
+        source_snapshot = (
+            handoff.get("source_commit_or_snapshot")
+            if isinstance(handoff, dict)
+            else None
+        )
+        paths = snapshot.get("managed_changed_paths") if isinstance(snapshot, dict) else None
+        if not isinstance(paths, list):
+            errors.append(f"{label} managed paths are missing")
+        else:
+            try:
+                path_digest, content_digest = working_snapshot_hashes(root, paths)
+            except (OSError, RuntimeError, ValueError) as exc:
+                errors.append(f"{label} snapshot cannot be reproduced: {exc}")
+            else:
+                expected_live_after = {
+                    "branch": "current",
+                    "base_commit": NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT,
+                    "current_head": NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT,
+                    "managed_changed_path_count": len(paths),
+                    "path_set_sha256": path_digest,
+                    "content_set_sha256": content_digest,
+                }
+                _require_equal(errors, f"{label} live repository context", after, expected_live_after)
+                if (
+                    not isinstance(repository, dict)
+                    or repository.get("branch") != "current"
+                    or repository.get("snapshot_base_head") != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or snapshot.get("base_head") != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or snapshot.get("managed_changed_path_count") != len(paths)
+                    or snapshot.get("path_set_sha256") != path_digest
+                    or snapshot.get("content_set_sha256") != content_digest
+                    or not isinstance(source_snapshot, dict)
+                    or handoff.get("branch") != "current"
+                    or handoff.get("changed_files") != paths
+                    or source_snapshot.get("base_commit") != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_BASE_COMMIT
+                    or source_snapshot.get("current_head") != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT
+                    or source_snapshot.get("file_count") != len(paths)
+                    or source_snapshot.get("path_set_sha256") != path_digest
+                    or source_snapshot.get("content_set_sha256") != content_digest
+                ):
+                    errors.append(f"{label} checkpoint repository projection differs")
+        if current_branch(root) != "current" or current_head(root) != NPC_SINGLE_ADMIN_RECOVERY_REANCHOR_HEAD_COMMIT:
+            errors.append(f"{label} live Git identity differs")
+    return errors
+
+
+def _fp022_reanchor_repository_after(
+    checkpoint: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    started = history[68] if len(history) >= 69 and isinstance(history[68], dict) else None
+    fp022_started = bool(
+        isinstance(started, dict)
+        and started.get("sequence") == 69
+        and started.get("event_id")
+        == "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001"
+        and started.get("event_type") == "GOAL_STARTED"
+        and started.get("subject_goal_id") == FP022_GOAL_ID
+        and started.get("previous_event_sha256")
+        == history[67].get("event_sha256")
+    )
+    if not fp022_started:
+        snapshot = checkpoint.get("working_tree_snapshot")
+        handoff = checkpoint.get("session_handoff")
+        mirror = (
+            handoff.get("source_commit_or_snapshot")
+            if isinstance(handoff, dict)
+            else None
+        )
+        if not isinstance(snapshot, dict) or not isinstance(mirror, dict):
+            return None
+        return {
+            "branch": "current",
+            "base_commit": mirror.get("base_commit"),
+            "current_head": mirror.get("current_head"),
+            "managed_changed_path_count": snapshot.get("managed_changed_path_count"),
+            "path_set_sha256": snapshot.get("path_set_sha256"),
+            "content_set_sha256": snapshot.get("content_set_sha256"),
+        }
+    source = started.get("repository_snapshot_before")
+    if not isinstance(source, dict):
+        return None
+    return {
+        "branch": source.get("branch"),
+        "base_commit": source.get("checkpoint_base_head"),
+        "current_head": source.get("head_commit"),
+        "managed_changed_path_count": source.get("checkpoint_managed_path_count"),
+        "path_set_sha256": source.get("checkpoint_path_set_sha256"),
+        "content_set_sha256": source.get("checkpoint_content_set_sha256"),
+    }
+
+
+def _fp022_frozen_transition_review_binding(
+    root: Path,
+) -> dict[str, dict[str, Any]]:
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as completion_review,
+    )
+
+    rows = completion_review.prepare_frozen_start_review(root)
+    if len(rows) != 3:
+        raise RuntimeError("frozen FP022 R031 review inventory differs")
+    return {
+        "assignment": copy.deepcopy(rows[0]),
+        "review_result": copy.deepcopy(rows[1]),
+        "independent_review": copy.deepcopy(rows[2]),
+    }
+
+
+def _validate_fp022_control_reanchor_seq68(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    label = "FP022 start-control reanchor"
+    try:
+        from scripts import (
+            apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814
+            as authority,
+        )
+    except (ImportError, RuntimeError) as exc:
+        return [f"{label} authority cannot be loaded: {exc}"]
+    if set(event) != FP022_GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS:
+        errors.append(f"{label} event field set differs")
+    if event.get("sequence") != 68 or len(history) < 68:
+        return errors + [f"{label} sequence differs"]
+    ready = history[66]
+    if not isinstance(ready, dict):
+        return errors + [f"{label} seq67 READY source is missing"]
+    try:
+        _, successor_binding = authority._load_r002_contract(root)
+        review_binding = _fp022_frozen_transition_review_binding(root)
+        runner_binding = authority.start_gate_runner_binding(root)
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+    ) as exc:
+        return errors + [f"{label} control authority differs: {exc}"]
+    expected_supersession = {
+        "previous_contract_binding": authority.r001_contract_binding(),
+        "replacement_contract_binding": successor_binding,
+        "reason_code": authority.SUCCESSOR_REASON_CODE,
+    }
+    for item_label, actual, expected in (
+        ("event ID", event.get("event_id"), FP022_CONTROL_REANCHOR_EVENT_ID),
+        ("event type", event.get("event_type"), "GOAL_START_CONTROL_REANCHORED"),
+        ("occurred on", event.get("occurred_on"), "2026-08-14"),
+        ("occurred at", event.get("occurred_at"), authority.OCCURRED_AT),
+        ("previous focus", event.get("previous_focus_goal_id"), FP022_GOAL_ID),
+        ("previous focus content", event.get("previous_focus_content_sha256"), FP022_GOAL_SHA256),
+        ("focus", event.get("focus_goal_id"), FP022_GOAL_ID),
+        ("focus content", event.get("focus_goal_content_sha256"), FP022_GOAL_SHA256),
+        ("subject", event.get("subject_goal_id"), FP022_GOAL_ID),
+        ("from status", event.get("from_status"), "READY"),
+        ("to status", event.get("to_status"), "READY"),
+        ("status changes", event.get("status_changes"), {}),
+        ("source checkpoint version", event.get("source_checkpoint_version"), "1.25.0"),
+        ("source checkpoint", event.get("source_checkpoint_binding"), authority.source_checkpoint_binding()),
+        ("source READY", event.get("source_ready_event_binding"), authority.source_ready_event_binding()),
+        ("contract supersession", event.get("contract_supersession"), expected_supersession),
+        ("start-gate runner", event.get("start_gate_runner_binding"), runner_binding),
+        ("transition review", event.get("transition_control_review_binding"), review_binding),
+        ("claim boundary", event.get("claim_boundary"), authority.CLAIM_BOUNDARY),
+        ("previous event", event.get("previous_event_sha256"), FP022_READY_EVENT_SHA256),
+    ):
+        _require_equal(errors, f"{label} {item_label}", actual, expected)
+    if (
+        ready.get("sequence") != 67
+        or ready.get("event_id") != FP022_READY_EVENT_ID
+        or ready.get("event_type") != "GOAL_READY"
+        or ready.get("subject_goal_id") != FP022_GOAL_ID
+        or ready.get("event_sha256") != FP022_READY_EVENT_SHA256
+        or ready.get("event_sha256") != event_sha256(ready)
+    ):
+        errors.append(f"{label} seq67 READY source differs")
+    for item_label, actual, expected in (
+        ("runtime", event.get("runtime_after"), ready.get("runtime_after")),
+        ("blockers", event.get("blockers_after"), ready.get("blockers_after")),
+        ("blocker resolutions", event.get("blocker_resolution_ids_after"), ready.get("blocker_resolution_ids_after")),
+        (
+            "canonical snapshot",
+            event.get("canonical_binding_snapshot_after"),
+            ready.get("canonical_binding_snapshot_after"),
+        ),
+        (
+            "unchanged projection",
+            event.get("unchanged_control_projection"),
+            {
+                name: {"before_sha256": digest, "after_sha256": digest}
+                for name, digest in sorted(
+                    authority.SOURCE_UNCHANGED_CONTROL_SHA256.items()
+                )
+            },
+        ),
+    ):
+        _require_equal(errors, f"{label} {item_label}", actual, expected)
+    if event.get("event_sha256") != event_sha256(event):
+        errors.append(f"{label} event seal differs")
+    repository_context = event.get("repository_context_reanchor")
+    before = (
+        repository_context.get("before")
+        if isinstance(repository_context, dict)
+        else None
+    )
+    after = (
+        repository_context.get("after")
+        if isinstance(repository_context, dict)
+        else None
+    )
+    _require_equal(
+        errors,
+        f"{label} repository before",
+        before,
+        authority.expected_source_repository_context(),
+    )
+    expected_after = _fp022_reanchor_repository_after(checkpoint, history)
+    _require_equal(errors, f"{label} repository after", after, expected_after)
+    return errors
+
+
+def _validate_npc_single_admin_recovery_control_reanchor(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+    history: list[dict[str, Any]],
+) -> list[str]:
+    if event.get("subject_goal_id") == FP022_GOAL_ID:
+        return _validate_fp022_control_reanchor_seq68(
+            root,
+            event=event,
+            checkpoint=checkpoint,
+            history=history,
+        )
+    event_id = event.get("event_id")
+    if event_id == NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID:
+        return _validate_npc_single_admin_recovery_control_reanchor_seq58(
+            root,
+            event=event,
+            checkpoint=checkpoint,
+            history=history,
+        )
+    if event_id == NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID:
+        return _validate_npc_single_admin_recovery_control_correction_seq59(
+            root,
+            event=event,
+            checkpoint=checkpoint,
+            history=history,
+        )
+    return ["NPC start-control reanchor event ID is not recognized"]
+
+
 def _fp008_private_file_identity(
     metadata: os.stat_result,
 ) -> tuple[int, int, int, int, int, int, int, int]:
@@ -2415,6 +3817,8 @@ def _validate_fp008_gate_event_inventory(
     if check_ids not in (
         FP008_START_GATE_CHECK_IDS,
         FP046_START_GATE_CHECK_IDS,
+        FP022_START_GATE_CHECK_IDS,
+        NPC_SINGLE_ADMIN_RECOVERY_START_GATE_CHECK_IDS,
     ):
         errors.append(f"{label} ordered log inventory contract differs")
         return errors
@@ -2443,7 +3847,8 @@ def _validate_fp008_gate_event_inventory(
         os.close(directory_fd)
     if observed_entries != expected_entries:
         errors.append(
-            f"{label} inventory must contain only the 9 ordered logs and receipt"
+            f"{label} inventory must contain only the {len(check_ids)} "
+            "ordered logs and receipt"
         )
     final_errors, final_directory_fd, _ = _open_fp008_gate_event_directory(
         root,
@@ -3752,6 +5157,319 @@ def _validate_fp046_runtime_bindings(
     )
 
 
+def _fp022_start_gate_contract(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> tuple[
+    list[str],
+    list[dict[str, str]],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    errors: list[str] = []
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    event_sequence = event.get("sequence")
+    ready_events = [
+        item
+        for item in history
+        if isinstance(item, dict)
+        and item.get("event_type") == "GOAL_READY"
+        and item.get("subject_goal_id") == FP022_GOAL_ID
+        and isinstance(item.get("sequence"), int)
+        and isinstance(event_sequence, int)
+        and item["sequence"] < event_sequence
+    ] if isinstance(history, list) else []
+    if len(ready_events) != 1:
+        return ["FP022 start gate READY event is missing or ambiguous"], [], {}, {}
+    ready = ready_events[0]
+    reanchor_events = [
+        item
+        for item in history
+        if isinstance(item, dict)
+        and item.get("event_type") == "GOAL_START_CONTROL_REANCHORED"
+        and item.get("subject_goal_id") == FP022_GOAL_ID
+        and isinstance(item.get("sequence"), int)
+        and isinstance(event_sequence, int)
+        and item["sequence"] < event_sequence
+    ] if isinstance(history, list) else []
+    if len(reanchor_events) != 1:
+        return ["FP022 start-control reanchor is missing or ambiguous"], [], {}, ready
+    reanchor = reanchor_events[0]
+    if (
+        event.get("event_id") != FP022_STARTED_EVENT_ID
+    ):
+        errors.append("FP022 start gate event ID differs")
+    if (
+        ready.get("sequence") != 67
+        or ready.get("event_id") != FP022_READY_EVENT_ID
+        or ready.get("event_sha256") != event_sha256(ready)
+        or ready.get("event_sha256") != FP022_READY_EVENT_SHA256
+        or reanchor.get("sequence") != 68
+        or reanchor.get("event_id") != FP022_CONTROL_REANCHOR_EVENT_ID
+        or reanchor.get("previous_event_sha256") != ready.get("event_sha256")
+        or reanchor.get("event_sha256") != event_sha256(reanchor)
+        or event.get("previous_event_sha256") != reanchor.get("event_sha256")
+    ):
+        errors.append("FP022 start gate READY event lineage differs")
+    errors.extend(
+        _validate_fp022_control_reanchor_seq68(
+            root,
+            event=reanchor,
+            checkpoint=checkpoint,
+            history=history,
+        )
+    )
+
+    supersession = reanchor.get("contract_supersession")
+    binding = (
+        supersession.get("replacement_contract_binding")
+        if isinstance(supersession, dict)
+        else None
+    )
+    if (
+        not isinstance(binding, dict)
+        or set(binding) != FP008_START_GATE_CONTRACT_BINDING_FIELDS
+    ):
+        return errors + ["FP022 start gate contract binding differs"], [], {}, ready
+    expected_identity = (
+        ("schema version", "schema_version", "1.1"),
+        (
+            "document ID",
+            "document_id",
+            "WS-FP022-INITIAL-START-GATE-CONTRACT-20260814-002",
+        ),
+        ("path", "path", FP022_START_GATE_CONTRACT_PATH),
+        ("contract ID", "contract_id", "WS-FP022-INTERNAL-START-GATE-R002"),
+        ("contract version", "contract_version", "2026-08-14.1"),
+    )
+    for label, key, expected in expected_identity:
+        _require_equal(
+            errors,
+            f"FP022 start gate contract {label}",
+            binding.get(key),
+            expected,
+        )
+    if _contains_symlink(root, FP022_START_GATE_CONTRACT_PATH):
+        errors.append("FP022 start gate contract path contains a symlink")
+        return errors, [], binding, ready
+    path = resolve_repo_file(root, binding.get("path"))
+    if path is None:
+        return errors + ["FP022 start gate contract path is missing or unsafe"], [], binding, ready
+    file_sha256 = binding.get("file_sha256")
+    if not isinstance(file_sha256, str) or not SHA256_RE.fullmatch(file_sha256):
+        errors.append("FP022 start gate contract file SHA-256 is invalid")
+    elif sha256_file(path) != file_sha256:
+        errors.append("FP022 start gate contract file SHA-256 differs")
+    try:
+        contract_value = load_json(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return errors + [f"FP022 start gate contract cannot be loaded: {exc}"], [], binding, ready
+    if set(contract_value) != {
+        "schema_version",
+        "document_id",
+        "contract_id",
+        "contract_version",
+        "target_goal_id",
+        "target_goal_content_sha256",
+        "gate_purpose",
+        "successor_reason_code",
+        "supersedes",
+        "ordered_checks",
+        "claim_boundary",
+    }:
+        errors.append("FP022 start gate contract field set differs")
+    _require_equal(
+        errors,
+        "FP022 start gate canonical contract SHA-256",
+        binding.get("canonical_contract_sha256"),
+        canonical_json_sha256(contract_value),
+    )
+    for label, actual, expected in (
+        ("schema version", contract_value.get("schema_version"), "1.1"),
+        ("document ID", contract_value.get("document_id"), binding.get("document_id")),
+        ("contract ID", contract_value.get("contract_id"), binding.get("contract_id")),
+        ("contract version", contract_value.get("contract_version"), binding.get("contract_version")),
+        ("target Goal", contract_value.get("target_goal_id"), FP022_GOAL_ID),
+        ("target Goal content SHA-256", contract_value.get("target_goal_content_sha256"), FP022_GOAL_SHA256),
+        ("purpose", contract_value.get("gate_purpose"), "INITIAL_START"),
+        (
+            "successor reason",
+            contract_value.get("successor_reason_code"),
+            "SEQ67_READY_TRUST_ANCHOR_AND_CURRENT_CONTROL_COHORT_REQUIRED",
+        ),
+    ):
+        _require_equal(errors, f"FP022 start gate contract {label}", actual, expected)
+    raw_checks = contract_value.get("ordered_checks")
+    checks: list[dict[str, str]] = []
+    if not isinstance(raw_checks, list):
+        errors.append("FP022 start gate ordered checks are missing")
+    else:
+        for index, item in enumerate(raw_checks, start=1):
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"check_id", "command"}
+                or not isinstance(item.get("check_id"), str)
+                or not isinstance(item.get("command"), str)
+                or not item["command"]
+            ):
+                errors.append(f"FP022 start gate ordered check {index} differs")
+                continue
+            checks.append({"check_id": item["check_id"], "command": item["command"]})
+    _require_equal(
+        errors,
+        "FP022 start gate ordered check IDs",
+        [item["check_id"] for item in checks],
+        FP022_START_GATE_CHECK_IDS,
+    )
+    forbidden = (
+        "apps/web",
+        "adminapp",
+        "android-gateway",
+        "connecteddebugandroidtest",
+        " adb ",
+        "device",
+        "external",
+        "formal",
+        "deploy",
+        "release",
+    )
+    if any(
+        token in item["command"].lower()
+        for item in checks
+        for token in forbidden
+    ):
+        errors.append("FP022 start gate contract contains forbidden command scope")
+    return errors, checks, binding, ready
+
+
+def _validate_fp022_runtime_bindings(
+    root: Path,
+    value: Any,
+    *,
+    event_id: str,
+) -> list[str]:
+    return _validate_start_gate_runtime_bindings(
+        root,
+        value,
+        event_id=event_id,
+        expected_paths=FP022_START_GATE_RUNTIME_PATHS,
+        label="FP022",
+    )
+
+
+def _npc_single_admin_recovery_start_gate_contract(
+    root: Path,
+    *,
+    event: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> tuple[
+    list[str],
+    list[dict[str, str]],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    errors: list[str] = []
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    event_sequence = event.get("sequence")
+    if not isinstance(history, list) or not isinstance(event_sequence, int):
+        return ["NPC start gate history is missing"], [], {}, {}
+
+    ready_events = [
+        item
+        for item in history
+        if isinstance(item, dict)
+        and item.get("event_type") == "GOAL_READY"
+        and item.get("subject_goal_id") == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        and isinstance(item.get("sequence"), int)
+        and item["sequence"] < event_sequence
+    ]
+    if len(ready_events) != 1:
+        return ["NPC start gate READY event is missing or ambiguous"], [], {}, {}
+    ready = ready_events[0]
+    reanchor_events = [
+        item
+        for item in history
+        if isinstance(item, dict)
+        and item.get("event_type") == "GOAL_START_CONTROL_REANCHORED"
+        and item.get("subject_goal_id") == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        and isinstance(item.get("sequence"), int)
+        and item["sequence"] < event_sequence
+    ]
+    if len(reanchor_events) != 2:
+        return errors + ["NPC start-control reanchor is missing or ambiguous"], [], {}, ready
+    reanchor_event, correction_event = reanchor_events
+    if (
+        ready.get("sequence") != 57
+        or ready.get("event_id") != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_ID
+        or ready.get("event_type") != "GOAL_READY"
+        or ready.get("focus_goal_content_sha256")
+        != NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256
+        or ready.get("event_sha256")
+        != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256
+        or ready.get("event_sha256") != event_sha256(ready)
+        or ready.get("implementation_start_gate_contract_binding")
+        != NPC_SINGLE_ADMIN_RECOVERY_R001_BINDING
+    ):
+        errors.append("NPC start gate seq57 READY lineage differs")
+    if (
+        reanchor_event.get("sequence") != 58
+        or reanchor_event.get("event_id")
+        != NPC_SINGLE_ADMIN_RECOVERY_CONTROL_REANCHOR_EVENT_ID
+        or reanchor_event.get("previous_event_sha256")
+        != NPC_SINGLE_ADMIN_RECOVERY_READY_EVENT_SHA256
+        or reanchor_event.get("event_sha256") != event_sha256(reanchor_event)
+    ):
+        errors.append("NPC start gate seq58 reanchor lineage differs")
+    if (
+        correction_event.get("sequence") != 59
+        or correction_event.get("event_id")
+        != NPC_SINGLE_ADMIN_RECOVERY_CONTROL_CORRECTION_EVENT_ID
+        or correction_event.get("previous_event_sha256")
+        != reanchor_event.get("event_sha256")
+        or correction_event.get("event_sha256") != event_sha256(correction_event)
+        or event.get("previous_event_sha256")
+        != correction_event.get("event_sha256")
+    ):
+        errors.append("NPC start gate seq59 correction lineage differs")
+    for item_label, reanchor_item in (
+        ("seq58", reanchor_event),
+        ("seq59", correction_event),
+    ):
+        supersession = reanchor_item.get("contract_supersession")
+        replacement = (
+            supersession.get("replacement_contract_binding")
+            if isinstance(supersession, dict)
+            else None
+        )
+        if replacement != NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING:
+            errors.append(f"NPC start gate {item_label} R002 replacement binding differs")
+
+    contract_errors, checks, _ = (
+        _load_npc_single_admin_recovery_r002_contract(root)
+    )
+    errors.extend(contract_errors)
+    return errors, checks, NPC_SINGLE_ADMIN_RECOVERY_R002_BINDING, ready
+
+
+def _validate_npc_single_admin_recovery_runtime_bindings(
+    root: Path,
+    value: Any,
+    *,
+    event_id: str,
+) -> list[str]:
+    return _validate_start_gate_runtime_bindings(
+        root,
+        value,
+        event_id=event_id,
+        expected_paths=NPC_SINGLE_ADMIN_RECOVERY_START_GATE_RUNTIME_PATHS,
+        label="NPC single-admin recovery",
+    )
+
+
 def _validate_start_gate(
     root: Path,
     *,
@@ -3790,7 +5508,15 @@ def _validate_start_gate(
         event.get("event_type") in {"GOAL_STARTED", "WORK_SESSION_RESUMED"}
         and subject == FP046_GOAL_ID
     )
-    private_scoped = fp008_scoped or fp046_scoped
+    fp022_scoped = (
+        event.get("event_type") == "GOAL_STARTED"
+        and subject == FP022_GOAL_ID
+    )
+    npc_scoped = (
+        event.get("event_type") == "GOAL_STARTED"
+        and subject == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+    )
+    private_scoped = fp008_scoped or fp046_scoped or fp022_scoped or npc_scoped
     path_errors: list[str] = []
     if not isinstance(binding, dict):
         path_errors.append("start gate binding is missing")
@@ -3851,6 +5577,28 @@ def _validate_start_gate(
         errors.extend(contract_errors)
         expected_receipt_fields = FP008_START_GATE_RECEIPT_FIELDS
         expected_schema_version = "1.1"
+    elif fp022_scoped:
+        contract_errors, checks, private_contract_binding, private_ready = (
+            _fp022_start_gate_contract(
+                root,
+                event=event,
+                checkpoint=checkpoint,
+            )
+        )
+        errors.extend(contract_errors)
+        expected_receipt_fields = FP008_START_GATE_RECEIPT_FIELDS
+        expected_schema_version = "1.1"
+    elif npc_scoped:
+        contract_errors, checks, private_contract_binding, private_ready = (
+            _npc_single_admin_recovery_start_gate_contract(
+                root,
+                event=event,
+                checkpoint=checkpoint,
+            )
+        )
+        errors.extend(contract_errors)
+        expected_receipt_fields = FP008_START_GATE_RECEIPT_FIELDS
+        expected_schema_version = "1.1"
     else:
         contract = _manifest_transition_contract(manifest)
         checks = _control_checks(
@@ -3891,7 +5639,15 @@ def _validate_start_gate(
         _require_equal(errors, f"start gate {label}", actual, expected)
 
     if private_scoped:
-        private_label = "FP008" if fp008_scoped else "FP046"
+        private_label = (
+            "FP008"
+            if fp008_scoped
+            else "FP046"
+            if fp046_scoped
+            else "FP022"
+            if fp022_scoped
+            else "NPC single-admin recovery"
+        )
         contract_version = private_contract_binding.get("contract_version")
         contract_sha256 = private_contract_binding.get(
             "canonical_contract_sha256"
@@ -3939,6 +5695,10 @@ def _validate_start_gate(
             _validate_fp008_runtime_bindings
             if fp008_scoped
             else _validate_fp046_runtime_bindings
+            if fp046_scoped
+            else _validate_fp022_runtime_bindings
+            if fp022_scoped
+            else _validate_npc_single_admin_recovery_runtime_bindings
         )
         errors.extend(
             runtime_validator(
@@ -4259,6 +6019,7 @@ def _expected_status_change(
     if event_type in {
         "PACKAGE_ACTIVATED",
         "CANONICAL_BINDINGS_UPDATED",
+        "GOAL_START_CONTROL_REANCHORED",
         "WORK_SESSION_RESUMED",
         "GOAL_FOCUS_CHANGED",
     }:
@@ -4343,6 +6104,11 @@ def _expected_from_to(
         return statuses.get(subject, ""), changes.get(subject, "")
     if event_type == "WORK_SESSION_RESUMED":
         return "IN_PROGRESS", "IN_PROGRESS"
+    if event_type == "GOAL_START_CONTROL_REANCHORED":
+        if not isinstance(subject, str):
+            return None
+        status = statuses.get(subject, "")
+        return status, status
     if event_type == "CANONICAL_BINDINGS_UPDATED":
         producer = event.get("produced_by_goal_id")
         focus = event.get("focus_goal_id")
@@ -4359,6 +6125,17 @@ def _expected_from_to(
     if materialized is not None:
         return "", changes.get(str(materialized), "")
     return None
+
+
+def _completion_source_is_allowed(
+    before_status: object,
+    goal_kind: object,
+) -> bool:
+    """Allow READY completion only for aggregate Workstream Goals."""
+
+    return before_status == "IN_PROGRESS" or (
+        before_status == "READY" and goal_kind == "WORKSTREAM"
+    )
 
 
 def validate_generic_event_order(
@@ -4495,7 +6272,14 @@ def validate_generic_event_order(
             event.get("to_status"),
         ) != expected_boundary:
             errors.append(f"{label} from/to boundary differs")
-        if event_type == "GOAL_STARTED":
+        if event_type == "GOAL_START_CONTROL_REANCHORED":
+            if (
+                not isinstance(subject, str)
+                or before.get(subject) != "READY"
+                or any(status == "IN_PROGRESS" for status in before.values())
+            ):
+                errors.append(f"{label} does not reanchor a sole READY Goal")
+        elif event_type == "GOAL_STARTED":
             if not isinstance(subject, str) or before.get(subject) != "READY":
                 errors.append(f"{label} does not start a READY Goal")
             if any(status == "IN_PROGRESS" for status in before.values()):
@@ -4523,9 +6307,11 @@ def validate_generic_event_order(
         elif event_type == "GOAL_COMPLETED":
             if (
                 not isinstance(subject, str)
-                or before.get(subject) != "IN_PROGRESS"
+                or before.get(subject) not in {"IN_PROGRESS", "READY"}
             ):
-                errors.append(f"{label} does not complete IN_PROGRESS work")
+                errors.append(
+                    f"{label} does not complete IN_PROGRESS or READY work"
+                )
             if pending_producer == subject:
                 pending_producer = None
         elif event_type == "GOAL_MATERIALIZED":
@@ -4662,6 +6448,17 @@ def validate_transition_replay(
     if not isinstance(imported, dict):
         imported = {}
         errors.append("v2.4 imported predecessor Goal bindings are missing")
+
+    goal_kind_by_id: dict[str, object] = {
+        goal_id: record.get("goal_kind")
+        for goal_id, record in imported.items()
+        if isinstance(goal_id, str) and isinstance(record, dict)
+    }
+    final_inventory = state.get("dynamic_goal_inventory")
+    if isinstance(final_inventory, dict):
+        for goal_id, record in final_inventory.items():
+            if isinstance(goal_id, str) and isinstance(record, dict):
+                goal_kind_by_id[goal_id] = record.get("goal_kind")
 
     previous_hash = ""
     statuses: dict[str, str] = {}
@@ -4985,6 +6782,15 @@ def validate_transition_replay(
                 errors.append(f"{label} from/to boundary differs")
             if event_type == "PACKAGE_ACTIVATED":
                 pass
+            elif event_type == "GOAL_START_CONTROL_REANCHORED":
+                errors.extend(
+                    _validate_npc_single_admin_recovery_control_reanchor(
+                        root,
+                        event=event,
+                        checkpoint=checkpoint,
+                        history=history,
+                    )
+                )
             elif event_type == "GOAL_STARTED":
                 if not isinstance(subject, str) or before.get(subject) != "READY":
                     errors.append(f"{label} does not start a READY Goal")
@@ -5041,9 +6847,14 @@ def validate_transition_replay(
             elif event_type == "GOAL_COMPLETED":
                 if (
                     not isinstance(subject, str)
-                    or before.get(subject) != "IN_PROGRESS"
+                    or not _completion_source_is_allowed(
+                        before.get(subject),
+                        goal_kind_by_id.get(subject),
+                    )
                 ):
-                    errors.append(f"{label} does not complete IN_PROGRESS work")
+                    errors.append(
+                        f"{label} does not complete IN_PROGRESS work or a READY Workstream"
+                    )
                 if pending_producer == subject:
                     pending_producer = None
                 if isinstance(subject, str):
@@ -5435,6 +7246,173 @@ def validate_prepared_checkpoint_projection(
     return errors
 
 
+def _fp022_completion_review_paths() -> dict[str, str]:
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+    )
+
+    return {
+        "assignment": review.ASSIGNMENT_REL.as_posix(),
+        "review_result": review.RESULT_REL.as_posix(),
+        "independent_review": review.INDEPENDENT_REL.as_posix(),
+    }
+
+
+def validate_fp022_completion_seq70_71(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Fail closed on the exact reviewed FP-022 producer/completion suffix."""
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 70:
+        return []
+    errors: list[str] = []
+    if len(history) < 71:
+        return ["FP022 seq70 producer transaction lacks adjacent seq71 completion"]
+    update, completion = history[69:71]
+    if not isinstance(update, dict) or not isinstance(completion, dict):
+        return ["FP022 seq70/71 events are malformed"]
+    expected_update_fields = {
+        "sequence", "event_id", "event_type", "occurred_on", "occurred_at",
+        "previous_focus_goal_id", "previous_focus_content_sha256", "focus_goal_id",
+        "focus_goal_content_sha256", "from_status", "to_status",
+        "static_plan_manifest_sha256", "status_changes", "runtime_after",
+        "blockers_after", "blocker_resolution_ids_after", "source_checkpoint_version",
+        "evidence_refs", "previous_event_sha256", "produced_by_goal_id",
+        "produced_binding_roles", "producer_completion_receipt_binding",
+        "changed_binding_roles", "changed_subject_ids_by_role",
+        "producer_output_subject_ids_by_role", "impact_closure_goal_ids",
+        "impact_disposition_by_goal", "reopened_completion_event_sha256_by_goal",
+        "canonical_binding_snapshot_after", "transition_control_review_binding",
+        "event_sha256",
+    }
+    expected_completion_fields = {
+        "sequence", "event_id", "event_type", "occurred_on", "occurred_at",
+        "previous_focus_goal_id", "previous_focus_content_sha256", "focus_goal_id",
+        "focus_goal_content_sha256", "subject_goal_id", "from_status", "to_status",
+        "static_plan_manifest_sha256", "status_changes", "runtime_after",
+        "blockers_after", "blocker_resolution_ids_after", "source_checkpoint_version",
+        "evidence_refs", "previous_event_sha256", "canonical_update_event_sha256",
+        "completion_receipt_binding", "completion_evidence_bindings",
+        "completion_evidence_by_goal_after", "canonical_binding_snapshot_after",
+        "event_sha256",
+    }
+    expected_binding = {
+        "role": FP022_COMPLETION_ROLE,
+        "document_id": FP022_COMPLETION_DOCUMENT_ID,
+        "path": FP022_COMPLETION_PATH,
+    }
+    source = history[68] if isinstance(history[68], dict) else {}
+    for label, actual, expected in (
+        ("seq70 fields", set(update), expected_update_fields),
+        ("seq71 fields", set(completion), expected_completion_fields),
+        ("seq70 sequence", update.get("sequence"), 70),
+        ("seq71 sequence", completion.get("sequence"), 71),
+        ("seq70 ID", update.get("event_id"), FP022_COMPLETION_UPDATE_EVENT_ID),
+        ("seq71 ID", completion.get("event_id"), FP022_COMPLETION_EVENT_ID),
+        ("seq70 type", update.get("event_type"), "CANONICAL_BINDINGS_UPDATED"),
+        ("seq71 type", completion.get("event_type"), "GOAL_COMPLETED"),
+        ("seq70 previous", update.get("previous_event_sha256"), source.get("event_sha256")),
+        ("seq71 previous", completion.get("previous_event_sha256"), update.get("event_sha256")),
+        ("seq71 update", completion.get("canonical_update_event_sha256"), update.get("event_sha256")),
+        ("seq70 focus", update.get("focus_goal_id"), FP022_GOAL_ID),
+        ("seq70 producer", update.get("produced_by_goal_id"), FP022_GOAL_ID),
+        ("seq71 subject", completion.get("subject_goal_id"), FP022_GOAL_ID),
+        ("seq71 focus", completion.get("focus_goal_id"), FP022_PARENT_GOAL_ID),
+        ("seq71 focus content", completion.get("focus_goal_content_sha256"), FP022_PARENT_GOAL_SHA256),
+        ("seq71 status", completion.get("status_changes"), {FP022_GOAL_ID: "COMPLETE_AT_TARGET"}),
+        ("seq70 changed roles", update.get("changed_binding_roles"), ["IMPLEMENTATION_BACKLOG", "IMPLEMENTATION_GAP", FP022_COMPLETION_ROLE]),
+        ("seq70 producer roles", update.get("produced_binding_roles"), ["IMPLEMENTATION_BACKLOG", "IMPLEMENTATION_GAP"]),
+        (
+            "seq70 changed subjects",
+            update.get("changed_subject_ids_by_role"),
+            {
+                "IMPLEMENTATION_BACKLOG": ["FP-022"],
+                "IMPLEMENTATION_GAP": ["FP-022", "GAP-031"],
+            },
+        ),
+        (
+            "seq70 producer subjects",
+            update.get("producer_output_subject_ids_by_role"),
+            {
+                "IMPLEMENTATION_BACKLOG": ["FP-022"],
+                "IMPLEMENTATION_GAP": ["FP-022", "GAP-031"],
+            },
+        ),
+        ("seq71 evidence", completion.get("evidence_refs"), [FP022_COMPLETION_ROLE]),
+    ):
+        _require_equal(errors, f"FP022 completion {label}", actual, expected)
+    if update.get("event_sha256") != event_sha256(update):
+        errors.append("FP022 completion seq70 event seal differs")
+    if completion.get("event_sha256") != event_sha256(completion):
+        errors.append("FP022 completion seq71 event seal differs")
+    for label, binding in (
+        ("seq70 producer completion", update.get("producer_completion_receipt_binding")),
+        ("seq71 completion", completion.get("completion_receipt_binding")),
+    ):
+        if not isinstance(binding, dict) or any(
+            binding.get(key) != value for key, value in expected_binding.items()
+        ):
+            errors.append(f"FP022 completion {label} binding differs")
+    review_binding = update.get("transition_control_review_binding")
+    try:
+        expected_review_paths = _fp022_completion_review_paths()
+    except (ImportError, RuntimeError, TypeError, ValueError) as exc:
+        errors.append(f"FP022 completion transition review authority differs: {exc}")
+        expected_review_paths = {}
+    if not isinstance(review_binding, dict) or set(review_binding) != set(expected_review_paths):
+        errors.append("FP022 completion transition review binding differs")
+    else:
+        for role, relative in expected_review_paths.items():
+            row = review_binding.get(role)
+            path = resolve_repo_file(root, relative)
+            if (
+                not isinstance(row, dict)
+                or row.get("path") != relative
+                or path is None
+                or row.get("sha256") != sha256_file(path)
+                or row.get("byte_length") != path.stat().st_size
+            ):
+                errors.append(f"FP022 completion transition review differs: {role}")
+    if len(history) == 71:
+        runtime = completion.get("runtime_after")
+        if (
+            state.get("status_by_goal", {}).get(FP022_GOAL_ID) != "COMPLETE_AT_TARGET"
+            or state.get("focus_goal_id") != FP022_PARENT_GOAL_ID
+            or state.get("focus_goal_path") != FP022_PARENT_GOAL_PATH
+            or state.get("focus_work_item_id") != ""
+            or state.get("focus_source") != "WORKSTREAM_GRAPH"
+            or state.get("ready_frontier_goal_ids")
+            != [FP022_PARENT_GOAL_ID, "WS-GOAL-EPIC-12"]
+            or not isinstance(runtime, dict)
+            or runtime.get("focus_goal_id") != FP022_PARENT_GOAL_ID
+        ):
+            errors.append("FP022 completion final parent/frontier projection differs")
+        if state.get("completion_evidence_by_goal", {}).get(FP022_GOAL_ID) != [FP022_COMPLETION_ROLE]:
+            errors.append("FP022 completion evidence role differs")
+        roles = canonical_binding_snapshot(checkpoint)
+        completion_binding = roles.get(FP022_COMPLETION_ROLE)
+        if not isinstance(completion_binding, dict) or any(
+            completion_binding.get(key) != value for key, value in expected_binding.items()
+        ):
+            errors.append("FP022 completion canonical receipt binding differs")
+        for role, relative in (
+            ("IMPLEMENTATION_GAP", FP022_R028_GAP_PATH),
+            ("IMPLEMENTATION_BACKLOG", FP022_R028_BACKLOG_PATH),
+        ):
+            binding = roles.get(role)
+            path = resolve_repo_file(root, relative)
+            if (
+                not isinstance(binding, dict)
+                or binding.get("path") != relative
+                or path is None
+                or binding.get("file_sha256") != sha256_file(path)
+            ):
+                errors.append(f"FP022 completion R028 canonical binding differs: {role}")
+    return errors
+
+
 def validate(
     root: Path,
     checkpoint_path: Path = V24_CHECKPOINT_RELATIVE,
@@ -5464,6 +7442,7 @@ def validate(
             checkpoint,
         )
     )
+    errors.extend(validate_fp022_completion_seq70_71(root, checkpoint))
     if archive:
         finalized_prepared = (
             None

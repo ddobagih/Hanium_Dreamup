@@ -328,6 +328,14 @@ class AdminSecurityControl(Base):
 
     __tablename__ = "admin_security_controls"
     __table_args__ = (
+        UniqueConstraint(
+            "singleton_scope",
+            name="uq_admin_security_controls_singleton",
+        ),
+        CheckConstraint(
+            "singleton_scope",
+            name="ck_admin_security_controls_singleton",
+        ),
         CheckConstraint(
             "security_state IN ('NORMAL', 'RECOVERY_REQUIRED', 'RECOVERY_IN_PROGRESS')",
             name="ck_admin_security_controls_state",
@@ -337,14 +345,60 @@ class AdminSecurityControl(Base):
             "totp_secret_fingerprint ~ '^[0-9a-f]{64}$'",
             name="ck_admin_security_controls_totp_fingerprint",
         ),
+        CheckConstraint(
+            "recovery_custody_state IN ('UNATTESTED', 'ATTESTED')",
+            name="ck_admin_security_controls_custody_state",
+        ),
+        CheckConstraint(
+            "recovery_custody_reference_sha256 IS NULL OR "
+            "recovery_custody_reference_sha256 ~ '^[0-9a-f]{64}$'",
+            name="ck_admin_security_controls_custody_reference",
+        ),
+        CheckConstraint(
+            "(recovery_custody_state = 'UNATTESTED' "
+            "AND recovery_custody_attested_at IS NULL "
+            "AND recovery_custody_reference_sha256 IS NULL "
+            "AND recovery_custody_material_kind IS NULL "
+            "AND recovery_custody_storage_location IS NULL "
+            "AND NOT recovery_custody_separate_backup_confirmed) OR "
+            "(recovery_custody_state = 'ATTESTED' "
+            "AND recovery_custody_attested_at IS NOT NULL "
+            "AND recovery_custody_reference_sha256 IS NOT NULL "
+            "AND recovery_custody_material_kind IN ('RECOVERY_CODE', 'SECURITY_KEY') "
+            "AND recovery_custody_storage_location = 'OFF_PHONE' "
+            "AND recovery_custody_separate_backup_confirmed)",
+            name="ck_admin_security_controls_custody_attestation",
+        ),
     )
 
     admin_id = Column(String(64), primary_key=True)
+    singleton_scope = Column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
     password_hash = Column(Text, nullable=False)
     totp_secret_fingerprint = Column(String(64), nullable=False)
     last_totp_timecode = Column(BigInteger, nullable=True)
     security_state = Column(String(32), nullable=False, default="NORMAL")
     state_version = Column(BigInteger, nullable=False, default=1)
+    recovery_custody_state = Column(
+        String(16),
+        nullable=False,
+        default="UNATTESTED",
+        server_default="UNATTESTED",
+    )
+    recovery_custody_attested_at = Column(DateTime(timezone=True), nullable=True)
+    recovery_custody_reference_sha256 = Column(String(64), nullable=True)
+    recovery_custody_material_kind = Column(String(32), nullable=True)
+    recovery_custody_storage_location = Column(String(32), nullable=True)
+    recovery_custody_separate_backup_confirmed = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

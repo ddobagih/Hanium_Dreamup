@@ -26,6 +26,10 @@ public final class AdminSecurityBoundaryStaticTest {
     private final String operationsClient = read(
         "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminOperationsHttpClient.java"
     );
+    private final String securityClient = read(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java"
+    );
+    private final String readme = read("README.md");
 
     @Test
     public void onlyInternetPermissionIsDeclaredAndBackupsAreClosed() {
@@ -73,6 +77,30 @@ public final class AdminSecurityBoundaryStaticTest {
         assertTrue(controller.contains("private String recoveryToken"));
         assertFalse(controller.contains("SharedPreferences"));
         assertFalse(controller.contains("FileOutputStream"));
+        assertFalse(controller.contains("private String custodyReference"));
+    }
+
+    @Test
+    public void recoveryCustodyAndLostDeviceControlsAreExplicitAndKeepNoRecoveryMaterial() {
+        assertTrue(activity.contains("custodyConfirmationInput.isChecked()"));
+        assertTrue(activity.contains("복구자료 외부 보관 확인 기록"));
+        assertTrue(activity.contains("서버 키·앱 서명 키·관리자 복구자료"));
+        assertTrue(activity.contains("같은 저장공간이나 계정에 키를 함께 두지 않았음"));
+        assertTrue(activity.contains("앱은 복구자료 원문을 저장하거나 전송하지 않습니다"));
+        assertTrue(controller.contains("new byte[32]"));
+        assertTrue(controller.contains("RecoveryStorageLocation.OFF_PHONE"));
+        assertTrue(securityClient.contains("/admin/security/recovery-custody/attest"));
+        assertTrue(securityClient.contains("/report-lost"));
+        assertTrue(securityClient.contains("current device cannot be reported lost"));
+        assertTrue(securityClient.contains("Set.of(\"sessions\", \"devices\")"));
+        assertTrue(activity.contains("활성 장치 키만 남은 기기"));
+        assertFalse(activity.contains("putString(\"recovery"));
+        assertTrue(readme.contains("서버 키, 앱 서명 키, 관리자 복구자료"));
+        assertTrue(readme.contains("separate_encrypted_backup_confirmed=true"));
+        assertTrue(readme.contains("실제 운영 custody 보관"));
+        assertTrue(readme.contains("분실 복구 훈련 증거가 아니다"));
+        assertTrue(readme.contains("`NOT_RUN`"));
+        assertTrue(readme.contains("외부 증거 없이 완료됐다고 주장하지 않는다"));
     }
 
     @Test
@@ -87,6 +115,8 @@ public final class AdminSecurityBoundaryStaticTest {
         assertTrue(deviceKeyStore.contains("public_key_spki_base64url"));
         assertTrue(activity.contains("setTextIsSelectable(true)"));
         assertTrue(activity.contains("registrationDescriptor(deviceId)"));
+        assertTrue(readme.contains("--expected-key-marker '<descriptor key_marker>'"));
+        assertTrue(readme.contains("DB write 전에 검증"));
         assertFalse(deviceKeyStore.contains("getPrivate().getEncoded"));
         assertFalse(deviceKeyStore.contains("PrivateKey.getEncoded"));
     }

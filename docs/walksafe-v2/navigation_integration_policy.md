@@ -17,6 +17,14 @@
 - Web/PWA의 `NEXT_PUBLIC_WALKSAFE_DESTINATION_LAT/LNG/NAME` 목적지는 개발·테스트 fallback으로만 본다. 실제 사용자 경로는 목적지 검색과 후보 선택을 사용한다.
 - Android native voice로 목적지 설정, 후보 선택, 길안내 시작까지 완성된 실사용 UX는 아직 후속이다.
 
+## 2026-08-14 FP-022 저장소 내부 구현 보정
+
+- Android native voice는 목적지 후보를 이름·주소·거리와 함께 세 개씩 읽고, 사용자가 `더 듣기`를 명시한 경우에만 다음 세 개를 안내한다. 현재 음성 페이지의 절대 번호만 선택할 수 있다.
+- trusted GPS와 현재 세션에 저장된 TMAP 경로가 남은 거리·경로 끝·이탈 판정의 권위다. 평균 또는 보정된 개인 보폭은 진행량 일관성의 보조 증거일 뿐 위치·방향·이탈·도착을 단독으로 만들지 않는다.
+- 이탈이 연속 샘플로 확인돼도 사용자 선택 전에는 새 TMAP 경로를 요청하지 않는다. 도착 가능성이 확인돼도 사용자 확인 전에는 도착을 확정하거나 경로를 지우지 않는다.
+- GPS·위치 권한·TMAP 경로를 신뢰할 수 없으면 방향 안내를 중지하고 원인을 알린다. route와 무관한 일반 위험 경고는 이 길안내 중지와 별도다.
+- 이 보정은 저장소 내부 코드·자동 회귀 범위다. 실제 기기·TalkBack·현장 GPS·외부 TMAP·정식 시험·배포·출시는 `NOT_RUN` 또는 `NOT_ELIGIBLE`이다.
+
 ## 1. 목적
 
 WalkSafe의 길안내는 지도 서비스를 대체하는 완전한 내비게이션이 아니라, **보행 경로 + 카메라 기반 보행 안전 레이어**를 섞는 기능이다.
@@ -91,9 +99,8 @@ TMAP은 점자블록 경로망을 제공하지 않는다. 따라서 점자블록
 - `useNavigationGuidance`
   - 현재 GPS와 설정된 목적지 좌표로 `/navigation/walking`을 호출한다.
   - 기본 priority는 `STAIR_AVOID`다.
-  - 경로 이탈이 연속 샘플로 확인되면 자동 재탐색 코드 경로를 실행할 수 있다.
-  - 자동 재탐색은 GPS 정확도, GPS jump, in-flight, cooldown, 길안내 세션 누적 max count gate를 모두 통과해야 한다. 재탐색 성공으로 횟수를 초기화하지 않는다.
-  - 경로 이탈은 GPS 정확도를 알 수 없으면 확정하지 않으며, 도착은 정확도 상한을 통과한 연속 2개 샘플로만 확정한다.
+  - Web/PWA의 과거 자동 재탐색·자동 도착 경로는 Android 제품 동작이나 완료 증거가 아니다.
+  - Android 제품 경로는 이탈·도착 후보를 만들 수 있지만 사용자 선택 전에는 네트워크 재요청·도착 확정·경로 종료를 하지 않는다.
   - 응답의 `provider`가 `tmap_pedestrian`이 아니면 현재 제품 계약 위반으로 거부한다.
   - 길안내 상태 카드를 `AssistPanel`에 표시한다.
   - 경로 시작 TTS와 정상 점자블록 follow 안내를 `useRiskFeedback`에 낮은 우선순위 prompt로 넘긴다.
@@ -109,10 +116,10 @@ TMAP은 점자블록 경로망을 제공하지 않는다. 따라서 점자블록
 
 - 목적지 이름 검색은 backend `GET /navigation/destinations/search`와 Android UI에 연결되어 있다.
 - Web/PWA는 개발·테스트 fallback으로 `NEXT_PUBLIC_WALKSAFE_DESTINATION_LAT/LNG/NAME` 목적지 좌표를 사용할 수 있지만 제품 기본 경로로 간주하지 않는다.
-- Android native voice에서 목적지 slot을 검색 후보 선택과 길안내 시작까지 자연스럽게 잇는 UX는 아직 후속이다.
+- Android native voice의 목적지 검색·세 개 단위 후보 안내·명시 선택·길안내 시작은 저장소 내부 구현과 자동 회귀까지 연결됐다. 실제 기기·사용자 접근성 검증은 후속이다.
 - 목적지 후보는 Android UI에서 동명 후보 이름/주소/거리 표시, 더 보기, 취소를 제공한다.
 - `distance_m`이 있는 후보가 `NEXT_PUBLIC_WALKSAFE_DESTINATION_MAX_DISTANCE_M`를 넘으면 자동 선택/길안내를 막는다.
-- TMAP 응답은 경로 geometry/요약/구간 설명 중심으로만 쓰고, 사용자 안내 문장은 WalkSafe가 보행 속도/보폭 기반으로 재가공한다.
+- TMAP 응답은 경로 geometry/요약/구간 설명 중심으로 쓰며, 남은 거리와 경로 끝은 trusted GPS의 저장 경로 projection을 기준으로 계산한다. 보행 속도·보폭은 보조 일관성 정보만 제공한다.
 - 길안내 음성은 거리(m) 단독 표현보다 시간/보폭 기반 표현을 우선한다. 예: “10초 뒤 좌회전 준비”, “약 15보 앞”, “지금 좌회전하세요”.
 - 보폭 기본값은 임시 추정값으로 시작하되, 사용자 키/보폭 설정 또는 보행 캘리브레이션으로 개인화할 수 있어야 한다. 개인화 전에는 보폭 안내에 “약”을 붙인다.
 - 현재 프론트 기본 보폭은 `NEXT_PUBLIC_WALKSAFE_STEP_LENGTH_M`로 조정할 수 있고, 미설정 시 `0.65m`를 사용한다.
@@ -179,6 +186,8 @@ NEXT_PUBLIC_WALKSAFE_REROUTE_MAX_GPS_JUMP_M=50
 NEXT_PUBLIC_WALKSAFE_ARRIVAL_RADIUS_M=8
 NEXT_PUBLIC_WALKSAFE_ARRIVAL_MAX_ACCURACY_M=20
 ```
+
+위 `NEXT_PUBLIC_*` 자동 재탐색·도착 변수는 Web/PWA 개발 fallback의 historical 설정이다. Android 제품 정책이나 사용자 선택 없는 재탐색·도착을 허가하지 않는다.
 
 주의: `NEXT_PUBLIC_*` 값은 브라우저 번들에 포함된다. API key는 절대 `NEXT_PUBLIC_*`에 넣지 않는다.
 

@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,8 +49,12 @@ class AndroidVoiceCommandTest {
     fun parsesDestinationCancellationNextRouteAndNavigationStop() {
         assertEquals(AndroidVoiceCommand.CancelDestination, parseAndroidVoiceCommand("목적지 취소"))
         assertEquals(AndroidVoiceCommand.CancelDestination, parseAndroidVoiceCommand("목적지를 취소해"))
+        assertEquals(AndroidVoiceCommand.HearMoreDestinationCandidates, parseAndroidVoiceCommand("더 듣기"))
         assertEquals(AndroidVoiceCommand.NextNavigationInstruction, parseAndroidVoiceCommand("다음 경로 뭐야?"))
         assertEquals(AndroidVoiceCommand.NextNavigationInstruction, parseAndroidVoiceCommand("다음 안내 알려줘"))
+        assertEquals(AndroidVoiceCommand.RequestReroute, parseAndroidVoiceCommand("경로 다시 찾아줘"))
+        assertEquals(AndroidVoiceCommand.ConfirmArrival, parseAndroidVoiceCommand("도착 확인"))
+        assertEquals(AndroidVoiceCommand.RejectArrival, parseAndroidVoiceCommand("아직 도착 아니야"))
         assertEquals(AndroidVoiceCommand.StopNavigation, parseAndroidVoiceCommand("길안내 중지"))
     }
 
@@ -92,6 +97,13 @@ class AndroidVoiceCommandTest {
             AndroidVoiceAction.SelectDestinationCandidate(2),
             AndroidVoiceCommand.SelectDestinationCandidate(2).toAction(),
         )
+        assertEquals(
+            AndroidVoiceAction.HearMoreDestinationCandidates,
+            AndroidVoiceCommand.HearMoreDestinationCandidates.toAction(),
+        )
+        assertEquals(AndroidVoiceAction.RequestReroute, AndroidVoiceCommand.RequestReroute.toAction())
+        assertEquals(AndroidVoiceAction.ConfirmArrival, AndroidVoiceCommand.ConfirmArrival.toAction())
+        assertEquals(AndroidVoiceAction.RejectArrival, AndroidVoiceCommand.RejectArrival.toAction())
     }
 
     @Test
@@ -154,7 +166,82 @@ class AndroidVoiceCommandTest {
         assertTrue(prompt.contains("1번 후보 1"))
         assertTrue(prompt.contains("3번 후보 3"))
         assertTrue(!prompt.contains("후보 4,"))
-        assertTrue(prompt.contains("나머지 1곳은 화면의 더 보기에서 확인할 수 있습니다."))
+        assertTrue(prompt.contains("더 들으려면 더 듣기라고 말씀해 주세요."))
+    }
+
+    @Test
+    fun destinationSearchVoiceStatePagesSevenCandidatesThreeThreeOne() {
+        val results = (1..7).map { index ->
+            destinationResult(
+                name = "도서관 ${index}",
+                roadAddress = "서울 ${index}길",
+                distanceM = index * 100,
+            )
+        }
+        val firstPage = DestinationSearchVoiceState(query = "도서관", results = results)
+
+        assertEquals(listOf("도서관 1", "도서관 2", "도서관 3"), firstPage.currentPageResults.map { it.name })
+        assertTrue(firstPage.voicePrompt().contains("1번 도서관 1, 서울 1길, 100m"))
+        assertTrue(firstPage.voicePrompt().contains("3번 도서관 3, 서울 3길, 300m"))
+
+        val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore)
+        assertTrue(secondPage.accepted)
+        assertEquals(listOf("도서관 4", "도서관 5", "도서관 6"), secondPage.state.currentPageResults.map { it.name })
+        assertTrue(secondPage.state.voicePrompt().contains("4번 도서관 4, 서울 4길, 400m"))
+        assertTrue(secondPage.state.voicePrompt().contains("6번 도서관 6, 서울 6길, 600m"))
+
+        val thirdPage = secondPage.state.onCommand(DestinationSearchVoiceCommand.HearMore)
+        assertTrue(thirdPage.accepted)
+        assertEquals(listOf("도서관 7"), thirdPage.state.currentPageResults.map { it.name })
+        assertTrue(thirdPage.state.voicePrompt().contains("7번 도서관 7, 서울 7길, 700m"))
+        assertTrue(!thirdPage.state.onCommand(DestinationSearchVoiceCommand.HearMore).accepted)
+    }
+
+    @Test
+    fun fullRemotePageOffersHearMoreBeforeTheNextPageIsLoaded() {
+        val state = DestinationSearchVoiceState(
+            query = "도서관",
+            results = (1..3).map { destinationResult("도서관 ${it}") },
+            moreResultsAvailable = true,
+        )
+
+        assertTrue(state.voicePrompt().contains("더 듣기"))
+        assertFalse(state.onCommand(DestinationSearchVoiceCommand.HearMore).accepted)
+    }
+
+    @Test
+    fun onlyExplicitHearMoreCommandAdvancesTheDestinationPage() {
+        val state = DestinationSearchVoiceState(
+            query = "도서관",
+            results = (1..7).map { destinationResult("도서관 ${it}") },
+        )
+
+        assertEquals(DestinationSearchVoiceCommand.HearMore, parseDestinationSearchVoiceCommand("더 듣기"))
+        listOf("다음", "계속", "더 보여줘", "또 듣기").forEach { phrase ->
+            assertNull(parseDestinationSearchVoiceCommand(phrase))
+        }
+        assertEquals(0, state.onCommand(DestinationSearchVoiceCommand.SelectCandidate(1)).state.pageIndex)
+        assertEquals(1, state.onCommand(DestinationSearchVoiceCommand.HearMore).state.pageIndex)
+    }
+
+    @Test
+    fun destinationSelectionAcceptsOnlyAnExplicitNumberOnTheCurrentPage() {
+        val results = (1..7).map { destinationResult("후보 ${it}") }
+        val firstPage = DestinationSearchVoiceState(query = "후보", results = results)
+
+        assertNull(parseDestinationSearchVoiceCommand("첫 번째 선택"))
+        assertEquals(
+            DestinationSearchVoiceCommand.SelectCandidate(4),
+            parseDestinationSearchVoiceCommand("4번 선택"),
+        )
+        assertTrue(!firstPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(4)).accepted)
+
+        val secondPage = firstPage.onCommand(DestinationSearchVoiceCommand.HearMore).state
+        assertTrue(!secondPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(1)).accepted)
+        val selection = secondPage.onCommand(DestinationSearchVoiceCommand.SelectCandidate(4))
+        assertTrue(selection.accepted)
+        assertEquals(4, selection.selectedOneBasedIndex)
+        assertEquals("후보 4", selection.selectedResult?.name)
     }
 
     @Test

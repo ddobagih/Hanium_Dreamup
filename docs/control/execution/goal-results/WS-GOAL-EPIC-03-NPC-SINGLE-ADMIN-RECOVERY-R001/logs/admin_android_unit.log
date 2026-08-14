@@ -1,0 +1,57 @@
+WALKSAFE_NPC_VERIFICATION_LOG_BEGIN
+WALKSAFE_NPC_VERIFICATION_SCHEMA walksafe.npc-single-admin-recovery-verification-lane.v1
+WALKSAFE_NPC_VERIFICATION_RUN_ID NPC-RECOVERY-8e477a558daf63a5d0584e774a1e82f9
+WALKSAFE_NPC_VERIFICATION_SOURCE_CONTENT_SET_SHA256 d9185bb5eef23838dd2036be668adbc0d5c841859d9035f8e294208d35d0029e
+WALKSAFE_NPC_VERIFICATION_LANE_ID ADMIN_ANDROID_UNIT
+WALKSAFE_NPC_VERIFICATION_CWD apps/android
+WALKSAFE_NPC_VERIFICATION_STARTED_AT 2026-08-13T07:02:20.470052+09:00
+WALKSAFE_NPC_VERIFICATION_COMMAND_COUNT 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 1
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "./gradlew --offline --no-daemon --max-workers=1 :adminapp:testDebugUnitTest --rerun-tasks"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 1
+| To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+| Daemon will be stopped at the end of the build 
+| > Task :adminapp:preBuild UP-TO-DATE
+| > Task :adminapp:preDebugBuild UP-TO-DATE
+| > Task :adminapp:generateDebugBuildConfig
+| > Task :adminapp:generateDebugResources
+| > Task :adminapp:packageDebugResources
+| > Task :adminapp:processDebugNavigationResources
+| > Task :adminapp:parseDebugLocalResources
+| > Task :adminapp:generateDebugRFile
+| > Task :adminapp:compileDebugKotlin NO-SOURCE
+| > Task :adminapp:javaPreCompileDebug
+| > Task :adminapp:compileDebugJavaWithJavac
+| > Task :adminapp:checkDebugAarMetadata
+| > Task :adminapp:mapDebugSourceSetPaths
+| > Task :adminapp:compileDebugNavigationResources
+| > Task :adminapp:mergeDebugResources
+| > Task :adminapp:createDebugCompatibleScreenManifests
+| > Task :adminapp:extractDeepLinksDebug
+| > Task :adminapp:processDebugMainManifest
+| > Task :adminapp:processDebugManifest
+| > Task :adminapp:processDebugManifestForPackage
+| > Task :adminapp:processDebugResources
+| > Task :adminapp:bundleDebugClassesToRuntimeJar
+| > Task :adminapp:bundleDebugClassesToCompileJar
+| > Task :adminapp:preDebugUnitTestBuild UP-TO-DATE
+| > Task :adminapp:compileDebugUnitTestKotlin NO-SOURCE
+| > Task :adminapp:javaPreCompileDebugUnitTest
+| > Task :adminapp:compileDebugUnitTestJavaWithJavac
+| > Task :adminapp:processDebugJavaRes NO-SOURCE
+| > Task :adminapp:processDebugUnitTestJavaRes NO-SOURCE
+| > Task :adminapp:testDebugUnitTest
+| 
+| BUILD SUCCESSFUL in 6s
+| 23 actionable tasks: 23 executed
+| Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.3.1/userguide/configuration_cache_enabling.html
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 1
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 1
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 1 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 1
+WALKSAFE_NPC_VERIFICATION_ENDED_AT 2026-08-13T07:02:27.114947+09:00
+WALKSAFE_NPC_VERIFICATION_EXIT_CODE 0
+WALKSAFE_NPC_VERIFICATION_STATUS PASS
+WALKSAFE_NPC_VERIFICATION_LOG_END

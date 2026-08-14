@@ -270,7 +270,7 @@
     <div class="wrap">
       <h1>WalkSafe 기능 구현·분담 목록</h1>
       <p>팀원이 구현할 기능을 분야 → 큰 기능 → 세부 기능으로 나눈 작업용 목록입니다.</p>
-      <p>기준일: 2026-08-11 · 기준 브랜치: <strong>current</strong></p>
+      <p>기준일: 2026-08-13 · 기준 브랜치: <strong>current</strong></p>
     </div>
   </header>
 
@@ -356,7 +356,7 @@
     </section>
 
     <footer>
-      판단 근거: 현재 코드, v2.4 seq57 체크포인트, r025 구현 Gap 분석, FP008·FP046 내부 검증 영수증. 상태가 바뀌면 해당 행을 함께 갱신합니다.
+      판단 근거: 현재 코드, v2.4 seq62 체크포인트, r026 구현 Gap 분석, NPC 단일 관리자 복구 내부 검증 영수증. 실제 기기·복구훈련·정식 시험은 별도 증거 전까지 미실행입니다.
     </footer>
   </main>
 
@@ -438,7 +438,7 @@
       {id:"PV-07",domain:"개인정보 · 보안",group:"삭제",feature:"계정 삭제 단계·기한·영수증 관리",status:"내부 구현",next:"실제 권리요청과 운영 DB에서 끝까지 검증한다.",owner:"Backend · 개인정보",priority:"P0"},
       {id:"PV-08",domain:"개인정보 · 보안",group:"삭제",feature:"서버·가공본·학습본·외부기관 실제 삭제",status:"일부 구현",next:"삭제 단계에 저장소별 실제 삭제 작업을 연결한다.",owner:"서버 · 데이터 운영 · 개인정보",priority:"P0"},
       {id:"PV-09",domain:"개인정보 · 보안",group:"보존",feature:"백업·보존자료 삭제와 복원 뒤 재삭제",status:"실환경 검증 필요",next:"운영 백업·복원·35일 순환과 삭제 차단선을 훈련한다.",owner:"SRE · DBA · 개인정보",priority:"P0"},
-      {id:"PV-10",domain:"개인정보 · 보안",group:"관리자 보안",feature:"패스키 또는 추가 본인확인",status:"미구현",next:"단일 관리자 복구 Goal에서 방식과 등록·폐기 절차를 구현한다.",owner:"보안 · Android Admin · Backend",priority:"P0"},
+      {id:"PV-10",domain:"개인정보 · 보안",group:"관리자 보안",feature:"패스키 또는 추가 본인확인",status:"내부 구현",next:"실제 등록 기기와 운영 키 관리 절차로 로그인·교체·폐기를 검증한다.",owner:"보안 · Android Admin · Backend",priority:"P0"},
       {id:"PV-11",domain:"개인정보 · 보안",group:"관리자 복구",feature:"휴대전화 밖 복구자료와 새 기기 복구",status:"일부 구현",next:"복구자료 보관·키 분리·새 기기 등록·실제 훈련을 완성한다.",owner:"보안 · 개인정보 · 운영",priority:"P0"},
       {id:"PV-12",domain:"개인정보 · 보안",group:"관리자 세션",feature:"분실 기기 원격 세션 폐기",status:"내부 구현",next:"휴대전화 분실 상황으로 실제 원격 폐기 훈련을 한다.",owner:"보안 운영 · QA",priority:"P0"},
       {id:"PV-13",domain:"개인정보 · 보안",group:"고위험 통제",feature:"복구 중 고위험 작업 동결과 감사",status:"일부 구현",next:"모든 고위험 API·화면과 경보에 동결 상태를 연결한다.",owner:"보안 · Backend · Android Admin",priority:"P0"},
@@ -505,7 +505,7 @@
 
     const storageKey = "walksafe-feature-catalog-assignments-v1";
     const assignmentSchemaVersion = "walksafe.feature-assignments.v1";
-    const catalogDate = "2026-08-11";
+    const catalogDate = "2026-08-13";
     const assignmentPayloadKeys = ["assignments", "catalog_date", "catalog_sha256", "feature_count", "schema_version"];
     const assignmentRowKeys = ["assigned_owner", "assignment_done", "domain", "feature", "group", "id", "next", "priority", "status", "suggested_owner"];
     let catalogSha256Promise;

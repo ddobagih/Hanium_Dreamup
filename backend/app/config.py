@@ -66,6 +66,9 @@ DEFAULT_ADMIN_STEP_UP_TTL_SECONDS = 5 * 60
 DEFAULT_ADMIN_RECOVERY_TTL_SECONDS = 15 * 60
 DEFAULT_ADMIN_AUTH_RATE_LIMIT_ATTEMPTS = 5
 DEFAULT_ADMIN_AUTH_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
+DEFAULT_ADMIN_CREDENTIAL_ISSUER_KEY_FILE = Path(
+    "/etc/walksafe/admin-credential-issuer.key"
+)
 MIN_FIELD_TEST_TOKEN_LENGTH = 24
 MIN_PRIVACY_HMAC_SECRET_BYTES = 32
 DEPLOYMENT_ENVIRONMENTS = frozenset({"field", "staging", "production"})
@@ -76,6 +79,7 @@ FULL_GIT_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 ADMIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 TOTP_SECRET_PATTERN = re.compile(r"^[A-Z2-7]+$")
 KEY_BOUNDARY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{2,127}$")
+DATABASE_ROLE_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,62}$")
 
 
 def _env_text(name: str, default: str = "") -> str:
@@ -83,6 +87,19 @@ def _env_text(name: str, default: str = "") -> str:
     if value is None:
         return default
     return value.strip()
+
+
+def _load_local_dotenv(backend_root: Path) -> None:
+    environment = _env_text("WALKSAFE_ENVIRONMENT", "development").lower()
+    if environment not in DEPLOYMENT_ENVIRONMENTS:
+        load_dotenv(backend_root / ".env")
+        loaded_environment = _env_text(
+            "WALKSAFE_ENVIRONMENT", "development"
+        ).lower()
+        if loaded_environment in DEPLOYMENT_ENVIRONMENTS:
+            raise ValueError(
+                "deployment environment must not be selected from repository .env"
+            )
 
 
 def _has_minimum_privacy_hmac_bytes(value: str) -> bool:
@@ -169,6 +186,23 @@ def validate_admin_totp_secret(raw_secret: str) -> str:
     if len(decoded) < 20 or canonical != secret:
         raise ValueError(message)
     return secret
+
+
+def _parse_admin_credential_issuer_key_file(
+    raw_path: str,
+    environment: str,
+) -> Path | None:
+    if raw_path:
+        path = Path(raw_path).expanduser()
+    elif environment in DEPLOYMENT_ENVIRONMENTS:
+        path = DEFAULT_ADMIN_CREDENTIAL_ISSUER_KEY_FILE
+    else:
+        return None
+    if not path.is_absolute() or Path(os.path.abspath(path)) != path:
+        raise ValueError(
+            "WALKSAFE_ADMIN_CREDENTIAL_ISSUER_KEY_FILE must be a normalized absolute path"
+        )
+    return path
 
 
 def _parse_walking_route_provider(raw_value: str) -> str:
@@ -274,14 +308,14 @@ def _validate_provider_url(name: str, raw_url: str, allowed_hosts: frozenset[str
 def migration_database_url() -> str:
     """Load only the database settings needed by Alembic."""
     backend_root = Path(__file__).resolve().parents[1]
-    load_dotenv(backend_root / ".env")
+    _load_local_dotenv(backend_root)
     environment = _env_text("WALKSAFE_ENVIRONMENT", "development").lower()
     if environment not in SUPPORTED_WALKSAFE_ENVIRONMENTS:
         raise ValueError("WALKSAFE_ENVIRONMENT has an unsupported value")
-    runtime_database_url = _parse_database_url(_env_text("DATABASE_URL"))
+    raw_runtime_database_url = _env_text("DATABASE_URL")
     configured_migration_url = os.getenv("WALKSAFE_MIGRATION_DATABASE_URL", "").strip()
     database_url = _parse_database_url(
-        configured_migration_url or runtime_database_url
+        configured_migration_url or raw_runtime_database_url
     )
     if environment in DEPLOYMENT_ENVIRONMENTS:
         if not configured_migration_url:
@@ -289,7 +323,34 @@ def migration_database_url() -> str:
                 "deployment migrations require WALKSAFE_MIGRATION_DATABASE_URL"
             )
         _validate_deployment_database_transport(database_url)
-        if urlsplit(database_url).username == urlsplit(runtime_database_url).username:
+        configured_runtime_role = _env_text("WALKSAFE_RUNTIME_DATABASE_ROLE")
+        runtime_role_from_url = (
+            unquote(urlsplit(raw_runtime_database_url).username or "")
+            if raw_runtime_database_url
+            else ""
+        )
+        if configured_runtime_role and not DATABASE_ROLE_PATTERN.fullmatch(
+            configured_runtime_role
+        ):
+            raise ValueError(
+                "WALKSAFE_RUNTIME_DATABASE_ROLE must name one canonical database role"
+            )
+        if (
+            configured_runtime_role
+            and runtime_role_from_url
+            and configured_runtime_role != runtime_role_from_url
+        ):
+            raise ValueError(
+                "WALKSAFE_RUNTIME_DATABASE_ROLE must match the DATABASE_URL role"
+            )
+        runtime_role = configured_runtime_role or runtime_role_from_url
+        if not runtime_role:
+            raise ValueError(
+                "deployment migrations require WALKSAFE_RUNTIME_DATABASE_ROLE "
+                "when DATABASE_URL is not present"
+            )
+        migration_role = unquote(urlsplit(database_url).username or "")
+        if migration_role == runtime_role:
             raise ValueError(
                 "migration and runtime database roles must be distinct"
             )
@@ -299,7 +360,7 @@ def migration_database_url() -> str:
 class Settings:
     def __init__(self) -> None:
         backend_root = Path(__file__).resolve().parents[1]
-        load_dotenv(backend_root / ".env")
+        _load_local_dotenv(backend_root)
         self.database_url = _parse_database_url(
             os.getenv(
                 "DATABASE_URL",
@@ -532,6 +593,9 @@ class Settings:
         self.admin_device_proof_enabled = self.admin_security_enabled
         self.admin_id = _env_text("WALKSAFE_ADMIN_ID")
         self.admin_totp_secret = _env_text("WALKSAFE_ADMIN_TOTP_SECRET").replace(" ", "").upper()
+        raw_admin_credential_issuer_key_file = _env_text(
+            "WALKSAFE_ADMIN_CREDENTIAL_ISSUER_KEY_FILE"
+        )
         self.admin_session_ttl_seconds = _parse_positive_int(
             "WALKSAFE_ADMIN_SESSION_TTL_SECONDS",
             DEFAULT_ADMIN_SESSION_TTL_SECONDS,
@@ -577,6 +641,12 @@ class Settings:
             raw_maintenance_lock.is_absolute() if raw_maintenance_lock is not None else False
         )
         self.walksafe_environment = _env_text("WALKSAFE_ENVIRONMENT", "development").lower()
+        self.admin_credential_issuer_key_file = (
+            _parse_admin_credential_issuer_key_file(
+                raw_admin_credential_issuer_key_file,
+                self.walksafe_environment,
+            )
+        )
         self.backend_workers = _parse_positive_int("WALKSAFE_BACKEND_WORKERS", 1)
         self.backend_replicas = _parse_positive_int("WALKSAFE_BACKEND_REPLICAS", 1)
         self.actor_rate_limit_store = _env_text(
@@ -634,6 +704,10 @@ class Settings:
                 self.admin_totp_secret
             )
         if self.walksafe_environment in DEPLOYMENT_ENVIRONMENTS:
+            if _env_text("WALKSAFE_MIGRATION_DATABASE_URL"):
+                raise ValueError(
+                    "API deployment must not expose WALKSAFE_MIGRATION_DATABASE_URL"
+                )
             _validate_deployment_database_transport(self.database_url)
             if not self.database_at_rest_encryption_confirmed:
                 raise ValueError(

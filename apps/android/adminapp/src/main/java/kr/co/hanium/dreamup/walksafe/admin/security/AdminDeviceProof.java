@@ -142,7 +142,10 @@ public final class AdminDeviceProof {
             }
             if (!"POST".equals(method)
                 || readPurpose != null
-                || !("report.review.decide".equals(action) || "report.delivery.create".equals(action))) {
+                || !("report.review.decide".equals(action)
+                || "report.delivery.create".equals(action)
+                || "recovery.custody.attest".equals(action)
+                || "device.report_lost".equals(action))) {
                 throw new IllegalArgumentException("administrator action proof fields do not match the contract");
             }
         }

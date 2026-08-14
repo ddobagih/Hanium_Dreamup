@@ -122,20 +122,61 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun gatesRerouteByOffRouteCooldownAndInFlight() {
+    fun confirmedOffRouteRequiresUserDecisionWithoutAutomaticReroute() {
         val navigator = RouteNavigator()
         navigator.setRoute(route())
 
-        val blocked = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = true)
-        val first = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
-        val cooldown = navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
+        val pending = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        val confirmed = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
+        val repeated = navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
 
-        assertFalse(blocked.shouldReroute)
-        assertTrue(first.shouldReroute)
-        assertFalse(cooldown.shouldReroute)
-        assertEquals("off_route_waiting", cooldown.reason)
-        assertTrue(cooldown.instruction?.contains("경로를 벗어났습니다") == true)
-        assertFalse(cooldown.instruction?.contains("직진하세요") == true)
+        assertFalse(pending.shouldReroute)
+        assertFalse(pending.userDecisionRequired)
+        listOf(confirmed, repeated).forEach { update ->
+            assertTrue(update.offRoute)
+            assertFalse(update.shouldReroute)
+            assertTrue(update.userDecisionRequired)
+            assertEquals(RouteNavigatorUserDecision.REROUTE, update.pendingUserDecision)
+            assertEquals("off_route_user_decision_required", update.reason)
+            assertTrue(update.instruction?.contains("사용자 선택이 필요") == true)
+            assertFalse(update.instruction?.contains("직진하세요") == true)
+            assertFalse(update.instruction?.contains("다시 찾습니다") == true)
+        }
+        assertEquals(RouteNavigatorUserDecision.REROUTE, navigator.pendingUserDecision())
+    }
+
+    @Test
+    fun onlyExplicitRerouteApprovalRequestsANewRoute() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        val detected = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val approved = navigator.approveReroute()
+        val waiting = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = true)
+
+        assertFalse(detected.shouldReroute)
+        assertTrue(approved.shouldReroute)
+        assertEquals("off_route_reroute_approved", approved.reason)
+        assertEquals(null, navigator.pendingUserDecision())
+        assertFalse(waiting.shouldReroute)
+        assertFalse(waiting.userDecisionRequired)
+        assertEquals("off_route_reroute_approved_in_flight", waiting.reason)
+        assertEquals(null, navigator.currentInstruction(offRouteLocation()))
+        assertTrue(navigator.hasRoute())
+    }
+
+    @Test
+    fun failedRerouteRequestRestoresTheExplicitUserDecision() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        assertTrue(navigator.approveReroute().shouldReroute)
+
+        navigator.rerouteRequestFailed()
+
+        assertEquals(RouteNavigatorUserDecision.REROUTE, navigator.pendingUserDecision())
+        assertTrue(navigator.approveReroute().shouldReroute)
+        assertTrue(navigator.hasRoute())
     }
 
     @Test
@@ -147,7 +188,9 @@ class RouteNavigatorTest {
 
         assertTrue(update.offRoute)
         assertFalse(update.shouldReroute)
-        assertEquals("off_route_waiting", update.reason)
+        assertTrue(update.userDecisionRequired)
+        assertEquals("off_route_user_decision_required", update.reason)
+        assertTrue(update.instruction?.contains("사용자 선택이 필요") == true)
         assertFalse(update.instruction?.contains("오른쪽") == true)
         assertEquals(null, navigator.currentInstruction(offRouteLocation()))
     }
@@ -163,8 +206,10 @@ class RouteNavigatorTest {
         assertFalse(first.shouldReroute)
         assertFalse(first.offRoute)
         assertEquals("off_route_pending", first.reason)
-        assertTrue(second.shouldReroute)
+        assertFalse(second.shouldReroute)
         assertTrue(second.offRoute)
+        assertTrue(second.userDecisionRequired)
+        assertEquals("off_route_user_decision_required", second.reason)
     }
 
     @Test
@@ -185,7 +230,7 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun arrivalClearsRouteOnlyAfterSpeechIsAcknowledged() {
+    fun arrivalCandidateRequiresExplicitConfirmationBeforeClearingRoute() {
         val navigator = RouteNavigator()
         navigator.setRoute(route())
 
@@ -201,12 +246,121 @@ class RouteNavigatorTest {
         )
 
         assertFalse(first.arrived)
-        assertTrue(second.arrived)
+        assertFalse(first.arrivalCandidate)
+        assertFalse(second.arrived)
+        assertTrue(second.arrivalCandidate)
+        assertTrue(second.userDecisionRequired)
+        assertEquals(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION, second.pendingUserDecision)
+        assertEquals("arrival_confirmation_required", second.reason)
+        assertTrue(second.instruction?.contains("도착 후보") == true)
         assertTrue(navigator.hasRoute())
 
         navigator.acknowledgeInstruction(second, spokenAtMs = 2_000L)
 
+        assertTrue(navigator.hasRoute())
+
+        val confirmed = navigator.confirmArrival()
+
+        assertTrue(confirmed.arrived)
+        assertEquals("arrival_confirmed", confirmed.reason)
         assertFalse(navigator.hasRoute())
+    }
+
+    @Test
+    fun rejectingArrivalKeepsRouteAndResetsTheCandidate() {
+        val navigator = RouteNavigator()
+        navigator.setRoute(route())
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+        navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
+        val candidate = navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+
+        val rejected = navigator.rejectArrival()
+        val firstAfterRejection = navigator.update(nearEnd, nowMs = 3_000L, requestInFlight = false)
+
+        assertTrue(candidate.arrivalCandidate)
+        assertFalse(rejected.arrived)
+        assertFalse(rejected.arrivalCandidate)
+        assertEquals("arrival_rejected_route_retained", rejected.reason)
+        assertTrue(navigator.hasRoute())
+        assertFalse(firstAfterRejection.arrivalCandidate)
+        assertEquals("route_guidance", firstAfterRejection.reason)
+    }
+
+    @Test
+    fun strideProgressCannotCreateArrivalWithoutTrustedGpsAndTmapEndEvidence() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 1))
+        navigator.setRoute(route())
+
+        val update = navigator.update(
+            location = locationNearStart(),
+            nowMs = 1_000L,
+            requestInFlight = false,
+            stepProgressM = 100.0,
+        )
+
+        assertFalse(update.arrivalCandidate)
+        assertFalse(update.arrived)
+        assertTrue(navigator.hasRoute())
+    }
+
+    @Test
+    fun strideConsistencyIsObservedWithoutOverridingAuthoritativeArrivalEvidence() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 1))
+        navigator.setRoute(route())
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+
+        val inconsistent = navigator.update(
+            location = nearEnd,
+            nowMs = 1_000L,
+            requestInFlight = false,
+            stepProgressM = 0.0,
+        )
+        val corroborated = navigator.update(
+            location = nearEnd,
+            nowMs = 2_000L,
+            requestInFlight = false,
+            stepProgressM = 100.0,
+        )
+
+        assertEquals(false, inconsistent.stepProgressConsistent)
+        assertTrue(inconsistent.arrivalCandidate)
+        assertFalse(inconsistent.arrived)
+        assertEquals(true, corroborated.stepProgressConsistent)
+        assertTrue(corroborated.arrivalCandidate)
+        assertFalse(corroborated.arrived)
+    }
+
+    @Test
+    fun pendingDecisionTokenChangesWhenTheSameRouteIsReinstalled() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(arrivalConfirmSamples = 1))
+        val nearEnd = TrustedLocation(37.0009, 127.0, 5f, 1_000L)
+        navigator.setRoute(route())
+        navigator.update(nearEnd, nowMs = 1_000L, requestInFlight = false)
+        val firstToken = navigator.pendingDecisionToken()
+
+        navigator.setRoute(route())
+        navigator.update(nearEnd, nowMs = 2_000L, requestInFlight = false)
+        val replacementToken = navigator.pendingDecisionToken()
+
+        assertNotNull(firstToken)
+        assertNotNull(replacementToken)
+        assertTrue(firstToken != replacementToken)
+    }
+
+    @Test
+    fun pendingDecisionTokenChangesAcrossSameRouteDecisionAba() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        val firstToken = navigator.pendingDecisionToken()
+
+        navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
+        navigator.update(offRouteLocation(), nowMs = 3_000L, requestInFlight = false)
+        val replacementToken = navigator.pendingDecisionToken()
+
+        assertNotNull(firstToken)
+        assertNotNull(replacementToken)
+        assertTrue(firstToken != replacementToken)
     }
 
     @Test
@@ -294,17 +448,35 @@ class RouteNavigatorTest {
     }
 
     @Test
-    fun rerouteReplacementPreservesCooldownAndBudget() {
-        val navigator = RouteNavigator(
-            RouteNavigatorConfig(offRouteConfirmSamples = 1, rerouteCooldownMs = 0, maxRerouteCount = 1),
-        )
+    fun routeReplacementResetsPendingUserDecision() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
         navigator.setRoute(route())
-        val first = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
-        navigator.setRoute(route(), resetRerouteBudget = false)
-        val afterReplacement = navigator.update(offRouteLocation(), nowMs = 2_000L, requestInFlight = false)
+        val offRoute = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        navigator.setRoute(route())
+        val afterReplacement = navigator.update(locationNearStart(), nowMs = 2_000L, requestInFlight = false)
 
-        assertTrue(first.shouldReroute)
+        assertTrue(offRoute.userDecisionRequired)
         assertFalse(afterReplacement.shouldReroute)
+        assertFalse(afterReplacement.userDecisionRequired)
+        assertEquals("route_guidance", afterReplacement.reason)
+    }
+
+    @Test
+    fun remainingDistanceUsesStoredRouteSummaryAndProgressInsteadOfStraightLineFallback() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(guidanceIntervalMs = 0))
+        val longSummaryRoute = route().copy(
+            summary = WalkingRouteSummary(distanceM = 1_000, durationS = 900),
+            guidePoints = emptyList(),
+        )
+        navigator.setRoute(longSummaryRoute)
+        val midpoint = TrustedLocation(37.00045, 127.0, 3f, 1_000L)
+
+        val beforeProgress = navigator.currentInstruction(midpoint)
+        val update = navigator.update(midpoint, nowMs = 1_000L, requestInFlight = false)
+
+        assertTrue(beforeProgress?.contains("남은 거리를 확인 중") == true)
+        assertTrue(update.instruction?.contains("500m") == true)
+        assertFalse(update.instruction?.contains("50m") == true)
     }
 
     @Test

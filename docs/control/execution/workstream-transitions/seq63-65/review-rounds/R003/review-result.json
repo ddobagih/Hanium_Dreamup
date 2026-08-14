@@ -1,0 +1,500 @@
+{
+  "assignment_binding": {
+    "byte_length": 19307,
+    "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R003/review-assignment.json",
+    "sha256": "b5f5b512286ad70b9a0833126dadd71bb5a11fc0244d22acc27b82c289626b09"
+  },
+  "decision": "APPROVED",
+  "evidence_type": "WORKSTREAM_AGGREGATE_REVIEW_RESULT",
+  "finding_dispositions": [
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R001-HISTORICAL-NPC-CLOSURE-P1-001",
+      "rationale": "The frozen R011 assignment/result/independent-review chain and all 23 frozen controls replay byte-exactly, while the current Goal-graph regression rejects a self-consistent omission from the NPC completion managed closure.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_goal_graph_v2_4.py::WalkSafeNpcSingleAdminRecoverySuccessorTest::test_completion_managed_closure_rejects_self_consistent_history_omission",
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R001-FULL-EVIDENCE-P1-002",
+      "rationale": "The seq63/65 projection consumes the complete existing EPIC-02 and EPIC-03 completion contracts: all 12 and 5 active children respectively remain COMPLETE_AT_TARGET with their exact work-item receipts, and empty or altered aggregate evidence fails closed.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py",
+        "PYTHON_BIN=/home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python scripts/run_walksafe_test_layers_current.sh validate"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R001-EPIC04-DEPENDENCY-P1-003",
+      "rationale": "EPIC-04 readiness is derived from exactly the seq63 EPIC-02 completion event; the projected frontier and focus are exact, and adding an EPIC-03 dependency is rejected by the projection regression.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R001-ATOMIC-PUBLICATION-P1-004",
+      "rationale": "Preflight and commit guards now revalidate checkpoint source, retained pins, candidate catalogs, physical bindings, working snapshot, and Git-visible managed closure after checker execution; rollback failure is surfaced as POSTCOMMIT_UNCERTAIN with the recovery entry retained.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py",
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py -k 'atomic_write or partial_temp_write or failed_cas_rollback or failure_state_fsync or parent_fsync_failure'"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R002-FINAL-GUARD-P1-001",
+      "rationale": "After the third commit guard, publication rechecks the canonical parent plus the staged published inode/content and displaced source inode/content before unlinking recovery state. Checkpoint-swap, parent-replacement, detached-parent, and rollback-failure injections all fail closed with the correct certainty.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py -k 'atomic_write or partial_temp_write or failed_cas_rollback or failure_state_fsync or parent_fsync_failure'",
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R002-SUPERSEDED-PROVENANCE-P1-002",
+      "rationale": "R001 and R002 assignment bytes are pinned exactly and both superseded rounds' review-result and independent-review paths must remain absent, including symlinks. The constraint is replayed by assignment, result, and post-review validation through the shared review context.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m scripts.build_walksafe_workstream_aggregate_review_20260813 --check-assignment",
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py tests/test_build_walksafe_workstream_aggregate_review_20260813.py"
+      ]
+    },
+    {
+      "disposition": "CLOSED",
+      "finding_id": "WS-AGG-R002-ATOMIC-TEST-EXPECTATION-P1-003",
+      "rationale": "The same-byte inode-swap regression now expects ordinary CompletionApplyError when the post-exchange CAS rollback succeeds and restores the exact foreign pre-exchange inode; only failed rollback remains CompletionPostCommitError with a retained recovery entry.",
+      "retest_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 /home/ddobagi/.cache/uv/archive-v0/MEG-YaDOq8vbxEwW/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py -k 'atomic_write or partial_temp_write or failed_cas_rollback or failure_state_fsync or parent_fsync_failure'"
+      ]
+    }
+  ],
+  "findings": {
+    "blocking": [],
+    "major_open": [],
+    "minor_open": []
+  },
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "atomic_checkpoint_publication_is_fail_closed": true,
+      "checker_time_drift_is_revalidated_before_pass_or_commit": true,
+      "epic02_and_epic03_use_full_existing_completion_evidence": true,
+      "epic04_ready_depends_only_on_epic02_completion_event": true,
+      "frozen_r011_review_replays_without_current_control_bytes": true,
+      "projected_seq65_passes_continuation_and_goal_graph": true,
+      "r011_changed_controls_are_exactly_superseded": true,
+      "rollback_failure_is_postcommit_uncertain": true
+    },
+    "added_control_bindings": [
+      {
+        "byte_length": 73137,
+        "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+        "sha256": "6b1038129a8783ad1c7c11f6066d1c1758705b358c8c0a6034553fcda4d17f7c"
+      },
+      {
+        "byte_length": 33327,
+        "path": "scripts/apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "222fe5d3b0eccee9c272a627952c4af01ce17f709ad98efadfa1a00b9b7e08a9"
+      },
+      {
+        "byte_length": 22173,
+        "path": "scripts/build_walksafe_workstream_aggregate_review_20260813.py",
+        "sha256": "1011a72e2ee694345d7606e18139685dc9c0803876659e6d2568450440a5454c"
+      },
+      {
+        "byte_length": 8880,
+        "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "32c3b0a8f8761c2947d7f42137b131ebd055a1733c24f63399747735d9ab68c6"
+      },
+      {
+        "byte_length": 6410,
+        "path": "tests/test_build_walksafe_workstream_aggregate_review_20260813.py",
+        "sha256": "af6099cd13ef3c92d4fc17f9cd742c2726fe2090033ec704807c7d602c39b727"
+      },
+      {
+        "byte_length": 41222,
+        "path": "tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+        "sha256": "6004935a29f7c7727bfcf65dba1fea5ebef73b0a26f6494af9338cf732ede589"
+      }
+    ],
+    "frozen_r011_control_code_cohort": [
+      {
+        "byte_length": 507244,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "fed00f386579e9a1b1d543a496f17a4ee9da7fb7a70d5011a581a3093203b371"
+      },
+      {
+        "byte_length": 279786,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "bba938afb030f1e77b06c2a8452298547131a0cbc826c71f0e42c4c2d25ad36f"
+      },
+      {
+        "byte_length": 101138,
+        "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "807de3db7b56201876bbb5062e4d57bbf4090361c3652bd3dda51b15a8afea8a"
+      },
+      {
+        "byte_length": 45632,
+        "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "80573be6a2a0ef034db0b3c5cc28d86e3ff1b082744c431bbf330642043e5d58"
+      },
+      {
+        "byte_length": 23787,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "91418f75fc130c04a1c86acc9885224118f2cc6d7d146307642d9f310feb0a82"
+      },
+      {
+        "byte_length": 64825,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "a453e158a4c1a05e9320c46c4b196ee41bb05bb30883bdd41fd2825b68d3093a"
+      },
+      {
+        "byte_length": 36230,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "f6e4bff5d80782c950b5e825ccae134c52aec5a2ab5bcb1f919e2ab6ae4a00a5"
+      },
+      {
+        "byte_length": 15199,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "32b4d6a4659411f9516c85ee8c284da56801907d7f2d466f4a66eadbc9fd478b"
+      },
+      {
+        "byte_length": 3659,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "a7107cf770b0c78d1fe58d61771830bfcb195464e5ba803be7b46eee9ecc1f52"
+      },
+      {
+        "byte_length": 13294,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "9e039fda28fc851ca2181ad2c408b3823a87d0c2a3ba3fcaaf81a6f33db4b07d"
+      },
+      {
+        "byte_length": 3686,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "d97532568b141e27f751623af36990df01f63e97d009315fa97671fdae761e1b"
+      },
+      {
+        "byte_length": 13246,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+        "sha256": "6ab84ece67883287ccf3793061b9d6131306c16c0968fbd414d778e178468f8b"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+        "sha256": "b1dddc82ff5212d84b28122ef53e9fe6813fff5d8af4cddaff7efe9ed0fe01d8"
+      },
+      {
+        "byte_length": 13628,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+        "sha256": "5511a73a94581d3a7367d0f7c2cb67d7713695f4d91a009a6e395a2883424ff3"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+        "sha256": "1bbf9458d1ac370c14b3d09c84a4df67a74d2a3cf3c07e003c8a1dcccf9b4893"
+      },
+      {
+        "byte_length": 14063,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+        "sha256": "7243551831737ab8c0dd6dbfd36ba253e4ae3ff21c1f853d2f6ffe55ed4a484d"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+        "sha256": "d3a07fa5b6a18b05dd0389bee250afb0f1a6d9cce8dbbb0246fda832e1101d7d"
+      },
+      {
+        "byte_length": 16208,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+        "sha256": "d2a133ddb6a72eb41e94471cb2427c70ddff629e5ff3ce1428df6ff818c63745"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+        "sha256": "87902ac067f8362038c1a91f6e11c0862633c81368a93c9e2f1b0e9f6cbd5ec0"
+      },
+      {
+        "byte_length": 16530,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+        "sha256": "0e7a3e42481dfa3171daa06048427b5d10f71c3a26761853a61d4f1c45cb860a"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+        "sha256": "6b53580955f13f3eadd39797dbd6d29e8b0801c12718c22cb4e3c107ede1e8ae"
+      },
+      {
+        "byte_length": 16993,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+        "sha256": "a737e0a66cd3dd33ae08af31cbba22e05073a90bdd0afdb4b1b44e625c452344"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+        "sha256": "e75c01315624382527fc2d760a1a041ca4e759a1325519773fba864fd3f0e148"
+      }
+    ],
+    "predecessor_review_bindings": [
+      {
+        "byte_length": 11683,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R011/review-assignment.json",
+        "sha256": "b158738d372d665cd73c944f4c1633bb2d8c3d80d51fb000f295704c49a52f69"
+      },
+      {
+        "byte_length": 15428,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R011/review-result.json",
+        "sha256": "3a417664a6a81be049bfba7a1db71d2b3db0a965d3490ad861286ebb042b9a09"
+      },
+      {
+        "byte_length": 15708,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R011/independent-review.json",
+        "sha256": "455b010ce8f3f8d5e760a697471026faef1603e991a1b54221fde29ac912a2a3"
+      }
+    ],
+    "r011_control_transitions": [
+      {
+        "after_byte_length": 516317,
+        "after_sha256": "dea79fae022b2b45523aada04677a87ca93ce407475a656776f333916c9e7a89",
+        "before_byte_length": 507244,
+        "before_sha256": "fed00f386579e9a1b1d543a496f17a4ee9da7fb7a70d5011a581a3093203b371",
+        "change_kind": "MODIFIED",
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py"
+      },
+      {
+        "after_byte_length": 281030,
+        "after_sha256": "ce92d54600e1deb6b2ccff0d340c777c61445ab71ce37a1ea9d1bc29c03bd0f1",
+        "before_byte_length": 279786,
+        "before_sha256": "bba938afb030f1e77b06c2a8452298547131a0cbc826c71f0e42c4c2d25ad36f",
+        "change_kind": "MODIFIED",
+        "path": "tests/test_walksafe_goal_graph_v2_4.py"
+      },
+      {
+        "after_byte_length": 23925,
+        "after_sha256": "196068a8bd4254b269da87c1a2331b92209ac61acea5745e3ca3e71a77c0d14f",
+        "before_byte_length": 23787,
+        "before_sha256": "91418f75fc130c04a1c86acc9885224118f2cc6d7d146307642d9f310feb0a82",
+        "change_kind": "MODIFIED",
+        "path": "scripts/run_walksafe_test_layers_current.sh"
+      },
+      {
+        "after_byte_length": 64975,
+        "after_sha256": "df89dfbc1448a064da21d9e32ae5e4b8b25d4dd8a9e23425be7b8350952b70b4",
+        "before_byte_length": 64825,
+        "before_sha256": "a453e158a4c1a05e9320c46c4b196ee41bb05bb30883bdd41fd2825b68d3093a",
+        "change_kind": "MODIFIED",
+        "path": "scripts/generate_repository_catalogs.py"
+      },
+      {
+        "after_byte_length": 36388,
+        "after_sha256": "6787d11b583da33eee7e9549c74db90e34ee4c56cf203da88a2da35e9032e6ad",
+        "before_byte_length": 36230,
+        "before_sha256": "f6e4bff5d80782c950b5e825ccae134c52aec5a2ab5bcb1f919e2ab6ae4a00a5",
+        "change_kind": "MODIFIED",
+        "path": "tests/test_repository_catalogs.py"
+      }
+    ],
+    "required_finding_ids": [
+      "WS-AGG-R001-HISTORICAL-NPC-CLOSURE-P1-001",
+      "WS-AGG-R001-FULL-EVIDENCE-P1-002",
+      "WS-AGG-R001-EPIC04-DEPENDENCY-P1-003",
+      "WS-AGG-R001-ATOMIC-PUBLICATION-P1-004",
+      "WS-AGG-R002-FINAL-GUARD-P1-001",
+      "WS-AGG-R002-SUPERSEDED-PROVENANCE-P1-002",
+      "WS-AGG-R002-ATOMIC-TEST-EXPECTATION-P1-003"
+    ],
+    "reviewed_control_code_cohort": [
+      {
+        "byte_length": 516317,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "dea79fae022b2b45523aada04677a87ca93ce407475a656776f333916c9e7a89"
+      },
+      {
+        "byte_length": 281030,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "ce92d54600e1deb6b2ccff0d340c777c61445ab71ce37a1ea9d1bc29c03bd0f1"
+      },
+      {
+        "byte_length": 64975,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "df89dfbc1448a064da21d9e32ae5e4b8b25d4dd8a9e23425be7b8350952b70b4"
+      },
+      {
+        "byte_length": 36388,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "6787d11b583da33eee7e9549c74db90e34ee4c56cf203da88a2da35e9032e6ad"
+      },
+      {
+        "byte_length": 23925,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "196068a8bd4254b269da87c1a2331b92209ac61acea5745e3ca3e71a77c0d14f"
+      },
+      {
+        "byte_length": 33327,
+        "path": "scripts/apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "222fe5d3b0eccee9c272a627952c4af01ce17f709ad98efadfa1a00b9b7e08a9"
+      },
+      {
+        "byte_length": 8880,
+        "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "32c3b0a8f8761c2947d7f42137b131ebd055a1733c24f63399747735d9ab68c6"
+      },
+      {
+        "byte_length": 22173,
+        "path": "scripts/build_walksafe_workstream_aggregate_review_20260813.py",
+        "sha256": "1011a72e2ee694345d7606e18139685dc9c0803876659e6d2568450440a5454c"
+      },
+      {
+        "byte_length": 6410,
+        "path": "tests/test_build_walksafe_workstream_aggregate_review_20260813.py",
+        "sha256": "af6099cd13ef3c92d4fc17f9cd742c2726fe2090033ec704807c7d602c39b727"
+      },
+      {
+        "byte_length": 73137,
+        "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+        "sha256": "6b1038129a8783ad1c7c11f6066d1c1758705b358c8c0a6034553fcda4d17f7c"
+      },
+      {
+        "byte_length": 41222,
+        "path": "tests/test_walksafe_fp048_goal_completed_seq43_44_20260802.py",
+        "sha256": "6004935a29f7c7727bfcf65dba1fea5ebef73b0a26f6494af9338cf732ede589"
+      }
+    ],
+    "reviewed_control_code_cohort_sha256": "9aad0222203ebe935e263541deb2da838f416df1ec3b6039fa0ea54f8eb17602",
+    "source_checkpoint": {
+      "byte_length": 1842320,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 62,
+      "sha256": "250d94d68329e1ce30083697726e2312ba57140eeb33a58c0b7501c4594fd408"
+    },
+    "superseded_review_assignments": [
+      {
+        "byte_length": 17015,
+        "must_remain_absent": [
+          "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R001/review-result.json",
+          "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R001/independent-review.json"
+        ],
+        "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R001/review-assignment.json",
+        "sha256": "d955c7d183e6500ed3c4b01835058bc47edf54d67342444d26838f6950897822",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 18321,
+        "must_remain_absent": [
+          "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R002/review-result.json",
+          "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R002/independent-review.json"
+        ],
+        "path": "docs/control/execution/workstream-transitions/seq63-65/review-rounds/R002/review-assignment.json",
+        "sha256": "5a704a40db048d1b22814795c25fd3b03b35d3e15cfb406d32ecd28e08b8987f",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      }
+    ],
+    "unchanged_r011_controls": [
+      {
+        "byte_length": 101138,
+        "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "807de3db7b56201876bbb5062e4d57bbf4090361c3652bd3dda51b15a8afea8a"
+      },
+      {
+        "byte_length": 45632,
+        "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "80573be6a2a0ef034db0b3c5cc28d86e3ff1b082744c431bbf330642043e5d58"
+      },
+      {
+        "byte_length": 15199,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "32b4d6a4659411f9516c85ee8c284da56801907d7f2d466f4a66eadbc9fd478b"
+      },
+      {
+        "byte_length": 3659,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "a7107cf770b0c78d1fe58d61771830bfcb195464e5ba803be7b46eee9ecc1f52"
+      },
+      {
+        "byte_length": 13294,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "9e039fda28fc851ca2181ad2c408b3823a87d0c2a3ba3fcaaf81a6f33db4b07d"
+      },
+      {
+        "byte_length": 3686,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "d97532568b141e27f751623af36990df01f63e97d009315fa97671fdae761e1b"
+      },
+      {
+        "byte_length": 13246,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+        "sha256": "6ab84ece67883287ccf3793061b9d6131306c16c0968fbd414d778e178468f8b"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+        "sha256": "b1dddc82ff5212d84b28122ef53e9fe6813fff5d8af4cddaff7efe9ed0fe01d8"
+      },
+      {
+        "byte_length": 13628,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+        "sha256": "5511a73a94581d3a7367d0f7c2cb67d7713695f4d91a009a6e395a2883424ff3"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+        "sha256": "1bbf9458d1ac370c14b3d09c84a4df67a74d2a3cf3c07e003c8a1dcccf9b4893"
+      },
+      {
+        "byte_length": 14063,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+        "sha256": "7243551831737ab8c0dd6dbfd36ba253e4ae3ff21c1f853d2f6ffe55ed4a484d"
+      },
+      {
+        "byte_length": 3666,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+        "sha256": "d3a07fa5b6a18b05dd0389bee250afb0f1a6d9cce8dbbb0246fda832e1101d7d"
+      },
+      {
+        "byte_length": 16208,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+        "sha256": "d2a133ddb6a72eb41e94471cb2427c70ddff629e5ff3ce1428df6ff818c63745"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+        "sha256": "87902ac067f8362038c1a91f6e11c0862633c81368a93c9e2f1b0e9f6cbd5ec0"
+      },
+      {
+        "byte_length": 16530,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+        "sha256": "0e7a3e42481dfa3171daa06048427b5d10f71c3a26761853a61d4f1c45cb860a"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+        "sha256": "6b53580955f13f3eadd39797dbd6d29e8b0801c12718c22cb4e3c107ede1e8ae"
+      },
+      {
+        "byte_length": 16993,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+        "sha256": "a737e0a66cd3dd33ae08af31cbba22e05073a90bdd0afdb4b1b44e625c452344"
+      },
+      {
+        "byte_length": 3796,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+        "sha256": "e75c01315624382527fc2d760a1a041ca4e759a1325519773fba864fd3f0e148"
+      }
+    ]
+  },
+  "reviewed_at": "2026-08-13T14:13:28+00:00",
+  "reviewer": {
+    "agent_instance_id": "codex-workstream-aggregate-reviewer-20260813",
+    "canonical_task": "/root/workstream_aggregate_reviewer",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-WORKSTREAM-AGGREGATE-SEQ63-65-REVIEW-20260813-R003",
+  "schema_version": "1.0"
+}

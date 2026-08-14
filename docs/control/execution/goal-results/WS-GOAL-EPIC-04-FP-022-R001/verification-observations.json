@@ -1,0 +1,114 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_independence_claimed": false,
+    "external_review_status": "NOT_RUN",
+    "external_tmap_status": "NOT_RUN",
+    "field_gps_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_ids": [
+      "TC-FP-022-01",
+      "TC-FP-022-02",
+      "TC-FP-022-03",
+      "TC-FP-022-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "credit_scope": "REPOSITORY_INTERNAL_ONLY",
+  "document_id": "WS-FP022-NAVIGATION-OBSERVATIONS-20260814-001",
+  "executor": {
+    "id": "codex-fp022-navigation-implementer-20260814",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "task": "/root"
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "implementation_content_set_sha256": "4ef7df96c5edf35864b81b637fcf8406009ab32f61cb97cae1e88763166c24f3",
+  "kind": "VERIFICATION_OBSERVATIONS",
+  "lane_count": 3,
+  "lane_log_bindings": [
+    {
+      "byte_length": 531,
+      "lane_id": "BACKEND_NAVIGATION_INTERNAL",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/backend-navigation-internal.log",
+      "sha256": "249031160869dc49edbec23a88808d17dadda9e174a1d5e97a0568361123d951"
+    },
+    {
+      "byte_length": 3701,
+      "lane_id": "ANDROID_USER_INTERNAL",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/android-user-internal.log",
+      "sha256": "cdf1a98a74eb416ed30689d71e509f44155596ceb8d05a3df9c211014c904838"
+    },
+    {
+      "byte_length": 421,
+      "lane_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/test-layer-registry-validate.log",
+      "sha256": "e6502409d2de507ce23ef8dff787545a5b835d3862f3f1f362a326df71190e02"
+    }
+  ],
+  "lanes": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q backend/tests/test_navigation_routes.py",
+      "ended_at": "2026-08-14T14:46:15.129100+09:00",
+      "exit_code": 0,
+      "lane_id": "BACKEND_NAVIGATION_INTERNAL",
+      "metrics": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 42,
+        "skipped": 0
+      },
+      "raw_output_byte_length": 531,
+      "raw_output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/backend-navigation-internal.log",
+      "raw_output_sha256": "249031160869dc49edbec23a88808d17dadda9e174a1d5e97a0568361123d951",
+      "schema_version": "walksafe.fp022-internal-lane-observation.v1",
+      "started_at": "2026-08-14T14:46:14.313603+09:00",
+      "status": "PASS"
+    },
+    {
+      "command": "(cd apps/android && GRADLE_USER_HOME=/home/ddobagi/.gradle ./gradlew --offline --no-daemon --max-workers=1 :app:testDebugUnitTest :app:assembleDebug :app:lintDebug)",
+      "ended_at": "2026-08-14T14:46:19.603503+09:00",
+      "exit_code": 0,
+      "lane_id": "ANDROID_USER_INTERNAL",
+      "metrics": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1000,
+        "skipped": 0
+      },
+      "raw_output_byte_length": 3701,
+      "raw_output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/android-user-internal.log",
+      "raw_output_sha256": "cdf1a98a74eb416ed30689d71e509f44155596ceb8d05a3df9c211014c904838",
+      "schema_version": "walksafe.fp022-internal-lane-observation.v1",
+      "started_at": "2026-08-14T14:46:15.129581+09:00",
+      "status": "PASS"
+    },
+    {
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate",
+      "ended_at": "2026-08-14T14:46:19.617604+09:00",
+      "exit_code": 0,
+      "lane_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "metrics": {
+        "errors": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0
+      },
+      "raw_output_byte_length": 421,
+      "raw_output_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/test-layer-registry-validate.log",
+      "raw_output_sha256": "e6502409d2de507ce23ef8dff787545a5b835d3862f3f1f362a326df71190e02",
+      "schema_version": "walksafe.fp022-internal-lane-observation.v1",
+      "started_at": "2026-08-14T14:46:19.606165+09:00",
+      "status": "PASS"
+    }
+  ],
+  "observed_at": "2026-08-14T14:46:19.617604+09:00",
+  "schema_version": "walksafe.fp022-verification-observations.v1",
+  "status": "CAPTURED",
+  "verification_observations_content_sha256": "aaac347330e1b2fba24a1069b8dcacdfe1f873279cb49e2e4c88274bc3d1e519"
+}

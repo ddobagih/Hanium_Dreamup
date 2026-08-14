@@ -6,12 +6,13 @@ Before=walksafe-backend.service
 
 [Service]
 Type=oneshot
-User=walksafe-backend
-Group=walksafe-backend
+User=walksafe-maintenance
+Group=walksafe-maintenance
 WorkingDirectory=/srv/walksafe/backend
 Environment=PYTHONPATH=/srv/walksafe/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
-EnvironmentFile=/etc/walksafe/backend.env
+EnvironmentFile=/etc/walksafe/backend-migration.env
+UMask=0077
 ExecStart=/srv/walksafe/backend/.venv/bin/python -m alembic -c backend/alembic.ini upgrade head
 LimitCORE=0
 NoNewPrivileges=true
@@ -22,3 +23,4 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+InaccessiblePaths=/etc/walksafe/backend-runtime.env /etc/walksafe/backend.env /etc/walksafe/admin-credential-issuer.key

@@ -1,0 +1,193 @@
+{
+  "claim_semantics": "NPC_GAP008_R026_RECORD_PROGRESS_BINDING_ONLY_NO_STATE_OR_CREDIT_PROMOTION",
+  "formal_device_external_release_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "external_evidence_status": "NOT_RUN",
+    "formal_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "integrity": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 6154,
+    "content_sha256": "b7581076656334d774dccd37991c6b478bb1d06266b1ad278ff513b2813011ad",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/evidence.json"
+  },
+  "ledger_binding": {
+    "binding_id": "R015-OUT-001",
+    "byte_length": 2721893,
+    "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-ledger-r015.json",
+    "sha256": "dfb74531e1922b639667645ab9949fa754a3b93474215f65b93481c8c939f4e9",
+    "subject_role": "R015_FULL_EXACT257_LEDGER"
+  },
+  "nonself_digest_check": {
+    "algorithm": "SHA-256",
+    "canonical_byte_count": 6154,
+    "content_sha256": "b7581076656334d774dccd37991c6b478bb1d06266b1ad278ff513b2813011ad",
+    "encoding": "UTF-8",
+    "ensure_ascii": false,
+    "final_lf": true,
+    "json_separators": [
+      ",",
+      ":"
+    ],
+    "projection_null_paths": [
+      "/integrity/canonical_byte_count",
+      "/integrity/content_sha256",
+      "/nonself_digest_check/canonical_byte_count",
+      "/nonself_digest_check/content_sha256"
+    ],
+    "projection_path": "/",
+    "recursive_key_order": "LEXICOGRAPHIC",
+    "status": "PASS",
+    "target_path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/evidence.json"
+  },
+  "packet_id": "WS-PHASE1-EXACT257-SUCCESSOR-EVIDENCE-20260812-R015",
+  "predecessor_packet_bindings": [
+    {
+      "binding_id": "R015-PRE-001",
+      "byte_length": 2699594,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/phase1-exact257-successor-ledger-r014.json",
+      "sha256": "275e0f193f367b409c9498d44ed229736cad15f952cc3e7dd8c69d4f3d78ad5d",
+      "subject_role": "R014_LEDGER"
+    },
+    {
+      "binding_id": "R015-PRE-002",
+      "byte_length": 7485,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/evidence.json",
+      "sha256": "047d2f06203a9438c666da37c8c9f57827018fde08b5a7efcedc673fc4c7217f",
+      "subject_role": "R014_EVIDENCE"
+    },
+    {
+      "binding_id": "R015-PRE-003",
+      "byte_length": 8911,
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r014/phase1-exact257-successor-check-receipt-r014.json",
+      "sha256": "5d0988a25d418cf1a801fbec47a3452255c8ab4065b18bd1ac80fbdbf91963bc",
+      "subject_role": "R014_RECEIPT"
+    }
+  ],
+  "prepared_on": "2026-08-12",
+  "preserved_invariants": {
+    "all_queue_routes_deep_equal": true,
+    "authorization_boundary_deep_equal": true,
+    "summaries_deep_equal": true,
+    "zero_credits": {
+      "acceptance_count": 0,
+      "actual_device_event_count": 0,
+      "attestation_approval_count": 0,
+      "execution_count": 0,
+      "formal279_pass_count": 0,
+      "formal_evidence_count": 0,
+      "in_scope_substantive_credit_count": 0,
+      "owner_approval_count": 0,
+      "real_event_count": 0,
+      "release_eligible_count": 0,
+      "verified_rights_or_external_fact_count": 0
+    }
+  },
+  "row_delta": {
+    "credit_delta_count": 0,
+    "other_record_delta_count": 0,
+    "progress_binding_record_count": 6,
+    "record_count": 257,
+    "record_order_preserved": true,
+    "status_delta_count": 0,
+    "target_artifact_ids": [
+      "DLV-DOC-05",
+      "DLV-DOC-01",
+      "DLV-REQ-16",
+      "DLV-DES-06",
+      "DLV-DEV-01",
+      "DLV-DEV-18"
+    ],
+    "unchanged_record_count": 251
+  },
+  "run_id": "WS-ARTIFACT-CLOSURE-RUN-20260727-001",
+  "schema_version": "walksafe.phase1-exact257-successor-evidence.v15",
+  "source_bindings": [
+    {
+      "binding_id": "R015-SRC-001",
+      "byte_length": 16279,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+      "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4",
+      "subject_role": "NPC_IMPLEMENTATION_RESULT"
+    },
+    {
+      "binding_id": "R015-SRC-002",
+      "byte_length": 2542,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+      "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2",
+      "subject_role": "NPC_VERIFICATION_RESULT"
+    },
+    {
+      "binding_id": "R015-SRC-003",
+      "byte_length": 515757,
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+      "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1",
+      "subject_role": "GAP008_R026_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-004",
+      "byte_length": 135765,
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "09c5fdb8eee426a7d60cf10639bf7d6ec9fc41ef2862bec8912282635a5ba96c",
+      "subject_role": "NPC_DLV-DOC-05_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-005",
+      "byte_length": 3838659,
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "70305918b52204097db9376de642f191b19b4c4f7925d2a1bedf0f5e115465b0",
+      "subject_role": "NPC_DLV-DOC-01_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-006",
+      "byte_length": 2057598,
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "2bfb1420660e48fb9df1a0d8311da98fa95381a0ea932dc4fc942f84b3695cab",
+      "subject_role": "NPC_DLV-REQ-16_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-007",
+      "byte_length": 587809,
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "4159a80cc7cdf74011db80c08dbfcbf68eade6f652a543d8cc6979b168a0dea6",
+      "subject_role": "NPC_DLV-DES-06_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-008",
+      "byte_length": 387396,
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "sha256": "b2b4f25dbd21781dbd3624bc4ba90c70080cd05bbd4b247bb5dc1f5c64408a03",
+      "subject_role": "NPC_DLV-DEV-01_PHYSICAL_SUCCESSOR"
+    },
+    {
+      "binding_id": "R015-SRC-009",
+      "byte_length": 190585,
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "2e4b3dc105efc07adcd851d770a20cf79925a06bcb7c128381f87bd8f96bb709",
+      "subject_role": "NPC_DLV-DEV-18_PHYSICAL_SUCCESSOR"
+    }
+  ],
+  "verdict": "PASS_FOR_NPC_SINGLE_ADMIN_RECOVERY_GAP008_R026_EXACT6_RECORD_PROGRESS_BINDING_WITH_ZERO_CREDIT_ONLY"
+}

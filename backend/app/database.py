@@ -23,6 +23,7 @@ engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
     pool_timeout=settings.database_connect_timeout_seconds,
+    hide_parameters=True,
     connect_args=connect_args,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

@@ -1,0 +1,46 @@
+...............................F.......................................  [100%]
+=================================== FAILURES ===================================
+_ WalkSafeProjectContinuationV24Test.test_fp008_private_gate_rejects_extra_inventory_entry _
+
+self = <test_walksafe_project_continuation_v2_4.WalkSafeProjectContinuationV24Test testMethod=test_fp008_private_gate_rejects_extra_inventory_entry>
+
+    def test_fp008_private_gate_rejects_extra_inventory_entry(self) -> None:
+        event_id = "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP008-20260803-904"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            event_dir, binding, expected_checks, run_receipt = (
+                self._create_fp008_private_gate_fixture(root, event_id)
+            )
+            _, _, _, directory_identity = (
+                continuation._load_fp008_private_binding(
+                    root,
+                    binding,
+                    event_id=event_id,
+                    expected_path=binding["path"],
+                    label="synthetic FP008 receipt",
+                )
+            )
+            extra = event_dir / ".receipt.stage"
+            extra.write_bytes(b"unpublished\n")
+            os.chmod(extra, 0o600)
+    
+            errors, _ = continuation._validate_check_runs(
+                root,
+                label="synthetic FP008 gate",
+                event_id=event_id,
+                receipt=run_receipt,
+                expected_checks=expected_checks,
+                fp008_private_evidence=True,
+                fp008_event_directory_identity=directory_identity,
+            )
+    
+>       self.assertTrue(
+            any("only the 9 ordered logs and receipt" in error for error in errors),
+            errors,
+        )
+E       AssertionError: False is not true : ['synthetic FP008 gate inventory must contain only the ordered logs and receipt', 'synthetic FP008 gate final inventory must contain only the ordered logs and receipt']
+
+tests/test_walksafe_project_continuation_v2_4.py:1653: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_walksafe_project_continuation_v2_4.py::WalkSafeProjectContinuationV24Test::test_fp008_private_gate_rejects_extra_inventory_entry
+1 failed, 70 passed in 7.26s

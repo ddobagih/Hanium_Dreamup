@@ -208,6 +208,21 @@ def test_layer_runner_migrates_the_verified_test_database_before_tests() -> None
     assert web_lock < backup < snapshot < restore_trap < web_build
 
 
+def test_current_runner_omits_unpreserved_v25_candidate_test() -> None:
+    candidate_test = "tests/test_walksafe_v2_5_control_candidate_20260730.py"
+    ignored_paths = Path(".gitignore").read_text(encoding="utf-8").splitlines()
+    current_runner = Path("scripts/run_walksafe_test_layers_current.sh").read_text(
+        encoding="utf-8"
+    )
+    frozen_runner = Path("scripts/run_walksafe_test_layers_20260711.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert f"/{candidate_test}" in ignored_paths
+    assert candidate_test not in current_runner
+    assert candidate_test in frozen_runner
+
+
 def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> None:
     workflow = Path(".github/workflows/quality.yml").read_text(encoding="utf-8")
 

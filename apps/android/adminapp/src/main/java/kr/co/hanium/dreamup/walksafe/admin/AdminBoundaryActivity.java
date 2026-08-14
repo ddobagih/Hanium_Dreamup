@@ -18,6 +18,8 @@ import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,6 +28,7 @@ import kr.co.hanium.dreamup.walksafe.admin.security.AdminInstitutionDelivery;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminOperationsHttpClient;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryMessagePolicy;
+import kr.co.hanium.dreamup.walksafe.admin.security.AdminRecoveryCustodyState;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminReportDecision;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityApi;
 import kr.co.hanium.dreamup.walksafe.admin.security.AdminSecurityController;
@@ -46,6 +49,7 @@ public final class AdminBoundaryActivity extends Activity {
     private TextView statusText;
     private TextView metadataText;
     private TextView deviceKeyText;
+    private TextView custodyText;
     private TextView resultText;
     private TextView operationalLockText;
     private EditText adminIdInput;
@@ -60,6 +64,9 @@ public final class AdminBoundaryActivity extends Activity {
     private LinearLayout recoveryCompleteGroup;
     private LinearLayout sessionGroup;
     private LinearLayout sessionList;
+    private LinearLayout custodyGroup;
+    private Spinner custodyMaterialKindInput;
+    private CheckBox custodyConfirmationInput;
     private LinearLayout operationsGroup;
     private EditText reportIdInput;
     private Spinner reviewDecisionInput;
@@ -153,6 +160,12 @@ public final class AdminBoundaryActivity extends Activity {
         metadataText.setGravity(Gravity.CENTER);
         content.addView(metadataText, matchWrap());
 
+        custodyText = text("", 15);
+        custodyText.setGravity(Gravity.CENTER);
+        custodyText.setPadding(0, 8, 0, 0);
+        custodyText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        content.addView(custodyText, matchWrap());
+
         deviceKeyText = text("", 13);
         deviceKeyText.setGravity(Gravity.CENTER);
         deviceKeyText.setPadding(0, 8, 0, 0);
@@ -218,6 +231,22 @@ public final class AdminBoundaryActivity extends Activity {
         completeRecovery.setOnClickListener(view -> completeRecovery());
         recoveryCompleteGroup.addView(completeRecovery, matchWrap());
         content.addView(recoveryCompleteGroup, matchWrap());
+
+        custodyGroup = group();
+        custodyGroup.addView(text(
+            "서버 키, 앱 서명 키, 관리자 복구자료를 서로 분리해 각각 암호화 백업했고, 같은 저장공간이나 계정에 키를 함께 두지 않은 경우에만 확인하세요. 관리자 복구자료는 이 휴대전화 밖에 있어야 합니다. 앱은 복구자료 원문을 저장하거나 전송하지 않습니다.",
+            16
+        ), matchWrap());
+        custodyMaterialKindInput = enumSpinner(AdminSecurityApi.RecoveryMaterialKind.values());
+        custodyGroup.addView(custodyMaterialKindInput, matchWrap());
+        custodyConfirmationInput = checkBox(
+            "서버 키·앱 서명 키·관리자 복구자료를 서로 분리해 각각 암호화 백업했고, 같은 저장공간이나 계정에 키를 함께 두지 않았음을 직접 확인했습니다."
+        );
+        custodyGroup.addView(custodyConfirmationInput, matchWrap());
+        Button attestCustody = button("복구자료 외부 보관 확인 기록");
+        attestCustody.setOnClickListener(view -> attestRecoveryCustody());
+        custodyGroup.addView(attestCustody, matchWrap());
+        content.addView(custodyGroup, matchWrap());
 
         sessionGroup = group();
         Button refreshButton = button("서버 보안상태와 기기 세션 새로고침");
@@ -485,6 +514,24 @@ public final class AdminBoundaryActivity extends Activity {
         );
     }
 
+    private void attestRecoveryCustody() {
+        if (!custodyConfirmationInput.isChecked()) {
+            resultText.setText("세 키의 개별 암호화 백업과 저장공간·계정 분리를 확인한 뒤 확인란을 선택해 주세요.");
+            return;
+        }
+        AdminSecurityApi.RecoveryMaterialKind materialKind =
+            AdminSecurityApi.RecoveryMaterialKind.valueOf(
+                custodyMaterialKindInput.getSelectedItem().toString()
+            );
+        custodyConfirmationInput.setChecked(false);
+        runSecurityOperation(
+            "복구자료 보관 확인 상태를 갱신하고 있습니다.",
+            "복구자료가 휴대전화 밖에 분리 보관된 상태를 확인했습니다.",
+            AdminRecoveryMessagePolicy.Phase.CUSTODY_ATTESTATION,
+            () -> controller.attestRecoveryCustody(materialKind)
+        );
+    }
+
     private void revokeCurrentSession() {
         String sessionId = controller.snapshot().currentSessionId();
         if (sessionId == null) {
@@ -498,6 +545,15 @@ public final class AdminBoundaryActivity extends Activity {
         runSecurityOperation("선택한 기기 세션을 폐기하고 있습니다.", "기기 세션을 폐기했습니다.",
             AdminRecoveryMessagePolicy.Phase.GENERAL, () ->
             controller.revokeSession(sessionId)
+        );
+    }
+
+    private void reportLostDevice(String lostDeviceId) {
+        runSecurityOperation(
+            "분실 기기의 모든 세션과 장치 키를 폐기하고 있습니다.",
+            "분실 기기의 모든 세션과 장치 키를 폐기했습니다.",
+            AdminRecoveryMessagePolicy.Phase.LOST_DEVICE_REPORT,
+            () -> controller.reportLostDevice(lostDeviceId)
         );
     }
 
@@ -549,6 +605,7 @@ public final class AdminBoundaryActivity extends Activity {
         if (controller == null) {
             statusText.setText("관리자 보안 기능은 잠겨 있습니다.");
             metadataText.setText(BuildConfig.ADMIN_WORKFLOW_STATE);
+            custodyText.setText("복구자료 외부 보관 상태를 확인할 수 없습니다.");
             hideInteractiveGroups();
             operationsGroup.setVisibility(View.GONE);
             operationalLockText.setText("인증·복구·감사 기능을 승인하기 전에는 어떤 관리자 업무도 수행할 수 없습니다.");
@@ -562,27 +619,40 @@ public final class AdminBoundaryActivity extends Activity {
             valueOrPending(snapshot.stateVersion()),
             valueOrPending(snapshot.observedAt())
         ));
+        custodyText.setText(custodyLabel(snapshot));
 
         boolean accessActive = snapshot.isAccessSessionActive();
         boolean recoveryActive = snapshot.isRecoveryActive();
+        boolean custodyAttested =
+            snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.ATTESTED;
         loginButton.setVisibility(!accessActive && !recoveryActive ? View.VISIBLE : View.GONE);
         recoveryStartGroup.setVisibility(
             !recoveryActive && snapshot.securityState() != AdminSecurityState.NORMAL ? View.VISIBLE : View.GONE
         );
         recoveryCompleteGroup.setVisibility(recoveryActive ? View.VISIBLE : View.GONE);
+        custodyGroup.setVisibility(
+            accessActive && snapshot.securityState() == AdminSecurityState.NORMAL && !custodyAttested
+                ? View.VISIBLE
+                : View.GONE
+        );
         sessionGroup.setVisibility(accessActive ? View.VISIBLE : View.GONE);
         revokeCurrentButton.setEnabled(snapshot.currentSessionId() != null);
-        renderSessions(snapshot.sessions());
+        renderDevices(snapshot.sessions(), snapshot.devices());
 
         boolean operationsVisible = BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED
             && operationsClientConfigured
             && accessActive
-            && snapshot.securityState() == AdminSecurityState.NORMAL;
+            && snapshot.securityState() == AdminSecurityState.NORMAL
+            && custodyAttested;
         operationsGroup.setVisibility(operationsVisible ? View.VISIBLE : View.GONE);
         if (!BuildConfig.ADMIN_OPERATIONAL_WORKFLOWS_ENABLED) {
             operationalLockText.setText(R.string.admin_operations_default_locked);
         } else if (!operationsClientConfigured) {
             operationalLockText.setText("장치 서명 키를 검증할 수 없어 관리자 운영 업무를 잠갔습니다.");
+        } else if (!custodyAttested) {
+            operationalLockText.setText(
+                "복구자료의 휴대전화 밖 보관이 확인되지 않아 고위험 작업과 관리자 운영 업무를 잠갔습니다."
+            );
         } else if (!operationsVisible) {
             operationalLockText.setText("정상 관리자 세션과 추가 인증을 완료하면 내부 운영 업무를 사용할 수 있습니다.");
         } else {
@@ -592,13 +662,17 @@ public final class AdminBoundaryActivity extends Activity {
         }
     }
 
-    private void renderSessions(java.util.List<AdminSecurityApi.SessionInfo> sessions) {
+    private void renderDevices(
+        java.util.List<AdminSecurityApi.SessionInfo> sessions,
+        java.util.List<AdminSecurityApi.DeviceInfo> devices
+    ) {
         sessionList.removeAllViews();
         if (sessions.isEmpty()) {
-            sessionList.addView(text("등록된 세션을 아직 불러오지 못했습니다.", 15), matchWrap());
-            return;
+            sessionList.addView(text("활성 기기 세션이 없습니다.", 15), matchWrap());
         }
+        Set<String> activeSessionDevices = new HashSet<>();
         for (AdminSecurityApi.SessionInfo session : sessions) {
+            if (!session.isRevoked()) activeSessionDevices.add(session.deviceId());
             TextView description = text(
                 session.deviceLabel() + (session.isCurrent() ? " (현재 기기)" : "")
                     + "\n최근 사용: " + session.lastSeenAt()
@@ -612,12 +686,29 @@ public final class AdminBoundaryActivity extends Activity {
             revoke.setOnClickListener(view -> revokeSession(session.sessionId()));
             sessionList.addView(revoke, matchWrap());
         }
+        for (AdminSecurityApi.DeviceInfo device : devices) {
+            boolean keyOnly = !activeSessionDevices.contains(device.deviceId());
+            TextView description = text(
+                (keyOnly ? "활성 장치 키만 남은 기기" : "활성 장치 키가 있는 기기")
+                    + (device.isCurrent() ? " (현재 기기)" : "")
+                    + "\n기기 ID: " + device.deviceId(),
+                15
+            );
+            description.setPadding(0, 20, 0, 4);
+            sessionList.addView(description, matchWrap());
+            if (!device.isCurrent()) {
+                Button reportLost = button("이 기기를 분실 신고하고 모든 세션·키 폐기");
+                reportLost.setOnClickListener(view -> reportLostDevice(device.deviceId()));
+                sessionList.addView(reportLost, matchWrap());
+            }
+        }
     }
 
     private void hideInteractiveGroups() {
         loginButton.setVisibility(View.GONE);
         recoveryStartGroup.setVisibility(View.GONE);
         recoveryCompleteGroup.setVisibility(View.GONE);
+        custodyGroup.setVisibility(View.GONE);
         sessionGroup.setVisibility(View.GONE);
         operationsGroup.setVisibility(View.GONE);
     }
@@ -730,6 +821,17 @@ public final class AdminBoundaryActivity extends Activity {
 
     private static String valueOrPending(String value) {
         return value == null ? "확인 전" : value;
+    }
+
+    private static String custodyLabel(AdminSecurityController.Snapshot snapshot) {
+        if (snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.ATTESTED) {
+            return "복구자료 외부 보관 확인됨 · 확인시각 "
+                + valueOrPending(snapshot.recoveryCustodyAttestedAt());
+        }
+        if (snapshot.recoveryCustodyState() == AdminRecoveryCustodyState.UNATTESTED) {
+            return "복구자료 외부 보관 미확인 · 고위험 작업 잠금";
+        }
+        return "복구자료 외부 보관 상태 확인 전 · 고위험 작업 잠금";
     }
 
     private static String stateLabel(AdminSecurityState state) {

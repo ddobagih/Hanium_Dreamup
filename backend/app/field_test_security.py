@@ -43,6 +43,7 @@ from backend.app.services.admin_security import (
     authorize_admin_bearer,
     authorize_high_risk_bearer,
     classify_admin_operation,
+    load_admin_credential_issuer_key_for_settings,
     record_admin_security_denial,
 )
 from backend.app.services.admin_device_proof import (
@@ -284,6 +285,9 @@ def _authorize_admin_request(
 
     try:
         with SessionLocal.begin() as db:
+            credential_issuer_key = load_admin_credential_issuer_key_for_settings(
+                settings
+            )
             if high_risk_action is not None:
                 return authorize_high_risk_bearer(
                     db,
@@ -293,6 +297,7 @@ def _authorize_admin_request(
                     path=path,
                     nonce=reconfirmation_nonce,
                     runtime_totp_secret=settings.admin_totp_secret,
+                    credential_issuer_key=credential_issuer_key,
                     device_id=device_id,
                     app_kind=app_kind,
                     role=role,
@@ -302,6 +307,7 @@ def _authorize_admin_request(
                 db,
                 raw_token,
                 runtime_totp_secret=settings.admin_totp_secret,
+                credential_issuer_key=credential_issuer_key,
                 device_id=device_id,
                 app_kind=app_kind,
                 role=role,
@@ -316,14 +322,21 @@ def _authorize_admin_request(
 
 
 def _verify_admin_device_proof_request(
-    _settings: Any,
+    settings: Any,
     **kwargs: Any,
 ) -> VerifiedAdminDeviceProof:
     from backend.app.database import SessionLocal
 
     try:
         with SessionLocal.begin() as db:
-            return verify_admin_device_proof(db, **kwargs)
+            return verify_admin_device_proof(
+                db,
+                runtime_totp_secret=settings.admin_totp_secret,
+                credential_issuer_key=(
+                    load_admin_credential_issuer_key_for_settings(settings)
+                ),
+                **kwargs,
+            )
     except AdminSecurityError:
         raise
     except SQLAlchemyError as exc:

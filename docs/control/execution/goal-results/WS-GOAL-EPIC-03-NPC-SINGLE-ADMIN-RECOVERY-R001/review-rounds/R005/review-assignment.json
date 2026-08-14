@@ -1,0 +1,125 @@
+{
+  "assigned_at": "2026-08-13T20:10:00+09:00",
+  "assigner": {
+    "agent_instance_id": "codex-root-assigner-r005-20260813",
+    "canonical_task": "/root",
+    "role": "INTERNAL_REVIEW_ASSIGNER"
+  },
+  "evidence_type": "NPC_R005_FOLLOWUP_REVIEW_ASSIGNMENT",
+  "executor": {
+    "agent_instance_id": "codex-root-executor-r005-20260813",
+    "canonical_task": "/root",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR"
+  },
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "review_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "formal_test_status": "NOT_RUN",
+    "product_execution_rerun_claimed": false,
+    "production_deployment_status": "NOT_RUN",
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "POST_R003_COMPLETION_CONTROL_ONLY"
+  },
+  "review_scope": {
+    "acceptance": {
+      "current_test_layer_registry_must_pass": true,
+      "exact_fp047_snapshot_overlay_required": true,
+      "overlay_must_end_at_fp046_final_digest": true,
+      "projected_seq62_goal_graph_pass_required": true,
+      "unrelated_or_disconnected_edge_fails_closed": true
+    },
+    "predecessor_review_bindings": [
+      {
+        "byte_length": 57544,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R003/review-assignment.json",
+        "sha256": "86404b78e0424bc75a3f01fcb5cacc27347ca1c3f284af2a1be600f19de770e2"
+      },
+      {
+        "byte_length": 74252,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R003/review-result.json",
+        "sha256": "bb733e12d6db46b366d187f4c3276635a3a6b470951e7089f9c02d2d38fc898c"
+      },
+      {
+        "byte_length": 74539,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R003/independent-review.json",
+        "sha256": "48775fc51138f2564ca2bbf77a2dcfe470a4e6e635b2338ae6dae7757f33afb9"
+      },
+      {
+        "byte_length": 113655,
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/completion-receipt-v3.json",
+        "sha256": "c021a2fad05315c5a31e3726ed4f4b8717977030e95e4f9616d336c346ae5281"
+      }
+    ],
+    "required_finding_ids": [
+      "NPC-R005-PROJECTED-LINEAGE-P1-001",
+      "NPC-R005-TEST-LAYER-P1-002"
+    ],
+    "reviewed_control_code_cohort": [
+      {
+        "byte_length": 504719,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "2d06c964fc240fc27e60d48b15b693d32d56c66c9f96ca9d1a9905de51325d68"
+      },
+      {
+        "byte_length": 275773,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "5a16038183aae3738d64a12af8c5ee71939e28bb22c3640c6677d31d8d94b5e7"
+      },
+      {
+        "byte_length": 96226,
+        "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "ea33fe234be1a0604544c4a6debd7802169f81655408328d6c8a47c39af41f60"
+      },
+      {
+        "byte_length": 42070,
+        "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "sha256": "2c64e7abf1a4b14040dee412ea88ff0fbff9ce56ce1995764336775faa3b8464"
+      },
+      {
+        "byte_length": 23265,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "e0fc92992b18c2dfddcbf718e68ff563a5b22028e17c103bb5420d9c4d73592a"
+      },
+      {
+        "byte_length": 15199,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "32b4d6a4659411f9516c85ee8c284da56801907d7f2d466f4a66eadbc9fd478b"
+      },
+      {
+        "byte_length": 3659,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+        "sha256": "a7107cf770b0c78d1fe58d61771830bfcb195464e5ba803be7b46eee9ecc1f52"
+      },
+      {
+        "byte_length": 13294,
+        "path": "scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "9e039fda28fc851ca2181ad2c408b3823a87d0c2a3ba3fcaaf81a6f33db4b07d"
+      },
+      {
+        "byte_length": 3686,
+        "path": "tests/test_build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+        "sha256": "d97532568b141e27f751623af36990df01f63e97d009315fa97671fdae761e1b"
+      }
+    ],
+    "reviewed_control_code_cohort_sha256": "bd4a162049375b27e8fb2de0e8ddf274e66ba34751a320efacf1301d376bb2f5",
+    "superseded_r004_assignment": {
+      "byte_length": 4229,
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R004/review-assignment.json",
+      "reason": "R004 test was absent from the current layer registry",
+      "sha256": "094ba59f38837af29e84710ea8e5ca9b7f21c5cf03269a4f1d7a1362eab455fb",
+      "status": "SUPERSEDED_BEFORE_REVIEW"
+    },
+    "trigger": {
+      "checkpoint_sequence": 60,
+      "diagnostic": "archived v2.2 NPC permission-session changed artifact 21 differs",
+      "failed_command": "apply seq61/62 --refresh-catalogs"
+    }
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-r005-transition-reviewer-20260813",
+    "canonical_task": "/root/r004_transition_reviewer",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-REVIEW-20260813-R005",
+  "schema_version": "1.0"
+}

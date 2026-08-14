@@ -257,7 +257,15 @@ COMPONENT_RECORD_KEYS = {
         {"artifact", "signing_status", "deployable", "deployment_blocker"}
     ),
     "backend": frozenset(
-        {"artifact", "runtime_unit", "migration_unit", "configuration_example"}
+        {
+            "artifact",
+            "runtime_unit",
+            "migration_unit",
+            "configuration_example",
+            "migration_configuration_example",
+            "issuer_binding_unit",
+            "issuer_binding_cli",
+        }
     ),
     "voice": frozenset({"artifact", "runtime_unit", "configuration_example"}),
 }
@@ -277,6 +285,11 @@ EXPECTED_COMPONENT_METADATA = {
         "runtime_unit": "deploy/systemd/walksafe-backend.service",
         "migration_unit": "deploy/systemd/walksafe-backend-migrate.service",
         "configuration_example": "deploy/config/walksafe-backend.env.example",
+        "migration_configuration_example": (
+            "deploy/config/walksafe-backend-migration.env.example"
+        ),
+        "issuer_binding_unit": "deploy/systemd/walksafe-admin-issuer-bind.service",
+        "issuer_binding_cli": "scripts/bind_walksafe_admin_credential_issuer_key.py",
     },
     "voice": {
         "runtime_unit": "deploy/systemd/walksafe-voice.service",
@@ -306,17 +319,21 @@ REQUIRED_PROVENANCE_PATHS = {
     "configs/walksafe_product_quality_policy_20260713.json",
     "configs/walksafe_node_toolchain_lock_20260715.json",
     "deploy/config/walksafe-backend.env.example",
+    "deploy/config/walksafe-backend-migration.env.example",
     "deploy/config/walksafe-report-retention.env.example",
     "deploy/config/walksafe-voice.env.example",
     "deploy/config/walksafe-web.env.example",
     "deploy/nginx/walksafe-web.conf.example",
     "deploy/systemd/walksafe-backend-migrate.service",
     "deploy/systemd/walksafe-backend.service",
+    "deploy/systemd/walksafe-admin-issuer-bind.service",
+    "deploy/sysusers.d/walksafe-backend.conf",
     "deploy/systemd/walksafe-report-retention.service",
     "deploy/systemd/walksafe-report-retention.timer",
     "deploy/systemd/walksafe-voice.service",
     "deploy/systemd/walksafe-web.service",
     "docs/release/walksafe_full_rc_20260713.md",
+    "scripts/bind_walksafe_admin_credential_issuer_key.py",
     "scripts/build_walksafe_full_rc_20260713.py",
     "scripts/build_walksafe_web_release_20260711.sh",
     "scripts/check_android_apk_model_asset_20260713.py",
@@ -2055,7 +2072,7 @@ def _validate_runtime_contracts(source: Path) -> None:
             "WALKSAFE_BACKEND_REPLICAS": "1",
             "WALKSAFE_ACTOR_RATE_LIMIT_STORE": "postgresql",
             "DATABASE_URL": (
-                "postgresql+psycopg://walksafe_app:CHANGE_ME@db.example.invalid:5432/"
+                "postgresql+psycopg://walksafe_backend_app:CHANGE_ME@db.example.invalid:5432/"
                 "walksafe?sslmode=verify-full&gssencmode=disable"
             ),
             "WALKSAFE_DATABASE_AT_REST_ENCRYPTION_CONFIRMED": "true",
@@ -2091,6 +2108,9 @@ def _validate_runtime_contracts(source: Path) -> None:
             "WALKSAFE_ADMIN_TOTP_SECRET": (
                 "CHANGE_ME_CANONICAL_UNPADDED_BASE32_MIN_160_BITS"
             ),
+            "WALKSAFE_ADMIN_CREDENTIAL_ISSUER_KEY_FILE": (
+                "/etc/walksafe/admin-credential-issuer.key"
+            ),
             "WALKSAFE_ADMIN_SESSION_TTL_SECONDS": "43200",
             "WALKSAFE_ADMIN_STEP_UP_TTL_SECONDS": "300",
             "WALKSAFE_ADMIN_RECOVERY_TTL_SECONDS": "900",
@@ -2099,6 +2119,10 @@ def _validate_runtime_contracts(source: Path) -> None:
             "WALKSAFE_GATEWAY_SESSION_SECRET": (
                 "CHANGE_ME_RANDOM_SESSION_SECRET_AT_LEAST_32_CHARACTERS"
             ),
+            "WALKSAFE_PRIVACY_HMAC_SECRET": (
+                "CHANGE_ME_RANDOM_PRIVACY_HMAC_SECRET_AT_LEAST_32_UTF8_BYTES"
+            ),
+            "WALKSAFE_PRIVACY_HMAC_KEY_VERSION": "1",
             "WALKSAFE_MAINTENANCE_LOCK_PATH": "/run/walksafe-backend/maintenance.lock",
         },
         allowed_keys=set(
@@ -2122,10 +2146,12 @@ def _validate_runtime_contracts(source: Path) -> None:
             WALKSAFE_ALLOW_INSECURE_LOCAL_DEV WALKSAFE_FIELD_TEST_SECURITY_ENABLED
             WALKSAFE_FIELD_TEST_TOKEN WALKSAFE_ADMIN_TOKEN WALKSAFE_ADMIN_SECURITY_ENABLED
             WALKSAFE_ADMIN_ID WALKSAFE_ADMIN_TOTP_SECRET
+            WALKSAFE_ADMIN_CREDENTIAL_ISSUER_KEY_FILE
             WALKSAFE_ADMIN_SESSION_TTL_SECONDS WALKSAFE_ADMIN_STEP_UP_TTL_SECONDS
             WALKSAFE_ADMIN_RECOVERY_TTL_SECONDS WALKSAFE_ADMIN_AUTH_RATE_LIMIT_ATTEMPTS
             WALKSAFE_ADMIN_AUTH_RATE_LIMIT_WINDOW_SECONDS
-            WALKSAFE_GATEWAY_SESSION_SECRET WALKSAFE_MAINTENANCE_LOCK_PATH""".split()
+            WALKSAFE_GATEWAY_SESSION_SECRET WALKSAFE_PRIVACY_HMAC_SECRET
+            WALKSAFE_PRIVACY_HMAC_KEY_VERSION WALKSAFE_MAINTENANCE_LOCK_PATH""".split()
         ),
         context="backend runtime example",
     )
@@ -2139,6 +2165,58 @@ def _validate_runtime_contracts(source: Path) -> None:
     ):
         raise ValidationError(
             "backend runtime DATABASE_URL must set sslmode=verify-full and gssencmode=disable"
+        )
+    migration_config = (
+        source / "deploy/config/walksafe-backend-migration.env.example"
+    ).read_text(encoding="utf-8")
+    migration_environment = _environment_assignments(
+        migration_config, context="backend migration example"
+    )
+    _require_environment_values(
+        migration_environment,
+        {
+            "WALKSAFE_ENVIRONMENT": "production",
+            "WALKSAFE_RUNTIME_DATABASE_ROLE": "walksafe_backend_app",
+            "WALKSAFE_MIGRATION_DATABASE_URL": (
+                "postgresql+psycopg://walksafe_migrator:CHANGE_ME@db.example.invalid:5432/"
+                "walksafe?sslmode=verify-full&gssencmode=disable"
+            ),
+            "WALKSAFE_PRIVACY_HMAC_SECRET": (
+                "CHANGE_ME_RANDOM_PRIVACY_HMAC_SECRET_AT_LEAST_32_UTF8_BYTES"
+            ),
+            "WALKSAFE_PRIVACY_HMAC_KEY_VERSION": "1",
+        },
+        allowed_keys={
+            "WALKSAFE_ENVIRONMENT",
+            "WALKSAFE_RUNTIME_DATABASE_ROLE",
+            "WALKSAFE_MIGRATION_DATABASE_URL",
+            "WALKSAFE_PRIVACY_HMAC_SECRET",
+            "WALKSAFE_PRIVACY_HMAC_KEY_VERSION",
+        },
+        context="backend migration example",
+    )
+    migration_parameters = parse_qs(
+        urlsplit(migration_environment["WALKSAFE_MIGRATION_DATABASE_URL"]).query,
+        keep_blank_values=True,
+    )
+    if (
+        migration_parameters.get("sslmode") != ["verify-full"]
+        or migration_parameters.get("gssencmode") != ["disable"]
+    ):
+        raise ValidationError(
+            "backend migration database URL must set sslmode=verify-full and gssencmode=disable"
+        )
+    if (
+        urlsplit(backend_environment["DATABASE_URL"]).username
+        == urlsplit(migration_environment["WALKSAFE_MIGRATION_DATABASE_URL"]).username
+    ):
+        raise ValidationError("backend runtime and migration database roles must differ")
+    if (
+        urlsplit(backend_environment["DATABASE_URL"]).username
+        != migration_environment["WALKSAFE_RUNTIME_DATABASE_ROLE"]
+    ):
+        raise ValidationError(
+            "backend runtime and migration examples must agree on the runtime role"
         )
     retention_config = (
         source / "deploy/config/walksafe-report-retention.env.example"
@@ -2385,7 +2463,7 @@ def _validate_runtime_contracts(source: Path) -> None:
                 "PYTHONPATH=/srv/walksafe/backend",
                 "PYTHONDONTWRITEBYTECODE=1",
             ],
-            "EnvironmentFile": ["/etc/walksafe/backend.env"],
+            "EnvironmentFile": ["/etc/walksafe/backend-runtime.env"],
             "RuntimeDirectory": ["walksafe-backend"],
             "RuntimeDirectoryMode": ["0700"],
             "StateDirectory": ["walksafe/uploads walksafe/android-debug-logs"],
@@ -2398,7 +2476,13 @@ def _validate_runtime_contracts(source: Path) -> None:
             "RestartSec": ["3"],
             "LimitCORE": ["0"],
             **common_service_hardening,
-            "ReadOnlyPaths": ["/etc/walksafe/report-image-keyring.json"],
+            "ReadOnlyPaths": [
+                "/etc/walksafe/report-image-keyring.json "
+                "/etc/walksafe/admin-credential-issuer.key"
+            ],
+            "InaccessiblePaths": [
+                "/etc/walksafe/backend-migration.env /etc/walksafe/backend.env"
+            ],
             "ReadWritePaths": [
                 "/var/lib/walksafe/uploads /var/lib/walksafe/android-debug-logs "
                 "/run/walksafe-backend"
@@ -2479,20 +2563,25 @@ def _validate_runtime_contracts(source: Path) -> None:
         },
         "Service": {
             "Type": ["oneshot"],
-            "User": ["walksafe-backend"],
-            "Group": ["walksafe-backend"],
+            "User": ["walksafe-maintenance"],
+            "Group": ["walksafe-maintenance"],
             "WorkingDirectory": ["/srv/walksafe/backend"],
             "Environment": [
                 "PYTHONPATH=/srv/walksafe/backend",
                 "PYTHONDONTWRITEBYTECODE=1",
             ],
-            "EnvironmentFile": ["/etc/walksafe/backend.env"],
+            "EnvironmentFile": ["/etc/walksafe/backend-migration.env"],
+            "UMask": ["0077"],
             "ExecStart": [
                 "/srv/walksafe/backend/.venv/bin/python -m alembic "
                 "-c backend/alembic.ini upgrade head"
             ],
             "LimitCORE": ["0"],
             **common_service_hardening,
+            "InaccessiblePaths": [
+                "/etc/walksafe/backend-runtime.env /etc/walksafe/backend.env "
+                "/etc/walksafe/admin-credential-issuer.key"
+            ],
         },
     }
     _require_exact_systemd_unit(
@@ -2502,6 +2591,68 @@ def _validate_runtime_contracts(source: Path) -> None:
         expected=expected_migration_unit,
         context="backend migration unit",
     )
+    expected_issuer_binding_unit = {
+        "Unit": {
+            "Description": ["WalkSafe one-time administrator issuer-key binding"],
+            "After": [
+                "network-online.target walksafe-backend-migrate.service"
+            ],
+            "Wants": ["network-online.target"],
+            "Requires": ["walksafe-backend-migrate.service"],
+            "Before": ["walksafe-backend.service"],
+            "Conflicts": ["walksafe-backend.service"],
+        },
+        "Service": {
+            "Type": ["oneshot"],
+            "User": ["walksafe-issuer-bind"],
+            "Group": ["walksafe-issuer-bind"],
+            "WorkingDirectory": ["/srv/walksafe/backend"],
+            "Environment": [
+                "PYTHONPATH=/srv/walksafe/backend",
+                "PYTHONDONTWRITEBYTECODE=1",
+            ],
+            "EnvironmentFile": ["/etc/walksafe/backend-migration.env"],
+            "UMask": ["0077"],
+            "LoadCredential": [
+                "admin-credential-issuer.key:"
+                "/etc/walksafe/admin-credential-issuer.key"
+            ],
+            "ExecStart": [
+                "/srv/walksafe/backend/.venv/bin/python "
+                "/srv/walksafe/backend/scripts/"
+                "bind_walksafe_admin_credential_issuer_key.py "
+                "--admin-id walksafe.admin "
+                "--issuer-key-file %d/admin-credential-issuer.key "
+                "--issuer-key-source systemd-credential"
+            ],
+            "LimitCORE": ["0"],
+            **common_service_hardening,
+            "CapabilityBoundingSet": [""],
+            "AmbientCapabilities": [""],
+            "InaccessiblePaths": [
+                "/etc/walksafe/backend-runtime.env "
+                "/etc/walksafe/backend-migration.env /etc/walksafe/backend.env "
+                "/etc/walksafe/admin-credential-issuer.key"
+            ],
+        },
+    }
+    _require_exact_systemd_unit(
+        (
+            source / "deploy/systemd/walksafe-admin-issuer-bind.service"
+        ).read_text(encoding="utf-8"),
+        expected=expected_issuer_binding_unit,
+        context="backend issuer binding unit",
+    )
+    expected_sysusers = (
+        'u walksafe-maintenance - "WalkSafe database migration" '
+        "/nonexistent /usr/sbin/nologin\n"
+        'u walksafe-issuer-bind - "WalkSafe issuer-key binding" '
+        "/nonexistent /usr/sbin/nologin\n"
+    )
+    if (
+        source / "deploy/sysusers.d/walksafe-backend.conf"
+    ).read_text(encoding="utf-8") != expected_sysusers:
+        raise ValidationError("backend service-account provisioning differs")
     expected_voice_unit = {
         "Unit": {
             "Description": ["WalkSafe Voice API (single replica)"],
@@ -2743,11 +2894,15 @@ def _validate_full_rc_snapshot(
         "model/two_model_runtime.py",
         "configs/walksafe_unified_epoch270_field_20260711.json",
         "deploy/config/walksafe-backend.env.example",
+        "deploy/config/walksafe-backend-migration.env.example",
         "deploy/config/walksafe-report-retention.env.example",
         "deploy/systemd/walksafe-backend.service",
         "deploy/systemd/walksafe-backend-migrate.service",
+        "deploy/systemd/walksafe-admin-issuer-bind.service",
+        "deploy/sysusers.d/walksafe-backend.conf",
         "deploy/systemd/walksafe-report-retention.service",
         "deploy/systemd/walksafe-report-retention.timer",
+        "scripts/bind_walksafe_admin_credential_issuer_key.py",
         "scripts/check_report_retention_dry_run.py",
         "scripts/run_walksafe_report_retention_20260717.sh",
         "scripts/walksafe_backup_integrity.py",

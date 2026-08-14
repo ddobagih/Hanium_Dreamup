@@ -55,6 +55,10 @@ def bind_privacy_hmac_key() -> None:
         )
 
 
+def validate_admin_credential_issuer_binding() -> None:
+    health.assert_admin_credential_issuer_startup_ready(settings)
+
+
 def reconcile_report_storage() -> None:
     with SessionLocal.begin() as db:
         lock_report_storage_reconciliation_transaction(db)
@@ -104,6 +108,7 @@ def reconcile_report_storage() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     try:
+        await asyncio.to_thread(validate_admin_credential_issuer_binding)
         await asyncio.to_thread(bind_privacy_hmac_key)
         await asyncio.to_thread(reconcile_report_storage)
         yield

@@ -458,6 +458,39 @@
         "title": "AccountDeletionStatusV2",
         "type": "object"
       },
+      "AdminRecoveryExpiredErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "const": "admin_recovery_expired",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "AdminRecoveryExpiredErrorDetail",
+        "type": "object"
+      },
+      "AdminRecoveryExpiredErrorResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "$ref": "#/components/schemas/AdminRecoveryExpiredErrorDetail"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "AdminRecoveryExpiredErrorResponse",
+        "type": "object"
+      },
       "AndroidDebugDepthLogEntry": {
         "additionalProperties": false,
         "properties": {
@@ -1811,6 +1844,28 @@
         "title": "DeviceDeletionEvidenceV2",
         "type": "object"
       },
+      "DeviceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "device_id": {
+            "maxLength": 128,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+            "title": "Device Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "current"
+        ],
+        "title": "DeviceItem",
+        "type": "object"
+      },
       "DeviceProofChallengeRequest": {
         "additionalProperties": false,
         "description": "All exact13 fields are required, including explicit nullable fields.",
@@ -2127,6 +2182,12 @@
           "duplicate_count"
         ],
         "title": "DuplicateCheckResponse",
+        "type": "object"
+      },
+      "EmptyRequest": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyRequest",
         "type": "object"
       },
       "GpsFix": {
@@ -2608,6 +2669,45 @@
           "device_label"
         ],
         "title": "RecoveryCompleteRequest",
+        "type": "object"
+      },
+      "RecoveryCustodyAttestRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "custody_reference": {
+            "description": "Canonical unpadded Base64url encoding of an opaque 32-byte recovery custody reference.",
+            "maxLength": 43,
+            "minLength": 43,
+            "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+            "title": "Custody Reference",
+            "type": "string"
+          },
+          "material_kind": {
+            "enum": [
+              "RECOVERY_CODE",
+              "SECURITY_KEY"
+            ],
+            "title": "Material Kind",
+            "type": "string"
+          },
+          "separate_encrypted_backup_confirmed": {
+            "const": true,
+            "title": "Separate Encrypted Backup Confirmed",
+            "type": "boolean"
+          },
+          "storage_location": {
+            "const": "OFF_PHONE",
+            "title": "Storage Location",
+            "type": "string"
+          }
+        },
+        "required": [
+          "custody_reference",
+          "material_kind",
+          "storage_location",
+          "separate_encrypted_backup_confirmed"
+        ],
+        "title": "RecoveryCustodyAttestRequest",
         "type": "object"
       },
       "RecoveryStartRequest": {
@@ -3473,16 +3573,26 @@
       "SessionsResponse": {
         "additionalProperties": false,
         "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceItem"
+            },
+            "maxItems": 100,
+            "title": "Devices",
+            "type": "array"
+          },
           "sessions": {
             "items": {
               "$ref": "#/components/schemas/SessionItem"
             },
+            "maxItems": 100,
             "title": "Sessions",
             "type": "array"
           }
         },
         "required": [
-          "sessions"
+          "sessions",
+          "devices"
         ],
         "title": "SessionsResponse",
         "type": "object"
@@ -3492,6 +3602,26 @@
         "properties": {
           "observed_at": {
             "title": "Observed At",
+            "type": "string"
+          },
+          "recovery_custody_attested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Custody Attested At"
+          },
+          "recovery_custody_state": {
+            "enum": [
+              "UNATTESTED",
+              "ATTESTED"
+            ],
+            "title": "Recovery Custody State",
             "type": "string"
           },
           "security_state": {
@@ -3511,7 +3641,9 @@
         "required": [
           "security_state",
           "state_version",
-          "observed_at"
+          "observed_at",
+          "recovery_custody_state",
+          "recovery_custody_attested_at"
         ],
         "title": "StateResponse",
         "type": "object"
@@ -4020,6 +4152,17 @@
             },
             "description": "Successful Response"
           },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRecoveryExpiredErrorResponse"
+                }
+              }
+            },
+            "description": "The recovery transaction for a RECOVERY_COMPLETE device-proof challenge expired.",
+            "x-walksafe-when-purpose": "RECOVERY_COMPLETE"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -4048,6 +4191,82 @@
         "x-walksafe-device-header-must-match-body": true,
         "x-walksafe-device-proof-recursive": false,
         "x-walksafe-required-role": "admin-public-auth"
+      }
+    },
+    "/admin/security/devices/{device_id}/report-lost": {
+      "post": {
+        "operationId": "report_lost_device_admin_security_devices__device_id__report_lost_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": []
+          }
+        ],
+        "summary": "Report Lost Device",
+        "tags": [
+          "admin-security"
+        ],
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": "device.report_lost",
+          "purpose": "ACTION",
+          "read_purpose": null,
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
       }
     },
     "/admin/security/reauthenticate": {
@@ -4103,6 +4322,68 @@
         "x-walksafe-required-role": "admin"
       }
     },
+    "/admin/security/recovery-custody/attest": {
+      "post": {
+        "operationId": "attest_recovery_custody_admin_security_recovery_custody_attest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryCustodyAttestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "WalkSafeAdminAppKind": [],
+            "WalkSafeAdminAudience": [],
+            "WalkSafeAdminBearer": [],
+            "WalkSafeAdminDeviceChallengeId": [],
+            "WalkSafeAdminDeviceId": [],
+            "WalkSafeAdminDeviceSignature": [],
+            "WalkSafeAdminRole": [],
+            "WalkSafeCorrelationId": []
+          }
+        ],
+        "summary": "Attest Recovery Custody",
+        "tags": [
+          "admin-security"
+        ],
+        "x-walksafe-actor-identity-required": false,
+        "x-walksafe-actor-identity-source": "admin-session",
+        "x-walksafe-admin-device-proof": {
+          "action": "recovery.custody.attest",
+          "purpose": "ACTION",
+          "read_purpose": null,
+          "session_id": "authenticated-admin-session"
+        },
+        "x-walksafe-required-role": "admin"
+      }
+    },
     "/admin/security/recovery/complete": {
       "post": {
         "operationId": "complete_recovery_admin_security_recovery_complete_post",
@@ -4126,6 +4407,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRecoveryExpiredErrorResponse"
+                }
+              }
+            },
+            "description": "The administrator recovery transaction expired."
           },
           "422": {
             "content": {

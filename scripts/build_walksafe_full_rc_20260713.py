@@ -188,12 +188,15 @@ RELEASE_SOURCE_INPUTS = (
     "voice/quality-requirements.txt",
     "voice/quality-requirements.lock",
     "deploy/config/walksafe-backend.env.example",
+    "deploy/config/walksafe-backend-migration.env.example",
     "deploy/config/walksafe-report-retention.env.example",
     "deploy/config/walksafe-voice.env.example",
     "deploy/config/walksafe-web.env.example",
     "deploy/nginx/walksafe-web.conf.example",
     "deploy/systemd/walksafe-backend-migrate.service",
     "deploy/systemd/walksafe-backend.service",
+    "deploy/systemd/walksafe-admin-issuer-bind.service",
+    "deploy/sysusers.d/walksafe-backend.conf",
     "deploy/systemd/walksafe-report-retention.service",
     "deploy/systemd/walksafe-report-retention.timer",
     "deploy/systemd/walksafe-voice.service",
@@ -207,6 +210,7 @@ RELEASE_SOURCE_INPUTS = (
     "scripts/walksafe_backup_integrity.py",
     "scripts/walksafe_environment_identity.py",
     "scripts/walksafe_external_check_receipt.py",
+    "scripts/bind_walksafe_admin_credential_issuer_key.py",
     "scripts/walksafe_android_dex_binding.py",
     "scripts/build_walksafe_web_release_20260711.sh",
     "scripts/create_walksafe_web_build_manifest_20260711.py",
@@ -1057,11 +1061,15 @@ def _backend_runtime_files(root: Path) -> list[str]:
         "model/two_model_runtime.py",
         "configs/walksafe_unified_epoch270_field_20260711.json",
         "deploy/config/walksafe-backend.env.example",
+        "deploy/config/walksafe-backend-migration.env.example",
         "deploy/config/walksafe-report-retention.env.example",
         "deploy/systemd/walksafe-backend.service",
         "deploy/systemd/walksafe-backend-migrate.service",
+        "deploy/systemd/walksafe-admin-issuer-bind.service",
+        "deploy/sysusers.d/walksafe-backend.conf",
         "deploy/systemd/walksafe-report-retention.service",
         "deploy/systemd/walksafe-report-retention.timer",
+        "scripts/bind_walksafe_admin_credential_issuer_key.py",
         "scripts/check_report_retention_dry_run.py",
         "scripts/run_walksafe_report_retention_20260717.sh",
         "scripts/walksafe_backup_integrity.py",
@@ -1692,6 +1700,15 @@ def build_full_rc(
                 "runtime_unit": "deploy/systemd/walksafe-backend.service",
                 "migration_unit": "deploy/systemd/walksafe-backend-migrate.service",
                 "configuration_example": "deploy/config/walksafe-backend.env.example",
+                "migration_configuration_example": (
+                    "deploy/config/walksafe-backend-migration.env.example"
+                ),
+                "issuer_binding_unit": (
+                    "deploy/systemd/walksafe-admin-issuer-bind.service"
+                ),
+                "issuer_binding_cli": (
+                    "scripts/bind_walksafe_admin_credential_issuer_key.py"
+                ),
             },
             "voice": {
                 "artifact": _artifact_record(voice_output, temporary),

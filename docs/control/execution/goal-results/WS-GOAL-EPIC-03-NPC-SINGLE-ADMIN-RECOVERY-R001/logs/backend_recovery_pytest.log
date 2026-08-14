@@ -1,0 +1,66 @@
+WALKSAFE_NPC_VERIFICATION_LOG_BEGIN
+WALKSAFE_NPC_VERIFICATION_SCHEMA walksafe.npc-single-admin-recovery-verification-lane.v1
+WALKSAFE_NPC_VERIFICATION_RUN_ID NPC-RECOVERY-8e477a558daf63a5d0584e774a1e82f9
+WALKSAFE_NPC_VERIFICATION_SOURCE_CONTENT_SET_SHA256 d9185bb5eef23838dd2036be668adbc0d5c841859d9035f8e294208d35d0029e
+WALKSAFE_NPC_VERIFICATION_LANE_ID BACKEND_RECOVERY_PYTEST
+WALKSAFE_NPC_VERIFICATION_CWD .
+WALKSAFE_NPC_VERIFICATION_STARTED_AT 2026-08-13T07:02:38.620182+09:00
+WALKSAFE_NPC_VERIFICATION_COMMAND_COUNT 3
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 1
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 -B scripts/check_walksafe_test_database_20260713.py"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 1
+| test database preflight PASS: walksafe_npc_final_test_20260813_003
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 1
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 1
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 1 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 2
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=${WALKSAFE_TEST_DATABASE_URL} python3 -B -m alembic -c backend/alembic.ini upgrade head"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 2
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 2
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 2
+| INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+| INFO  [alembic.runtime.migration] Will assume transactional DDL.
+| INFO  [alembic.runtime.migration] Running upgrade  -> 202605120001, create reports table
+| INFO  [alembic.runtime.migration] Running upgrade 202605120001 -> 202607110001, add report query indexes
+| INFO  [alembic.runtime.migration] Running upgrade 202607110001 -> 202607110002, add report data integrity constraints
+| INFO  [alembic.runtime.migration] Running upgrade 202607110002 -> 202607110003, add durable export audit and strengthen report location constraints
+| INFO  [alembic.runtime.migration] Running upgrade 202607110003 -> 202607110004, make report audit tables append-only
+| INFO  [alembic.runtime.migration] Running upgrade 202607110004 -> 202607130001, reject TRUNCATE on append-only audit tables
+| INFO  [alembic.runtime.migration] Running upgrade 202607130001 -> 202607130002, make export audit ids unique and retain canonical row digests
+| INFO  [alembic.runtime.migration] Running upgrade 202607130002 -> 202607130003, add append-only sensitive report read audits
+| INFO  [alembic.runtime.migration] Running upgrade 202607130003 -> 202607130004, add shared actor rate-limit events
+| INFO  [alembic.runtime.migration] Running upgrade 202607130004 -> 202607160001, Allow a distinct durable audit type for duplicate-check reads.
+| INFO  [alembic.runtime.migration] Running upgrade 202607160001 -> 202607220001, add password and TOTP administrator security state
+| INFO  [alembic.runtime.migration] Running upgrade 202607220001 -> 202607260001, bind administrator reconfirmation and chain security audits
+| INFO  [alembic.runtime.migration] Running upgrade 202607260001 -> 202608020001, encrypt report image originals and add approved access audit
+| INFO  [alembic.runtime.migration] Running upgrade 202608020001 -> 202608080001, add FP-008 administrator device proof, review, and delivery records
+| INFO  [alembic.runtime.migration] Running upgrade 202608080001 -> 202608090001, add FP-046 consent and account deletion lifecycle
+| INFO  [alembic.runtime.migration] Running upgrade 202608090001 -> 202608120001, add singleton recovery custody state
+WALKSAFE_NPC_VERIFICATION_STDERR_END 2
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 2 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 2
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 3
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 -B -m pytest -p no:cacheprovider -q backend/tests/test_admin_security.py backend/tests/test_admin_credential_issuer_binding.py backend/tests/test_admin_credential_issuer_key.py backend/tests/test_admin_device_proof.py backend/tests/test_field_test_security.py backend/tests/test_fp008_postgres_integration.py backend/tests/test_health_readiness.py backend/tests/test_inference_process.py backend/tests/test_openapi_contract.py backend/tests/test_report_image_keyring.py backend/tests/test_report_original_access.py backend/tests/test_report_storage_reconciliation.py tests/test_bind_walksafe_admin_credential_issuer_key.py tests/test_walksafe_full_rc_tooling.py"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 3
+| ........................................................................ [ 15%]
+| ........................................................................ [ 31%]
+| ........................................................................ [ 47%]
+| ........................................................................ [ 63%]
+| ........................................................................ [ 79%]
+| ........................................................................ [ 95%]
+| ...................                                                      [100%]
+| 451 passed in 560.15s (0:09:20)
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 3
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 3
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 3
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 3 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 3
+WALKSAFE_NPC_VERIFICATION_ENDED_AT 2026-08-13T07:12:00.180637+09:00
+WALKSAFE_NPC_VERIFICATION_EXIT_CODE 0
+WALKSAFE_NPC_VERIFICATION_STATUS PASS
+WALKSAFE_NPC_VERIFICATION_LOG_END

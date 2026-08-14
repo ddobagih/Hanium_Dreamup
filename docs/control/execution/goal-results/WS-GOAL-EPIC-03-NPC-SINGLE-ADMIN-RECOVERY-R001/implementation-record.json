@@ -1,0 +1,393 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-20260812-001",
+  "execution_start_event": {
+    "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-NPC-SINGLE-ADMIN-RECOVERY-20260812-006",
+    "event_sha256": "b3a6482c8ea951df03e820faab36604f5694527f5f462ede7f1b406cdffa4998",
+    "sequence": 60
+  },
+  "final_content_manifest": {
+    "content_set_sha256": "f31df4ef3a98a22dbc84809ce19a542c41c2eec9238f956cb0133eb2b33a7057",
+    "file_count": 67,
+    "files": [
+      {
+        "byte_count": 6734,
+        "path": "apps/android/adminapp/README.md",
+        "sha256": "0e12b7517fef0ecabe5c781b6ccfd943a2a8da3e3bd1084db50131d1de72e78c"
+      },
+      {
+        "byte_count": 39659,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+        "sha256": "961aa14a6f9d502ee6d7edabf2f0e4674a9c866c54f5332ac81a817fc0ea3158"
+      },
+      {
+        "byte_count": 19129,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProof.java",
+        "sha256": "8d2ac1479aa31a2b5dd9843ac822da9b8a0876a785a37ed869cb953663af76a2"
+      },
+      {
+        "byte_count": 5659,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+        "sha256": "dadf2d43f8848ce7e3750021e4879c70146d2f41f90de02ede0b7ee79b0f18e2"
+      },
+      {
+        "byte_count": 406,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryCustodyState.java",
+        "sha256": "060da24f7867db3c34314c249a09a7b995736fa48508689df74d83c9998ca81a"
+      },
+      {
+        "byte_count": 4316,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicy.java",
+        "sha256": "6f3f1746a9067a82704ebb65095506d3094b1f4aaf2355b0bd6682d114cbe79e"
+      },
+      {
+        "byte_count": 8727,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+        "sha256": "11afbd635dd64d8a2e0f688b4009eba39198d85ef3617dcfd4fc4e6d629ba998"
+      },
+      {
+        "byte_count": 1890,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApiException.java",
+        "sha256": "8b7321b1e4b0f87b1eafe2511e835baad7b3de74b3ccf413cd722c5f0b1e505f"
+      },
+      {
+        "byte_count": 30795,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+        "sha256": "cb5ea3474e989b387b3ae5d98ba736114859ff4398b832062ddd11c4231d9daf"
+      },
+      {
+        "byte_count": 36633,
+        "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+        "sha256": "e392a6392cd8159cee55d0c6ff75525f5b009b26badc0dd438892aafd74a27c8"
+      },
+      {
+        "byte_count": 6889,
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+        "sha256": "93757aa93e932646661f690e144e18a79f092e3eed3c4cde97d7730c25eb35af"
+      },
+      {
+        "byte_count": 6248,
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java",
+        "sha256": "6f9344a793b46a62f898116a5a6a75159816a1c7fbf3ae21600f26b42ecf3b07"
+      },
+      {
+        "byte_count": 8055,
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+        "sha256": "5d89dd18f3c0eeea6fd32e8b2214c3ae81d73f37d041e68efb6df292b154c350"
+      },
+      {
+        "byte_count": 30623,
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+        "sha256": "db82bad5e857f5b43f197aa2455ee3d807fc0a7937d0a20697252d577c2cd352"
+      },
+      {
+        "byte_count": 45692,
+        "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+        "sha256": "23265c9ca62b71fc6329499fb00f40740536f53fa98eb8716cc0c64a1e271be4"
+      },
+      {
+        "byte_count": 5615,
+        "path": "backend/.env.example",
+        "sha256": "70b43d743418672fcc47de0e60bdf9237389b89eb736e8d50cf467b6006e6c19"
+      },
+      {
+        "byte_count": 22584,
+        "path": "backend/README.md",
+        "sha256": "3ea257b811c886a27570c65c934abcc517f87fce7cd8a771a3c572693147f602"
+      },
+      {
+        "byte_count": 867,
+        "path": "backend/alembic/README.md",
+        "sha256": "73be6aadb677870e9e70111ca79d8e960fe256b66fca1fdb51eab0d7a21487c4"
+      },
+      {
+        "byte_count": 134131,
+        "path": "backend/alembic/versions/202608120001_admin_recovery_custody.py",
+        "sha256": "40a6e86fe965cd3d08dc10450c9bde353a3d665707763cd777a49243e82da6eb"
+      },
+      {
+        "byte_count": 4818,
+        "path": "backend/app/api/README.md",
+        "sha256": "27a14443275c00e1f16307f15a35629ea1a8f188a9be050a0bc4581b20a9ca4c"
+      },
+      {
+        "byte_count": 23795,
+        "path": "backend/app/api/admin_security.py",
+        "sha256": "3b76b6f03d790bf1a9397f4dba17e14cf20ea2ee5e881a4852ad7dd8f39a13fe"
+      },
+      {
+        "byte_count": 18952,
+        "path": "backend/app/api/health.py",
+        "sha256": "ae18fa113fbad37b0d9a32a6d0f309375f4faa4b8f22c3647b2fd326c021f7a6"
+      },
+      {
+        "byte_count": 3117,
+        "path": "backend/app/api/uploads.py",
+        "sha256": "59ee8d2956ca20f096b1afa79d3c350501bc671d33acd667e048dec6ea1dbf23"
+      },
+      {
+        "byte_count": 44292,
+        "path": "backend/app/config.py",
+        "sha256": "0101b5b7d1ab9c06590a270b464bb6ac48831bfa3b5cc84ceab587caab91106d"
+      },
+      {
+        "byte_count": 1013,
+        "path": "backend/app/database.py",
+        "sha256": "df97c1dabf6a105ca9bcea78dfc46f5ce010e07bd3b8411d3267b6989b2f23b5"
+      },
+      {
+        "byte_count": 48282,
+        "path": "backend/app/field_test_security.py",
+        "sha256": "4f181ccc655ead15d3a58ff4b5cd88b299dbe39adb6572290ac9a7b562fd16e1"
+      },
+      {
+        "byte_count": 6269,
+        "path": "backend/app/main.py",
+        "sha256": "16799466412e8962c9df17c96fc8dc782d9a1b63e7208d219fb6baf3c29db77c"
+      },
+      {
+        "byte_count": 63396,
+        "path": "backend/app/models.py",
+        "sha256": "bfb6f78b00a1b3b94d394dc2790e8b780978e8478686994589380b51d4e44eaa"
+      },
+      {
+        "byte_count": 18280,
+        "path": "backend/app/openapi_contract.py",
+        "sha256": "c5cfd12e304d3cb3dc5c9847821f9dab35c14a7aa2f76a76e2aee71c6dc2000d"
+      },
+      {
+        "byte_count": 7495,
+        "path": "backend/app/services/README.md",
+        "sha256": "c96aca6bd998ab801d5747ae42dadea9ab4be3ac159078a6b756e38c882e09ea"
+      },
+      {
+        "byte_count": 7167,
+        "path": "backend/app/services/admin_credential_issuer_key.py",
+        "sha256": "f0d1673b7324bf85d9163aa17c38ac1ebaa679ae23f2627b3189a795666f3947"
+      },
+      {
+        "byte_count": 40950,
+        "path": "backend/app/services/admin_device_proof.py",
+        "sha256": "6c38ce0ab205799511820d529ab7e7b4bb14b4f2034b4443d6ddad09667ddbda"
+      },
+      {
+        "byte_count": 148255,
+        "path": "backend/app/services/admin_security.py",
+        "sha256": "1c8050101bc05ea9bec07b408977a9547418733703230491cf410efc18e7c164"
+      },
+      {
+        "byte_count": 31657,
+        "path": "backend/app/services/report_image_keys.py",
+        "sha256": "e48af3e3f1c2b81b05c5635fb0fa9b1d70d8a66f9365271e0f35f43da9e5e50d"
+      },
+      {
+        "byte_count": 22965,
+        "path": "backend/app/services/report_original_access.py",
+        "sha256": "2b054ae3fd26e0a01afa093d9b51fb09724adf3dc222b830d9bea3a7f362e52f"
+      },
+      {
+        "byte_count": 3533,
+        "path": "backend/tests/README.md",
+        "sha256": "e3f5047e5d27bf9eaa97372b71ee599a0f604a045b97c072020274dc5eb4b782"
+      },
+      {
+        "byte_count": 10636,
+        "path": "backend/tests/conftest.py",
+        "sha256": "d1796ac586dcd0080a425fb8b8cfd57371691a889c4b292427ddf23421441359"
+      },
+      {
+        "byte_count": 12723,
+        "path": "backend/tests/test_admin_credential_issuer_binding.py",
+        "sha256": "c9291221ff7471462cbba55b61a0f6b5f91e5dd8c549605660fb9d4b4fb62531"
+      },
+      {
+        "byte_count": 8318,
+        "path": "backend/tests/test_admin_credential_issuer_key.py",
+        "sha256": "019b4934ef842f1cbeec88e92126787caddcf8da5a55f09d71d45406856226ed"
+      },
+      {
+        "byte_count": 73481,
+        "path": "backend/tests/test_admin_device_proof.py",
+        "sha256": "8c133048daaeede58b62d869502a5c5a9364a7da47c19c64e9266384984a2a61"
+      },
+      {
+        "byte_count": 182209,
+        "path": "backend/tests/test_admin_security.py",
+        "sha256": "43a4e8fe29072e8043c2dee5c3308a3ba7667d0c454ba3fb2fa3dbfe029da0da"
+      },
+      {
+        "byte_count": 48389,
+        "path": "backend/tests/test_field_test_security.py",
+        "sha256": "934f874f896430c4a76b9d4978e2fd39a1abdb177bf0df25c53f549d9f82a1b6"
+      },
+      {
+        "byte_count": 20624,
+        "path": "backend/tests/test_fp008_postgres_integration.py",
+        "sha256": "dcb8a0decf5efca4d3f9dddcac536984f4b4f1b9db28e0cdc8cdb5146f09a3e6"
+      },
+      {
+        "byte_count": 25338,
+        "path": "backend/tests/test_health_readiness.py",
+        "sha256": "510a28701666a25bc6ade6e2b2adbbdfa1360b7315f9724ebca5f310394db84a"
+      },
+      {
+        "byte_count": 8361,
+        "path": "backend/tests/test_inference_process.py",
+        "sha256": "7bf1fe5c87da490cbcd95813bb7f4ee71b29593275d5b95759877c2117562616"
+      },
+      {
+        "byte_count": 10864,
+        "path": "backend/tests/test_openapi_contract.py",
+        "sha256": "a30a38ed868621154e7e2cd6b339027d22299705c5e84aad50ecd653af47fb24"
+      },
+      {
+        "byte_count": 18964,
+        "path": "backend/tests/test_report_image_keyring.py",
+        "sha256": "4cf17addd6a1f8bd1991107ec2f957f1fe7fa671df5c7cb331cb2811fd4a6cf4"
+      },
+      {
+        "byte_count": 28104,
+        "path": "backend/tests/test_report_original_access.py",
+        "sha256": "e1c1e73bd2c2c59f6750a5d93259c1060f164a5290fb7c6f81858563a122506a"
+      },
+      {
+        "byte_count": 22491,
+        "path": "backend/tests/test_report_storage_reconciliation.py",
+        "sha256": "8f2a4158bf15cb7c91fdbca9b0aef9c9e821f96d680d9f523c8f9e4645dd61cd"
+      },
+      {
+        "byte_count": 215129,
+        "path": "contracts/walksafe.openapi.json",
+        "sha256": "7b6618ed7805c8cc0d25de78b40e7b9ec15da4a7aa4c367133aa39a030aa606c"
+      },
+      {
+        "byte_count": 1053,
+        "path": "deploy/config/walksafe-backend-migration.env.example",
+        "sha256": "f474c221a8b9481fdf41a491705dd76c35fd90131ef88d34ab6fd27001f59a83"
+      },
+      {
+        "byte_count": 4470,
+        "path": "deploy/config/walksafe-backend.env.example",
+        "sha256": "bc9e34f91402b8b2e71d759294b0f56f54ce701e25402221ca3d61586bbb9618"
+      },
+      {
+        "byte_count": 1239,
+        "path": "deploy/systemd/walksafe-admin-issuer-bind.service",
+        "sha256": "8cf185bdacddb40c6b07bbf983494a44818fc166287276fc72192474ec63a1a0"
+      },
+      {
+        "byte_count": 806,
+        "path": "deploy/systemd/walksafe-backend-migrate.service",
+        "sha256": "0d0e847b81ccaf1d3e4b009c8bb1f1385b9ed71c64441c0b49198a2842b01dcb"
+      },
+      {
+        "byte_count": 1209,
+        "path": "deploy/systemd/walksafe-backend.service",
+        "sha256": "037a10e0a974505432116a8a26d91be187600e9bf0bb4cf684598900659b00ee"
+      },
+      {
+        "byte_count": 172,
+        "path": "deploy/sysusers.d/walksafe-backend.conf",
+        "sha256": "87c2db5321206457dbe0a941836e4b02c3997e00e1b254c9aa578dd464509c30"
+      },
+      {
+        "byte_count": 5043,
+        "path": "docs/guides/code/android-admin.md",
+        "sha256": "bc9e96497fb1acd5a6c6b71d669647c6ca9ceda60db49e7ab08762d2a3eb50b3"
+      },
+      {
+        "byte_count": 12091,
+        "path": "docs/guides/security-privacy-guide.md",
+        "sha256": "1313a6ba5b21bc5d969c3698010732780a65b452284ef1ba03ea5c81fbd91af3"
+      },
+      {
+        "byte_count": 12546,
+        "path": "docs/guides/testing-guide.md",
+        "sha256": "2f8fdc982be013ccb739b1283ee5456b92bda56e304700e93ba925c5b72a7bd5"
+      },
+      {
+        "byte_count": 5007,
+        "path": "scripts/bind_walksafe_admin_credential_issuer_key.py",
+        "sha256": "9109e43ea03b2137154ac387446e6e12a15638e3abaac6bf1627926d7da66dcd"
+      },
+      {
+        "byte_count": 83622,
+        "path": "scripts/build_walksafe_full_rc_20260713.py",
+        "sha256": "bb9dd6bb5128a33338f51467ecc19d756db2166280873648e40afe2da69de45c"
+      },
+      {
+        "byte_count": 5942,
+        "path": "scripts/provision_walksafe_admin_device_key.py",
+        "sha256": "3490783da848ccf1767096d03fa5deabceaeb86c1fc55d841d694ec5c7b4c5ac"
+      },
+      {
+        "byte_count": 149965,
+        "path": "scripts/validate_walksafe_full_rc_20260713.py",
+        "sha256": "5400d611881f6227cef9c28e0e4321199552695536f4c891de1b09e249ef47ec"
+      },
+      {
+        "byte_count": 8588,
+        "path": "scripts/walksafe_admin_high_risk_gate.py",
+        "sha256": "e2435c3b216c27ad4dd7307fa37d6bf684578262a2646b00dbe1e88c61b744fd"
+      },
+      {
+        "byte_count": 8302,
+        "path": "tests/test_bind_walksafe_admin_credential_issuer_key.py",
+        "sha256": "ec69b94ce9e40aec7fc0a9ade3fc6fe54e89d6794e4556fdf50ce80927f8f51f"
+      },
+      {
+        "byte_count": 29781,
+        "path": "tests/test_walksafe_admin_high_risk_data_delete_gate.py",
+        "sha256": "fb80b04064ac59cb028da51cbf5d3ef4487554c07d84281cad1511f1ab2f4d90"
+      },
+      {
+        "byte_count": 138044,
+        "path": "tests/test_walksafe_full_rc_tooling.py",
+        "sha256": "b2009d52a808aefb3fc200e19414d370415de1c66d1db6f285d01e0a5df7d4e2"
+      }
+    ],
+    "manifest_content_sha256": "14d3829c5b5343d035e21aa51aa9e6c6f0fc05464ad56e94920b6fe895f5f24c",
+    "path_set_sha256": "7ab871407c2f0e44488cbceb033fcda587800bfdb03894d39ac1f3c41ca273dd"
+  },
+  "gap_id": "GAP-008",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "implementation_record_content_sha256": "0ca97a0a120f4adce240e430d5248d46cd98a5ffab18a5e1da6cb03ab6cbc0c2",
+  "implementation_start_gate_binding": {
+    "file_sha256": "f2c2464b9d2719eab6b6716bda05a00dc20dea236487b10b858b9e0d20f56a76",
+    "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-NPC-SINGLE-ADMIN-RECOVERY-20260812-006/implementation-start-gate-receipt.json"
+  },
+  "implemented_controls": [
+    "ADDITIONAL_AUTHENTICATION_OR_PASSKEY_NO_SHARED_BYPASS",
+    "OFF_DEVICE_RECOVERY_CUSTODY_FAIL_CLOSED",
+    "REMOTE_LOST_DEVICE_SESSION_REVOCATION_AND_REUSE_REJECTION",
+    "HIGH_RISK_ACTION_FREEZE_UNTIL_RECOVERY_AND_REAUTHENTICATION",
+    "SEPARATED_KEY_AND_RECOVERY_MATERIAL_CUSTODY",
+    "RECOVERY_REVOCATION_FREEZE_AND_REAUTHENTICATION_AUDIT"
+  ],
+  "kind": "IMPLEMENTATION_RECORD",
+  "observed_at": "2026-08-13T07:12:01.612093+09:00",
+  "policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+  "schema_version": "1.0",
+  "scope_kind": "EXACT_ORDERED_NPC_SINGLE_ADMIN_RECOVERY_FINAL_CONTENT_MANIFEST",
+  "status": "PASS_INTERNAL",
+  "work_item_id": "EPIC-03-NPC-SINGLE-ADMIN-RECOVERY"
+}

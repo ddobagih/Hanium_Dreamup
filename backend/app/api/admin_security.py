@@ -7,7 +7,14 @@ from typing import Annotated, Any, Literal, NoReturn
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -24,6 +31,8 @@ from backend.app.services.admin_security import (
     AdminSecurityService,
     AdminSessionIdentity,
     authorize_admin_bearer,
+    load_admin_credential_issuer_key_for_settings,
+    valid_recovery_custody_reference,
 )
 
 
@@ -48,6 +57,20 @@ Password = Annotated[str, StringConstraints(min_length=12, max_length=256)]
 NewPassword = Annotated[str, StringConstraints(min_length=12, max_length=256)]
 TotpCode = Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")]
 RecoveryCode = Annotated[str, StringConstraints(min_length=24, max_length=256, strip_whitespace=True)]
+CustodyReference = Annotated[
+    str,
+    StringConstraints(
+        min_length=43,
+        max_length=43,
+        pattern=r"^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+    ),
+    Field(
+        description=(
+            "Canonical unpadded Base64url encoding of an opaque 32-byte "
+            "recovery custody reference."
+        )
+    ),
+]
 OpaqueRecoveryToken = Annotated[str, StringConstraints(min_length=32, max_length=512)]
 AdminAction = Annotated[
     str,
@@ -104,6 +127,16 @@ class StateResponse(_StrictModel):
     security_state: SecurityStateWire
     state_version: str
     observed_at: str
+    recovery_custody_state: Literal["UNATTESTED", "ATTESTED"]
+    recovery_custody_attested_at: AwareDatetime | None
+
+    @model_validator(mode="after")
+    def validate_custody_timestamp(self) -> "StateResponse":
+        if (self.recovery_custody_state == "ATTESTED") != (
+            self.recovery_custody_attested_at is not None
+        ):
+            raise ValueError("recovery custody state and timestamp must agree")
+        return self
 
 
 class SessionItem(_StrictModel):
@@ -115,8 +148,40 @@ class SessionItem(_StrictModel):
     last_seen_at: str
 
 
+class DeviceItem(_StrictModel):
+    device_id: DeviceId
+    current: bool
+
+
 class SessionsResponse(_StrictModel):
-    sessions: list[SessionItem]
+    sessions: list[SessionItem] = Field(max_length=100)
+    devices: list[DeviceItem] = Field(max_length=100)
+
+    @model_validator(mode="after")
+    def validate_current_device(self) -> "SessionsResponse":
+        device_ids = [item.device_id for item in self.devices]
+        if len(device_ids) != len(set(device_ids)):
+            raise ValueError("administrator device identifiers must be unique")
+        current_sessions = [
+            item for item in self.sessions if item.current and not item.revoked
+        ]
+        current_devices = [item for item in self.devices if item.current]
+        if (
+            len(current_sessions) != 1
+            or len(current_devices) != 1
+            or current_sessions[0].device_id != current_devices[0].device_id
+        ):
+            raise ValueError("current administrator session and device must agree")
+        return self
+
+
+class AdminRecoveryExpiredErrorDetail(_StrictModel):
+    code: Literal["admin_recovery_expired"]
+    message: str
+
+
+class AdminRecoveryExpiredErrorResponse(_StrictModel):
+    detail: AdminRecoveryExpiredErrorDetail
 
 
 class ReauthenticateRequest(_StrictModel):
@@ -153,6 +218,27 @@ class RecoveryCompleteRequest(_StrictModel):
     totp_code: TotpCode
     device_id: DeviceId
     device_label: DeviceLabel
+
+
+class RecoveryCustodyAttestRequest(_StrictModel):
+    custody_reference: CustodyReference
+    material_kind: Literal["RECOVERY_CODE", "SECURITY_KEY"]
+    storage_location: Literal["OFF_PHONE"]
+    separate_encrypted_backup_confirmed: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_canonical_custody_reference(
+        self,
+    ) -> "RecoveryCustodyAttestRequest":
+        if not valid_recovery_custody_reference(self.custody_reference):
+            raise ValueError(
+                "custody_reference must be canonical unpadded Base64url for 32 bytes"
+            )
+        return self
+
+
+class EmptyRequest(_StrictModel):
+    pass
 
 
 class DeviceProofChallengeRequest(_StrictModel):
@@ -261,6 +347,9 @@ def _authorize_action_challenge(settings: Any, request: Request) -> AdminSession
                 db,
                 _bearer_token(request),
                 runtime_totp_secret=settings.admin_totp_secret,
+                credential_issuer_key=(
+                    load_admin_credential_issuer_key_for_settings(settings)
+                ),
                 device_id=request.headers.get("x-walksafe-device-id"),
                 app_kind=request.headers.get("x-walksafe-app-kind"),
                 role=request.headers.get("x-walksafe-role"),
@@ -346,7 +435,7 @@ def create_router(
         def get_device_proof_service(
             db: Session = Depends(get_db),
         ) -> AdminDeviceProofService:
-            return AdminDeviceProofService(db)
+            return AdminDeviceProofService(db, settings)
     else:
         def get_device_proof_service() -> Any:
             return device_proof_service_factory()
@@ -465,10 +554,15 @@ def create_router(
         _disable_sensitive_response_caching(response)
         _require_enabled(settings)
         try:
-            sessions = service.list_sessions(_request_identity(request))
+            identity = _request_identity(request)
+            sessions = service.list_sessions(identity)
+            devices = service.list_active_devices(identity)
         except AdminSecurityError as exc:
             _raise_http(exc)
-        return SessionsResponse(sessions=[SessionItem(**item) for item in sessions])
+        return SessionsResponse(
+            sessions=[SessionItem(**item) for item in sessions],
+            devices=[DeviceItem(**item) for item in devices],
+        )
 
     @router.post("/sessions/{session_id}/revoke", response_model=StateResponse)
     def revoke_session(
@@ -481,6 +575,47 @@ def create_router(
         _require_enabled(settings)
         try:
             result = service.revoke_session(_request_identity(request), session_id)
+        except AdminSecurityError as exc:
+            _raise_http(exc)
+        return StateResponse(**result)
+
+    @router.post("/recovery-custody/attest", response_model=StateResponse)
+    def attest_recovery_custody(
+        payload: RecoveryCustodyAttestRequest,
+        request: Request,
+        response: Response,
+        service: Any = Depends(get_service),
+    ) -> StateResponse:
+        _disable_sensitive_response_caching(response)
+        _require_enabled(settings)
+        try:
+            result = service.attest_recovery_custody(
+                _request_identity(request),
+                **payload.model_dump(),
+            )
+        except AdminSecurityError as exc:
+            _raise_http(exc)
+        return StateResponse(**result)
+
+    @router.post(
+        "/devices/{device_id}/report-lost",
+        response_model=StateResponse,
+    )
+    def report_lost_device(
+        device_id: DeviceId,
+        payload: EmptyRequest,
+        request: Request,
+        response: Response,
+        service: Any = Depends(get_service),
+    ) -> StateResponse:
+        del payload
+        _disable_sensitive_response_caching(response)
+        _require_enabled(settings)
+        try:
+            result = service.report_lost_device(
+                _request_identity(request),
+                device_id,
+            )
         except AdminSecurityError as exc:
             _raise_http(exc)
         return StateResponse(**result)
@@ -539,7 +674,16 @@ def create_router(
             security_state=grant.security_state,
         )
 
-    @router.post("/recovery/complete", response_model=LoginResponse)
+    @router.post(
+        "/recovery/complete",
+        response_model=LoginResponse,
+        responses={
+            410: {
+                "model": AdminRecoveryExpiredErrorResponse,
+                "description": "The administrator recovery transaction expired.",
+            }
+        },
+    )
     def complete_recovery(
         payload: RecoveryCompleteRequest,
         request: Request,

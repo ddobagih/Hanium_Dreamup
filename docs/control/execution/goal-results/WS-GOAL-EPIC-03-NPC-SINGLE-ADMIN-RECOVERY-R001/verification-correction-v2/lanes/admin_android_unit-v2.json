@@ -1,0 +1,57 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ADMIN_ANDROID_UNIT-CORRECTION-RECEIPT-20260813-002",
+  "evidence_schema": "V2_CORRECTION_ONLY",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "observation": {
+    "command": [
+      "./gradlew --offline --no-daemon --max-workers=1 --no-build-cache --no-configuration-cache --no-watch-fs '-Dorg.gradle.java.home=${JAVA_HOME}' :adminapp:testDebugUnitTest --rerun-tasks"
+    ],
+    "cwd": "apps/android",
+    "database_preflight_receipt_sha256": "129f44d712774d2117c749d1f826d7a8143fab9a3520649e29226a0956480256",
+    "database_runtime_receipt_sha256": "e08b46685505b4b52141e5a9acf44be9829334384471e9a25a58b284db22634e",
+    "ended_at": "2026-08-13T12:44:59.247726+09:00",
+    "environment_receipt_sha256": "5739b235edaf5470799474bd1cf0b5ec93fa3e01fce5044aed8a61ac2a00b4dc",
+    "execution_input_content_set_sha256": "23a4249119546354a1073004a5eebf87739e7efb8e4b373a7a79f6aedcd3727d",
+    "exit_code": 0,
+    "lane_id": "ADMIN_ANDROID_UNIT",
+    "log_byte_count": 2954,
+    "log_header_marker": "WALKSAFE_NPC_VERIFICATION_LOG_BEGIN",
+    "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/logs/admin_android_unit.log",
+    "log_sha256": "8495ccb123dd5f4838a2e17085f33865c9b893bfefb97e06d677e123c4969cf7",
+    "log_tail_marker": "WALKSAFE_NPC_VERIFICATION_LOG_END",
+    "run_id": "NPC-RECOVERY-90c3addd9209478e2f6b48dbcdc643ae",
+    "source_content_set_sha256": "c3560526a30b6f7b0f3e8442bbe972bc5bc20064b6bda8488ad76aff45449145",
+    "started_at": "2026-08-13T12:44:52.402728+09:00",
+    "status": "PASS",
+    "toolchain_receipt_sha256": "145839f4ecf8210c1519bd364ee8e86e88520a5b7ffdd9510daf77114e4eb2f6"
+  },
+  "raw_output_binding": {
+    "byte_length": 2954,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/logs/admin_android_unit.log",
+    "sha256": "8495ccb123dd5f4838a2e17085f33865c9b893bfefb97e06d677e123c4969cf7"
+  },
+  "receipt_content_sha256": "a6de1598e993404a43e2dd0fb82608ca5c0ad0626357b23d488149ce0c127fed",
+  "schema_version": "1.0",
+  "status": "PASS"
+}

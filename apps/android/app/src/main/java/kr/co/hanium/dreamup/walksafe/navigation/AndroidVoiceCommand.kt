@@ -6,8 +6,12 @@ sealed interface AndroidVoiceCommand {
     data object CreateReport : AndroidVoiceCommand
     data class SetDestination(val placeName: String) : AndroidVoiceCommand
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceCommand
+    data object HearMoreDestinationCandidates : AndroidVoiceCommand
     data object CancelDestination : AndroidVoiceCommand
     data object NextNavigationInstruction : AndroidVoiceCommand
+    data object RequestReroute : AndroidVoiceCommand
+    data object ConfirmArrival : AndroidVoiceCommand
+    data object RejectArrival : AndroidVoiceCommand
     data object StopNavigation : AndroidVoiceCommand
 }
 
@@ -15,9 +19,94 @@ sealed interface AndroidVoiceAction {
     data object CreateReport : AndroidVoiceAction
     data class SearchDestination(val query: String) : AndroidVoiceAction
     data class SelectDestinationCandidate(val oneBasedIndex: Int) : AndroidVoiceAction
+    data object HearMoreDestinationCandidates : AndroidVoiceAction
     data object CancelDestination : AndroidVoiceAction
     data object SpeakNextNavigationInstruction : AndroidVoiceAction
+    data object RequestReroute : AndroidVoiceAction
+    data object ConfirmArrival : AndroidVoiceAction
+    data object RejectArrival : AndroidVoiceAction
     data object StopNavigation : AndroidVoiceAction
+}
+
+sealed interface DestinationSearchVoiceCommand {
+    data object HearMore : DestinationSearchVoiceCommand
+    data class SelectCandidate(val oneBasedIndex: Int) : DestinationSearchVoiceCommand
+}
+
+data class DestinationSearchVoiceTransition(
+    val state: DestinationSearchVoiceState,
+    val accepted: Boolean,
+    val selectedOneBasedIndex: Int? = null,
+    val selectedResult: DestinationSearchResult? = null,
+)
+
+data class DestinationSearchVoiceState(
+    val query: String,
+    val results: List<DestinationSearchResult>,
+    val pageIndex: Int = 0,
+    val moreResultsAvailable: Boolean = false,
+) {
+    init {
+        val lastPageIndex = if (results.isEmpty()) 0 else (results.size - 1) / DESTINATION_VOICE_PAGE_SIZE
+        require(pageIndex in 0..lastPageIndex) { "pageIndex is outside the destination results" }
+    }
+
+    private val pageOffset: Int
+        get() = pageIndex * DESTINATION_VOICE_PAGE_SIZE
+
+    val currentPageResults: List<DestinationSearchResult>
+        get() = results.drop(pageOffset).take(DESTINATION_VOICE_PAGE_SIZE)
+
+    val hasMoreResults: Boolean
+        get() = pageOffset + currentPageResults.size < results.size
+
+    val canHearMore: Boolean
+        get() = hasMoreResults || moreResultsAvailable
+
+    fun voicePrompt(): String {
+        val safeQuery = query.toVoiceLabel(maxLength = 40, fallback = "요청한")
+        if (results.isEmpty()) return "${safeQuery} 목적지 검색 결과가 없습니다."
+
+        val candidates = currentPageResults.mapIndexed { index, result ->
+            val name = result.name.toVoiceLabel(maxLength = 40, fallback = "이름 미상")
+            val address = (result.roadAddress?.takeIf(String::isNotBlank) ?: result.address)
+                .toVoiceLabel(maxLength = 60, fallback = "주소 미상")
+            "${pageOffset + index + 1}번 ${name}, ${address}, ${formatDestinationDistance(result.distanceM)}"
+        }.joinToString(". ")
+        val moreInstruction = if (canHearMore) {
+            " 더 들으려면 더 듣기라고 말씀해 주세요."
+        } else {
+            ""
+        }
+        return "${safeQuery} 목적지 후보가 ${results.size}곳 있습니다. " +
+            "${candidates}.${moreInstruction} 원하는 번호를 말씀해 주세요."
+    }
+
+    fun onCommand(command: DestinationSearchVoiceCommand): DestinationSearchVoiceTransition {
+        return when (command) {
+            DestinationSearchVoiceCommand.HearMore -> {
+                if (hasMoreResults) {
+                    DestinationSearchVoiceTransition(copy(pageIndex = pageIndex + 1), accepted = true)
+                } else {
+                    DestinationSearchVoiceTransition(this, accepted = false)
+                }
+            }
+            is DestinationSearchVoiceCommand.SelectCandidate -> {
+                val zeroBasedIndex = command.oneBasedIndex - 1
+                val pageEndExclusive = pageOffset + currentPageResults.size
+                if (zeroBasedIndex in pageOffset until pageEndExclusive) {
+                    DestinationSearchVoiceTransition(
+                        state = this,
+                        accepted = true,
+                        selectedOneBasedIndex = command.oneBasedIndex,
+                        selectedResult = results[zeroBasedIndex],
+                    )
+                } else {
+                    DestinationSearchVoiceTransition(this, accepted = false)
+                }
+            }
+        }
+    }
 }
 
 fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
@@ -25,8 +114,12 @@ fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
         AndroidVoiceCommand.CreateReport -> AndroidVoiceAction.CreateReport
         is AndroidVoiceCommand.SetDestination -> AndroidVoiceAction.SearchDestination(placeName)
         is AndroidVoiceCommand.SelectDestinationCandidate -> AndroidVoiceAction.SelectDestinationCandidate(oneBasedIndex)
+        AndroidVoiceCommand.HearMoreDestinationCandidates -> AndroidVoiceAction.HearMoreDestinationCandidates
         AndroidVoiceCommand.CancelDestination -> AndroidVoiceAction.CancelDestination
         AndroidVoiceCommand.NextNavigationInstruction -> AndroidVoiceAction.SpeakNextNavigationInstruction
+        AndroidVoiceCommand.RequestReroute -> AndroidVoiceAction.RequestReroute
+        AndroidVoiceCommand.ConfirmArrival -> AndroidVoiceAction.ConfirmArrival
+        AndroidVoiceCommand.RejectArrival -> AndroidVoiceAction.RejectArrival
         AndroidVoiceCommand.StopNavigation -> AndroidVoiceAction.StopNavigation
     }
 }
@@ -47,24 +140,22 @@ fun selectAndroidVoiceAction(
 fun formatDestinationSearchVoicePrompt(
     query: String,
     results: List<DestinationSearchResult>,
-): String {
-    val safeQuery = query.toVoiceLabel(maxLength = 40, fallback = "요청한")
-    if (results.isEmpty()) return "${safeQuery} 목적지 검색 결과가 없습니다."
+): String = DestinationSearchVoiceState(query = query, results = results).voicePrompt()
 
-    val spokenResults = results.take(MAX_SPOKEN_DESTINATION_RESULTS)
-    val candidates = spokenResults.mapIndexed { index, result ->
-        val name = result.name.toVoiceLabel(maxLength = 40, fallback = "이름 미상")
-        val address = (result.roadAddress?.takeIf(String::isNotBlank) ?: result.address)
-            .toVoiceLabel(maxLength = 60, fallback = "주소 미상")
-        "${index + 1}번 ${name}, ${address}, ${formatDestinationDistance(result.distanceM)}"
-    }.joinToString(". ")
-    val remaining = results.size - spokenResults.size
-    val remainingNotice = if (remaining > 0) {
-        " 나머지 ${remaining}곳은 화면의 더 보기에서 확인할 수 있습니다."
-    } else {
-        ""
-    }
-    return "${safeQuery} 목적지 후보가 ${results.size}곳 있습니다. ${candidates}.${remainingNotice} 원하는 번호를 말씀해 주세요."
+fun parseDestinationSearchVoiceCommand(text: String): DestinationSearchVoiceCommand? {
+    val compact = text
+        .trim()
+        .lowercase(Locale.KOREAN)
+        .replace(PUNCTUATION, "")
+        .replace(WHITESPACE, "")
+    if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
+    if (compact == "더듣기") return DestinationSearchVoiceCommand.HearMore
+    val oneBasedIndex = DESTINATION_PAGE_SELECTION_NUMBER.matchEntire(compact)
+        ?.groupValues
+        ?.get(1)
+        ?.toIntOrNull()
+        ?: return null
+    return DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)
 }
 
 fun parseAndroidVoiceCommand(text: String): AndroidVoiceCommand? {
@@ -77,7 +168,11 @@ fun parseAndroidVoiceCommand(text: String): AndroidVoiceCommand? {
     if (compact.isBlank() || NEGATION_MARKERS.any(compact::contains)) return null
 
     if (compact in DESTINATION_CANCEL_COMMANDS) return AndroidVoiceCommand.CancelDestination
+    if (compact == "더듣기") return AndroidVoiceCommand.HearMoreDestinationCandidates
     if (compact in NEXT_NAVIGATION_COMMANDS) return AndroidVoiceCommand.NextNavigationInstruction
+    if (compact in REROUTE_COMMANDS) return AndroidVoiceCommand.RequestReroute
+    if (compact in ARRIVAL_CONFIRM_COMMANDS) return AndroidVoiceCommand.ConfirmArrival
+    if (compact in ARRIVAL_REJECT_COMMANDS) return AndroidVoiceCommand.RejectArrival
     if (compact in STOP_NAVIGATION_COMMANDS) return AndroidVoiceCommand.StopNavigation
     if (isReportCommand(compact)) return AndroidVoiceCommand.CreateReport
     destinationCandidateIndex(compact)?.let { return AndroidVoiceCommand.SelectDestinationCandidate(it) }
@@ -133,6 +228,9 @@ private val REPORT_COMMAND = Regex("(?:(?:이거|여기|위험)(?:을|를)?)?(?:
 private val DESTINATION_CANDIDATE_NUMBER = Regex(
     "(?:목적지)?([1-9]\\d*)번(?:목적지)?(?:을|를)?(?:선택|골라)(?:해|해줘|해주세요)?",
 )
+private val DESTINATION_PAGE_SELECTION_NUMBER = Regex(
+    "(?:목적지)?([1-9]\\d*)번(?:목적지)?(?:을|를)?선택(?:해|해줘|해주세요)?",
+)
 private val DESTINATION_ORDINALS = mapOf(
     "첫번째" to 1,
     "첫째" to 1,
@@ -158,7 +256,7 @@ private val NEGATION_MARKERS = listOf(
     "안해",
     "안할",
 )
-private const val MAX_SPOKEN_DESTINATION_RESULTS = 3
+private const val DESTINATION_VOICE_PAGE_SIZE = 3
 
 private fun String?.toVoiceLabel(maxLength: Int, fallback: String): String {
     val normalized = this?.replace(WHITESPACE, " ")?.trim().orEmpty()
@@ -185,6 +283,21 @@ private val NEXT_NAVIGATION_COMMANDS = setOf(
     "다음경로말해줘",
     "다음길알려줘",
     "다음안내알려줘",
+)
+private val REROUTE_COMMANDS = setOf(
+    "새경로찾아줘",
+    "경로다시찾아줘",
+    "재탐색해줘",
+)
+private val ARRIVAL_CONFIRM_COMMANDS = setOf(
+    "도착확인",
+    "도착했어",
+    "도착했습니다",
+)
+private val ARRIVAL_REJECT_COMMANDS = setOf(
+    "도착아니야",
+    "아직도착아니야",
+    "도착하지않았어",
 )
 private val STOP_NAVIGATION_COMMANDS = setOf(
     "길안내중지",

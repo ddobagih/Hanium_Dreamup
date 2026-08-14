@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import base64
+import copy
+import gzip
 import hashlib
 import json
 import os
-from pathlib import Path
-import copy
 import shutil
 import subprocess
 import tempfile
-from typing import Callable
 import unittest
+from pathlib import Path
+from typing import Callable
 from unittest import mock
 
 from scripts import check_walksafe_goal_graph_v2_4 as graph
@@ -126,7 +128,8 @@ def frozen_requirements_traceability_errors() -> set[str]:
 
 def fp008_seq50_checkpoint() -> dict:
     checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
-    history = checkpoint["goal_execution"]["transition_history"]
+    state = checkpoint["goal_execution"]
+    history = state["transition_history"]
     if (
         len(history) >= 50
         and history[48].get("event_id")
@@ -134,6 +137,115 @@ def fp008_seq50_checkpoint() -> dict:
         and history[49].get("event_id")
         == graph.FP008_ADMIN_REVIEW_COMPLETION_EVENT_ID
     ):
+        snapshot = history[48]["canonical_binding_snapshot_after"]
+        historical_bindings = []
+        for binding in checkpoint["canonical_bindings"]:
+            role = binding["role"]
+            if role not in snapshot:
+                continue
+            historical = copy.deepcopy(binding)
+            historical.update(snapshot[role])
+            historical_bindings.append(historical)
+        if (
+            len(historical_bindings) != 40
+            or graph.continuation.canonical_json_sha256(
+                historical_bindings
+            )
+            != graph.FP008_ADMIN_REVIEW_CANONICAL_BINDINGS_SHA256
+        ):
+            raise AssertionError("FP008 historical canonical fixture differs")
+        checkpoint["canonical_bindings"] = historical_bindings
+        state["transition_history"] = history[:50]
+
+        boundary = state["completion_boundary"]
+        boundary.update(
+            copy.deepcopy(
+                graph.FP008_ADMIN_REVIEW_COMPLETION_BOUNDARY_SAFE_FIELDS
+            )
+        )
+        runtime = copy.deepcopy(graph.FP008_ADMIN_REVIEW_COMPLETION_RUNTIME)
+        runtime["artifact_work_queue_sha256"] = (
+            graph.continuation.canonical_json_sha256(
+                state["artifact_work_queue"]
+            )
+        )
+        runtime["completion_boundary_sha256"] = (
+            graph.continuation.canonical_json_sha256(boundary)
+        )
+        for field in (
+            "focus_goal_id",
+            "focus_goal_path",
+            "focus_work_item_id",
+            "focus_source",
+            "ready_frontier_goal_ids",
+            "blocked_goal_ids",
+            "pending_questions",
+            "open_question_count",
+            "activation_status",
+            "package_status",
+        ):
+            state[field] = copy.deepcopy(runtime[field])
+        state["blockers_by_goal"] = {}
+
+        occurred_at = "2026-08-09T16:48:00+09:00"
+        event = {
+            "sequence": 51,
+            "event_id": (
+                "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-"
+                "SAFE-FUTURE-20260809-001"
+            ),
+            "event_type": "WORK_SESSION_RESUMED",
+            "occurred_on": "2026-08-09",
+            "occurred_at": occurred_at,
+            "previous_focus_goal_id": (
+                graph.FP008_ADMIN_REVIEW_PARENT_GOAL_ID
+            ),
+            "previous_focus_content_sha256": (
+                graph.FP008_ADMIN_REVIEW_PARENT_GOAL_SHA256
+            ),
+            "focus_goal_id": graph.FP008_ADMIN_REVIEW_PARENT_GOAL_ID,
+            "focus_goal_content_sha256": (
+                graph.FP008_ADMIN_REVIEW_PARENT_GOAL_SHA256
+            ),
+            "from_status": "READY",
+            "to_status": "READY",
+            "static_plan_manifest_sha256": (
+                graph.FP008_ADMIN_REVIEW_MANIFEST_SHA256
+            ),
+            "status_changes": {},
+            "runtime_after": runtime,
+            "blockers_after": {},
+            "blocker_resolution_ids_after": [],
+            "source_checkpoint_version": (
+                graph.FP008_ADMIN_REVIEW_SOURCE_CHECKPOINT_VERSION
+            ),
+            "evidence_refs": [],
+            "previous_event_sha256": state["transition_history"][49][
+                "event_sha256"
+            ],
+        }
+        event["event_sha256"] = graph.continuation.event_sha256(event)
+        state["transition_history"].append(event)
+        state["transition_history_anchor_sha256"] = event["event_sha256"]
+        state["validation_cutoff_at"] = occurred_at
+
+        current = checkpoint["current_work"]
+        current.update(graph.FP008_ADMIN_REVIEW_CURRENT_WORK_SAFE_FIELDS)
+        current["status"] = "READY"
+        current["current_focus"] = "EPIC-03 READY; FP046 PLANNED_NEXT"
+        current["next_action"] = (
+            "continue the next repository-scoped implementation item"
+        )
+        current["deferred_release_gate_ids"] = copy.deepcopy(
+            graph.FP008_ADMIN_REVIEW_DEFERRED_RELEASE_GATE_IDS
+        )
+        handoff = checkpoint["session_handoff"]
+        handoff.update(graph.FP008_ADMIN_REVIEW_HANDOFF_SAFE_FIELDS)
+        handoff["current_epic"] = "EPIC-03 / FP046 PLANNED_NEXT"
+        handoff["last_updated_by_work_item"] = (
+            "EPIC-03-FUTURE-SAFE-PROGRESS"
+        )
+        handoff["next_single_action"] = current["next_action"]
         return checkpoint
     if len(history) != 48:
         raise AssertionError("source checkpoint is not seq48 or FP008 seq50+")
@@ -156,6 +268,66 @@ def fp008_seq50_checkpoint() -> dict:
             goal_graph_checker=lambda *_: [],
         )
     return prepared.projected_checkpoint
+
+
+def enter_fp008_historical_physical_bindings(
+    test: unittest.TestCase,
+) -> object:
+    historical_rtm = mock.Mock()
+    historical_rtm.stat.return_value.st_size = (
+        graph.FP008_REQUIREMENTS_TRACEABILITY_BYTE_COUNT
+    )
+    original_exact = graph._exact_repo_file
+    original_sha256 = graph.continuation.sha256_file
+    original_filter = graph.filter_frozen_v23_successor_errors
+
+    def exact_file(root: Path, relative: object) -> Path | object | None:
+        if relative == graph.FP008_REQUIREMENTS_TRACEABILITY_BINDING["path"]:
+            return historical_rtm
+        return original_exact(root, relative)
+
+    def exact_sha256(path: object) -> str:
+        if path is historical_rtm:
+            return graph.FP008_REQUIREMENTS_TRACEABILITY_BINDING["sha256"]
+        return original_sha256(path)
+
+    def focused_successor_filter(
+        root: Path,
+        errors: list[str],
+        *,
+        checkpoint: dict | None = None,
+        archive: dict | None = None,
+    ) -> list[str]:
+        focused = [
+            error
+            for error in errors
+            if graph.FROZEN_CHANGED_ARTIFACT_ERROR_RE.fullmatch(error) is None
+        ]
+        return original_filter(
+            root,
+            focused,
+            checkpoint=checkpoint,
+            archive=archive,
+        )
+
+    test.enterContext(
+        mock.patch.object(graph, "_exact_repo_file", side_effect=exact_file)
+    )
+    test.enterContext(
+        mock.patch.object(
+            graph.continuation,
+            "sha256_file",
+            side_effect=exact_sha256,
+        )
+    )
+    test.enterContext(
+        mock.patch.object(
+            graph,
+            "filter_frozen_v23_successor_errors",
+            side_effect=focused_successor_filter,
+        )
+    )
+    return historical_rtm
 
 
 def fp046_seq55_checkpoint() -> dict:
@@ -219,9 +391,22 @@ class WalkSafeFp046R014SuccessorRegressionTest(unittest.TestCase):
                 )
             },
         )
+        npc_successors = (
+            graph._npc_single_admin_recovery_live_compatibility_artifacts(
+                ROOT,
+                fp046_seq55_checkpoint(),
+            )
+        )
+        self.assertIsInstance(npc_successors, dict)
         for relative, (before_sha256, after_sha256) in transitions.items():
             self.assertNotEqual(before_sha256, after_sha256)
-            self.assertEqual(sha256_file(ROOT / relative), after_sha256)
+            successor = npc_successors.get(relative)
+            expected_live = (
+                successor[1]
+                if successor is not None and successor[0] == after_sha256
+                else after_sha256
+            )
+            self.assertEqual(sha256_file(ROOT / relative), expected_live)
 
     def test_seq55_r014_authority_rejects_pinned_ledger_drift(
         self,
@@ -260,6 +445,22 @@ class WalkSafeFp046R014SuccessorRegressionTest(unittest.TestCase):
         self,
     ) -> None:
         checkpoint = fp046_seq55_checkpoint()
+        npc = (
+            graph._npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+                ROOT,
+            )
+        )
+        fp022 = graph._fp022_completion_start_to_final_transitions(
+            ROOT,
+            checkpoint,
+            require_completion_review=False,
+        )
+        self.assertIsInstance(npc, dict)
+        self.assertIsInstance(fp022, dict)
+        successors = graph._compose_completion_product_successors(
+            npc, fp022
+        )
+        self.assertIsInstance(successors, dict)
         with tempfile.NamedTemporaryFile(
             "wb",
             dir=ROOT / "docs/control",
@@ -270,19 +471,149 @@ class WalkSafeFp046R014SuccessorRegressionTest(unittest.TestCase):
             stream.write(json_bytes(checkpoint))
             checkpoint_path = Path(stream.name)
         try:
-            self.assertEqual(
-                graph.validate(
-                    ROOT,
-                    checkpoint_path.relative_to(ROOT),
-                    check_continuation=False,
+            original_filter = graph.filter_frozen_v23_successor_errors
+
+            def product_only_filter(root, errors, **kwargs):
+                return original_filter(
+                    root,
+                    [
+                        error
+                        for error in errors
+                        if graph.FROZEN_CHANGED_ARTIFACT_ERROR_RE.fullmatch(
+                            error
+                        )
+                        is None
+                    ],
+                    **kwargs,
+                )
+
+            with (
+                mock.patch.object(
+                    graph,
+                    "_npc_single_admin_recovery_live_compatibility_artifacts",
+                    return_value=successors,
                 ),
-                [],
-            )
+                mock.patch.object(
+                    graph,
+                    "_npc_single_admin_recovery_sealed_product_successor_artifacts",
+                    return_value=npc,
+                ),
+                mock.patch.object(
+                    graph,
+                    "filter_frozen_v23_successor_errors",
+                    side_effect=product_only_filter,
+                ),
+            ):
+                self.assertEqual(
+                    graph.validate(
+                        ROOT,
+                        checkpoint_path.relative_to(ROOT),
+                        check_continuation=False,
+                    ),
+                    [],
+                )
         finally:
             checkpoint_path.unlink()
 
 
 class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
+    def _copied_git_witness_root(self) -> Path:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        source = ROOT / graph.HISTORICAL_GIT_WITNESS_ROOT_RELATIVE
+        target = root / graph.HISTORICAL_GIT_WITNESS_ROOT_RELATIVE
+        shutil.copytree(source, target)
+        return root
+
+    def test_historical_git_witness_is_exact_and_history_stays_absent(
+        self,
+    ) -> None:
+        archive = load_json(ROOT / ARCHIVE_RELATIVE)
+        errors, lookup = graph.validate_historical_git_witness(ROOT, archive)
+        base_check = subprocess.run(
+            [
+                "git",
+                "cat-file",
+                "-e",
+                f"{graph.HISTORICAL_GIT_WITNESS_COMMIT}^{{commit}}",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(lookup), 65)
+        self.assertEqual(sum(state[0] for state in lookup.values()), 15)
+        self.assertEqual(base_check.returncode, 128)
+
+    def test_historical_git_witness_rejects_manifest_tamper(self) -> None:
+        root = self._copied_git_witness_root()
+        manifest = root / graph.HISTORICAL_GIT_WITNESS_MANIFEST_RELATIVE
+        manifest.write_bytes(manifest.read_bytes() + b"\n")
+
+        errors, lookup = graph.validate_historical_git_witness(root)
+
+        self.assertEqual(
+            errors,
+            ["historical Git witness manifest SHA-256 differs"],
+        )
+        self.assertEqual(lookup, {})
+
+    def test_historical_git_witness_rejects_missing_blob(self) -> None:
+        root = self._copied_git_witness_root()
+        manifest = load_json(
+            root / graph.HISTORICAL_GIT_WITNESS_MANIFEST_RELATIVE
+        )
+        blob = next(
+            row for row in manifest["objects"] if row["object_type"] == "blob"
+        )
+        (root / blob["fixture_path"]).unlink()
+
+        errors, lookup = graph.validate_historical_git_witness(root)
+
+        self.assertIn(
+            f"historical Git witness object is missing: {blob['object_id']}",
+            errors,
+        )
+        self.assertEqual(lookup, {})
+
+    def test_historical_git_witness_rejects_third_digest(self) -> None:
+        root = self._copied_git_witness_root()
+        manifest_path = root / graph.HISTORICAL_GIT_WITNESS_MANIFEST_RELATIVE
+        manifest = load_json(manifest_path)
+        blob = next(
+            row for row in manifest["objects"] if row["object_type"] == "blob"
+        )
+        third_payload = b"walksafe-third-digest-must-fail-closed\n"
+        encoded = base64.b64encode(gzip.compress(third_payload, mtime=0)) + b"\n"
+        (root / blob["fixture_path"]).write_bytes(encoded)
+        blob.update(
+            {
+                "raw_byte_count": len(third_payload),
+                "raw_sha256": hashlib.sha256(third_payload).hexdigest(),
+                "fixture_byte_count": len(encoded),
+                "fixture_sha256": hashlib.sha256(encoded).hexdigest(),
+            }
+        )
+        manifest_path.write_bytes(json_bytes(manifest))
+        tampered_manifest_sha256 = sha256_file(manifest_path)
+
+        with mock.patch.object(
+            graph,
+            "HISTORICAL_GIT_WITNESS_MANIFEST_SHA256",
+            tampered_manifest_sha256,
+        ):
+            errors, lookup = graph.validate_historical_git_witness(root)
+
+        self.assertIn(
+            f"historical Git witness raw object differs: {blob['object_id']}",
+            errors,
+        )
+        self.assertEqual(lookup, {})
+
     def _copied_preimage_root(self) -> Path:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -501,8 +832,22 @@ class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
                 checkpoint,
             )
         )
+        fp046_errors, _artifacts, fp046_transitions = (
+            graph.validate_fp046_r014_successor_authority(
+                ROOT,
+                checkpoint,
+            )
+        )
         self.assertEqual(errors, [])
+        self.assertEqual(fp046_errors, [])
         self.assertEqual(len(bindings), 32)
+        completion_transitions = (
+            graph._npc_single_admin_recovery_live_compatibility_artifacts(
+                ROOT,
+                checkpoint,
+            )
+        )
+        self.assertIsInstance(completion_transitions, dict)
         for relative, bridge in (
             graph.PHASE1_ANDROID_REPORT_SUCCESSOR_BRIDGES.items()
         ):
@@ -514,7 +859,20 @@ class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
                 if fp048 is not None
                 else bridge["current_sha256"]
             )
-            self.assertEqual(bindings[relative], current_sha256)
+            successor = fp046_transitions.get(relative)
+            expected_live = (
+                successor[1]
+                if successor is not None and successor[0] == current_sha256
+                else current_sha256
+            )
+            completion_successor = completion_transitions.get(relative)
+            expected_live = (
+                completion_successor[1]
+                if completion_successor is not None
+                and completion_successor[0] == expected_live
+                else expected_live
+            )
+            self.assertEqual(bindings[relative], expected_live)
             self.assertEqual(
                 graph._phase1_android_report_successor_bridge(
                     ROOT,
@@ -525,7 +883,7 @@ class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
                 ),
                 (
                     bridge["predecessor_sha256"],
-                    current_sha256,
+                    expected_live,
                 ),
             )
             self.assertIsNone(
@@ -554,13 +912,28 @@ class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
             ROOT,
             checkpoint,
             packet_bindings,
+            require_live_after=False,
         )
+        fp046_errors, _artifacts, fp046_transitions = (
+            graph.validate_fp046_r014_successor_authority(
+                ROOT,
+                checkpoint,
+            )
+        )
+        self.assertEqual(fp046_errors, [])
         self.assertIsInstance(successors, dict)
         self.assertEqual(
             set(successors),
             set(graph.FP048_ANDROID_REPORT_SUCCESSOR_BY_PATH),
         )
         self.assertEqual(len(successors), 5)
+        completion_transitions = (
+            graph._npc_single_admin_recovery_live_compatibility_artifacts(
+                ROOT,
+                checkpoint,
+            )
+        )
+        self.assertIsInstance(completion_transitions, dict)
         for relative, transition in (
             graph.FP048_ANDROID_REPORT_SUCCESSOR_BY_PATH.items()
         ):
@@ -573,9 +946,21 @@ class WalkSafeHistoricalBindingRegressionTest(unittest.TestCase):
                 transition["after_sha256"],
             )
             self.assertEqual(
-                sha256_file(ROOT / relative),
-                transition["after_sha256"],
+                fp046_transitions[relative],
+                (
+                    transition["after_sha256"],
+                    (
+                        completion_transitions[relative][0]
+                        if relative in completion_transitions
+                        else sha256_file(ROOT / relative)
+                    ),
+                ),
             )
+            if relative in completion_transitions:
+                self.assertEqual(
+                    completion_transitions[relative][1],
+                    sha256_file(ROOT / relative),
+                )
 
     def test_android_report_fp048_successor_rejects_mixed_and_unlisted_live_drift(
         self,
@@ -1716,9 +2101,16 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
             ),
         )
         self.assertEqual(fp047[relative][1], fp048[relative][0])
+        fp046_errors, _artifacts, fp046_transitions = (
+            graph.validate_fp046_r014_successor_authority(
+                ROOT,
+                checkpoint,
+            )
+        )
+        self.assertEqual(fp046_errors, [])
         self.assertEqual(
-            fp048[relative][1],
-            sha256_file(ROOT / relative),
+            fp046_transitions[relative],
+            (fp048[relative][1], sha256_file(ROOT / relative)),
         )
         self.assertEqual(
             graph.filter_frozen_v23_successor_errors(
@@ -1877,6 +2269,7 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
     def test_fp008_seq50_rtm_allowance_requires_exact_completion_chain(
         self,
     ) -> None:
+        historical_rtm = enter_fp008_historical_physical_bindings(self)
         checkpoint = fp008_seq50_checkpoint()
         archive = load_json(ROOT / graph.V23_ARCHIVE_RELATIVE)
         expected = frozen_requirements_traceability_errors()
@@ -1980,10 +2373,10 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
 
         original_sha256 = graph.continuation.sha256_file
         completion_path = ROOT / graph.FP008_ADMIN_REVIEW_COMPLETION_PATH
-        rtm_path = ROOT / graph.FP008_REQUIREMENTS_TRACEABILITY_BINDING["path"]
+        rtm_path = historical_rtm
 
-        def wrong_physical_sha256(target: Path) -> Callable[[Path], str]:
-            def sha256(path: Path) -> str:
+        def wrong_physical_sha256(target: object) -> Callable[[object], str]:
+            def sha256(path: object) -> str:
                 return "0" * 64 if path == target else original_sha256(path)
 
             return sha256
@@ -2011,6 +2404,7 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
     def test_fp008_seq50_resealed_semantic_and_safety_tamper_is_rejected(
         self,
     ) -> None:
+        enter_fp008_historical_physical_bindings(self)
         checkpoint = fp008_seq50_checkpoint()
         archive = load_json(ROOT / graph.V23_ARCHIVE_RELATIVE)
         expected = sorted(frozen_requirements_traceability_errors())
@@ -2375,62 +2769,13 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
     def test_fp008_future_suffix_allows_progress_but_preserves_safety(
         self,
     ) -> None:
+        enter_fp008_historical_physical_bindings(self)
         checkpoint = fp008_seq50_checkpoint()
         archive = load_json(ROOT / graph.V23_ARCHIVE_RELATIVE)
         expected = sorted(frozen_requirements_traceability_errors())
 
         future = copy.deepcopy(checkpoint)
         state = future["goal_execution"]
-        completion = state["transition_history"][49]
-        occurred_at = "2026-08-09T16:48:00+09:00"
-        event = {
-            "sequence": 51,
-            "event_id": (
-                "WS-GOAL-GRAPH-V2-4-WORK-SESSION-RESUMED-"
-                "SAFE-FUTURE-20260809-001"
-            ),
-            "event_type": "WORK_SESSION_RESUMED",
-            "occurred_on": "2026-08-09",
-            "occurred_at": occurred_at,
-            "previous_focus_goal_id": graph.FP008_ADMIN_REVIEW_PARENT_GOAL_ID,
-            "previous_focus_content_sha256": (
-                graph.FP008_ADMIN_REVIEW_PARENT_GOAL_SHA256
-            ),
-            "focus_goal_id": graph.FP008_ADMIN_REVIEW_PARENT_GOAL_ID,
-            "focus_goal_content_sha256": (
-                graph.FP008_ADMIN_REVIEW_PARENT_GOAL_SHA256
-            ),
-            "from_status": "READY",
-            "to_status": "READY",
-            "static_plan_manifest_sha256": (
-                graph.FP008_ADMIN_REVIEW_MANIFEST_SHA256
-            ),
-            "status_changes": {},
-            "runtime_after": copy.deepcopy(
-                graph.FP008_ADMIN_REVIEW_COMPLETION_RUNTIME
-            ),
-            "blockers_after": {},
-            "blocker_resolution_ids_after": [],
-            "source_checkpoint_version": (
-                graph.FP008_ADMIN_REVIEW_SOURCE_CHECKPOINT_VERSION
-            ),
-            "evidence_refs": [],
-            "previous_event_sha256": completion["event_sha256"],
-        }
-        event["event_sha256"] = graph.continuation.event_sha256(event)
-        state["transition_history"].append(event)
-        state["transition_history_anchor_sha256"] = event["event_sha256"]
-        state["validation_cutoff_at"] = occurred_at
-        future["current_work"]["status"] = "READY"
-        future["current_work"]["current_focus"] = (
-            "EPIC-03 READY; FP046 PLANNED_NEXT"
-        )
-        future["session_handoff"]["current_epic"] = (
-            "EPIC-03 / FP046 PLANNED_NEXT"
-        )
-        future["session_handoff"]["last_updated_by_work_item"] = (
-            "EPIC-03-FUTURE-SAFE-PROGRESS"
-        )
 
         self.assertTrue(
             graph._fp008_admin_review_completion_is_declared(ROOT, future)
@@ -2640,7 +2985,10 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
             ROOT / graph.continuation.V24_CHECKPOINT_RELATIVE
         )
         self.assertEqual(
-            graph.validate_v24_artifact_work_queue(ROOT, checkpoint),
+            graph.continuation.validate_seq39_canonical_binding_update(
+                ROOT,
+                checkpoint,
+            ),
             [],
         )
         history = checkpoint["goal_execution"]["transition_history"]
@@ -2655,11 +3003,14 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
             graph.continuation._seq39_register_update()["after_sha256"],
         )
 
-        checkpoint["goal_execution"]["artifact_work_queue"][
+        history[38]["runtime_after"]["artifact_work_queue"][
             "counts_by_status"
         ]["WAITING_TRIGGER"] += 1
         self.assertTrue(
-            graph.validate_v24_artifact_work_queue(ROOT, checkpoint)
+            graph.continuation.validate_seq39_canonical_binding_update(
+                ROOT,
+                checkpoint,
+            )
         )
 
     def test_fp013_successor_uses_byte_bound_start_repository_state(
@@ -2816,9 +3167,17 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
     ) -> None:
         checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
         archive = load_json(ROOT / ARCHIVE_RELATIVE)
+        fp014 = graph._fp014_successor_product_artifacts(
+            ROOT,
+            checkpoint,
+            require_live_successors=False,
+        )
+        self.assertIsInstance(fp014, dict)
         transitions = graph._fp015_successor_product_artifacts(
             ROOT,
             checkpoint,
+            successor_artifacts=fp014,
+            require_live_successors=False,
         )
         self.assertIsNotNone(transitions)
         self.assertEqual(len(transitions), 16)
@@ -2979,35 +3338,47 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
             f"{historical_goal_id}: implementation changed artifact "
             f"{historical_index} differs"
         )
+        original_git = graph._run_git_bytes
         for returncode in (128, 2):
-            failed_git = subprocess.CompletedProcess(
-                args=["git", "cat-file", "-e"],
-                returncode=returncode,
-                stdout=b"",
-                stderr=b"invalid pinned HEAD",
-            )
+            def controlled_git(root, args, **kwargs):
+                if args == [
+                    "cat-file",
+                    "-e",
+                    f"{graph.HISTORICAL_GIT_WITNESS_COMMIT}^{{commit}}",
+                ]:
+                    return subprocess.CompletedProcess(
+                        args=["git", *args],
+                        returncode=returncode,
+                        stdout=b"",
+                        stderr=b"invalid pinned HEAD",
+                    )
+                return original_git(root, args, **kwargs)
+
             with self.subTest(
                 pinned_head_returncode=returncode
             ), mock.patch.object(
-                graph.continuation._v23_utility,
+                graph,
                 "_run_git_bytes",
-                return_value=failed_git,
+                side_effect=controlled_git,
             ):
-                self.assertIsNone(
-                    graph._fp015_successor_product_artifacts(
-                        ROOT,
-                        checkpoint,
-                    )
+                transitions = graph._fp015_successor_product_artifacts(
+                    ROOT,
+                    checkpoint,
+                    successor_artifacts=fp014,
+                    require_live_successors=False,
                 )
-                self.assertEqual(
-                    graph.filter_frozen_v23_successor_errors(
-                        ROOT,
-                        [frozen_error],
-                        checkpoint=checkpoint,
-                        archive=archive,
-                    ),
+                filtered = graph.filter_frozen_v23_successor_errors(
+                    ROOT,
                     [frozen_error],
+                    checkpoint=checkpoint,
+                    archive=archive,
                 )
+                if returncode == 128:
+                    self.assertIsInstance(transitions, dict)
+                    self.assertEqual(filtered, [])
+                else:
+                    self.assertIsNone(transitions)
+                    self.assertEqual(filtered, [frozen_error])
 
     def test_v24_runbook_successor_override_is_byte_exact(self) -> None:
         frozen_error = (
@@ -3415,6 +3786,40 @@ class WalkSafeGoalGraphV24Test(unittest.TestCase):
                     "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3",
                 )
 
+    def test_imported_goal_projection_rejects_joint_live_and_binding_sha_drift(
+        self,
+    ) -> None:
+        checkpoint = copy.deepcopy(
+            load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        )
+        archive = load_json(ROOT / ARCHIVE_RELATIVE)
+        goal_id = next(
+            iter(
+                checkpoint["goal_execution"][
+                    "imported_predecessor_goal_bindings"
+                ]
+            )
+        )
+        checkpoint["goal_execution"]["imported_predecessor_goal_bindings"][
+            goal_id
+        ]["sha256"] = "f" * 64
+
+        with mock.patch.object(
+            graph.continuation,
+            "sha256_file",
+            return_value="f" * 64,
+        ):
+            errors = graph.validate_imported_goal_projection(
+                ROOT,
+                checkpoint,
+                archive,
+            )
+
+        self.assertIn(
+            f"{goal_id}: predecessor Goal SHA-256 differs",
+            errors,
+        )
+
     def test_imported_completion_lineage_matches_frozen_v23_events(
         self,
     ) -> None:
@@ -3533,6 +3938,43 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+
+    def _current_successor_artifacts(
+        self,
+    ) -> tuple[dict, dict, dict, dict]:
+        npc = (
+            graph._npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+                ROOT,
+            )
+        )
+        self.assertIsInstance(npc, dict)
+        fp022 = graph._fp022_completion_start_to_final_transitions(
+            ROOT,
+            self.checkpoint,
+            require_completion_review=False,
+        )
+        self.assertIsInstance(fp022, dict)
+        npc = graph._compose_completion_product_successors(npc, fp022)
+        self.assertIsInstance(npc, dict)
+        errors, _, fp046 = graph.validate_fp046_r014_successor_authority(
+            ROOT,
+            self.checkpoint,
+            successor_artifacts=npc,
+        )
+        self.assertEqual(errors, [])
+        fp012 = graph._fp012_successor_product_artifacts(
+            ROOT,
+            self.checkpoint,
+            successor_artifacts=fp046,
+        )
+        self.assertIsInstance(fp012, dict)
+        fp016 = graph._fp016_successor_product_artifacts(
+            ROOT,
+            self.checkpoint,
+            successor_artifacts={**fp046, **fp012},
+        )
+        self.assertIsInstance(fp016, dict)
+        return npc, fp046, fp012, fp016
 
     def _fp047_precompletion_checkpoint(self) -> dict:
         checkpoint = copy.deepcopy(self.checkpoint)
@@ -3653,13 +4095,12 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
             self.checkpoint["goal_execution"]["transition_history"],
             28,
         )
-        fp016 = graph._fp016_successor_product_artifacts(
-            ROOT,
-            self.checkpoint,
-        )
+        npc, _, _, fp016 = self._current_successor_artifacts()
         combined = graph._fp014_successor_product_artifacts(
             ROOT,
             self.checkpoint,
+            require_live_successors=False,
+            successor_artifacts=npc,
         )
         self.assertIsInstance(fp016, dict)
         self.assertEqual(len(fp016), 10)
@@ -3667,6 +4108,40 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
         self.assertTrue(set(fp016).issubset(combined))
         self.assertIsInstance(projection, tuple)
         self.assertNotIn(graph.FP047_PARENT_GOAL_ID, projection[1])
+
+    def test_fp016_runtime_amendment_rejects_third_digest(self) -> None:
+        relative = "apps/android/gradle/verification-metadata.xml"
+        sealed = (
+            "0f2fc21ad52bd81b877f4a2cecdf587841f4dcac2c87e0e3139a0f94374c0084"
+        )
+        expected = (
+            sealed,
+            "eaa662a434257a71c595ab510889657579e5e5a107041813338a257b56674d17",
+        )
+        self.assertEqual(
+            graph._sealed_start_gate_runtime_successor(ROOT, relative, sealed),
+            expected,
+        )
+
+        original = graph.continuation.sha256_file
+
+        def third_digest(path: Path) -> str:
+            if path == ROOT / relative:
+                return "f" * 64
+            return original(path)
+
+        with mock.patch.object(
+            graph.continuation,
+            "sha256_file",
+            side_effect=third_digest,
+        ):
+            self.assertIsNone(
+                graph._sealed_start_gate_runtime_successor(
+                    ROOT,
+                    relative,
+                    sealed,
+                )
+            )
 
     def test_fp016_transition_tamper_is_rejected(self) -> None:
         checkpoint = copy.deepcopy(self.checkpoint)
@@ -3691,10 +4166,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
             self.checkpoint,
             graph.FP047_GATE_REMEDIATION_PRE_SHA256,
         )
-        artifacts = graph._fp016_successor_product_artifacts(
-            ROOT,
-            self.checkpoint,
-        )
+        _, _, _, artifacts = self._current_successor_artifacts()
 
         self.assertEqual(
             after_sha256,
@@ -3987,10 +4459,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
             )
         )
         runner = graph.FP047_GATE_REMEDIATION_RUNNER_PATH
-        fp016 = graph._fp016_successor_product_artifacts(
-            ROOT,
-            self.checkpoint,
-        )
+        _, _, _, fp016 = self._current_successor_artifacts()
         self.assertEqual(
             fp016[runner][1],
             graph.FP047_GATE_REMEDIATION_POST_SHA256,
@@ -4015,6 +4484,56 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
         self.assertEqual(
             len(set(graph.FP047_ACTIVE_SCOPE_PATHS)),
             len(graph.FP047_ACTIVE_SCOPE_PATHS),
+        )
+
+    def test_npc_precompletion_successor_uses_frozen_r003_context(self) -> None:
+        with mock.patch.object(
+            graph.npc_review,
+            "prepare_review_context",
+            side_effect=AssertionError("mutable R003 context must not be used"),
+        ):
+            artifacts = (
+                graph._npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+                    ROOT
+                )
+            )
+        self.assertIsInstance(artifacts, dict)
+        self.assertEqual(len(artifacts), 55)
+
+    def test_live_product_compatibility_does_not_replay_completion_credit(
+        self,
+    ) -> None:
+        npc = {"npc": ("1" * 64, "2" * 64)}
+        fp022 = {"fp022": ("3" * 64, "4" * 64)}
+        with (
+            mock.patch.object(
+                graph,
+                "_npc_single_admin_recovery_precompletion_live_compatibility_artifacts",
+                return_value=npc,
+            ) as product_loader,
+            mock.patch.object(
+                graph,
+                "_npc_single_admin_recovery_sealed_product_successor_artifacts",
+                side_effect=AssertionError("completion credit was replayed"),
+            ),
+            mock.patch.object(
+                graph,
+                "_fp022_completion_start_to_final_transitions",
+                return_value=fp022,
+            ) as fp022_loader,
+        ):
+            self.assertEqual(
+                graph._npc_single_admin_recovery_live_compatibility_artifacts(
+                    ROOT,
+                    self.checkpoint,
+                ),
+                {**npc, **fp022},
+            )
+        product_loader.assert_called_once_with(ROOT)
+        fp022_loader.assert_called_once_with(
+            ROOT,
+            self.checkpoint,
+            require_completion_review=False,
         )
 
     def test_fp047_successful_start_snapshot_rejects_payload_tamper(
@@ -4980,35 +5499,26 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
         state["transition_history_anchor_sha256"] = history[-1][
             "event_sha256"
         ]
-        state["status_by_goal"].pop(
-            "WS-GOAL-EPIC-03-FP-048-R001",
-            None,
-        )
-        state["dynamic_goal_inventory"].pop(
-            "WS-GOAL-EPIC-03-FP-048-R001",
-            None,
-        )
-        state["status_by_goal"].pop(
-            "WS-GOAL-EPIC-03-FP-008-R001",
-            None,
-        )
-        state["dynamic_goal_inventory"].pop(
-            "WS-GOAL-EPIC-03-FP-008-R001",
-            None,
-        )
-        state["completion_evidence_by_goal"].pop(
-            "WS-GOAL-EPIC-03-FP-008-R001",
-            None,
-        )
-        state["completion_evidence_by_goal"].pop(
+        later_goals = (
             graph.FP048_ANDROID_REPORT_GOAL_ID,
-            None,
+            graph.FP008_ADMIN_REVIEW_GOAL_ID,
+            graph.FP046_GOAL_ID,
+            graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
         )
+        for goal_id in later_goals:
+            state["status_by_goal"].pop(goal_id, None)
+            state["dynamic_goal_inventory"].pop(goal_id, None)
+            state["completion_evidence_by_goal"].pop(goal_id, None)
         checkpoint["canonical_bindings"] = [
             binding
             for binding in checkpoint["canonical_bindings"]
             if binding.get("role")
-            != graph.FP048_ANDROID_REPORT_COMPLETION_ROLE
+            not in {
+                graph.FP048_ANDROID_REPORT_COMPLETION_ROLE,
+                graph.FP008_ADMIN_REVIEW_COMPLETION_ROLE,
+                graph.FP046_COMPLETION_ROLE,
+                graph.NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE,
+            }
         ]
         state["materialized_child_goal_ids_by_parent"][
             "WS-GOAL-EPIC-03"
@@ -5044,14 +5554,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
             graph.validate_fp047_canonical_completion(ROOT, checkpoint),
             [],
         )
-        self.assertIsInstance(
-            graph._fp014_successor_product_artifacts(
-                ROOT,
-                checkpoint,
-                require_live_successors=False,
-            ),
-            dict,
-        )
+        self.assertTrue(graph._fp014_is_declared_complete(checkpoint))
         self.assertFalse(
             graph._fp048_android_report_successor_is_declared(checkpoint)
         )
@@ -5073,8 +5576,6 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
         historical_sizes = {
             row["exact_path"]: row["byte_length"]
             for row in rows
-            if row["exact_path"]
-            in graph.FP048_ANDROID_REPORT_SUCCESSOR_BY_PATH
         }
         original_sha256 = graph.continuation.sha256_file
         original_stat = Path.stat
@@ -5108,6 +5609,10 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
             "stat",
             side_effect=historical_stat,
             autospec=True,
+        ), mock.patch.object(
+            graph,
+            "validate_fp046_r014_successor_authority",
+            return_value=([], {}, {}),
         ):
             errors, bindings = (
                 graph.validate_phase1_android_report_successor_binding(
@@ -5606,13 +6111,12 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
                 )
 
     def test_fp012_completion_extends_product_lineage(self) -> None:
-        fp012 = graph._fp012_successor_product_artifacts(
-            ROOT,
-            self.checkpoint,
-        )
+        npc, _, fp012, _ = self._current_successor_artifacts()
         combined = graph._fp014_successor_product_artifacts(
             ROOT,
             self.checkpoint,
+            require_live_successors=False,
+            successor_artifacts=npc,
         )
         receipt = graph._load_exact_json(ROOT, graph.FP012_COMPLETION_PATH)
         implementation_binding = next(
@@ -5638,6 +6142,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
     def test_fp012_lineage_accepts_only_legal_fp047_successor_states(
         self,
     ) -> None:
+        _, fp046, _, _ = self._current_successor_artifacts()
         completed = copy.deepcopy(self.checkpoint)
         completed["goal_execution"]["status_by_goal"][
             graph.FP047_GOAL_ID
@@ -5654,6 +6159,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
                 graph._fp012_successor_product_artifacts(
                     ROOT,
                     completed,
+                    successor_artifacts=fp046,
                 ),
                 dict,
             )
@@ -5668,6 +6174,7 @@ class FP014CanonicalCompletionTests(unittest.TestCase):
                     graph._fp012_successor_product_artifacts(
                         ROOT,
                         invalid,
+                        successor_artifacts=fp046,
                     )
                 )
 
@@ -5815,6 +6322,20 @@ class WalkSafeGoalGraphV24CompletedSuccessorLineageTest(unittest.TestCase):
                 / "docs/control/walksafe-project-continuation-checkpoint.json"
             ).read_text(encoding="utf-8")
         )
+        npc = (
+            graph._npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+                ROOT,
+            )
+        )
+        self.assertIsInstance(npc, dict)
+        fp022 = graph._fp022_completion_start_to_final_transitions(
+            ROOT,
+            checkpoint,
+            require_completion_review=False,
+        )
+        self.assertIsInstance(fp022, dict)
+        npc = graph._compose_completion_product_successors(npc, fp022)
+        self.assertIsInstance(npc, dict)
         completed = copy.deepcopy(checkpoint)
         state = completed["goal_execution"]
         state["status_by_goal"][graph.FP047_GOAL_ID] = "COMPLETE_AT_TARGET"
@@ -5825,7 +6346,12 @@ class WalkSafeGoalGraphV24CompletedSuccessorLineageTest(unittest.TestCase):
             "_fp047_completion_transition_matches",
             return_value=True,
         ):
-            artifacts = graph._fp014_successor_product_artifacts(ROOT, completed)
+            artifacts = graph._fp014_successor_product_artifacts(
+                ROOT,
+                completed,
+                require_live_successors=False,
+                successor_artifacts=npc,
+            )
         self.assertIsInstance(artifacts, dict)
 
         with mock.patch.object(
@@ -5834,7 +6360,12 @@ class WalkSafeGoalGraphV24CompletedSuccessorLineageTest(unittest.TestCase):
             return_value=False,
         ):
             self.assertIsNone(
-                graph._fp014_successor_product_artifacts(ROOT, completed)
+                graph._fp014_successor_product_artifacts(
+                    ROOT,
+                    completed,
+                    require_live_successors=False,
+                    successor_artifacts=npc,
+                )
             )
 
         for invalid_status in ("BLOCKED", "PLANNED"):
@@ -5848,7 +6379,12 @@ class WalkSafeGoalGraphV24CompletedSuccessorLineageTest(unittest.TestCase):
                 return_value=True,
             ):
                 self.assertIsNone(
-                    graph._fp014_successor_product_artifacts(ROOT, invalid)
+                    graph._fp014_successor_product_artifacts(
+                        ROOT,
+                        invalid,
+                        require_live_successors=False,
+                        successor_artifacts=npc,
+                    )
                 )
 
         later_focus = copy.deepcopy(completed)
@@ -5859,9 +6395,1776 @@ class WalkSafeGoalGraphV24CompletedSuccessorLineageTest(unittest.TestCase):
             return_value=True,
         ):
             self.assertIsInstance(
-                graph._fp014_successor_product_artifacts(ROOT, later_focus),
+                graph._fp014_successor_product_artifacts(
+                    ROOT,
+                    later_focus,
+                    require_live_successors=False,
+                    successor_artifacts=npc,
+                ),
                 dict,
             )
+
+
+class WalkSafeFp022Seq66Seq67SuccessorTest(unittest.TestCase):
+    @staticmethod
+    def _projected_checkpoint() -> dict:
+        from scripts import apply_walksafe_fp022_goal_seq66_67_20260813 as fp022
+
+        checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        raw = (ROOT / graph.CHECKPOINT_RELATIVE).read_bytes()
+        if hashlib.sha256(raw).hexdigest() == fp022.SOURCE_SHA256:
+            digests = fp022.aggregate._snapshot_digests(ROOT, checkpoint)
+            checkpoint, _ = fp022.project(ROOT, checkpoint, digests)
+        return checkpoint
+
+    def test_exact_fp022_materialized_ready_successor_is_accepted(self) -> None:
+        checkpoint = self._projected_checkpoint()
+
+        self.assertTrue(
+            graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
+        )
+
+    def test_fp022_successor_replays_the_frozen_seq66_67_review(self) -> None:
+        from scripts import (
+            build_walksafe_fp022_seq66_67_review_20260814 as fp022_review,
+        )
+
+        with mock.patch.object(
+            fp022_review,
+            "transition_review_binding",
+            side_effect=AssertionError("live predecessor review was replayed"),
+        ):
+            binding = graph._fp022_transition_review_binding(ROOT)
+        checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        self.assertEqual(
+            binding,
+            checkpoint["goal_execution"]["transition_history"][65][
+                "transition_control_review_binding"
+            ],
+        )
+
+    def test_fp022_ready_event_or_review_binding_tamper_fails_closed(self) -> None:
+        checkpoint = self._projected_checkpoint()
+        tampered = copy.deepcopy(checkpoint)
+        tampered["goal_execution"]["transition_history"][66][
+            "readiness_basis"
+        ]["dependency_completion_events"][0]["event_sha256"] = "0" * 64
+        self.assertFalse(
+            graph._fp022_seq66_67_successor_matches(ROOT, tampered)
+        )
+
+        aggregate_path = next(
+            iter(
+                graph.WORKSTREAM_AGGREGATE_R003_TRANSITION_REVIEW_BINDING.values()
+            )
+        )["path"]
+        original = graph.continuation.sha256_file
+
+        def drift(path: Path) -> str:
+            if path == ROOT / aggregate_path:
+                return "0" * 64
+            return original(path)
+
+        with mock.patch.object(
+            graph.continuation,
+            "sha256_file",
+            side_effect=drift,
+        ):
+            self.assertFalse(
+                graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
+            )
+
+    @staticmethod
+    def _with_completion_suffix(checkpoint: dict) -> dict:
+        candidate = copy.deepcopy(checkpoint)
+        history = candidate["goal_execution"]["transition_history"]
+        update = {
+            "sequence": 70,
+            "event_id": graph.continuation.FP022_COMPLETION_UPDATE_EVENT_ID,
+            "event_type": "CANONICAL_BINDINGS_UPDATED",
+            "previous_event_sha256": history[-1]["event_sha256"],
+        }
+        update["event_sha256"] = graph.continuation.event_sha256(update)
+        completion = {
+            "sequence": 71,
+            "event_id": graph.continuation.FP022_COMPLETION_EVENT_ID,
+            "event_type": "GOAL_COMPLETED",
+            "subject_goal_id": graph.continuation.FP022_GOAL_ID,
+            "previous_event_sha256": update["event_sha256"],
+        }
+        completion["event_sha256"] = graph.continuation.event_sha256(
+            completion
+        )
+        history.extend((update, completion))
+        return candidate
+
+    def test_completion_suffix_replays_historical_fp022_and_r027_authority(
+        self,
+    ) -> None:
+        checkpoint = self._with_completion_suffix(
+            self._projected_checkpoint()
+        )
+        self.assertTrue(
+            graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
+        )
+        self.assertTrue(
+            graph._npc_single_admin_recovery_r027_backlog_projection_matches(
+                ROOT,
+                checkpoint,
+                require_operational_pointer=False,
+            )
+        )
+
+        tampered = copy.deepcopy(checkpoint)
+        tampered["goal_execution"]["transition_history"][60][
+            "canonical_binding_snapshot_after"
+        ]["IMPLEMENTATION_BACKLOG"]["file_sha256"] = "0" * 64
+        self.assertFalse(
+            graph._npc_single_admin_recovery_r027_backlog_projection_matches(
+                ROOT,
+                tampered,
+                require_operational_pointer=False,
+            )
+        )
+
+    def test_completion_suffix_rewinds_final_runtime_to_seq67_authority(
+        self,
+    ) -> None:
+        checkpoint = self._with_completion_suffix(
+            self._projected_checkpoint()
+        )
+        state = checkpoint["goal_execution"]
+        state["status_by_goal"][graph.continuation.FP022_GOAL_ID] = (
+            "COMPLETE_AT_TARGET"
+        )
+        state.update(
+            {
+                "focus_goal_id": "WS-GOAL-EPIC-04",
+                "focus_goal_path": "final-focus",
+                "focus_work_item_id": "",
+                "focus_source": "WORKSTREAM_GRAPH",
+                "ready_frontier_goal_ids": [
+                    "WS-GOAL-EPIC-04",
+                    "WS-GOAL-EPIC-12",
+                ],
+            }
+        )
+        checkpoint["current_work"]["status"] = "READY"
+        checkpoint["current_work"]["work_item_id"] = ""
+        checkpoint["current_work"]["current_focus"] = "final focus"
+        checkpoint["session_handoff"]["current_epic"] = "final handoff"
+        self.assertTrue(
+            graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
+        )
+
+    def test_completion_product_manifest_yields_exact_nine_successors(
+        self,
+    ) -> None:
+        checkpoint = self._with_completion_suffix(
+            self._projected_checkpoint()
+        )
+        with (
+            mock.patch.object(
+                graph.continuation,
+                "validate_fp022_completion_seq70_71",
+                return_value=[],
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
+                "validate_post_review",
+                return_value=mock.Mock(),
+            ),
+        ):
+            transitions = (
+                graph._fp022_completion_start_to_final_transitions(
+                    ROOT, checkpoint
+                )
+            )
+        self.assertIsInstance(transitions, dict)
+        self.assertEqual(len(transitions), 9)
+        self.assertEqual(
+            transitions[
+                "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+                "walksafe/MainActivity.kt"
+            ],
+            (
+                "fd4c89497f99f215a0ef7f057aaf9968698156e2c941160399b573c06645ea55",
+                "7cf49ad23b268ebd52809055879b734d81e7cf7215c44c94f9196b20d5b4e865",
+            ),
+        )
+
+        tampered = copy.deepcopy(checkpoint)
+        tampered["goal_execution"]["transition_history"][68][
+            "implementation_start_gate_binding"
+        ]["file_sha256"] = "0" * 64
+        with (
+            mock.patch.object(
+                graph.continuation,
+                "validate_fp022_completion_seq70_71",
+                return_value=[],
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
+                "validate_post_review",
+                return_value=mock.Mock(),
+            ),
+        ):
+            self.assertIsNone(
+                graph._fp022_completion_start_to_final_transitions(
+                    ROOT, tampered
+                )
+            )
+
+
+class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.checkpoint = load_json(
+            ROOT / "docs/control/walksafe-project-continuation-checkpoint.json"
+        )
+
+    def test_seq61_62_package_uses_its_historical_snapshot_after_fp022_update(
+        self,
+    ) -> None:
+        checkpoint = (
+            WalkSafeFp022Seq66Seq67SuccessorTest._with_completion_suffix(
+                self.checkpoint
+            )
+        )
+        backlog = next(
+            row
+            for row in checkpoint["canonical_bindings"]
+            if row["role"] == "IMPLEMENTATION_BACKLOG"
+        )
+        backlog.update(
+            {
+                "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
+                "path": (
+                    "docs/control/audits/"
+                    "walksafe-implementation-remediation-backlog-20260814-r028.json"
+                ),
+                "file_sha256": "0" * 64,
+            }
+        )
+        with mock.patch.object(
+            graph,
+            "_npc_single_admin_recovery_completion_managed_closure_matches",
+            return_value=True,
+        ):
+            self.assertIsNotNone(
+                graph._npc_single_admin_recovery_completion_package(
+                    ROOT, checkpoint
+                )
+            )
+
+    def test_completion_managed_closure_rejects_self_consistent_history_omission(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def write(relative: Path, raw: bytes) -> None:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+
+            history_path = Path("fixture/immutable-history.json")
+            history_raw = b"immutable-history\n"
+            write(history_path, history_raw)
+            for relative in graph.npc_review.R002_REVIEW_HISTORY_PATHS:
+                write(relative, (ROOT / relative).read_bytes())
+            control_path = Path("scripts/current-control.py")
+            control_raw = b"current-control\n"
+            write(control_path, control_raw)
+            superseded_path = Path("fixture/superseded-assignment.json")
+            superseded_raw = b"superseded-assignment\n"
+            write(superseded_path, superseded_raw)
+            assignment_raw = b"assignment\n"
+            result_raw = b"result\n"
+            post_review = {
+                graph.npc_review.INDEPENDENT_REVIEW_REL: "independent\n",
+                graph.npc_review.COMPLETION_RECEIPT_REL: "completion\n",
+            }
+            write(graph.npc_review.REVIEW_ASSIGNMENT_REL, assignment_raw)
+            write(graph.npc_review.REVIEW_RESULT_REL, result_raw)
+            for relative, text in post_review.items():
+                write(relative, text.encode())
+            followup_assignment_raw = b"followup-assignment\n"
+            followup_result_raw = b"followup-result\n"
+            followup_independent_raw = b"followup-independent\n"
+            predecessor_raw_by_path = {
+                path: f"approved-r008-{index}\n".encode()
+                for index, path in enumerate(
+                    graph.npc_r011_review.PREDECESSOR_PINS,
+                    start=1,
+                )
+            }
+            for relative, raw in predecessor_raw_by_path.items():
+                write(relative, raw)
+            write(
+                graph.npc_r011_review.REVIEW_ASSIGNMENT_REL,
+                followup_assignment_raw,
+            )
+            write(
+                graph.npc_r011_review.REVIEW_RESULT_REL,
+                followup_result_raw,
+            )
+            write(
+                graph.npc_r011_review.INDEPENDENT_REVIEW_REL,
+                followup_independent_raw,
+            )
+            aggregate_assignment_raw = json_bytes(
+                {
+                    "review_scope": {
+                        "reviewed_control_code_cohort": [
+                            {
+                                "path": control_path.as_posix(),
+                                "sha256": hashlib.sha256(control_raw).hexdigest(),
+                                "byte_length": len(control_raw),
+                            }
+                        ]
+                    }
+                }
+            )
+            aggregate_result_raw = b"aggregate-result\n"
+            aggregate_independent_raw = b"aggregate-independent\n"
+            write(
+                graph.workstream_aggregate_review.ASSIGNMENT_REL,
+                aggregate_assignment_raw,
+            )
+            write(
+                graph.workstream_aggregate_review.RESULT_REL,
+                aggregate_result_raw,
+            )
+            write(
+                graph.workstream_aggregate_review.INDEPENDENT_REL,
+                aggregate_independent_raw,
+            )
+
+            context = mock.Mock()
+            context.control_code_cohort = (
+                {
+                    "path": control_path.as_posix(),
+                    "sha256": hashlib.sha256(b"r003-control\n").hexdigest(),
+                    "byte_length": len(b"r003-control\n"),
+                },
+            )
+            followup_context = mock.Mock()
+            followup_context.control_code_cohort = (
+                {
+                    "path": control_path.as_posix(),
+                    "sha256": hashlib.sha256(control_raw).hexdigest(),
+                    "byte_length": len(control_raw),
+                },
+            )
+            followup_context.superseded_assignment_bindings = (
+                {
+                    "path": superseded_path.as_posix(),
+                    "sha256": hashlib.sha256(superseded_raw).hexdigest(),
+                    "byte_length": len(superseded_raw),
+                    "status": "SUPERSEDED_BEFORE_REVIEW",
+                    "reason": "fixture",
+                },
+            )
+            followup_context.predecessor_bindings = tuple(
+                {
+                    "path": path.as_posix(),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "byte_length": len(raw),
+                }
+                for path, raw in predecessor_raw_by_path.items()
+            )
+            mandatory = sorted(
+                {
+                    history_path.as_posix(),
+                    control_path.as_posix(),
+                    superseded_path.as_posix(),
+                    *(path.as_posix() for path in graph.npc_review.R002_REVIEW_HISTORY_PATHS),
+                    graph.npc_review.REVIEW_ASSIGNMENT_REL.as_posix(),
+                    graph.npc_review.REVIEW_RESULT_REL.as_posix(),
+                    graph.npc_review.INDEPENDENT_REVIEW_REL.as_posix(),
+                    graph.npc_review.COMPLETION_RECEIPT_REL.as_posix(),
+                    *(path.as_posix() for path in predecessor_raw_by_path),
+                    graph.npc_r011_review.REVIEW_ASSIGNMENT_REL.as_posix(),
+                    graph.npc_r011_review.REVIEW_RESULT_REL.as_posix(),
+                    graph.npc_r011_review.INDEPENDENT_REVIEW_REL.as_posix(),
+                    graph.workstream_aggregate_review.ASSIGNMENT_REL.as_posix(),
+                    graph.workstream_aggregate_review.RESULT_REL.as_posix(),
+                    graph.workstream_aggregate_review.INDEPENDENT_REL.as_posix(),
+                }
+            )
+
+            def checkpoint(paths: list[str]) -> dict:
+                path_hash, content_hash = (
+                    graph.continuation.working_snapshot_hashes(root, paths)
+                )
+                return {
+                    "working_tree_snapshot": {
+                        "managed_changed_paths": paths,
+                        "managed_changed_path_count": len(paths),
+                        "path_set_sha256": path_hash,
+                        "content_set_sha256": content_hash,
+                    },
+                    "session_handoff": {
+                        "changed_files": copy.deepcopy(paths),
+                        "source_commit_or_snapshot": {
+                            "file_count": len(paths),
+                            "path_set_sha256": path_hash,
+                            "content_set_sha256": content_hash,
+                        },
+                    },
+                }
+
+            patches = (
+                mock.patch.object(
+                    graph.npc_r004_review,
+                    "prepare_frozen_r003_context",
+                    return_value=context,
+                ),
+                mock.patch.object(
+                    graph.workstream_aggregate_review,
+                    "prepare_frozen_r011_context",
+                    return_value=followup_context,
+                ),
+                mock.patch.object(
+                    graph,
+                    "_frozen_workstream_aggregate_r003_review_binding",
+                    return_value={},
+                ),
+                mock.patch.object(
+                    graph.npc_r011_review,
+                    "load_review_inputs",
+                    return_value=(
+                        {},
+                        followup_assignment_raw,
+                        {},
+                        followup_result_raw,
+                    ),
+                ),
+                mock.patch.object(
+                    graph.npc_r011_review,
+                    "build_independent_review",
+                    return_value=followup_independent_raw.decode(),
+                ),
+                mock.patch.object(
+                    graph.npc_review,
+                    "load_review_inputs",
+                    return_value=({}, assignment_raw, {}, result_raw),
+                ),
+                mock.patch.object(
+                    graph.npc_review,
+                    "build_post_review_outputs",
+                    return_value=post_review,
+                ),
+                mock.patch.object(
+                    graph.npc_review,
+                    "load_immutable_predecessor_history_sha256_by_path",
+                    return_value={
+                        history_path: hashlib.sha256(history_raw).hexdigest()
+                    },
+                ),
+            )
+            with (
+                patches[0],
+                patches[1],
+                patches[2],
+                patches[3],
+                patches[4],
+                patches[5],
+                patches[6],
+                patches[7],
+            ):
+                self.assertTrue(
+                    graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                        root,
+                        checkpoint(mandatory),
+                    )
+                )
+                omitted = [
+                    path for path in mandatory if path != history_path.as_posix()
+                ]
+                self.assertFalse(
+                    graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                        root,
+                        checkpoint(omitted),
+                    )
+                )
+
+    def test_seq68_managed_closure_loads_the_start_review_authority(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        history = checkpoint["goal_execution"]["transition_history"][:67]
+        checkpoint["goal_execution"]["transition_history"] = history
+        history.append(
+            {
+                "event_id": (
+                    "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-"
+                    "REANCHORED-FP022-20260814-001"
+                )
+            }
+        )
+        r003_context = mock.Mock()
+        followup_context = mock.Mock()
+        start_context = mock.Mock(control_code_cohort=())
+        with (
+            mock.patch.object(
+                graph.npc_r004_review,
+                "prepare_frozen_r003_context",
+                return_value=r003_context,
+            ),
+            mock.patch.object(
+                graph.workstream_aggregate_review,
+                "prepare_frozen_r011_context",
+                return_value=followup_context,
+            ),
+            mock.patch.object(
+                graph.npc_r011_review,
+                "load_review_inputs",
+                return_value=({}, b"assignment", {}, b"result"),
+            ),
+            mock.patch.object(
+                graph.npc_r011_review,
+                "build_independent_review",
+                return_value="followup",
+            ),
+            mock.patch.object(
+                graph,
+                "_npc_exact_live_bytes",
+                return_value=b"followup",
+            ),
+            mock.patch.object(
+                graph,
+                "_frozen_workstream_aggregate_r003_review_binding",
+                return_value={},
+            ),
+            mock.patch.object(
+                graph,
+                "_load_exact_json",
+                return_value={
+                    "review_scope": {"reviewed_control_code_cohort": []}
+                },
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_seq66_67_review_20260814."
+                "prepare_frozen_review_context",
+                return_value=mock.Mock(control_code_cohort=()),
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_seq68_69_review_20260814."
+                "validate_post_review",
+                return_value=start_context,
+            ) as validate_post_review,
+            mock.patch.object(
+                graph.npc_review,
+                "load_review_inputs",
+                side_effect=RuntimeError("stop after start review"),
+            ),
+        ):
+            self.assertFalse(
+                graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+        validate_post_review.assert_called_once_with(ROOT)
+
+    def test_seq71_managed_closure_uses_frozen_start_and_current_completion_review(
+        self,
+    ) -> None:
+        checkpoint = (
+            WalkSafeFp022Seq66Seq67SuccessorTest._with_completion_suffix(
+                self.checkpoint
+            )
+        )
+        r003_context = mock.Mock()
+        followup_context = mock.Mock()
+        frozen_start = mock.Mock(control_code_cohort=())
+        completion_context = mock.Mock(
+            control_code_cohort=(),
+            completion_evidence_bindings=(),
+            superseded_assignment_bindings=(),
+        )
+        with (
+            mock.patch.object(
+                graph.npc_r004_review,
+                "prepare_frozen_r003_context",
+                return_value=r003_context,
+            ),
+            mock.patch.object(
+                graph.workstream_aggregate_review,
+                "prepare_frozen_r011_context",
+                return_value=followup_context,
+            ),
+            mock.patch.object(
+                graph.npc_r011_review,
+                "load_review_inputs",
+                return_value=({}, b"assignment", {}, b"result"),
+            ),
+            mock.patch.object(
+                graph.npc_r011_review,
+                "build_independent_review",
+                return_value="followup",
+            ),
+            mock.patch.object(
+                graph,
+                "_npc_exact_live_bytes",
+                return_value=b"followup",
+            ),
+            mock.patch.object(
+                graph,
+                "_frozen_workstream_aggregate_r003_review_binding",
+                return_value={},
+            ),
+            mock.patch.object(
+                graph,
+                "_load_exact_json",
+                return_value={
+                    "review_scope": {"reviewed_control_code_cohort": []}
+                },
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_seq66_67_review_20260814."
+                "prepare_frozen_review_context",
+                return_value=mock.Mock(control_code_cohort=()),
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_seq68_69_review_20260814."
+                "validate_post_review",
+                side_effect=AssertionError("live R031 review was replayed"),
+            ),
+            mock.patch(
+                "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
+                "prepare_frozen_start_review_context",
+                return_value=frozen_start,
+            ) as frozen_loader,
+            mock.patch(
+                "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
+                "validate_post_review",
+                return_value=completion_context,
+            ) as completion_loader,
+            mock.patch.object(
+                graph.npc_review,
+                "load_review_inputs",
+                side_effect=RuntimeError("stop after completion review"),
+            ),
+        ):
+            self.assertFalse(
+                graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+        frozen_loader.assert_called_once_with(ROOT)
+        completion_loader.assert_called_once_with(ROOT)
+
+    def _r027_projection_fixture(self) -> tuple[Path, dict]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        epic = {
+            **copy.deepcopy(
+                graph.NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION
+            ),
+            "dependencies": ["EPIC-02"],
+        }
+        backlog = {
+            "metadata": {
+                "backlog_id": (
+                    graph.NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID
+                ),
+                "version": "0.27.0",
+            },
+            "epics": [epic],
+            "next_single_action": copy.deepcopy(
+                graph.NPC_SINGLE_ADMIN_RECOVERY_NEXT_ACTION
+            ),
+            "npc_single_admin_recovery_evidence_correction": {
+                "kind": "ADDITIVE_INTERNAL_EVIDENCE_CORRECTION"
+            },
+        }
+        backlog["backlog_content_sha256"] = (
+            graph.continuation.canonical_json_sha256(backlog)
+        )
+        relative = Path(graph.NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH)
+        target = root / relative
+        target.parent.mkdir(parents=True)
+        target.write_text(
+            json.dumps(backlog, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        action = graph.NPC_SINGLE_ADMIN_RECOVERY_NEXT_ACTION
+        projection = graph.NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION
+        checkpoint = {
+            "canonical_bindings": [
+                {
+                    "role": "IMPLEMENTATION_BACKLOG",
+                    "document_id": (
+                        graph.NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID
+                    ),
+                    "path": relative.as_posix(),
+                    "file_sha256": sha256_file(target),
+                    "identity_json_path": "metadata.backlog_id",
+                    "mutable": False,
+                }
+            ],
+            "current_work": {
+                "current_focus": (
+                    "FP-022/GAP-031 PLANNED_NEXT; EPIC-04 canonical Backlog "
+                    "aggregate"
+                ),
+                "deferred_release_gate_ids": copy.deepcopy(
+                    projection["deferred_release_gate_ids"]
+                ),
+                "epic_id": "WS-GOAL-EPIC-04",
+                "gap_ids": copy.deepcopy(projection["gap_ids"]),
+                "gap_ids_semantics": (
+                    "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE"
+                ),
+                "last_completed_work_summary": (
+                    "NPC-SINGLE-ADMIN-RECOVERY/GAP-008 repository-internal "
+                    "implementation, regression, review and successor evidence "
+                    "completed"
+                ),
+                "next_action": action["action"],
+                "policy_change_required": False,
+                "release_completion_claimed": False,
+                "scope_kind": "BACKLOG_EPIC_AGGREGATE",
+                "source_policy_ids": copy.deepcopy(
+                    projection["source_policy_ids"]
+                ),
+                "source_policy_ids_semantics": (
+                    "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE"
+                ),
+                "status": "PLANNED",
+                "status_scope": (
+                    "IMPLEMENTATION_BACKLOG_EPIC_STATUS_NOT_GOAL_STATUS"
+                ),
+                "target_completion_level": "IMPLEMENTATION_READY",
+                "title": projection["title"],
+                "work_item_id": action["work_item_id"],
+                "work_item_id_semantics": "NEXT_ACTION_POINTER_ONLY",
+            },
+            "session_handoff": {
+                "current_epic": "EPIC-04 / FP-022/GAP-031 PLANNED_NEXT",
+                "next_single_action": action["action"],
+                "last_updated_by_work_item": graph.npc_recovery.WORK_ITEM_ID,
+                "last_verification_status": (
+                    "PASS_INTERNAL_ONLY_FORMAL_EXTERNAL_DEVICE_RELEASE_NOT_RUN"
+                ),
+            },
+        }
+        return root, checkpoint
+
+    def _npc_checkpoint_at_sequence(self, sequence: int) -> dict:
+        from scripts import (
+            apply_walksafe_fp046_goal_completed_seq54_55_20260810 as fp046,
+        )
+        from scripts import (
+            apply_walksafe_fp022_goal_seq66_67_20260813 as fp022,
+        )
+
+        if sequence not in {60, 62}:
+            raise ValueError("NPC fixture sequence must be 60 or 62")
+        checkpoint = copy.deepcopy(self.checkpoint)
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        for event in reversed(history[sequence:]):
+            for goal_id in event.get("status_changes", {}):
+                if event["from_status"] is None:
+                    state["status_by_goal"].pop(goal_id, None)
+                else:
+                    state["status_by_goal"][goal_id] = event["from_status"]
+            if event.get("event_type") == "GOAL_COMPLETED":
+                state["completion_evidence_by_goal"].pop(
+                    event.get("subject_goal_id"), None
+                )
+        del history[sequence:]
+        state["dynamic_goal_inventory"].pop(fp022.GOAL_ID, None)
+        state["materialized_child_goal_ids_by_parent"].pop(
+            fp022.PARENT_GOAL_ID, None
+        )
+        if fp022.GOAL_PATH.as_posix() in state["goal_document_paths"]:
+            state["goal_document_paths"].remove(fp022.GOAL_PATH.as_posix())
+            state["goal_document_count"] = len(state["goal_document_paths"])
+        if fp022.GOAL_PATH.as_posix() in state["managed_goal_paths"]:
+            state["managed_goal_paths"].remove(fp022.GOAL_PATH.as_posix())
+            state["managed_goal_path_count"] = len(state["managed_goal_paths"])
+            state["path_set_sha256"], state["content_set_sha256"] = (
+                graph.continuation.package_hashes(
+                    ROOT, state["managed_goal_paths"]
+                )
+            )
+        checkpoint["current_work"]["status"] = "PLANNED"
+        checkpoint["current_work"]["current_focus"] = (
+            "FP-022/GAP-031 PLANNED_NEXT; EPIC-04 canonical Backlog aggregate"
+        )
+        checkpoint["session_handoff"]["current_epic"] = (
+            "EPIC-04 / FP-022/GAP-031 PLANNED_NEXT"
+        )
+        checkpoint["session_handoff"]["last_updated_by_work_item"] = (
+            graph.npc_recovery.WORK_ITEM_ID
+        )
+        tail = history[-1]
+        snapshot = tail.get("canonical_binding_snapshot_after")
+        if isinstance(snapshot, dict):
+            current_by_role = {
+                row["role"]: row for row in checkpoint["canonical_bindings"]
+            }
+            checkpoint["canonical_bindings"] = [
+                {**current_by_role.get(role, {}), **binding}
+                for role, binding in snapshot.items()
+            ]
+        state.update(copy.deepcopy(tail["runtime_after"]))
+        if sequence == 60:
+            checkpoint["canonical_bindings"] = [
+                binding
+                for binding in checkpoint["canonical_bindings"]
+                if binding.get("role")
+                != graph.NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE
+            ]
+        if sequence == 62:
+            queue, boundary = fp046.derive_runtime(
+                ROOT,
+                checkpoint,
+                state["ready_frontier_goal_ids"],
+            )
+            self.assertEqual(
+                graph.continuation.canonical_json_sha256(queue),
+                tail["runtime_after"]["artifact_work_queue_sha256"],
+            )
+            self.assertEqual(
+                graph.continuation.canonical_json_sha256(boundary),
+                tail["runtime_after"]["completion_boundary_sha256"],
+            )
+            state["artifact_work_queue"] = queue
+            state["completion_boundary"] = boundary
+        state["transition_history_anchor_sha256"] = tail["event_sha256"]
+        state["validation_cutoff_at"] = tail["occurred_at"]
+        return checkpoint
+
+    @staticmethod
+    def _reseal_synthetic_seq62(checkpoint: dict) -> None:
+        state = checkpoint["goal_execution"]
+        update, completion = state["transition_history"][-2:]
+        update.pop("event_sha256", None)
+        update["event_sha256"] = graph.continuation.event_sha256(update)
+        completion["previous_event_sha256"] = update["event_sha256"]
+        completion["canonical_update_event_sha256"] = update["event_sha256"]
+        completion.pop("event_sha256", None)
+        completion["event_sha256"] = graph.continuation.event_sha256(
+            completion
+        )
+        state["transition_history_anchor_sha256"] = completion["event_sha256"]
+
+    def test_r027_planned_projection_requires_exact_backlog_and_handoff(
+        self,
+    ) -> None:
+        root, checkpoint = self._r027_projection_fixture()
+        self.assertTrue(
+            graph._npc_single_admin_recovery_r027_backlog_projection_matches(
+                root,
+                checkpoint,
+            )
+        )
+
+        tampers = (
+            (
+                "epic",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "epic_id", "WS-GOAL-EPIC-02"
+                ),
+            ),
+            (
+                "status",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "status", "READY"
+                ),
+            ),
+            (
+                "pointer",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "work_item_id", "WS-GOAL-EPIC-04-FP-023-R001"
+                ),
+            ),
+            (
+                "action",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "next_action", "unbound action"
+                ),
+            ),
+            (
+                "gates",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "deferred_release_gate_ids", []
+                ),
+            ),
+            (
+                "policies",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "source_policy_ids", ["FP-022"]
+                ),
+            ),
+            (
+                "gaps",
+                lambda candidate: candidate["current_work"].__setitem__(
+                    "gap_ids", ["GAP-031"]
+                ),
+            ),
+            (
+                "handoff epic",
+                lambda candidate: candidate["session_handoff"].__setitem__(
+                    "current_epic", "EPIC-02"
+                ),
+            ),
+            (
+                "handoff action",
+                lambda candidate: candidate["session_handoff"].__setitem__(
+                    "next_single_action", "unbound action"
+                ),
+            ),
+            (
+                "handoff updater",
+                lambda candidate: candidate["session_handoff"].__setitem__(
+                    "last_updated_by_work_item", "EPIC-04-FP022"
+                ),
+            ),
+            (
+                "handoff verification",
+                lambda candidate: candidate["session_handoff"].__setitem__(
+                    "last_verification_status", "PASS_RELEASE"
+                ),
+            ),
+        )
+        for label, mutate in tampers:
+            with self.subTest(tamper=label):
+                candidate = copy.deepcopy(checkpoint)
+                mutate(candidate)
+                self.assertFalse(
+                    graph._npc_single_admin_recovery_r027_backlog_projection_matches(
+                        root,
+                        candidate,
+                    )
+                )
+
+        relative = Path(graph.NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH)
+        backlog_path = root / relative
+        backlog = json.loads(backlog_path.read_text(encoding="utf-8"))
+        backlog["next_single_action"]["source_policy_id"] = "FP-023"
+        backlog.pop("backlog_content_sha256")
+        backlog["backlog_content_sha256"] = (
+            graph.continuation.canonical_json_sha256(backlog)
+        )
+        backlog_path.write_text(
+            json.dumps(backlog, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        checkpoint["canonical_bindings"][0]["file_sha256"] = sha256_file(
+            backlog_path
+        )
+        self.assertFalse(
+            graph._npc_single_admin_recovery_r027_backlog_projection_matches(
+                root,
+                checkpoint,
+            )
+        )
+
+    def test_planned_suffix_without_exact_seq62_is_rejected(self) -> None:
+        checkpoint = fp008_seq50_checkpoint()
+        checkpoint["current_work"]["status"] = "PLANNED"
+        self.assertFalse(
+            graph._fp008_admin_review_completion_is_declared(ROOT, checkpoint)
+        )
+
+    def test_fp008_suffix_allows_planned_only_for_proven_npc_seq62(
+        self,
+    ) -> None:
+        _root, projection = self._r027_projection_fixture()
+        checkpoint = self._npc_checkpoint_at_sequence(62)
+        checkpoint["current_work"] = copy.deepcopy(projection["current_work"])
+        checkpoint["session_handoff"].update(
+            copy.deepcopy(projection["session_handoff"])
+        )
+
+        with mock.patch.object(
+            graph,
+            "_npc_single_admin_recovery_completion_package",
+            return_value={"evidence_schema": "V2_CORRECTION_ONLY"},
+        ):
+            self.assertTrue(
+                graph._fp008_admin_review_completion_is_declared(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+        with mock.patch.object(
+            graph,
+            "_npc_single_admin_recovery_completion_package",
+            return_value=None,
+        ):
+            self.assertFalse(
+                graph._fp008_admin_review_completion_is_declared(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+    def test_seq61_62_subject_producer_evidence_and_impact_are_exact(
+        self,
+    ) -> None:
+        checkpoint = self._npc_checkpoint_at_sequence(62)
+        patches = (
+            mock.patch.object(graph, "_sha256_binding_matches", return_value=True),
+            mock.patch.object(
+                graph,
+                "_npc_single_admin_recovery_r027_backlog_projection_matches",
+                return_value=True,
+            ),
+            mock.patch.object(
+                graph,
+                "_npc_single_admin_recovery_v2_completion_evidence",
+                return_value={"evidence_schema": "V2_CORRECTION_ONLY"},
+            ),
+            mock.patch.object(
+                graph,
+                "_npc_single_admin_recovery_completion_managed_closure_matches",
+                return_value=True,
+            ),
+        )
+        with patches[0], patches[1], patches[2], patches[3]:
+            self.assertIsNotNone(
+                graph._npc_single_admin_recovery_completion_package(
+                    ROOT,
+                    checkpoint,
+                )
+            )
+
+            def changed_subject(update: dict, _completion: dict) -> None:
+                update["changed_subject_ids_by_role"][
+                    "IMPLEMENTATION_GAP"
+                ] = ["GAP-008"]
+
+            def producer_subject(update: dict, _completion: dict) -> None:
+                update["producer_output_subject_ids_by_role"][
+                    "IMPLEMENTATION_GAP"
+                ] = ["GAP-008"]
+
+            def changed_roles(update: dict, _completion: dict) -> None:
+                update["changed_binding_roles"] = ["IMPLEMENTATION_GAP"]
+
+            def produced_roles(update: dict, _completion: dict) -> None:
+                update["produced_binding_roles"] = ["IMPLEMENTATION_GAP"]
+
+            def update_evidence(update: dict, _completion: dict) -> None:
+                update["evidence_refs"] = ["IMPLEMENTATION_GAP"]
+
+            def completion_evidence(_update: dict, completion: dict) -> None:
+                completion["evidence_refs"] = []
+
+            def impact_closure(update: dict, _completion: dict) -> None:
+                update["impact_closure_goal_ids"] = []
+
+            def impact_disposition(update: dict, _completion: dict) -> None:
+                update["impact_disposition_by_goal"] = {}
+
+            tampers = (
+                ("changed subjects", changed_subject),
+                ("producer subjects", producer_subject),
+                ("changed roles", changed_roles),
+                ("produced roles", produced_roles),
+                ("update evidence", update_evidence),
+                ("completion evidence", completion_evidence),
+                ("impact closure", impact_closure),
+                ("impact disposition", impact_disposition),
+            )
+            for label, mutate in tampers:
+                with self.subTest(tamper=label):
+                    candidate = copy.deepcopy(checkpoint)
+                    update, completion = candidate["goal_execution"][
+                        "transition_history"
+                    ][-2:]
+                    mutate(update, completion)
+                    self._reseal_synthetic_seq62(candidate)
+                    self.assertIsNone(
+                        graph._npc_single_admin_recovery_completion_package(
+                            ROOT,
+                            candidate,
+                        )
+                    )
+
+    def _run_v2_completion_rebuild(
+        self,
+        *,
+        r001_decision: str = "REJECTED",
+        tamper_observation: bool = False,
+        tamper_r016: bool = False,
+        legacy_consumer: str | None = None,
+    ) -> dict | None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+
+        def payload(label: str, **extra: object) -> str:
+            return graph.npc_recovery.json_text({"label": label, **extra})
+
+        def write(relative: Path, content: str | bytes) -> bytes:
+            raw = content.encode("utf-8") if type(content) is str else content
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+            return raw
+
+        observation_raw = write(
+            graph.npc_recovery.V2_OBSERVATION_MANIFEST_REL,
+            payload("v2-observation"),
+        )
+        result_outputs: dict[Path, str] = {
+            lane.receipt_rel: payload(f"lane:{lane.lane_id}")
+            for lane in graph.npc_recovery.LANES
+        }
+        result_outputs.update(
+            {
+                graph.npc_recovery.V2_IMPLEMENTATION_REL: payload(
+                    "v2-implementation",
+                    evidence_schema="V2_CORRECTION_ONLY",
+                    final_content_manifest={"files": []},
+                ),
+                graph.npc_recovery.V2_VERIFICATION_REL: payload(
+                    "v2-verification"
+                ),
+                graph.npc_recovery.V2_SUCCESSOR_REL: payload(
+                    "v2-successor"
+                ),
+                graph.npc_recovery.V2_REVIEW_SUBJECT_REL: payload(
+                    "v2-review-subject"
+                ),
+            }
+        )
+        result_raw = {
+            relative: write(relative, content)
+            for relative, content in result_outputs.items()
+        }
+
+        expected_consumers = tuple(graph.npc_recovery.CONSUMER_SPECS)
+        consumer_bindings: list[dict[str, object]] = []
+        consumer_raw: dict[Path, bytes] = {}
+        for role, relative in expected_consumers:
+            content = (
+                payload(
+                    "r001-review",
+                    goal_id=graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+                    decision=r001_decision,
+                )
+                if relative == graph.npc_review.R001_REVIEW_RESULT_REL
+                else payload(f"consumer:{role}")
+            )
+            raw = write(relative, content)
+            consumer_raw[relative] = raw
+            consumer_bindings.append(
+                {
+                    "role": role,
+                    "path": relative.as_posix(),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "byte_length": len(raw),
+                }
+            )
+
+        if legacy_consumer == "R026":
+            role, relative = "GAP_R026", graph.npc_recovery.GAP_R026_REL
+            raw = write(relative, payload("legacy-r026"))
+            consumer_bindings[0] = {
+                "role": role,
+                "path": relative.as_posix(),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+        elif legacy_consumer == "R015":
+            role, relative = graph.npc_recovery.R015_CONSUMERS[0]
+            raw = write(relative, payload("legacy-r015"))
+            consumer_bindings[8] = {
+                "role": role,
+                "path": relative.as_posix(),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+
+        if tamper_r016:
+            r016_path = graph.npc_recovery.R016_CONSUMERS[0][1]
+            write(r016_path, payload("third-r016-digest"))
+        if tamper_observation:
+            write(
+                graph.npc_recovery.V2_OBSERVATION_MANIFEST_REL,
+                payload("third-observation-digest"),
+            )
+
+        r001_raw = consumer_raw[graph.npc_review.R001_REVIEW_RESULT_REL]
+
+        assignment_raw = write(
+            graph.npc_review.REVIEW_ASSIGNMENT_REL,
+            payload("r002-assignment"),
+        )
+        review_result_raw = write(
+            graph.npc_review.REVIEW_RESULT_REL,
+            payload("r002-result"),
+        )
+        post_review_outputs = {
+            graph.npc_review.INDEPENDENT_REVIEW_REL: payload(
+                "r002-independent-review"
+            ),
+            graph.npc_review.COMPLETION_RECEIPT_REL: payload(
+                "v2-completion"
+            ),
+        }
+        for relative, content in post_review_outputs.items():
+            write(relative, content)
+
+        review_context = mock.Mock()
+        review_context.result_raw = result_raw
+        review_context.consumer_bindings = tuple(consumer_bindings)
+        history = {
+            Path(f"fixture/history-{index:02d}.json"): f"{index:064x}"
+            for index in range(20)
+        }
+        review_context.evidence_manifest = (
+            {
+                "path": (
+                    graph.npc_recovery.V2_OBSERVATION_MANIFEST_REL.as_posix()
+                ),
+                "sha256": hashlib.sha256(observation_raw).hexdigest(),
+            },
+            *(
+                {"path": path.as_posix(), "sha256": digest}
+                for path, digest in history.items()
+            ),
+        )
+        review_context.predecessor_review = {
+            "path": graph.npc_review.R001_REVIEW_RESULT_REL.as_posix(),
+            "sha256": hashlib.sha256(r001_raw).hexdigest(),
+            "decision": r001_decision,
+        }
+        review_context.prior_approved_review = {
+            "round_id": graph.npc_review.R002_ROUND_ID,
+            "decision": "APPROVED",
+        }
+        assignment: dict[str, object] = {}
+        review_result: dict[str, object] = {}
+
+        with mock.patch.object(
+            graph.npc_r004_review,
+            "prepare_frozen_r003_context",
+            return_value=review_context,
+        ), mock.patch.object(
+            graph.npc_review,
+            "load_review_inputs",
+            return_value=(
+                assignment,
+                assignment_raw,
+                review_result,
+                review_result_raw,
+            ),
+        ), mock.patch.object(
+            graph.npc_review,
+            "build_post_review_outputs",
+            return_value=post_review_outputs,
+        ), mock.patch.object(
+            graph.npc_review,
+            "IMMUTABLE_PREDECESSOR_HISTORY_PATHS",
+            tuple(history),
+        ), mock.patch.object(
+            graph.npc_review,
+            "load_immutable_predecessor_history_sha256_by_path",
+            return_value=history,
+        ), mock.patch.object(
+            graph.npc_review,
+            "load_attestation",
+            create=True,
+        ) as legacy_attestation:
+            rebuilt = graph._npc_single_admin_recovery_v2_completion_evidence(
+                root
+            )
+            legacy_attestation.assert_not_called()
+            return rebuilt
+
+    def test_completion_credit_rebuilds_only_the_exact_v2_chain(self) -> None:
+        implementation = self._run_v2_completion_rebuild()
+
+        self.assertIsInstance(implementation, dict)
+        self.assertEqual(implementation["label"], "v2-implementation")
+
+    def test_completion_credit_rejects_rebuilt_r016_byte_drift(self) -> None:
+        self.assertIsNone(
+            self._run_v2_completion_rebuild(tamper_r016=True)
+        )
+
+    def test_completion_credit_rejects_v2_observation_byte_drift(self) -> None:
+        self.assertIsNone(
+            self._run_v2_completion_rebuild(tamper_observation=True)
+        )
+
+    def test_completion_credit_rejects_r026_or_r015_consumer_authority(
+        self,
+    ) -> None:
+        for legacy_consumer in ("R026", "R015"):
+            with self.subTest(legacy_consumer=legacy_consumer):
+                self.assertIsNone(
+                    self._run_v2_completion_rebuild(
+                        legacy_consumer=legacy_consumer
+                    )
+                )
+
+    def test_completion_credit_fails_closed_when_strict_v2_rebuild_fails(
+        self,
+    ) -> None:
+        with mock.patch.object(
+            graph.npc_r004_review,
+            "prepare_frozen_r003_context",
+            side_effect=graph.npc_recovery.BuildError("R016 rebuild differs"),
+        ):
+            self.assertIsNone(
+                graph._npc_single_admin_recovery_v2_completion_evidence(ROOT)
+            )
+
+    def test_completion_credit_requires_r001_to_remain_rejected(self) -> None:
+        self.assertIsNone(
+            self._run_v2_completion_rebuild(r001_decision="APPROVED")
+        )
+
+    def test_precompletion_does_not_grant_successor_credit(self) -> None:
+        checkpoint = self._npc_checkpoint_at_sequence(60)
+        self.assertFalse(
+            graph._npc_single_admin_recovery_successor_is_declared(
+                checkpoint
+            )
+        )
+        self.assertEqual(
+            graph._npc_single_admin_recovery_sealed_product_successor_artifacts(
+                ROOT,
+                checkpoint,
+            ),
+            {},
+        )
+        self.assertEqual(
+            graph.validate_npc_single_admin_recovery_canonical_completion(
+                ROOT,
+                checkpoint,
+            ),
+            [],
+        )
+
+    def test_partial_or_tampered_completion_declaration_fails_closed(self) -> None:
+        tampered = self._npc_checkpoint_at_sequence(60)
+        tampered["goal_execution"]["status_by_goal"][
+            graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        ] = "COMPLETE_AT_TARGET"
+
+        self.assertTrue(
+            graph._npc_single_admin_recovery_successor_is_declared(tampered)
+        )
+        self.assertIsNone(
+            graph._npc_single_admin_recovery_sealed_product_successor_artifacts(
+                ROOT,
+                tampered,
+            )
+        )
+        self.assertEqual(
+            graph.validate_npc_single_admin_recovery_canonical_completion(
+                ROOT,
+                tampered,
+            ),
+            [
+                (
+                    "NPC single-admin recovery completion package or source "
+                    "successor differs"
+                )
+            ],
+        )
+
+    def test_start_to_final_transition_is_exact_55_and_rejects_tamper(self) -> None:
+        added = {
+            (
+                "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/"
+                "walksafe/admin/security/AdminRecoveryCustodyState.java"
+            ),
+            "backend/alembic/versions/202608120001_admin_recovery_custody.py",
+            "backend/app/services/admin_credential_issuer_key.py",
+            "backend/tests/test_admin_credential_issuer_binding.py",
+            "backend/tests/test_admin_credential_issuer_key.py",
+            "backend/tests/test_admin_runtime_acl_hardening.py",
+            "deploy/config/walksafe-backend-migration.env.example",
+            "deploy/systemd/walksafe-admin-issuer-bind.service",
+            "deploy/sysusers.d/walksafe-backend.conf",
+            "scripts/bind_walksafe_admin_credential_issuer_key.py",
+            "tests/test_bind_walksafe_admin_credential_issuer_key.py",
+        }
+        unchanged = {
+            "backend/tests/test_health_readiness.py",
+            "backend/tests/test_report_image_keyring.py",
+        }
+        before_raw = {
+            path: f"before:{path}".encode()
+            for path in graph.NPC_SINGLE_ADMIN_RECOVERY_PRODUCT_PATHS
+            if path not in added
+        }
+        after_raw = {
+            path: (
+                before_raw[path]
+                if path in unchanged
+                else f"after:{path}".encode()
+            )
+            for path in graph.NPC_SINGLE_ADMIN_RECOVERY_PRODUCT_PATHS
+        }
+        implementation = {
+            "final_content_manifest": {
+                "files": [
+                    {
+                        "path": path,
+                        "sha256": hashlib.sha256(after_raw[path]).hexdigest(),
+                        "byte_count": len(after_raw[path]),
+                    }
+                    for path in graph.NPC_SINGLE_ADMIN_RECOVERY_PRODUCT_PATHS
+                ]
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative = graph.npc_recovery.START_GATE_REPOSITORY_STATE_REL
+            state_path = root / relative
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "evidence_type": "GATE_REPOSITORY_STATE",
+                        "gate_event_id": graph.npc_recovery.EXPECTED_START_EVENT_ID,
+                        "repository": {"head_commit": "a" * 40},
+                        "dirty_snapshot": {"paths": []},
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+            )
+
+            def git_result(
+                _root: Path,
+                argv: list[str],
+                **_kwargs: object,
+            ) -> subprocess.CompletedProcess[bytes]:
+                if argv[:2] == ["cat-file", "-e"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout=b"", stderr=b"")
+                path = argv[2].split(":", 1)[1]
+                if path in added:
+                    return subprocess.CompletedProcess(argv, 128, stdout=b"", stderr=b"")
+                return subprocess.CompletedProcess(
+                    argv,
+                    0,
+                    stdout=before_raw[path],
+                    stderr=b"",
+                )
+
+            with mock.patch.object(
+                graph.npc_recovery,
+                "EXPECTED_START_GATE_REPOSITORY_STATE_SHA256",
+                sha256_file(state_path),
+            ), mock.patch.object(graph, "_run_git_bytes", side_effect=git_result):
+                transitions = (
+                    graph._npc_single_admin_recovery_start_to_final_transitions(
+                        root,
+                        implementation,
+                    )
+                )
+                self.assertIsInstance(transitions, dict)
+                self.assertEqual(len(transitions), 55)
+
+                modified = next(iter(transitions))
+                altered = copy.deepcopy(implementation)
+                row = next(
+                    item
+                    for item in altered["final_content_manifest"]["files"]
+                    if item["path"] == modified
+                )
+                row["sha256"] = hashlib.sha256(before_raw[modified]).hexdigest()
+                self.assertIsNone(
+                    graph._npc_single_admin_recovery_start_to_final_transitions(
+                        root,
+                        altered,
+                    )
+                )
+
+    def test_npc_edge_extends_older_lineage_and_rejects_third_digest(self) -> None:
+        relative = "backend/app/main.py"
+        old = hashlib.sha256(b"old").hexdigest()
+        fp047 = hashlib.sha256(b"fp047").hexdigest()
+        fp048 = hashlib.sha256(b"fp048").hexdigest()
+        fp046 = hashlib.sha256(b"fp046").hexdigest()
+        npc_raw = b"npc-final"
+        npc = hashlib.sha256(npc_raw).hexdigest()
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = root / relative
+            live.parent.mkdir(parents=True)
+            live.write_bytes(npc_raw)
+            common = {
+                "checkpoint": {},
+                "fp011_live_artifacts": {},
+                "fp011_transitions": {},
+                "fp013_artifacts": {},
+                "fp015_artifacts": {},
+                "fp014_artifacts": {},
+                "fp047_artifacts": {relative: (old, fp047)},
+                "fp048_artifacts": {relative: (fp047, fp048)},
+                "fp046_artifacts": {relative: (fp048, fp046)},
+                "npc_recovery_artifacts": {relative: (fp046, npc)},
+            }
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=old,
+            ):
+                self.assertTrue(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        **common,
+                    )
+                )
+                live.write_bytes(b"third-digest")
+                self.assertFalse(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        **common,
+                    )
+                )
+
+    def test_declared_successor_edge_before_mismatch_fails_closed(self) -> None:
+        relative = "backend/app/main.py"
+        old_raw = b"old"
+        old = hashlib.sha256(old_raw).hexdigest()
+        wrong = hashlib.sha256(b"wrong").hexdigest()
+        after = hashlib.sha256(b"after").hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = root / relative
+            live.parent.mkdir(parents=True)
+            live.write_bytes(old_raw)
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=old,
+            ):
+                self.assertFalse(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        checkpoint={},
+                        fp011_live_artifacts={},
+                        fp011_transitions={},
+                        fp013_artifacts={},
+                        fp015_artifacts={},
+                        fp014_artifacts={},
+                        fp047_artifacts={relative: (wrong, after)},
+                        fp048_artifacts={},
+                        fp046_artifacts={},
+                        npc_recovery_artifacts={},
+                    )
+                )
+
+    def test_composed_lineage_does_not_hide_mismatched_later_edge(self) -> None:
+        relative = "backend/app/main.py"
+        old = hashlib.sha256(b"old").hexdigest()
+        live_raw = b"live"
+        live = hashlib.sha256(live_raw).hexdigest()
+        wrong = hashlib.sha256(b"wrong").hexdigest()
+        later = hashlib.sha256(b"later").hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / relative
+            target.parent.mkdir(parents=True)
+            target.write_bytes(live_raw)
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=old,
+            ):
+                self.assertFalse(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        checkpoint={},
+                        fp011_live_artifacts={},
+                        fp011_transitions={},
+                        fp013_artifacts={},
+                        fp015_artifacts={},
+                        fp014_artifacts={relative: (old, live)},
+                        fp047_artifacts={relative: (wrong, later)},
+                        fp048_artifacts={},
+                        fp046_artifacts={},
+                        npc_recovery_artifacts={},
+                    )
+                )
+
+    def test_fp047_snapshot_overlay_must_end_at_fp046_final_digest(self) -> None:
+        relative = "apps/android-gateway/src/routes.ts"
+        old = hashlib.sha256(b"old").hexdigest()
+        fp047_after = hashlib.sha256(b"fp047-after").hexdigest()
+        fp046_before = hashlib.sha256(b"fp046-before").hexdigest()
+        final_raw = b"fp046-final"
+        final = hashlib.sha256(final_raw).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / relative
+            target.parent.mkdir(parents=True)
+            target.write_bytes(final_raw)
+            common = {
+                "checkpoint": {},
+                "fp011_live_artifacts": {},
+                "fp011_transitions": {},
+                "fp013_artifacts": {},
+                "fp015_artifacts": {},
+                "fp014_artifacts": {},
+                "fp047_artifacts": {relative: (old, fp047_after)},
+                "fp048_artifacts": {},
+                "fp046_artifacts": {relative: (fp046_before, final)},
+                "npc_recovery_artifacts": {},
+            }
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=old,
+            ), mock.patch.object(
+                graph,
+                "_fp047_start_snapshot_successor",
+                return_value=(old, final),
+            ):
+                self.assertTrue(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        **common,
+                    )
+                )
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=old,
+            ), mock.patch.object(
+                graph,
+                "_fp047_start_snapshot_successor",
+                return_value=(old, hashlib.sha256(b"wrong-final").hexdigest()),
+            ):
+                self.assertFalse(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, old),
+                        **common,
+                    )
+                )
+
+    def test_npc_does_not_mask_unrelated_fp048_android_drift(self) -> None:
+        relative = (
+            "apps/android/app/src/main/java/kr/co/hanium/dreamup/"
+            "walksafe/MainActivity.kt"
+        )
+        before = hashlib.sha256(b"before").hexdigest()
+        fp048_after = hashlib.sha256(b"fp048-after").hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = root / relative
+            live.parent.mkdir(parents=True)
+            live.write_bytes(b"unrelated-drift")
+            with mock.patch.object(
+                graph,
+                "_historical_artifact_lineage_head",
+                return_value=before,
+            ), mock.patch.object(
+                graph,
+                "_fp047_start_snapshot_successor",
+                return_value=None,
+            ), mock.patch.object(
+                graph,
+                "_resource_pilot_current_state_successor_bridge",
+                return_value=None,
+            ):
+                self.assertFalse(
+                    graph._successor_lineage_reaches_live(
+                        root,
+                        {},
+                        (relative, before),
+                        checkpoint={},
+                        fp011_live_artifacts={},
+                        fp011_transitions={},
+                        fp013_artifacts={},
+                        fp015_artifacts={},
+                        fp014_artifacts={},
+                        fp047_artifacts={},
+                        fp048_artifacts={relative: (before, fp048_after)},
+                        fp046_artifacts={},
+                        npc_recovery_artifacts={
+                            "backend/app/main.py": (
+                                hashlib.sha256(b"backend-before").hexdigest(),
+                                hashlib.sha256(b"backend-after").hexdigest(),
+                            )
+                        },
+                    )
+                )
+
+    def test_historical_implementation_seals_remain_immutable(self) -> None:
+        expected = {
+            "WS-GOAL-EPIC-03-FP-008-R001": (
+                "d5d7eca6873b5b5744c6ad8a0f55b41f0b4a94cb0aa109381a9b05c6b64aee9b"
+            ),
+            "WS-GOAL-EPIC-03-FP-046-R001": graph.FP046_IMPLEMENTATION_SHA256,
+            "WS-GOAL-EPIC-03-FP-048-R001": (
+                graph.FP048_ANDROID_REPORT_RESULT_SHA256_BY_KIND[
+                    "IMPLEMENTATION_RECORD"
+                ]
+            ),
+        }
+        for goal_id, digest in expected.items():
+            with self.subTest(goal_id=goal_id):
+                self.assertEqual(
+                    sha256_file(
+                        ROOT
+                        / "docs/control/execution/goal-results"
+                        / goal_id
+                        / "implementation-record.json"
+                    ),
+                    digest,
+                )
+
+
+class WalkSafeFp022CompletionGraphSuffixTest(unittest.TestCase):
+    def test_seq69_source_has_no_completion_semantics(self) -> None:
+        checkpoint = load_json(ROOT / graph.V24_CHECKPOINT_RELATIVE)
+        self.assertEqual(
+            graph.validate_fp022_completion_seq70_71(ROOT, checkpoint),
+            [],
+        )
+
+    def test_resealed_incomplete_completion_suffix_fails_closed(self) -> None:
+        checkpoint = load_json(ROOT / graph.V24_CHECKPOINT_RELATIVE)
+        state = checkpoint["goal_execution"]
+        if len(state["transition_history"]) >= 71:
+            del state["transition_history"][69:]
+        for sequence, event_type in ((70, "CANONICAL_BINDINGS_UPDATED"), (71, "GOAL_COMPLETED")):
+            event = copy.deepcopy(state["transition_history"][-1])
+            event.update(
+                {
+                    "sequence": sequence,
+                    "event_id": f"WS-FORGED-FP022-{sequence}",
+                    "event_type": event_type,
+                    "previous_event_sha256": state["transition_history"][-1]["event_sha256"],
+                }
+            )
+            event["event_sha256"] = graph.continuation.event_sha256(event)
+            state["transition_history"].append(event)
+        errors = graph.validate_fp022_completion_seq70_71(ROOT, checkpoint)
+        joined = "\n".join(errors)
+        self.assertIn("FP022 completion seq70 ID", joined)
 
 
 if __name__ == "__main__":

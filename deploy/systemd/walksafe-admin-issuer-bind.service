@@ -1,0 +1,31 @@
+[Unit]
+Description=WalkSafe one-time administrator issuer-key binding
+After=network-online.target walksafe-backend-migrate.service
+Wants=network-online.target
+Requires=walksafe-backend-migrate.service
+Before=walksafe-backend.service
+Conflicts=walksafe-backend.service
+
+[Service]
+Type=oneshot
+User=walksafe-issuer-bind
+Group=walksafe-issuer-bind
+WorkingDirectory=/srv/walksafe/backend
+Environment=PYTHONPATH=/srv/walksafe/backend
+Environment=PYTHONDONTWRITEBYTECODE=1
+EnvironmentFile=/etc/walksafe/backend-migration.env
+UMask=0077
+LoadCredential=admin-credential-issuer.key:/etc/walksafe/admin-credential-issuer.key
+ExecStart=/srv/walksafe/backend/.venv/bin/python /srv/walksafe/backend/scripts/bind_walksafe_admin_credential_issuer_key.py --admin-id walksafe.admin --issuer-key-file %d/admin-credential-issuer.key --issuer-key-source systemd-credential
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+InaccessiblePaths=/etc/walksafe/backend-runtime.env /etc/walksafe/backend-migration.env /etc/walksafe/backend.env /etc/walksafe/admin-credential-issuer.key

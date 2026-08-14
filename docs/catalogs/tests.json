@@ -3,9 +3,9 @@
     "ANDROID_ADMIN": 12,
     "ANDROID_GATEWAY": 12,
     "ANDROID_USER": 114,
-    "BACKEND": 28,
-    "CONTROL": 82,
-    "CROSS_REPOSITORY": 48,
+    "BACKEND": 31,
+    "CONTROL": 100,
+    "CROSS_REPOSITORY": 67,
     "LEGACY_WEB": 20,
     "MODEL_DATA": 8,
     "TOOLING": 13,
@@ -1131,6 +1131,20 @@
       "framework": "PYTEST",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_credential_issuer_binding.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_credential_issuer_key.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
       "path": "backend/tests/test_admin_device_proof.py"
     },
     {
@@ -1139,6 +1153,13 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "backend/tests/test_admin_report_workflow.py"
+    },
+    {
+      "area": "BACKEND",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "backend/tests/test_admin_runtime_acl_hardening.py"
     },
     {
       "area": "BACKEND",
@@ -1397,7 +1418,231 @@
       "framework": "PYTEST",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
       "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "test-runner-historical-array",
+      "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_bind_walksafe_admin_credential_issuer_key.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "predecessor-version",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r027_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_phase1_exact257_successor_r015_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_phase1_exact257_successor_r016_20260813.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_workstream_aggregate_review_20260813.py"
     },
     {
       "area": "CROSS_REPOSITORY",
@@ -1468,6 +1713,20 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "tests/test_repository_catalogs.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py"
     },
     {
       "area": "MODEL_DATA",
@@ -2046,6 +2305,20 @@
     {
       "area": "CONTROL",
       "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp022_goal_seq66_67_20260813.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_fp022_goal_start_gate_20260813.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_fp035_correction_candidate.py"
@@ -2277,6 +2550,13 @@
     {
       "area": "CROSS_REPOSITORY",
       "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_walksafe_npc_single_admin_recovery_start_gate_contract_r002_20260812.py"
+    },
+    {
+      "area": "CROSS_REPOSITORY",
+      "framework": "PYTEST",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_walksafe_operator_attestation.py"
@@ -2412,15 +2692,15 @@
     "ANDROID_INSTRUMENTATION_JUNIT": 2,
     "JUNIT": 124,
     "NODE_TEST": 12,
-    "PYTEST": 182,
+    "PYTEST": 222,
     "PYTHON_CLI": 2,
     "TYPESCRIPT_POLICY": 20
   },
   "lifecycle_counts": {
-    "CURRENT": 213,
-    "HISTORICAL": 129
+    "CURRENT": 251,
+    "HISTORICAL": 131
   },
-  "path_count": 342,
+  "path_count": 382,
   "schema_version": "1.0",
   "selection": [
     "test_*.py",
@@ -2438,5 +2718,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "1d62c3b6db29ab4f9f5c6e496832de8afcc0a91f36a3233c0e826d77e7a13ff7"
+  "source_set_sha256": "5383b60c7a38bafe56a0ed28817481b5303ea437300cfad9f3e7a325ec4ebaec"
 }

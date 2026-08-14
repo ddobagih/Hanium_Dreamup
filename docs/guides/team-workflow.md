@@ -6,7 +6,7 @@
 
 1. [프로젝트 가이드](project-guide.md)에서 제품 경계와 완료 판단을 확인합니다.
 2. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)의 focus, ready frontier, `next_action`을 확인합니다.
-3. [수정 백로그 r025](../control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json)에서 선행 의존성과 남은 Gap을 확인합니다.
+3. [수정 백로그 r026](../control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)에서 선행 의존성과 남은 Gap을 확인합니다.
 4. [기능 구현·분담 목록](../planning/walksafe_feature_implementation_catalog.html)에서 분야·우선순위·상태를 좁히고 담당 충돌을 확인합니다.
 5. 현재 실행 권한이 없는 Goal이나 외부 증거가 필요한 항목은 구현 완료로 잡지 않습니다.
 

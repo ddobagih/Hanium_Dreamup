@@ -53,12 +53,27 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/apply_walksafe_fp046_goal_started_seq53_20260809.py',
         'scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py',
         'scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py',
+        'scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py',
+        'scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py',
+        'scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py',
+        'scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py',
+        'scripts/build_walksafe_fp022_seq66_67_review_20260814.py',
+        'scripts/build_walksafe_fp022_seq68_69_review_20260814.py',
+        'scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py',
+        'scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py',
+        'scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py',
         'scripts/apply_walksafe_goal_graph_v2_4_seq39_20260729.py',
+        'scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py',
+        'scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py',
+        'scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py',
         'scripts/apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py',
+        'scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py',
+        'scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py',
         'scripts/audit_project_classification_20260708.py',
         'scripts/audit_submission_visual_privacy_20260711.py',
         'scripts/audit_walksafe_test_report_contamination_20260711.py',
         'scripts/backup_walksafe_data_20260711.sh',
+        'scripts/bind_walksafe_admin_credential_issuer_key.py',
         'scripts/build_design_documents_20260710.py',
         'scripts/build_latest_model_report_20260710.py',
         'scripts/build_midterm_design_ppt_20260712.py',
@@ -125,9 +140,28 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/build_walksafe_full_rc_20260713.py',
         'scripts/build_walksafe_goal_graph_v2_3.py',
         'scripts/build_walksafe_goal_graph_v2_4.py',
+        'scripts/build_walksafe_workstream_aggregate_review_20260813.py',
+        'scripts/build_walksafe_historical_git_witness_20260812.py',
         'scripts/build_walksafe_implementation_gap_analysis_20260722.py',
         'scripts/build_walksafe_integrated_baseline.py',
         'scripts/build_walksafe_npc_permission_session_trace_20260724.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r027_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py',
+        'scripts/apply_walksafe_workstream_aggregate_seq63_65_20260813.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py',
+        'scripts/build_walksafe_npc_single_admin_recovery_trace_20260812.py',
+        'scripts/build_walksafe_phase1_exact257_successor_r016_20260813.py',
+        'scripts/build_walksafe_phase1_exact257_successor_r015_20260812.py',
         'scripts/build_walksafe_phase1_exact257_successor_r011_20260729.py',
         'scripts/build_walksafe_phase1_exact257_successor_r012_20260802.py',
         'scripts/build_walksafe_phase1_exact257_successor_r013_20260803.py',
@@ -235,6 +269,9 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/run_walksafe_fp008_session_resume_gate_20260809.py',
         'scripts/run_walksafe_fp046_goal_start_gate_20260809.py',
         'scripts/run_walksafe_fp048_goal_start_gate_20260802.py',
+        'scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py',
+        'scripts/run_walksafe_fp022_goal_start_gate_20260813.py',
+        'scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py',
         'scripts/run_walksafe_isolated_python_20260713.py',
         'scripts/run_walksafe_log_retention_20260711.sh',
         'scripts/run_walksafe_product_quality_20260713.py',
@@ -424,6 +461,7 @@ HISTORICAL_SCRIPT_EXACT = frozenset(
         "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
         "scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py",
         "scripts/apply_walksafe_goal_graph_v2_4_seq39_20260729.py",
+        "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py",
         "scripts/build_walksafe_epic01_phase_b_trace_20260722.py",
         "scripts/build_walksafe_epic01_phase_c_trace_20260722.py",
         "scripts/build_walksafe_epic01_phase_e_android_gateway_trace_20260723.py",
@@ -502,6 +540,7 @@ DB_DEVICE_SCRIPT_EXACT = frozenset(
     {
         "scripts/audit_walksafe_test_report_contamination_20260711.py",
         "scripts/backup_walksafe_data_20260711.sh",
+        "scripts/bind_walksafe_admin_credential_issuer_key.py",
         "scripts/check_report_retention_dry_run.py",
         "scripts/check_walksafe_test_database_20260713.py",
         "scripts/check_detect_report_export_trace_20260524.py",
@@ -514,6 +553,7 @@ DB_DEVICE_SCRIPT_EXACT = frozenset(
         "scripts/pull_android_field_sessions_20260710.py",
         "scripts/restore_walksafe_backup_drill_20260711.sh",
         "scripts/run_walksafe_log_retention_20260711.sh",
+        "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
         "scripts/run_walksafe_report_retention_20260717.sh",
         "scripts/walksafe_admin_high_risk_gate.py",
         "scripts/walksafe_backup_integrity.py",
@@ -537,6 +577,13 @@ REPOSITORY_WRITE_SCRIPT_EXACT = frozenset(
         "scripts/export_android_tflite_models_20260531.py",
         "scripts/generate_repository_catalogs.py",
         "scripts/generate_walksafe_openapi.py",
+        "scripts/build_walksafe_historical_git_witness_20260812.py",
+        "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+        "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+        "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py",
+        "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+        "scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py",
+        "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
         "scripts/restore_walksafe_private_evidence_modes.py",
         "scripts/manage_local_model_registry.py",
         "scripts/run_walksafe_submission_python_20260714.py",
@@ -721,8 +768,19 @@ def _read_json(root: Path, path: str) -> Mapping[str, Any]:
     return value
 
 
-def load_checkpoint_attributes(root: Path, universe: set[str]) -> dict[str, Any]:
-    checkpoint = _read_json(root, CHECKPOINT_PATH)
+def load_checkpoint_attributes(
+    root: Path,
+    universe: set[str],
+    *,
+    checkpoint_override: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    if checkpoint_override is not None and not isinstance(checkpoint_override, Mapping):
+        raise CatalogError("checkpoint override must be an object")
+    checkpoint = (
+        _read_json(root, CHECKPOINT_PATH)
+        if checkpoint_override is None
+        else checkpoint_override
+    )
     try:
         snapshot = checkpoint["working_tree_snapshot"]
         managed_values = snapshot["managed_changed_paths"]
@@ -1139,10 +1197,19 @@ def stable_json_bytes(value: Mapping[str, Any]) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
-def build_catalog_bytes(root: Path, paths: tuple[str, ...] | None = None) -> dict[str, bytes]:
+def build_catalog_bytes(
+    root: Path,
+    paths: tuple[str, ...] | None = None,
+    *,
+    checkpoint_override: Mapping[str, Any] | None = None,
+) -> dict[str, bytes]:
     root = root.resolve()
     source_paths = discover_source_paths(root) if paths is None else tuple(sorted(set(paths) | set(OUTPUT_PATHS)))
-    checkpoint = load_checkpoint_attributes(root, set(source_paths))
+    checkpoint = load_checkpoint_attributes(
+        root,
+        set(source_paths),
+        checkpoint_override=checkpoint_override,
+    )
     catalogs = {
         OUTPUT_PATHS[0]: build_repository_catalog(root, source_paths, checkpoint),
         OUTPUT_PATHS[1]: build_script_catalog(root, source_paths),

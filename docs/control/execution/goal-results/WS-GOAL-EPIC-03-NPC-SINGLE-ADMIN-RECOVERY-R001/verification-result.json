@@ -1,0 +1,54 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-20260812-001",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "implementation_content_set_sha256": "f31df4ef3a98a22dbc84809ce19a542c41c2eec9238f956cb0133eb2b33a7057",
+  "implementation_record_sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4",
+  "internal_lane_count": 4,
+  "kind": "VERIFICATION_RESULT",
+  "lane_receipts": [
+    {
+      "lane_id": "ADMIN_ANDROID_UNIT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/lanes/admin_android_unit.json",
+      "sha256": "085994079d37900d5c68db08e8cf6f3bdd885bae4a42b9b3a2c1ca8849504941"
+    },
+    {
+      "lane_id": "ADMIN_ANDROID_ASSEMBLE_LINT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/lanes/admin_android_assemble_lint.json",
+      "sha256": "6d22c8214c9db46caf436e0300194052ad5fdb15736ef419929895830eec6d02"
+    },
+    {
+      "lane_id": "BACKEND_RECOVERY_PYTEST",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/lanes/backend_recovery_pytest.json",
+      "sha256": "5b59c79500ca0025b6c6f8c28b8bb2d96bb2372c281c9a4035a5a7ab19c3743f"
+    },
+    {
+      "lane_id": "RECOVERY_GATE_CLI_PYTEST",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/lanes/recovery_gate_cli_pytest.json",
+      "sha256": "7cd7064baede25529701858411c2a009c01a89d7d55cfb9441e4e89f12d6afd4"
+    }
+  ],
+  "observed_at": "2026-08-13T07:12:01.612093+09:00",
+  "schema_version": "1.0",
+  "status": "PASS_INTERNAL",
+  "verification_result_content_sha256": "d68c168e5574bd601d3f51e8b41e63e0168f8e89432081e52ccdf92639e3c0d4"
+}

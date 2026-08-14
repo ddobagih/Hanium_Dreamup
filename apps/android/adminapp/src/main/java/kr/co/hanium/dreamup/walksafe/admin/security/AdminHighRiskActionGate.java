@@ -7,9 +7,54 @@ public final class AdminHighRiskActionGate {
     public static final String RECONFIRMATION_NONCE_HEADER = "X-WalkSafe-Reconfirm-Nonce";
 
     public enum Action {
-        RELEASE_APPROVAL,
-        PRIVILEGE_CHANGE,
-        DATA_DELETE
+        RELEASE_APPROVAL(
+            "release.approval",
+            "POST",
+            "/admin/operations/release-approvals"
+        ),
+        PRIVILEGE_CHANGE(
+            "privilege.change",
+            "POST",
+            "/admin/operations/privilege-changes"
+        ),
+        DATA_DELETE(
+            "data.delete",
+            "POST",
+            "/admin/operations/data-deletions"
+        );
+
+        private final String reauthenticationAction;
+        private final String method;
+        private final String path;
+
+        Action(String reauthenticationAction, String method, String path) {
+            this.reauthenticationAction = reauthenticationAction;
+            this.method = method;
+            this.path = path;
+        }
+
+        public String reauthenticationAction() {
+            return reauthenticationAction;
+        }
+
+        public String method() {
+            return method;
+        }
+
+        public String path() {
+            return path;
+        }
+
+        public static Action fromExactTriple(String action, String method, String path) {
+            for (Action candidate : values()) {
+                if (candidate.name().equals(action)
+                    && candidate.method.equals(method)
+                    && candidate.path.equals(path)) {
+                    return candidate;
+                }
+            }
+            throw new IllegalArgumentException("unsupported high-risk action binding");
+        }
     }
 
     public static final class Decision {
@@ -37,20 +82,15 @@ public final class AdminHighRiskActionGate {
     }
 
     public static final class Binding {
-        private final String action;
-        private final String method;
-        private final String path;
+        private final Action action;
         private final String nonce;
         private final long expiresAtEpochMs;
 
-        public Binding(String action, String method, String path, String nonce, long expiresAtEpochMs) {
-            if (action == null || method == null || path == null
-                || !isCanonicalNonce(nonce)) {
+        public Binding(Action action, String nonce, long expiresAtEpochMs) {
+            if (action == null || !isCanonicalNonce(nonce)) {
                 throw new IllegalArgumentException("invalid reauthentication binding");
             }
             this.action = action;
-            this.method = method;
-            this.path = path;
             this.nonce = nonce;
             this.expiresAtEpochMs = expiresAtEpochMs;
         }
@@ -76,36 +116,40 @@ public final class AdminHighRiskActionGate {
     public static Decision evaluate(
         Action action,
         AdminSecurityState securityState,
+        AdminRecoveryCustodyState recoveryCustodyState,
         long reauthenticatedUntilEpochMs,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) {
         if (action == null || securityState == null) return denied("invalid_security_context");
         if (securityState != AdminSecurityState.NORMAL) return denied("administrator_access_not_normal");
+        if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+            return denied("recovery_custody_not_attested");
+        }
         if (!operationalWorkflowsEnabled) return denied("operational_workflows_locked");
         if (reauthenticatedUntilEpochMs <= nowEpochMs) return denied("recent_reauthentication_required");
         return denied("reconfirmation_binding_required");
     }
 
     public static Decision evaluate(
-        String action,
-        String method,
-        String path,
+        Action action,
         AdminSecurityState securityState,
+        AdminRecoveryCustodyState recoveryCustodyState,
         Binding binding,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) {
-        if (action == null || method == null || path == null || securityState == null) {
+        if (action == null || securityState == null) {
             return denied("invalid_security_context");
         }
         if (securityState != AdminSecurityState.NORMAL) return denied("administrator_access_not_normal");
+        if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+            return denied("recovery_custody_not_attested");
+        }
         if (!operationalWorkflowsEnabled) return denied("operational_workflows_locked");
         if (binding == null) return denied("reconfirmation_binding_required");
         if (binding.expiresAtEpochMs <= nowEpochMs) return denied("recent_reauthentication_required");
-        if (!binding.action.equals(action)
-            || !binding.method.equals(method)
-            || !binding.path.equals(path)) {
+        if (binding.action != action) {
             return denied("reconfirmation_binding_mismatch");
         }
         return new Decision(

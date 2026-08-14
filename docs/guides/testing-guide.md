@@ -34,7 +34,7 @@
 
 Integration의 unsigned release 정적 빌드는 사용자 Gateway와 관리자 API에 예약된 `.invalid` HTTPS origin을 주입한다. 필요하면 `WALKSAFE_RELEASE_TEST_GATEWAY_ORIGIN`과 `WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN`으로 정확한 테스트 origin을 바꿀 수 있지만, 이 값과 unsigned APK는 실제 배포 endpoint·서명·출시 증거가 아니다.
 
-### 2026-08-11 runner inventory 정리
+### 2026-08-13 runner inventory 정리
 
 다음 명령은 테스트 본문을 실행하지 않고 모든 Python 테스트가 정확히 한 분류에 속하는지 확인한다.
 
@@ -44,7 +44,7 @@ test -x "$PYTHON_BIN"
 PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh validate
 ```
 
-존재하지 않던 v2.5 후보 경로는 분류에서 제거했다. 완료된 FP046 snapshot 6개는 역사 제어에, live checkpoint를 읽지 않고 임시 fixture만 사용하는 NPC 도구 테스트 2개는 단위 계층에 등록했다. 새 중앙 문서 계약 테스트도 단위 계층에 포함한다. Git에 보존되지 않은 옛 AIHub183 helper를 import하는 테스트는 실행 가능한 모델 감사로 가장하지 않고 역사 inventory에 둔다. 이 inventory PASS는 파일 분류가 완전하다는 뜻일 뿐 테스트 본문 PASS나 제품 완료를 뜻하지 않는다.
+존재하지 않던 v2.5 후보 경로는 분류에서 제거했다. 완료된 FP046 snapshot 6개는 역사 제어에 둔다. NPC seq56/57 materialization, R002 contract, seq58 reanchor, 8-check start gate, seq59 correction과 seq60 start를 임시 fixture로 검증하는 현재 테스트 7개는 단위 계층에 등록하고, publication 전에 대체된 seq59 start projection은 역사 제어에 둔다. 새 중앙 문서 계약 테스트도 단위 계층에 포함한다. Git에 보존되지 않은 옛 AIHub183 helper를 import하는 테스트는 실행 가능한 모델 감사로 가장하지 않고 역사 inventory에 둔다. NPC completion 생성기 test 파일도 `validate`가 요구하는 정확히 한 분류에 등록한 뒤에만 현행 계층 결과에 포함한다. 이 inventory PASS와 completion projection 단위검사는 제품 observation, Goal 완료, 실제 custody·기기·복구훈련 또는 정식 시험 증거가 아니다. 해당 실행과 5개 release gate는 모두 `NOT_RUN`(미면제), 출시는 `NOT_ELIGIBLE`로 유지한다.
 
 모델·데이터 감사와 세션 결속 검사는 필요할 때 각각 별도로 실행한다.
 
@@ -62,7 +62,7 @@ PYTHON_BIN="$PYTHON_BIN" scripts/run_walksafe_test_layers_current.sh active-sess
 | Android 관리자 JVM | [`apps/android/adminapp/src/test`](../../apps/android/adminapp/src/test), `:adminapp:testDebugUnitTest` | 관리자 인증, 기기증명, 고위험 작업 gate, strict JSON·endpoint 정책 | Java 21, Android SDK | 실제 관리자 기기 분실·복구훈련, 운영 권한·DB 판정 아님 |
 | Android 관리자 instrumentation | `apps/android/adminapp/src/androidTest` | 현재 테스트 소스 없음 | 새 시험과 기기 환경을 먼저 준비해야 함 | JVM PASS로 기기 결속·생체/PIN·복구훈련을 완료 처리할 수 없음 |
 | Android Gateway | [`apps/android-gateway/test`](../../apps/android-gateway/test), `npm --prefix apps/android-gateway test` | 독립 Gateway의 계약, 암호화 저장, 동의·삭제·telemetry·field ledger | 잠긴 Node, `npm ci` | 배포 endpoint, 실제 Android 연결, Backend/TMAP 운영 품질 아님 |
-| Backend | [`backend/tests`](../../backend/tests), 계층 runner | FastAPI 계약, PostGIS 저장·보존, 보안·개인정보, detect/navigation | 단위 일부를 제외하면 격리 PostGIS와 migration | 운영 DB·외부 TMAP·실제 object storage·부하·침투시험 아님 |
+| Backend | [`backend/tests`](../../backend/tests), 계층 runner | FastAPI/OpenAPI, predecessor 0·1·2행 migration preflight, singleton·custody reset, runtime unaudited update 거부, 대상 key/session 폐기, device proof와 `NORMAL`+`ATTESTED` 고위험 gate | 단위 일부를 제외하면 격리 PostGIS와 migration | forged same-transaction audit, offline migration SQL, 운영 DB·실기기·복구훈련·외부 TMAP·침투시험 아님 |
 | 모델·데이터 | [`model/test_two_model_runtime.py`](../../model/test_two_model_runtime.py), `MODEL_AUDIT_PYTHON_TESTS`, integration smoke | runtime 조합, registry·tensor 계약, offline 데이터 무결성 | 모델·데이터·런타임별 의존성 | 정확도·동등성·실기기 FPS·발열·안전성을 자동으로 증명하지 않음 |
 | Legacy Web/PWA | [`apps/web`](../../apps/web), 계층 runner의 Node 작업 | 폐쇄된 과거 Web 경계와 회귀 snapshot 보존 | 잠긴 Node와 package lock | 현재 Android 제품·출시·현장 E2E 증거가 아니며 새 기능 기준으로 사용하지 않음 |
 | 저장소 제어·Python 계약 | [`tests`](../../tests), 계층 runner | 산출물·정책·Goal·도구·경계의 결정적 회귀 | 테스트별 source/checkpoint 전제 | 문서 구조 PASS를 기능 실행·승인·외부 검수로 승격할 수 없음 |

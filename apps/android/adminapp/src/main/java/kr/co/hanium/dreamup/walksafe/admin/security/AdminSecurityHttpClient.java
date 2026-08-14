@@ -7,6 +7,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -14,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -50,7 +54,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     private final int deviceKeyVersion;
     private final AdminDeviceProof.Signer signer;
     private final AdminOperationsHttpClient.Clock clock;
+    private String boundAccessTokenSha256;
+    private String boundAdminId;
     private String boundDeviceId;
+    private String boundSessionId;
     private String recoveryAdminId;
 
     public AdminSecurityHttpClient(
@@ -103,7 +110,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String deviceId,
         String deviceLabel
     ) throws IOException {
-        recoveryAdminId = null;
+        clearLocalBinding();
         String safeAdminId = requireAdminId(adminId);
         String safeDeviceId = requireIdentifier(deviceId, "invalid_device_id");
         byte[] body = jsonBytes(
@@ -124,7 +131,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             publicHeaders(safeDeviceId)
         );
         LoginResult result = parseLoginResult(response);
+        boundAccessTokenSha256 = tokenSha256(result.accessToken());
+        boundAdminId = safeAdminId;
         boundDeviceId = safeDeviceId;
+        boundSessionId = result.currentSessionId();
         return result;
     }
 
@@ -134,9 +144,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     @Override
-    public synchronized List<SessionInfo> getSessions(String accessToken) throws IOException {
+    public synchronized DeviceInventory getDeviceInventory(String accessToken) throws IOException {
         JSONObject response = get("/admin/security/sessions", protectedHeaders(accessToken));
-        requireExactKeys(response, Set.of("sessions"));
+        boolean legacyResponse = hasExactKeys(response, Set.of("sessions"));
+        if (!legacyResponse) requireExactKeys(response, Set.of("sessions", "devices"));
         JSONArray array = requiredArray(response, "sessions");
         if (array.length() > 100) throw new IOException("too many administrator sessions");
         List<SessionInfo> sessions = new ArrayList<>();
@@ -158,7 +169,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             if (!sessionIds.add(sessionId)) throw new IOException("duplicate administrator session id");
             if (current) {
                 currentCount += 1;
-                if (revoked || !deviceId.equals(boundDeviceId)) {
+                if (revoked || !deviceId.equals(boundDeviceId) || !sessionId.equals(boundSessionId)) {
                     throw new IOException("current administrator session binding is invalid");
                 }
             }
@@ -168,11 +179,48 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
                 requiredText(item, "device_label", 128),
                 current,
                 revoked,
-                requiredText(item, "last_seen_at", 128)
+                requiredAwareRfc3339(item, "last_seen_at", 128)
             ));
         }
         if (currentCount != 1) throw new IOException("one current administrator session is required");
-        return List.copyOf(sessions);
+
+        if (legacyResponse) {
+            Set<String> activeDeviceIds = new TreeSet<>();
+            for (SessionInfo session : sessions) {
+                if (!session.isRevoked()) activeDeviceIds.add(session.deviceId());
+            }
+            List<DeviceInfo> devices = new ArrayList<>();
+            for (String deviceId : activeDeviceIds) {
+                devices.add(new DeviceInfo(deviceId, deviceId.equals(boundDeviceId)));
+            }
+            return new DeviceInventory(sessions, devices);
+        }
+
+        JSONArray deviceArray = requiredArray(response, "devices");
+        if (deviceArray.length() > 100) throw new IOException("too many administrator devices");
+        List<DeviceInfo> devices = new ArrayList<>();
+        Set<String> deviceIds = new HashSet<>();
+        int currentDeviceCount = 0;
+        for (int index = 0; index < deviceArray.length(); index++) {
+            JSONObject item = deviceArray.optJSONObject(index);
+            if (item == null) throw new IOException("invalid administrator device item");
+            requireExactKeys(item, Set.of("device_id", "current"));
+            if (!(item.opt("current") instanceof Boolean)) {
+                throw new IOException("invalid administrator device flags");
+            }
+            String deviceId = requiredIdentifier(item, "device_id");
+            boolean current = item.optBoolean("current", false);
+            if (!deviceIds.add(deviceId)) throw new IOException("duplicate administrator device id");
+            if (current) {
+                currentDeviceCount += 1;
+                if (!deviceId.equals(boundDeviceId)) {
+                    throw new IOException("current administrator device binding is invalid");
+                }
+            }
+            devices.add(new DeviceInfo(deviceId, current));
+        }
+        if (currentDeviceCount != 1) throw new IOException("one current administrator device is required");
+        return new DeviceInventory(sessions, devices);
     }
 
     @Override
@@ -184,6 +232,53 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             protectedHeaders(accessToken)
         );
         return parseState(response);
+    }
+
+    @Override
+    public synchronized StateSnapshot attestRecoveryCustody(
+        String accessToken,
+        RecoveryCustodyAttestation attestation
+    ) throws IOException {
+        if (attestation == null) throw new IOException("recovery custody attestation is required");
+        String path = "/admin/security/recovery-custody/attest";
+        byte[] body = jsonBytes(
+            jsonObject(
+                "custody_reference", attestation.custodyReference(),
+                "material_kind", attestation.materialKind().name(),
+                "storage_location", attestation.storageLocation().name(),
+                "separate_encrypted_backup_confirmed",
+                attestation.isSeparateEncryptedBackupConfirmed()
+            )
+        );
+        JSONObject response = actionProofPost(
+            path,
+            "recovery.custody.attest",
+            accessToken,
+            body
+        );
+        return parseState(response);
+    }
+
+    @Override
+    public synchronized StateSnapshot reportLostDevice(String accessToken, String deviceId) throws IOException {
+        String safeDeviceId = requireIdentifier(deviceId, "invalid_lost_device_id");
+        if (safeDeviceId.equals(boundDeviceId)) throw new IOException("current device cannot be reported lost");
+        String path = "/admin/security/devices/" + safeDeviceId + "/report-lost";
+        return parseState(actionProofPost(
+            path,
+            "device.report_lost",
+            accessToken,
+            jsonBytes(new JSONObject())
+        ));
+    }
+
+    @Override
+    public synchronized void clearLocalBinding() {
+        boundAccessTokenSha256 = null;
+        boundAdminId = null;
+        boundDeviceId = null;
+        boundSessionId = null;
+        recoveryAdminId = null;
     }
 
     @Override
@@ -238,7 +333,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String deviceId,
         String deviceLabel
     ) throws IOException {
-        recoveryAdminId = null;
+        clearLocalBinding();
         JSONObject response = post(
             "/admin/security/recovery/start",
             jsonObject(
@@ -266,6 +361,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String deviceLabel
     ) throws IOException {
         if (recoveryAdminId == null) throw new IOException("recovery administrator identity is unavailable");
+        String safeAdminId = requireAdminId(recoveryAdminId);
         String safeDeviceId = requireIdentifier(deviceId, "invalid_device_id");
         byte[] body = jsonBytes(
             jsonObject(
@@ -279,13 +375,16 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         JSONObject response = proofPost(
             "/admin/security/recovery/complete",
             AdminDeviceProof.Purpose.RECOVERY_COMPLETE,
-            recoveryAdminId,
+            safeAdminId,
             safeDeviceId,
             body,
             publicHeaders(safeDeviceId)
         );
         LoginResult result = parseLoginResult(response);
+        boundAccessTokenSha256 = tokenSha256(result.accessToken());
+        boundAdminId = safeAdminId;
         boundDeviceId = safeDeviceId;
+        boundSessionId = result.currentSessionId();
         recoveryAdminId = null;
         return result;
     }
@@ -306,9 +405,43 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         byte[] body,
         Map<String, String> baseHeaders
     ) throws IOException {
+        return proofPost(path, purpose, adminId, deviceId, body, baseHeaders, null, null);
+    }
+
+    private JSONObject actionProofPost(
+        String path,
+        String action,
+        String accessToken,
+        byte[] body
+    ) throws IOException {
+        if (boundAdminId == null || boundSessionId == null) {
+            throw new IOException("administrator session identity binding is unavailable");
+        }
+        return proofPost(
+            path,
+            AdminDeviceProof.Purpose.ACTION,
+            boundAdminId,
+            boundDeviceId,
+            body,
+            protectedHeaders(accessToken),
+            action,
+            boundSessionId
+        );
+    }
+
+    private JSONObject proofPost(
+        String path,
+        AdminDeviceProof.Purpose purpose,
+        String adminId,
+        String deviceId,
+        byte[] body,
+        Map<String, String> baseHeaders,
+        String action,
+        String sessionId
+    ) throws IOException {
         String correlationId = UUID.randomUUID().toString();
         AdminDeviceProof.Intent intent = new AdminDeviceProof.Intent(
-            null,
+            action,
             adminId,
             AdminCanonicalEncoding.sha256Hex(body),
             correlationId,
@@ -320,7 +453,7 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
             purpose,
             AdminCanonicalEncoding.sha256Hex(new byte[0]),
             null,
-            null
+            sessionId
         );
         Map<String, String> challengeHeaders = new LinkedHashMap<>(baseHeaders);
         challengeHeaders.put(AdminOperationsHttpClient.CORRELATION_ID_HEADER, correlationId);
@@ -381,9 +514,15 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private Map<String, String> protectedHeaders(String token) throws IOException {
-        if (boundDeviceId == null) throw new IOException("administrator device binding is unavailable");
+        if (boundDeviceId == null || boundAccessTokenSha256 == null) {
+            throw new IOException("administrator device binding is unavailable");
+        }
+        String safeToken = requireToken(token);
+        if (!boundAccessTokenSha256.equals(tokenSha256(safeToken))) {
+            throw new IOException("administrator access token binding does not match");
+        }
         Map<String, String> headers = new LinkedHashMap<>(publicHeaders(boundDeviceId));
-        headers.put("Authorization", "Bearer " + requireToken(token));
+        headers.put("Authorization", "Bearer " + safeToken);
         return Map.copyOf(headers);
     }
 
@@ -406,12 +545,47 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private static StateSnapshot parseState(JSONObject response) throws IOException {
-        requireExactKeys(response, Set.of("security_state", "state_version", "observed_at"));
+        boolean legacyResponse = hasExactKeys(response, Set.of(
+            "security_state",
+            "state_version",
+            "observed_at"
+        ));
+        AdminRecoveryCustodyState custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        String custodyAttestedAt = null;
+        if (!legacyResponse) {
+            requireExactKeys(response, Set.of(
+                "security_state",
+                "state_version",
+                "observed_at",
+                "recovery_custody_state",
+                "recovery_custody_attested_at"
+            ));
+            custodyState = requiredRecoveryCustodyState(response);
+            custodyAttestedAt = nullableAwareRfc3339(
+                response,
+                "recovery_custody_attested_at",
+                128
+            );
+            if ((custodyState == AdminRecoveryCustodyState.ATTESTED) != (custodyAttestedAt != null)) {
+                throw new IOException("inconsistent recovery custody attestation state");
+            }
+        }
         return new StateSnapshot(
             requiredState(response),
             requiredText(response, "state_version", 128),
-            requiredText(response, "observed_at", 128)
+            requiredAwareRfc3339(response, "observed_at", 128),
+            custodyState,
+            custodyAttestedAt
         );
+    }
+
+    private static AdminRecoveryCustodyState requiredRecoveryCustodyState(JSONObject response)
+        throws IOException {
+        Object raw = response.opt("recovery_custody_state");
+        if (!(raw instanceof String)) throw new IOException("invalid recovery custody state type");
+        AdminRecoveryCustodyState state = AdminRecoveryCustodyState.fromWireValue((String) raw);
+        if (state == null) throw new IOException("unknown recovery custody state");
+        return state;
     }
 
     private static AdminSecurityState requiredState(JSONObject response) throws IOException {
@@ -456,6 +630,45 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         return value;
     }
 
+    private static String nullableText(JSONObject response, String key, int maxLength) throws IOException {
+        Object raw = response.opt(key);
+        if (raw == null) throw new IOException("missing response field: " + key);
+        if (raw == JSONObject.NULL) return null;
+        if (!(raw instanceof String)) throw new IOException("invalid response field type: " + key);
+        String value = (String) raw;
+        if (value.isBlank() || value.length() > maxLength || containsControl(value)) {
+            throw new IOException("invalid response field: " + key);
+        }
+        return value;
+    }
+
+    private static String nullableAwareRfc3339(JSONObject response, String key, int maxLength)
+        throws IOException {
+        String value = nullableText(response, key, maxLength);
+        if (value == null) return null;
+        return requireAwareRfc3339(value, key);
+    }
+
+    private static String requiredAwareRfc3339(JSONObject response, String key, int maxLength)
+        throws IOException {
+        return requireAwareRfc3339(requiredText(response, key, maxLength), key);
+    }
+
+    private static String requireAwareRfc3339(String value, String key) throws IOException {
+        if (!value.matches(
+            "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+                + "(?:\\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})"
+        )) {
+            throw new IOException("invalid timezone-aware timestamp: " + key);
+        }
+        try {
+            OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            return value;
+        } catch (DateTimeParseException error) {
+            throw new IOException("invalid timezone-aware timestamp: " + key, error);
+        }
+    }
+
     private static String requiredToken(JSONObject response, String key) throws IOException {
         Object raw = response.opt(key);
         if (!(raw instanceof String)) throw new IOException("invalid response field type: " + key);
@@ -466,6 +679,10 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
         String token = requireSecret(value, "invalid opaque token", 32, 512);
         if (token.chars().anyMatch(Character::isWhitespace)) throw new IOException("invalid opaque token");
         return token;
+    }
+
+    private static String tokenSha256(String token) {
+        return AdminCanonicalEncoding.sha256Hex(token.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String requireAdminId(String value) throws IOException {
@@ -575,9 +792,15 @@ public final class AdminSecurityHttpClient implements AdminSecurityApi {
     }
 
     private static void requireExactKeys(JSONObject value, Set<String> expected) throws IOException {
+        if (!hasExactKeys(value, expected)) {
+            throw new IOException("administrator API response fields do not match the contract");
+        }
+    }
+
+    private static boolean hasExactKeys(JSONObject value, Set<String> expected) {
         Set<String> actual = new HashSet<>();
         value.keys().forEachRemaining(actual::add);
-        if (!actual.equals(expected)) throw new IOException("administrator API response fields do not match the contract");
+        return actual.equals(expected);
     }
 
     private static JSONObject jsonObject(Object... keyValues) throws IOException {

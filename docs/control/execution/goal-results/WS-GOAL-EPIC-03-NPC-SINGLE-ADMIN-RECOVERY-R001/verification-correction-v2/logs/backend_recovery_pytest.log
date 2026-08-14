@@ -1,0 +1,81 @@
+WALKSAFE_NPC_VERIFICATION_LOG_BEGIN
+WALKSAFE_NPC_VERIFICATION_SCHEMA walksafe.npc-single-admin-recovery-verification-lane.v2
+WALKSAFE_NPC_VERIFICATION_RUN_ID NPC-RECOVERY-90c3addd9209478e2f6b48dbcdc643ae
+WALKSAFE_NPC_VERIFICATION_SOURCE_CONTENT_SET_SHA256 c3560526a30b6f7b0f3e8442bbe972bc5bc20064b6bda8488ad76aff45449145
+WALKSAFE_NPC_VERIFICATION_LANE_ID BACKEND_RECOVERY_PYTEST
+WALKSAFE_NPC_VERIFICATION_CWD .
+WALKSAFE_NPC_VERIFICATION_STARTED_AT 2026-08-13T12:45:12.103042+09:00
+WALKSAFE_NPC_VERIFICATION_COMMAND_COUNT 6
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 1
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 -B scripts/check_walksafe_test_database_20260713.py"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 1
+| test database preflight PASS: walksafe_npc_test_formal_20260813
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 1
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 1
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 1 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 1
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 2
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=${WALKSAFE_TEST_DATABASE_URL} python3 -B scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py --emit-database-state-receipt PRE_MIGRATION"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 2
+| WALKSAFE_NPC_DATABASE_STATE_RECEIPT {"application_rows_recorded":false,"catalog_component_seals":{"columns":{"row_count":357,"sha256":"c7a3290d562e4cbb31dd81490e42c4e1c283bb69bf7aa2f96bbfb849ddbcf2ec"},"constraints":{"row_count":231,"sha256":"6cf1250d237e9c539f792d92c48f9e00b965675cb0b485e6625f4714458a2483"},"effective_acl_privileges":{"row_count":1909,"sha256":"9ed2422a06a4bedf8e9e9da44870ae278fa579360ecf6699354d4b95844d717f"},"functions":{"row_count":795,"sha256":"8a660f3abbcab6c3cecaf2003f4ac577f50e0d5314885b75944560e6c643e744"},"indexes":{"row_count":149,"sha256":"7dfdacbf5e1f68307da2c899d80fd7a4551df5cdde25c8b7bfc01d04e9f4c358"},"relations":{"row_count":189,"sha256":"e9cbfd44e610806c4148a5c8988c286d398785bfe976354b4060a35a072f4e2f"},"rls_policies":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"safe_control_rows":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"schema_database_default_acl":{"row_count":2,"sha256":"04a212b67174626d7d030f00dc62e45b554db2f25b080e2d8ebf23c7a9e4f324"},"triggers":{"row_count":40,"sha256":"7781b9219f89a170d27faeaa274a34a1758e91b215636a9164d7c7f52bb224ea"},"walksafe_role_memberships":{"row_count":1,"sha256":"445a3715b6986a6a4178bcd4235cbb36e97a6c9b355af30faa915d598b0a7736"},"walksafe_roles":{"row_count":4,"sha256":"f13b79cc340fb4db3981d2f1d87c04ff63cd610791001f31baf9a213aa947e91"}},"current_database_sha256":"134fb875a42314786a11cc031053775179741f00f9b5a61534612c83e2a56e68","database_url_recorded":false,"phase":"PRE_MIGRATION","relevant_state_sha256":"91581d88c1b83a1a503ece4ab9fe49062988cf2916155792fef2c516492ee7a0","schema":"walksafe.npc-database-runtime-state.v2","schema_migration_heads":["202608120001"],"server_identity_sha256":"a14987de7a606e292ac9888708944dfb8ad543e2a6c09f72b9e77e23717cda6e"}
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 2
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 2
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 2
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 2 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 2
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 3
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=${WALKSAFE_TEST_DATABASE_URL} python3 -B -m alembic -c backend/alembic.ini upgrade head"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 3
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 3
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 3
+| INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+| INFO  [alembic.runtime.migration] Will assume transactional DDL.
+| INFO  [alembic.runtime.migration] Running upgrade 202608120001 -> 202608130001, harden administrator runtime ACL and recovery startup binding
+WALKSAFE_NPC_VERIFICATION_STDERR_END 3
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 3 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 3
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 4
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=${WALKSAFE_TEST_DATABASE_URL} python3 -B scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py --emit-database-state-receipt AFTER_MIGRATION"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 4
+| WALKSAFE_NPC_DATABASE_STATE_RECEIPT {"application_rows_recorded":false,"catalog_component_seals":{"columns":{"row_count":357,"sha256":"c7a3290d562e4cbb31dd81490e42c4e1c283bb69bf7aa2f96bbfb849ddbcf2ec"},"constraints":{"row_count":232,"sha256":"37d1111ecf63fb7b396f77b14238beefcd4d06e6bbed6a5588168bc051f2a882"},"effective_acl_privileges":{"row_count":1914,"sha256":"401318ada8dee9380537c6b3a71b524ed207d2eb3ebd04cef79326586ff1f5b6"},"functions":{"row_count":799,"sha256":"be2878e7059f655a38977b314eb95526f913dce2b29d25ee1a2e2a6b43a8dc43"},"indexes":{"row_count":149,"sha256":"7dfdacbf5e1f68307da2c899d80fd7a4551df5cdde25c8b7bfc01d04e9f4c358"},"relations":{"row_count":189,"sha256":"e9cbfd44e610806c4148a5c8988c286d398785bfe976354b4060a35a072f4e2f"},"rls_policies":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"safe_control_rows":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"schema_database_default_acl":{"row_count":2,"sha256":"04a212b67174626d7d030f00dc62e45b554db2f25b080e2d8ebf23c7a9e4f324"},"triggers":{"row_count":43,"sha256":"9d0eea7a544a9e33074db807c767c4bd931035ff27476218b7b0ec5078845440"},"walksafe_role_memberships":{"row_count":1,"sha256":"445a3715b6986a6a4178bcd4235cbb36e97a6c9b355af30faa915d598b0a7736"},"walksafe_roles":{"row_count":4,"sha256":"f13b79cc340fb4db3981d2f1d87c04ff63cd610791001f31baf9a213aa947e91"}},"current_database_sha256":"134fb875a42314786a11cc031053775179741f00f9b5a61534612c83e2a56e68","database_url_recorded":false,"phase":"AFTER_MIGRATION","relevant_state_sha256":"f30a691ab76dbbf1a21135f8a099f5db74ec1baaa796c3821eb4bf40c8376dac","schema":"walksafe.npc-database-runtime-state.v2","schema_migration_heads":["202608130001"],"server_identity_sha256":"a14987de7a606e292ac9888708944dfb8ad543e2a6c09f72b9e77e23717cda6e"}
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 4
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 4
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 4
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 4 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 4
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 5
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 -B -m pytest -p no:cacheprovider -q backend/tests/test_admin_security.py backend/tests/test_admin_credential_issuer_binding.py backend/tests/test_admin_credential_issuer_key.py backend/tests/test_admin_device_proof.py backend/tests/test_admin_runtime_acl_hardening.py backend/tests/test_field_test_security.py backend/tests/test_fp008_postgres_integration.py backend/tests/test_health_readiness.py backend/tests/test_inference_process.py backend/tests/test_openapi_contract.py backend/tests/test_report_image_keyring.py backend/tests/test_report_original_access.py backend/tests/test_report_storage_reconciliation.py tests/test_bind_walksafe_admin_credential_issuer_key.py tests/test_walksafe_full_rc_tooling.py"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 5
+| ........................................................................ [ 15%]
+| ........................................................................ [ 31%]
+| ........................................................................ [ 47%]
+| ........................................................................ [ 62%]
+| ........................................................................ [ 78%]
+| ........................................................................ [ 94%]
+| ...........................                                              [100%]
+| 459 passed in 538.12s (0:08:58)
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 5
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 5
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 5
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 5 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 5
+WALKSAFE_NPC_VERIFICATION_COMMAND_BEGIN 6
+WALKSAFE_NPC_VERIFICATION_LOGICAL_COMMAND "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. DATABASE_URL=${WALKSAFE_TEST_DATABASE_URL} python3 -B scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py --emit-database-state-receipt AFTER_TEST"
+WALKSAFE_NPC_VERIFICATION_STDOUT_BEGIN 6
+| WALKSAFE_NPC_DATABASE_STATE_RECEIPT {"application_rows_recorded":false,"catalog_component_seals":{"columns":{"row_count":357,"sha256":"c7a3290d562e4cbb31dd81490e42c4e1c283bb69bf7aa2f96bbfb849ddbcf2ec"},"constraints":{"row_count":232,"sha256":"37d1111ecf63fb7b396f77b14238beefcd4d06e6bbed6a5588168bc051f2a882"},"effective_acl_privileges":{"row_count":1914,"sha256":"401318ada8dee9380537c6b3a71b524ed207d2eb3ebd04cef79326586ff1f5b6"},"functions":{"row_count":799,"sha256":"be2878e7059f655a38977b314eb95526f913dce2b29d25ee1a2e2a6b43a8dc43"},"indexes":{"row_count":149,"sha256":"7dfdacbf5e1f68307da2c899d80fd7a4551df5cdde25c8b7bfc01d04e9f4c358"},"relations":{"row_count":189,"sha256":"e9cbfd44e610806c4148a5c8988c286d398785bfe976354b4060a35a072f4e2f"},"rls_policies":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"safe_control_rows":{"row_count":0,"sha256":"4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"},"schema_database_default_acl":{"row_count":2,"sha256":"04a212b67174626d7d030f00dc62e45b554db2f25b080e2d8ebf23c7a9e4f324"},"triggers":{"row_count":43,"sha256":"9d0eea7a544a9e33074db807c767c4bd931035ff27476218b7b0ec5078845440"},"walksafe_role_memberships":{"row_count":1,"sha256":"445a3715b6986a6a4178bcd4235cbb36e97a6c9b355af30faa915d598b0a7736"},"walksafe_roles":{"row_count":4,"sha256":"f13b79cc340fb4db3981d2f1d87c04ff63cd610791001f31baf9a213aa947e91"}},"current_database_sha256":"134fb875a42314786a11cc031053775179741f00f9b5a61534612c83e2a56e68","database_url_recorded":false,"phase":"AFTER_TEST","relevant_state_sha256":"f30a691ab76dbbf1a21135f8a099f5db74ec1baaa796c3821eb4bf40c8376dac","schema":"walksafe.npc-database-runtime-state.v2","schema_migration_heads":["202608130001"],"server_identity_sha256":"a14987de7a606e292ac9888708944dfb8ad543e2a6c09f72b9e77e23717cda6e"}
+WALKSAFE_NPC_VERIFICATION_STDOUT_END 6
+WALKSAFE_NPC_VERIFICATION_STDERR_BEGIN 6
+| <empty>
+WALKSAFE_NPC_VERIFICATION_STDERR_END 6
+WALKSAFE_NPC_VERIFICATION_COMMAND_EXIT_CODE 6 0
+WALKSAFE_NPC_VERIFICATION_COMMAND_END 6
+WALKSAFE_NPC_VERIFICATION_ENDED_AT 2026-08-13T12:54:13.194010+09:00
+WALKSAFE_NPC_VERIFICATION_EXIT_CODE 0
+WALKSAFE_NPC_VERIFICATION_STATUS PASS
+WALKSAFE_NPC_VERIFICATION_LOG_END

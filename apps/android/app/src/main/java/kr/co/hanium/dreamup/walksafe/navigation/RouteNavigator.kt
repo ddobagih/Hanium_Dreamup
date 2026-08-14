@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe.navigation
 
 import java.security.MessageDigest
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 data class RouteNavigatorConfig(
@@ -9,11 +10,21 @@ data class RouteNavigatorConfig(
     val arrivalConfirmSamples: Int = 2,
     val offRouteDistanceM: Double = 35.0,
     val offRouteConfirmSamples: Int = 2,
-    val rerouteCooldownMs: Long = 20_000L,
-    val maxRerouteCount: Int = 3,
     val guidanceIntervalMs: Long = 6_000L,
     val maximumProgressBacktrackM: Double = 8.0,
     val maximumProgressAdvanceM: Double = 80.0,
+)
+
+enum class RouteNavigatorUserDecision {
+    REROUTE,
+    ARRIVAL_CONFIRMATION,
+}
+
+data class RouteNavigatorDecisionToken(
+    val routeRevision: Long,
+    val decisionRevision: Long,
+    val routeId: String,
+    val decision: RouteNavigatorUserDecision,
 )
 
 data class RouteNavigatorUpdate(
@@ -23,7 +34,15 @@ data class RouteNavigatorUpdate(
     val shouldReroute: Boolean,
     val reason: String,
     val guideIndex: Int? = null,
-)
+    val pendingUserDecision: RouteNavigatorUserDecision? = null,
+    val stepProgressConsistent: Boolean? = null,
+) {
+    val userDecisionRequired: Boolean
+        get() = pendingUserDecision != null
+
+    val arrivalCandidate: Boolean
+        get() = pendingUserDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION
+}
 
 /** Frame-independent identity and nearest-segment evidence for the currently installed TMAP route. */
 data class ActiveRouteProjection(
@@ -43,14 +62,17 @@ class RouteNavigator(
     private val config: RouteNavigatorConfig = RouteNavigatorConfig(),
 ) {
     private var route: WalkingRoute? = null
+    private var routeRevision = 0L
+    private var decisionRevision = 0L
     private var activeRouteId: String? = null
     private var requestedDestination: RoutePoint? = null
     private var nextGuideIndex = 0
     private var lastGuidanceAtMs: Long? = null
-    private var lastRerouteAtMs: Long? = null
-    private var rerouteCount = 0
     private var offRouteSampleCount = 0
     private var arrivalSampleCount = 0
+    private var pendingDecision: RouteNavigatorUserDecision? = null
+    private var offRouteGuidanceSuspended = false
+    private var rerouteApprovedForCurrentDeviation = false
     private var progressDistanceM: Double? = null
     private var latestRouteBearingDeg: Float? = null
     private var announcedGuideIndex: Int? = null
@@ -60,8 +82,8 @@ class RouteNavigator(
     fun setRoute(
         route: WalkingRoute,
         destination: RoutePoint? = null,
-        resetRerouteBudget: Boolean = true,
     ) {
+        routeRevision += 1L
         this.route = route
         activeRouteId = route.providerRouteId?.trim()?.takeIf(String::isNotEmpty) ?: route.localRouteFingerprint()
         requestedDestination = destination
@@ -69,27 +91,28 @@ class RouteNavigator(
         lastGuidanceAtMs = null
         offRouteSampleCount = 0
         arrivalSampleCount = 0
+        updatePendingDecision(null)
+        offRouteGuidanceSuspended = false
+        rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
         latestRouteBearingDeg = null
         announcedGuideIndex = null
         closestDistanceToAnnouncedGuideM = null
-        if (resetRerouteBudget) {
-            lastRerouteAtMs = null
-            rerouteCount = 0
-        }
     }
 
     @Synchronized
     fun clear() {
+        routeRevision += 1L
         route = null
         activeRouteId = null
         requestedDestination = null
         nextGuideIndex = 0
         lastGuidanceAtMs = null
-        lastRerouteAtMs = null
-        rerouteCount = 0
         offRouteSampleCount = 0
         arrivalSampleCount = 0
+        updatePendingDecision(null)
+        offRouteGuidanceSuspended = false
+        rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
         latestRouteBearingDeg = null
         announcedGuideIndex = null
@@ -106,6 +129,16 @@ class RouteNavigator(
 
     @Synchronized
     fun hasRoute(): Boolean = route != null
+
+    @Synchronized
+    fun pendingUserDecision(): RouteNavigatorUserDecision? = pendingDecision
+
+    @Synchronized
+    fun pendingDecisionToken(): RouteNavigatorDecisionToken? {
+        val decision = pendingDecision ?: return null
+        val routeId = activeRouteId ?: return null
+        return RouteNavigatorDecisionToken(routeRevision, decisionRevision, routeId, decision)
+    }
 
     @Synchronized
     fun currentRouteId(): String? = activeRouteId
@@ -134,7 +167,7 @@ class RouteNavigator(
     @Synchronized
     fun currentInstruction(location: TrustedLocation): String? {
         val currentRoute = route ?: return null
-        if (offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)) return null
+        if (offRouteGuidanceSuspended || pendingDecision != null) return null
         return instructionForCurrentGuide(currentRoute, location).text
     }
 
@@ -142,10 +175,6 @@ class RouteNavigator(
     @Synchronized
     fun acknowledgeInstruction(update: RouteNavigatorUpdate, spokenAtMs: Long) {
         if (update.instruction == null) return
-        if (update.arrived && update.reason == "arrival_radius") {
-            clear()
-            return
-        }
         lastGuidanceAtMs = spokenAtMs
         if (update.reason == "route_guidance" && update.guideIndex == nextGuideIndex) {
             announcedGuideIndex = update.guideIndex
@@ -164,10 +193,65 @@ class RouteNavigator(
     }
 
     @Synchronized
+    fun approveReroute(): RouteNavigatorUpdate {
+        if (route == null || pendingDecision != RouteNavigatorUserDecision.REROUTE) {
+            return RouteNavigatorUpdate(null, false, false, false, "reroute_decision_missing")
+        }
+        updatePendingDecision(null)
+        rerouteApprovedForCurrentDeviation = true
+        return RouteNavigatorUpdate(
+            instruction = "사용자 선택으로 새 경로를 찾습니다.",
+            arrived = false,
+            offRoute = true,
+            shouldReroute = true,
+            reason = "off_route_reroute_approved",
+        )
+    }
+
+    @Synchronized
+    fun rerouteRequestFailed() {
+        if (route == null || !offRouteGuidanceSuspended) return
+        rerouteApprovedForCurrentDeviation = false
+        updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+    }
+
+    @Synchronized
+    fun confirmArrival(): RouteNavigatorUpdate {
+        if (route == null || pendingDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+            return RouteNavigatorUpdate(null, false, false, false, "arrival_confirmation_missing")
+        }
+        clear()
+        return RouteNavigatorUpdate(
+            instruction = "도착을 확인했습니다. 길안내를 종료합니다.",
+            arrived = true,
+            offRoute = false,
+            shouldReroute = false,
+            reason = "arrival_confirmed",
+        )
+    }
+
+    @Synchronized
+    fun rejectArrival(): RouteNavigatorUpdate {
+        if (route == null || pendingDecision != RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+            return RouteNavigatorUpdate(null, false, false, false, "arrival_confirmation_missing")
+        }
+        updatePendingDecision(null)
+        arrivalSampleCount = 0
+        return RouteNavigatorUpdate(
+            instruction = "도착하지 않은 것으로 확인했습니다. 현재 경로를 유지합니다.",
+            arrived = false,
+            offRoute = false,
+            shouldReroute = false,
+            reason = "arrival_rejected_route_retained",
+        )
+    }
+
+    @Synchronized
     fun update(
         location: TrustedLocation,
         nowMs: Long,
         requestInFlight: Boolean,
+        stepProgressM: Double? = null,
     ): RouteNavigatorUpdate {
         val currentRoute = route ?: return RouteNavigatorUpdate(null, false, false, false, "route_missing")
         val routeEndpoint = currentRoute.polyline.lastOrNull()
@@ -192,44 +276,72 @@ class RouteNavigator(
             latestRouteBearingDeg = projection.bearingDeg
         }
         advanceAnnouncedPassedGuides(currentRoute, location, progressDistanceM)
-        val remainingM = haversineMeters(location.latitude, location.longitude, destination.latitude, destination.longitude)
-        val remainingRouteM = progressDistanceM?.let { currentRoute.summary.distanceM - it }
+        val remainingToDestinationM = haversineMeters(
+            location.latitude,
+            location.longitude,
+            destination.latitude,
+            destination.longitude,
+        )
+        val remainingRouteM = progressDistanceM?.let { (currentRoute.summary.distanceM - it).coerceAtLeast(0.0) }
         val nearRouteEnd = remainingRouteM != null &&
             remainingRouteM <= maxOf(20.0, config.arrivalRadiusM + location.accuracyM)
-        val arrivalEvidence = nearRouteEnd &&
+        val authoritativeArrivalEvidence = nearRouteEnd &&
             location.accuracyM <= config.arrivalMaxAccuracyM &&
-            remainingM + location.accuracyM <= config.arrivalRadiusM
+            remainingToDestinationM + location.accuracyM <= config.arrivalRadiusM
+        val stepProgressConsistent = stepProgressM?.let { stepProgress ->
+            stepProgress.isFinite() &&
+                stepProgress >= 0.0 &&
+                progressDistanceM?.let { routeProgress ->
+                    abs(stepProgress - routeProgress) <= maxOf(
+                        config.maximumProgressAdvanceM,
+                        location.accuracyM.toDouble() * 2.0,
+                    )
+                } != false
+        }
+        val arrivalEvidence = authoritativeArrivalEvidence
+        if (pendingDecision == RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION) {
+            return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
+        }
         arrivalSampleCount = if (arrivalEvidence) arrivalSampleCount + 1 else 0
         if (arrivalSampleCount >= config.arrivalConfirmSamples.coerceAtLeast(1)) {
-            return RouteNavigatorUpdate("목적지에 도착했습니다.", arrived = true, offRoute = false, shouldReroute = false, reason = "arrival_radius")
+            updatePendingDecision(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION)
+            return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
         }
         val offRouteCandidate = distanceToRouteM - location.accuracyM > config.offRouteDistanceM
         offRouteSampleCount = if (offRouteCandidate) offRouteSampleCount + 1 else 0
         val offRoute = offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)
-        val rerouteAllowed = offRoute &&
-            !requestInFlight &&
-            rerouteCount < config.maxRerouteCount &&
-            (lastRerouteAtMs == null || nowMs - requireNotNull(lastRerouteAtMs) >= config.rerouteCooldownMs)
-        if (rerouteAllowed) {
-            rerouteCount += 1
-            lastRerouteAtMs = nowMs
-            return RouteNavigatorUpdate("경로를 벗어났습니다. 경로를 다시 찾습니다.", false, true, true, "off_route_reroute")
+        if (!offRouteCandidate) {
+            offRouteGuidanceSuspended = false
+            rerouteApprovedForCurrentDeviation = false
+            if (pendingDecision == RouteNavigatorUserDecision.REROUTE) updatePendingDecision(null)
         }
         if (offRouteCandidate && !offRoute) {
             return RouteNavigatorUpdate(null, arrived = false, offRoute = false, shouldReroute = false, reason = "off_route_pending")
         }
 
         if (offRoute) {
-            val lastGuidance = lastGuidanceAtMs
-            if (lastGuidance != null && nowMs - lastGuidance < config.guidanceIntervalMs) {
-                return RouteNavigatorUpdate(null, false, true, false, "off_route_waiting_rate_limited")
+            offRouteGuidanceSuspended = true
+            if (rerouteApprovedForCurrentDeviation) {
+                return RouteNavigatorUpdate(
+                    instruction = null,
+                    arrived = false,
+                    offRoute = true,
+                    shouldReroute = false,
+                    reason = if (requestInFlight) {
+                        "off_route_reroute_approved_in_flight"
+                    } else {
+                        "off_route_reroute_approved_waiting"
+                    },
+                )
             }
+            updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
             return RouteNavigatorUpdate(
-                "경로를 벗어났습니다. 안전한 위치에서 재탐색을 기다려 주세요.",
+                "경로를 벗어나 현재 방향 안내를 중지했습니다. 새 경로를 찾을지 사용자 선택이 필요합니다.",
                 arrived = false,
                 offRoute = true,
                 shouldReroute = false,
-                reason = "off_route_waiting",
+                reason = "off_route_user_decision_required",
+                pendingUserDecision = RouteNavigatorUserDecision.REROUTE,
             )
         }
 
@@ -246,7 +358,26 @@ class RouteNavigator(
             shouldReroute = false,
             reason = "route_guidance",
             guideIndex = guideInstruction.guideIndex,
+            stepProgressConsistent = stepProgressConsistent,
         )
+    }
+
+    private fun arrivalConfirmationRequiredUpdate(stepProgressConsistent: Boolean?): RouteNavigatorUpdate {
+        return RouteNavigatorUpdate(
+            instruction = "도착 후보입니다. 실제로 도착했다면 확인하고, 아니면 거절해 주세요.",
+            arrived = false,
+            offRoute = false,
+            shouldReroute = false,
+            reason = "arrival_confirmation_required",
+            pendingUserDecision = RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION,
+            stepProgressConsistent = stepProgressConsistent,
+        )
+    }
+
+    private fun updatePendingDecision(decision: RouteNavigatorUserDecision?) {
+        if (pendingDecision == decision) return
+        pendingDecision = decision
+        decisionRevision += 1L
     }
 
     private fun advanceAnnouncedPassedGuides(
@@ -286,26 +417,42 @@ class RouteNavigator(
             CrosswalkReferencePolicy.noticeFor(guide)?.let { notice ->
                 return RouteInstruction(text = notice, guideIndex = nextGuideIndex)
             }
-            val distanceM = haversineMeters(location.latitude, location.longitude, guide.point.latitude, guide.point.longitude).roundToInt()
-            val text = guide.instruction?.takeIf { it.isNotBlank() } ?: "전방 ${distanceM}m 지점까지 이동하세요."
+            val routeDistanceToGuideM = progressDistanceM?.let { progressM ->
+                guide.distanceFromStartM?.let { guideProgressM ->
+                    (guideProgressM - progressM).coerceAtLeast(0.0).roundToInt()
+                }
+            }
+            val instruction = guide.instruction?.takeIf { it.isNotBlank() }
+            val text = instruction ?: routeDistanceToGuideM?.let { distanceM ->
+                "TMAP 경로 기준 전방 ${distanceM}m 안내 지점까지 이동하세요."
+            } ?: "다음 TMAP 안내 지점까지 이동하세요."
             return RouteInstruction(
-                text = if (distanceM > 0 && guide.instruction != null) "${distanceM}m 앞, $text" else text,
+                text = if (routeDistanceToGuideM != null && routeDistanceToGuideM > 0 && instruction != null) {
+                    "TMAP 경로 기준 ${routeDistanceToGuideM}m 앞, $text"
+                } else {
+                    text
+                },
                 guideIndex = nextGuideIndex,
             )
         }
         val endpoint = route.polyline.last()
         val destination = requestedDestination ?: endpoint
         val endpointGapM = haversineMeters(endpoint.latitude, endpoint.longitude, destination.latitude, destination.longitude)
-        val remainingM = haversineMeters(location.latitude, location.longitude, destination.latitude, destination.longitude).roundToInt()
-        val endpointRemainingM = haversineMeters(location.latitude, location.longitude, endpoint.latitude, endpoint.longitude).roundToInt()
+        val routeRemainingM = progressDistanceM?.let { progressM ->
+            (route.summary.distanceM - progressM).coerceAtLeast(0.0).roundToInt()
+        }
         val text = if (endpointGapM > config.arrivalRadiusM) {
-            if (endpointRemainingM <= maxOf(20, location.accuracyM.roundToInt())) {
-                "TMAP 경로 종점입니다. 목적지가 약 ${remainingM}m 떨어져 있어 최종 접근을 확인하세요."
+            if (routeRemainingM == null) {
+                "저장된 TMAP 경로 기준 남은 거리를 확인 중입니다."
+            } else if (routeRemainingM <= maxOf(20, location.accuracyM.roundToInt())) {
+                "TMAP 경로 종점입니다. 요청한 목적지의 최종 접근을 확인하세요."
             } else {
-                "TMAP 경로 종점까지 약 ${endpointRemainingM}m, 목적지까지 약 ${remainingM}m 남았습니다."
+                "저장된 TMAP 경로 기준 종점까지 약 ${routeRemainingM}m 남았습니다."
             }
         } else {
-            "목적지까지 약 ${remainingM}m 남았습니다."
+            routeRemainingM?.let { remainingM ->
+                "저장된 TMAP 경로 기준 목적지까지 약 ${remainingM}m 남았습니다."
+            } ?: "저장된 TMAP 경로 기준 남은 거리를 확인 중입니다."
         }
         return RouteInstruction(text = text, guideIndex = null)
     }
