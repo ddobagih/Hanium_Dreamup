@@ -239,6 +239,13 @@ def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> Non
     assert "update-environment: false" in workflow
     assert "steps.backup_python.outputs.python-path" in workflow
     assert "steps.general_base_python.outputs.python-path" in workflow
+    assert 'NPC_REANCHOR_BASE_COMMIT: "f0093863e82bfc80d9f11915cef33a51d44b8730"' in workflow
+    assert 'NPC_REANCHOR_HEAD_COMMIT: "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"' in workflow
+    assert 'origin "${NPC_REANCHOR_HEAD_COMMIT:?}"' in workflow
+    assert '--depth=8' in workflow
+    ancestry_check = workflow.index("git merge-base --is-ancestor")
+    assert "${NPC_REANCHOR_BASE_COMMIT:?}" in workflow[ancestry_check : ancestry_check + 200]
+    assert "${NPC_REANCHOR_HEAD_COMMIT:?}" in workflow[ancestry_check : ancestry_check + 200]
     assert (
         '"${GENERAL_BASE_PYTHON}" -I -B scripts/restore_walksafe_private_evidence_modes.py'
         in workflow
