@@ -11,7 +11,7 @@
   },
   "classification_counts": {
     "CURRENT_PRODUCT": 285,
-    "EVIDENCE": 2365,
+    "EVIDENCE": 2368,
     "GENERATED": 4,
     "GOVERNANCE": 253,
     "LEGACY_REFERENCE": 214,
@@ -72062,6 +72062,84 @@
       "checkpoint": {
         "canonical_bindings": [],
         "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R004/assignment.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R004/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R004/review-result.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
         "managed": true,
         "path_bound": true,
         "static_protected": false
@@ -99419,9 +99497,9 @@
     "ARCHIVE_AFTER_DECOUPLING": 196,
     "KEEP": 692,
     "KEEP_AS_STUB": 2,
-    "KEEP_AT_PATH": 2923
+    "KEEP_AT_PATH": 2926
   },
-  "path_count": 3813,
+  "path_count": 3816,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -99433,5 +99511,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "e4a2114f553916bb9a2afa05daee4f68b8947631b5f3ec25d37a118bfe3f43a0"
+  "source_set_sha256": "223a73229c8d8041d6ae544ebe0e2c4f9dc81990beaa6a65a05b59ceb01b7bb8"
 }

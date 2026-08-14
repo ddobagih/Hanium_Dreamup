@@ -6141,8 +6141,10 @@ def _overlay_reviewed_managed_closure_source_successors_r003(
     root: Path,
     mandatory: dict[str, str],
     rows: tuple[dict[str, Any], ...],
+    *,
+    superseded_paths: frozenset[str] = frozenset(),
 ) -> dict[str, str] | None:
-    """Overlay only the exact source successors approved by control R003."""
+    """Overlay exact R003 successors, exempting only the declared R004 delta."""
 
     from scripts import (
         build_walksafe_fp022_completion_seq70_71_review_20260814
@@ -6156,6 +6158,87 @@ def _overlay_reviewed_managed_closure_source_successors_r003(
         path.as_posix(): pin
         for path, pin in source_pins.items()
     }
+    permitted_superseded_paths = frozenset(
+        path.as_posix()
+        for path in (
+            fp022_completion_review
+            .CONTROL_SUCCESSOR_R004_MANAGED_CLOSURE_SOURCE_PINS
+        )
+    )
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+        or superseded_paths not in {frozenset(), permitted_superseded_paths}
+        or not superseded_paths.issubset(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        raw = (
+            _npc_exact_live_bytes(root, Path(relative))
+            if isinstance(relative, str)
+            else None
+        )
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+            or (
+                relative not in superseded_paths
+                and (
+                    raw is None
+                    or len(raw) != successor.get("byte_length")
+                    or continuation.sha256_bytes(raw)
+                    != successor.get("sha256")
+                )
+            )
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
+def _overlay_reviewed_managed_closure_source_successors_r004(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+) -> dict[str, str] | None:
+    """Overlay only the exact live source successor approved by control R004."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R004_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {path.as_posix(): pin for path, pin in source_pins.items()}
     if (
         not isinstance(rows, tuple)
         or len(rows) != len(expected)
@@ -6210,7 +6293,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
     root: Path,
     checkpoint: dict[str, Any],
 ) -> bool:
-    """Reproduce the mandatory R003 final-managed subset and snapshot mirror."""
+    """Reproduce the mandatory R004 final-managed subset and snapshot mirror."""
 
     try:
         from scripts import (
@@ -6293,7 +6376,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             else None
         )
         fp022_control_successor_context = (
-            fp022_completion_review.validated_control_successor_r003_context(
+            fp022_completion_review.validated_control_successor_r004_context(
                 root
             )
             if fp022_completion_suffix
@@ -6581,7 +6664,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
 
         if fp022_control_successor_context is not None:
             r002_reviewed_sources = (
-                fp022_control_successor_context
+                fp022_control_successor_context.predecessor
                 .predecessor_managed_closure_source_successors
             )
             overlaid_mandatory = (
@@ -6594,6 +6677,10 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             if overlaid_mandatory is None:
                 return False
             r003_reviewed_sources = (
+                fp022_control_successor_context
+                .predecessor.managed_closure_source_successors
+            )
+            r004_reviewed_sources = (
                 fp022_control_successor_context.managed_closure_source_successors
             )
             overlaid_mandatory = (
@@ -6601,6 +6688,18 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                     root,
                     overlaid_mandatory,
                     r003_reviewed_sources,
+                    superseded_paths=frozenset(
+                        row["path"] for row in r004_reviewed_sources
+                    ),
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors_r004(
+                    root,
+                    overlaid_mandatory,
+                    r004_reviewed_sources,
                 )
             )
             if overlaid_mandatory is None:

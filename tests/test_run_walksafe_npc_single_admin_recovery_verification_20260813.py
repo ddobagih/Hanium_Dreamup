@@ -1000,8 +1000,18 @@ def test_toolchain_rejects_java_home_that_differs_from_path(
     root = make_repository(tmp_path)
     visible = runner._capture_visible_inventory(root)
     closure = runner.execution_input_closure(visible)
+    alternative_java_home = tmp_path / "alternative-jdk"
+    alternative_bin = alternative_java_home / "bin"
+    alternative_bin.mkdir(parents=True)
+    for executable in ("java", "javac"):
+        stub = alternative_bin / executable
+        stub.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+    (alternative_java_home / "release").write_text(
+        'JAVA_VERSION="21"\n', encoding="utf-8"
+    )
     mismatched = environment()
-    mismatched["JAVA_HOME"] = "/usr/lib/jvm/java-17-openjdk-amd64"
+    mismatched["JAVA_HOME"] = str(alternative_java_home)
 
     with pytest.raises(runner.VerificationError, match="JAVA_HOME and PATH-selected"):
         runner._toolchain_receipt(
