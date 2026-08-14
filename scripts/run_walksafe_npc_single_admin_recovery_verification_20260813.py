@@ -2655,6 +2655,25 @@ def _single_directory(candidates: Sequence[Path], label: str) -> Path:
     return values[0]
 
 
+def _gradle_offline_module_seed_directories(module_root: Path) -> dict[str, Path]:
+    directories = {
+        path.name: path.resolve(strict=True)
+        for path in module_root.iterdir()
+        if path.is_dir()
+        and (
+            path.name == "files-2.1"
+            or path.name.startswith("metadata-")
+            or path.name.startswith("resources-")
+        )
+    }
+    require(
+        {"files-2.1"}.issubset(directories)
+        and any(name.startswith("metadata-") for name in directories),
+        "Gradle offline module seed is incomplete",
+    )
+    return directories
+
+
 def _toolchain_receipt(
     root: Path,
     closure: Mapping[str, object],
@@ -2707,21 +2726,8 @@ def _toolchain_receipt(
         "Gradle distribution",
     )
     gradle_module_root = (gradle_home / "caches/modules-2").resolve(strict=True)
-    gradle_seed_directories = {
-        path.name: path.resolve(strict=True)
-        for path in gradle_module_root.iterdir()
-        if path.is_dir()
-        and (
-            path.name == "files-2.1"
-            or path.name.startswith("metadata-")
-            or path.name.startswith("resources-")
-        )
-    }
-    require(
-        {"files-2.1"}.issubset(gradle_seed_directories)
-        and any(name.startswith("metadata-") for name in gradle_seed_directories)
-        and any(name.startswith("resources-") for name in gradle_seed_directories),
-        "Gradle offline module seed is incomplete",
+    gradle_seed_directories = _gradle_offline_module_seed_directories(
+        gradle_module_root
     )
     forbidden_gradle_injection = (
         gradle_home / "gradle.properties",

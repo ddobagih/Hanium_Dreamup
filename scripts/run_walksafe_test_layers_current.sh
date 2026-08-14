@@ -118,18 +118,12 @@ UNIT_PYTHON_TESTS=(
   tests/test_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py
   tests/test_walksafe_npc_single_admin_recovery_start_gate_contract_r002_20260812.py
   tests/test_apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py
-  tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py
   tests/test_run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py
-  tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py
-  tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py
-  tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py
   tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py
   tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r027_20260813.py
-  tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py
   tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py
   tests/test_build_walksafe_phase1_exact257_successor_r015_20260812.py
   tests/test_build_walksafe_phase1_exact257_successor_r016_20260813.py
-  tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py
   tests/test_build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py
   tests/test_build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py
   tests/test_build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py
@@ -138,24 +132,17 @@ UNIT_PYTHON_TESTS=(
   tests/test_build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py
   tests/test_build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py
   tests/test_build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py
-  tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py
   tests/test_build_walksafe_workstream_aggregate_review_20260813.py
-  tests/test_walksafe_fp022_goal_seq66_67_20260813.py
-  tests/test_walksafe_fp022_goal_start_gate_20260813.py
   tests/test_build_walksafe_fp022_seq66_67_review_20260814.py
-  tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py
-  tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py
   tests/test_build_walksafe_fp022_seq68_69_review_20260814.py
   tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py
   tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py
   tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py
   tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py
-  tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py
   tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py
   model/test_two_model_runtime.py
   backend/tests/test_admin_credential_issuer_binding.py
   backend/tests/test_admin_credential_issuer_key.py
-  backend/tests/test_admin_runtime_acl_hardening.py
   backend/tests/test_field_test_security.py
   backend/tests/test_health_readiness.py
   backend/tests/test_openapi_contract.py
@@ -171,6 +158,7 @@ FUNCTIONAL_PYTHON_TESTS=(
   backend/tests/test_admin_device_proof.py
   backend/tests/test_admin_report_workflow.py
   backend/tests/test_admin_security.py
+  backend/tests/test_admin_runtime_acl_hardening.py
   backend/tests/test_actor_rate_limit_store.py
   backend/tests/test_android_debug_logs.py
   backend/tests/test_backup_source.py
@@ -330,6 +318,20 @@ HISTORICAL_CONTROL_PYTHON_TESTS=(
   tests/test_walksafe_phase1_exact257_successor_r013_20260803.py
   tests/test_walksafe_fp008_strict_review_gate_20260803.py
   tests/test_walksafe_fp008_goal_completed_seq49_50_20260809.py
+  # These completed NPC recovery and FP022 transition suites require their
+  # original predecessor bytes. Keep them for history replay, not seq71 CI.
+  tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py
+  tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py
+  tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py
+  tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py
+  tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py
+  tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py
+  tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py
+  tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py
+  tests/test_walksafe_fp022_goal_seq66_67_20260813.py
+  tests/test_walksafe_fp022_goal_start_gate_20260813.py
+  tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py
+  tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py
   # Superseded before publication by the add-only seq59 correction/seq60 start.
   tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py
   tests/test_walksafe_fp046_goal_seq51_52_20260809.py
@@ -421,10 +423,10 @@ require_backup_integrity_python() {
 run_unit() (
   activate_locked_node_path
   unset WALKSAFE_TEST_DATABASE_URL DATABASE_URL
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
   PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q "${UNIT_PYTHON_TESTS[@]}"
   run_locked_npm test
   run_locked_gateway_npm test
-  (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
 )
 
 run_active_session_control() (

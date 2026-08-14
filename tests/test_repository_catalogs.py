@@ -338,15 +338,31 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             {"tests/test_walksafe_project_continuation_v2_4.py"},
         )
         for path in (
-            "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py",
             "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
-            "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
             "tests/test_build_walksafe_phase1_exact257_successor_r015_20260812.py",
-            "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
-            "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
             "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
         ):
             self.assertEqual(entries[path]["lifecycle"], "CURRENT", path)
+        for path in (
+            "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+            "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+            "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+            "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+            "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+            "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+            "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+            "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+            "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        ):
+            self.assertEqual(entries[path]["lifecycle"], "HISTORICAL", path)
+            self.assertEqual(
+                entries[path]["lifecycle_rule"],
+                "test-runner-historical-array",
+                path,
+            )
         self.assertTrue(all(entry["lifecycle"] == "HISTORICAL" for entry in entries.values() if entry["area"] == "LEGACY_WEB"))
         self.assertTrue(
             all(

@@ -11,7 +11,7 @@
   },
   "classification_counts": {
     "CURRENT_PRODUCT": 285,
-    "EVIDENCE": 2355,
+    "EVIDENCE": 2356,
     "GENERATED": 4,
     "GOVERNANCE": 252,
     "LEGACY_REFERENCE": 214,
@@ -18243,6 +18243,32 @@
       "path": "daylog/2026-08-13.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "daylog",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "daylog",
+      "path": "daylog/2026-08-15.md",
+      "path_kind": "FILE",
+      "reason": "repository rule daylog"
     },
     {
       "canonical": {
@@ -99081,9 +99107,9 @@
     "ARCHIVE_AFTER_DECOUPLING": 196,
     "KEEP": 689,
     "KEEP_AS_STUB": 2,
-    "KEEP_AT_PATH": 2913
+    "KEEP_AT_PATH": 2914
   },
-  "path_count": 3800,
+  "path_count": 3801,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -99095,5 +99121,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "5383b60c7a38bafe56a0ed28817481b5303ea437300cfad9f3e7a325ec4ebaec"
+  "source_set_sha256": "0b40357b304250bfe90af30284d8568e20e04698005454a8eeededc48c01aa51"
 }

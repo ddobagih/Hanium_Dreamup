@@ -334,7 +334,45 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
                 "HISTORICAL_CONTROL_PYTHON_TESTS=("
             )
         ]
+    unit_start = runner.index("UNIT_PYTHON_TESTS=(")
+    functional_start = runner.index("FUNCTIONAL_PYTHON_TESTS=(")
+    historical_start = runner.index("HISTORICAL_CONTROL_PYTHON_TESTS=(")
+    active_start = runner.index("ACTIVE_SESSION_CONTROL_PYTHON_TESTS=(")
+    unit_layer = runner[unit_start:functional_start]
+    functional_layer = runner[functional_start:historical_start]
+    historical_layer = runner[historical_start:active_start]
+    completed_transition_tests = (
+        "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+        "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+        "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+        "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+        "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+        "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+    )
+    for completed_test in completed_transition_tests:
+        assert completed_test not in unit_layer
+        assert completed_test in historical_layer
+    current_recovery_verifier = (
+        "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py"
+    )
+    assert current_recovery_verifier in unit_layer
+    assert current_recovery_verifier not in historical_layer
+    postgres_runtime_acl = "backend/tests/test_admin_runtime_acl_hardening.py"
+    assert postgres_runtime_acl not in unit_layer
+    assert postgres_runtime_acl in functional_layer
     assert "./gradlew testDebugUnitTest --no-daemon --rerun-tasks" in runner
+    run_unit_start = runner.index("run_unit() (")
+    run_unit_end = runner.index("\n)\n\nrun_active_session_control", run_unit_start)
+    run_unit = runner[run_unit_start:run_unit_end]
+    assert run_unit.index("./gradlew testDebugUnitTest") < run_unit.index(
+        '"${PYTHON_BIN}" -m pytest'
+    )
     assert (
         'WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
         'https://admin.walksafe.invalid}"'
@@ -376,9 +414,26 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     fake_python.chmod(0o755)
     fake_node_bin = tmp_path / "locked-node/bin"
     fake_node_bin.mkdir(parents=True)
+    fake_repo = tmp_path / "repo"
+    fake_runner = fake_repo / "scripts/run_walksafe_test_layers_current.sh"
+    fake_runner.parent.mkdir(parents=True)
+    fake_runner.write_text(runner, encoding="utf-8")
+    fake_runner.chmod(0o755)
+    configured_tests = re.findall(
+        r"(?m)^  ((?:backend/tests|tests|model)/test_[^ ]+\.py)$",
+        runner,
+    )
+    for relative in configured_tests:
+        placeholder = fake_repo / relative
+        placeholder.parent.mkdir(parents=True, exist_ok=True)
+        placeholder.write_text("", encoding="utf-8")
+    fake_gradlew = fake_repo / "apps/android/gradlew"
+    fake_gradlew.parent.mkdir(parents=True)
+    fake_gradlew.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_gradlew.chmod(0o755)
     completed = subprocess.run(
         ["bash", "scripts/run_walksafe_test_layers_current.sh", "unit"],
-        cwd=Path(__file__).resolve().parents[1],
+        cwd=fake_repo,
         env={
             **os.environ,
             "PYTHON_BIN": str(fake_python),

@@ -2245,9 +2245,14 @@ def upgrade() -> None:
           current_security_state text;
           public_totp_fingerprint text;
           private_totp_fingerprint text;
+          pending_recovery_token_sha256 text;
+          pending_recovery_expires_at timestamptz;
+          pending_next_totp_fingerprint text;
           supplied_token_sha256 text;
+          supplied_totp_fingerprint text;
           transaction_expires_at timestamptz;
           transaction_completed_at timestamptz;
+          previous_totp_secret_fingerprint text;
           newer_active_transaction_exists boolean;
           next_security_state text;
         BEGIN
@@ -2264,11 +2269,45 @@ def upgrade() -> None:
             pg_catalog.sha256(pg_catalog.convert_to(p_recovery_token, 'UTF8')),
             'hex'
           );
+          supplied_totp_fingerprint := pg_catalog.encode(
+            pg_catalog.sha256(
+              pg_catalog.convert_to(p_runtime_totp_secret, 'UTF8')
+            ),
+            'hex'
+          );
 
           IF NOT public.walksafe_assert_admin_totp_capability(
             p_admin_id,
             p_runtime_totp_secret,
             p_credential_issuer_key
+          ) AND (
+            NOT public.walksafe_assert_admin_credential_issuer_key(
+              p_admin_id,
+              p_credential_issuer_key
+            )
+            OR NOT EXISTS (
+              SELECT 1
+              FROM public.admin_security_controls AS control
+              JOIN public.walksafe_recovery_custody_capabilities AS capability
+                ON capability.admin_id = control.admin_id
+              JOIN public.admin_security_recovery_transactions AS recovery
+                ON recovery.admin_id = control.admin_id
+              WHERE control.admin_id = p_admin_id
+                AND recovery.id = p_transaction_id
+                AND recovery.recovery_token_sha256 = supplied_token_sha256
+                AND recovery.completed_at IS NULL
+                AND recovery.expires_at <= p_observed_at
+                AND recovery.previous_totp_secret_fingerprint IS NOT DISTINCT
+                  FROM capability.totp_secret_fingerprint
+                AND control.totp_secret_fingerprint IS NOT DISTINCT FROM
+                  capability.totp_secret_fingerprint
+                AND capability.pending_recovery_token_sha256 IS NOT DISTINCT
+                  FROM supplied_token_sha256
+                AND capability.pending_recovery_expires_at IS NOT DISTINCT FROM
+                  recovery.expires_at
+                AND capability.pending_next_totp_fingerprint IS NOT DISTINCT
+                  FROM supplied_totp_fingerprint
+            )
           ) THEN
             RAISE EXCEPTION 'administrator recovery expiry capability is invalid'
               USING ERRCODE = '42501';
@@ -2276,18 +2315,28 @@ def upgrade() -> None:
 
           SELECT control.security_state,
                  control.totp_secret_fingerprint,
-                 capability.totp_secret_fingerprint
+                 capability.totp_secret_fingerprint,
+                 capability.pending_recovery_token_sha256,
+                 capability.pending_recovery_expires_at,
+                 capability.pending_next_totp_fingerprint
           INTO STRICT current_security_state,
                       public_totp_fingerprint,
-                      private_totp_fingerprint
+                      private_totp_fingerprint,
+                      pending_recovery_token_sha256,
+                      pending_recovery_expires_at,
+                      pending_next_totp_fingerprint
           FROM public.admin_security_controls AS control
           JOIN public.walksafe_recovery_custody_capabilities AS capability
             ON capability.admin_id = control.admin_id
           WHERE control.admin_id = p_admin_id
           FOR UPDATE OF control, capability;
 
-          SELECT recovery.expires_at, recovery.completed_at
-          INTO transaction_expires_at, transaction_completed_at
+          SELECT recovery.expires_at,
+                 recovery.completed_at,
+                 recovery.previous_totp_secret_fingerprint
+          INTO transaction_expires_at,
+               transaction_completed_at,
+               previous_totp_secret_fingerprint
           FROM public.admin_security_recovery_transactions AS recovery
           WHERE recovery.id = p_transaction_id
             AND recovery.admin_id = p_admin_id
@@ -2299,12 +2348,20 @@ def upgrade() -> None:
               p_credential_issuer_key
             )
             OR p_runtime_totp_secret IS NULL
-            OR pg_catalog.encode(
-              pg_catalog.sha256(
-                pg_catalog.convert_to(p_runtime_totp_secret, 'UTF8')
-              ),
-              'hex'
-            ) IS DISTINCT FROM private_totp_fingerprint
+            OR (
+              supplied_totp_fingerprint IS DISTINCT FROM
+                private_totp_fingerprint
+              AND (
+                supplied_totp_fingerprint IS DISTINCT FROM
+                  pending_next_totp_fingerprint
+                OR pending_recovery_token_sha256 IS DISTINCT FROM
+                  supplied_token_sha256
+                OR pending_recovery_expires_at IS DISTINCT FROM
+                  transaction_expires_at
+                OR previous_totp_secret_fingerprint IS DISTINCT FROM
+                  private_totp_fingerprint
+              )
+            )
             OR public_totp_fingerprint IS DISTINCT FROM private_totp_fingerprint
             OR current_security_state NOT IN (
               'RECOVERY_IN_PROGRESS', 'RECOVERY_REQUIRED'

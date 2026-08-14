@@ -227,6 +227,19 @@ def test_backend_lane_executes_each_current_recovery_test_once() -> None:
     assert pytest_argv.count("backend/tests/test_admin_runtime_acl_hardening.py") == 1
 
 
+def test_gradle_offline_seed_matches_fresh_gradle_9_cache(tmp_path: Path) -> None:
+    module_root = tmp_path / "modules-2"
+    files = module_root / "files-2.1"
+    metadata = module_root / "metadata-2.107"
+    files.mkdir(parents=True)
+    metadata.mkdir()
+
+    assert runner._gradle_offline_module_seed_directories(module_root) == {
+        "files-2.1": files,
+        "metadata-2.107": metadata,
+    }
+
+
 def test_fake_execution_builds_v2_in_memory_without_publication(
     tmp_path: Path,
 ) -> None:

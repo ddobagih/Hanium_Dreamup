@@ -379,6 +379,66 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
                 },
             )
         assert classify(CANDIDATE_TOTP) == "INVALID"
+
+        with engine.begin() as connection:
+            connection.execute(text("RESET SESSION AUTHORIZATION"))
+            connection.execute(
+                text(
+                    "DELETE FROM admin_security_recovery_transactions "
+                    "WHERE id = :id AND admin_id = :admin_id"
+                ),
+                {"id": second_transaction_id, "admin_id": admin_id},
+            )
+            connection.execute(
+                text(
+                    "DELETE FROM admin_security_recovery_codes "
+                    "WHERE id = :id AND admin_id = :admin_id"
+                ),
+                {"id": second_code_id, "admin_id": admin_id},
+            )
+
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            connection.execute(
+                text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+            )
+            expired_state = str(
+                connection.execute(
+                    text(
+                        "SELECT public.walksafe_expire_admin_recovery("
+                        ":admin_id, :transaction_id, :recovery_token, "
+                        ":observed_at, :runtime_totp_secret, :issuer_key)"
+                    ),
+                    {
+                        "admin_id": admin_id,
+                        "transaction_id": transaction_id,
+                        "recovery_token": "startup-candidate-token",
+                        "observed_at": expires_at,
+                        "runtime_totp_secret": CANDIDATE_TOTP,
+                        "issuer_key": ISSUER_KEY,
+                    },
+                ).scalar_one()
+            )
+            transaction.commit()
+        assert expired_state == "RECOVERY_REQUIRED"
+
+        with engine.connect() as connection:
+            connection.execute(text("RESET SESSION AUTHORIZATION"))
+            assert connection.execute(
+                text(
+                    "SELECT control.security_state, "
+                    "capability.pending_recovery_token_sha256, "
+                    "capability.pending_recovery_expires_at, "
+                    "capability.pending_next_totp_fingerprint "
+                    "FROM admin_security_controls AS control "
+                    "JOIN walksafe_recovery_custody_capabilities AS capability "
+                    "ON capability.admin_id = control.admin_id "
+                    "WHERE control.admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id},
+            ).one() == ("RECOVERY_REQUIRED", None, None, None)
+        assert classify(CURRENT_TOTP) == "CURRENT"
+        assert classify(CANDIDATE_TOTP) == "INVALID"
     finally:
         with engine.begin() as connection:
             connection.execute(text("RESET SESSION AUTHORIZATION"))
