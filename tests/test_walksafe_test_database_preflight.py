@@ -243,6 +243,11 @@ def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> Non
         '"${GENERAL_BASE_PYTHON}" -I -B scripts/restore_walksafe_private_evidence_modes.py'
         in workflow
     )
+    assert (
+        'PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B '
+        'scripts/check_walksafe_project_continuation_v2_4.py'
+        in workflow
+    )
     assert 'GITLEAKS_VERSION: "8.30.1"' in workflow
     assert (
         'GITLEAKS_ARCHIVE_SHA256: "551f6fc83ea457d62a0d98237cbad105a'

@@ -195,7 +195,7 @@ jobs:
           PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" scripts/generate_walksafe_openapi.py --check
       - name: Verify current continuation boundary
         run: |
-          "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B scripts/check_walksafe_project_continuation_v2_4.py
+          PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B scripts/check_walksafe_project_continuation_v2_4.py
       - name: Run current checkpoint control tests
         run: |
           PYTHON_BIN="${WALKSAFE_GENERAL_PYTHON_BIN:?}" scripts/run_walksafe_test_layers_current.sh active-session-control
