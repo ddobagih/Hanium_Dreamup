@@ -561,6 +561,11 @@ def _lock_device_proof_key(
             raise AdminSecurityStoreUnavailable()
         status = rows[0].context_status
         if status == "RECOVERY_EXPIRED":
+            if (
+                purpose == "RECOVERY_COMPLETE"
+                and rows[0].public_key_spki_der is not None
+            ):
+                return bytes(rows[0].public_key_spki_der)
             raise AdminSecurityError(
                 "admin_recovery_expired",
                 "The recovery transaction expired; start recovery again.",

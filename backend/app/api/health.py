@@ -41,7 +41,7 @@ from backend.app.services.tmap_pedestrian import (
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202608130001"
+EXPECTED_ALEMBIC_HEAD = "202608150002"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
 
@@ -148,16 +148,22 @@ def _admin_totp_binding_readiness(settings: Settings) -> dict[str, object]:
                     },
                 ).scalar_one()
             )
-            if totp_binding not in {"CURRENT", "RECOVERY_CANDIDATE"}:
+            if totp_binding not in {
+                "CURRENT",
+                "RECOVERY_CANDIDATE",
+                "RECOVERY_EXPIRED_CANDIDATE",
+            }:
                 return {
                     "ready": False,
                     "reason": "admin_totp_configuration_mismatch",
                 }
         return {
             "ready": True,
-            "admin_totp_binding": (
-                "matched" if totp_binding == "CURRENT" else "recovery_candidate"
-            ),
+            "admin_totp_binding": {
+                "CURRENT": "matched",
+                "RECOVERY_CANDIDATE": "recovery_candidate",
+                "RECOVERY_EXPIRED_CANDIDATE": "recovery_expired_candidate",
+            }[totp_binding],
             "admin_credential_issuer_binding": "matched",
         }
     finally:

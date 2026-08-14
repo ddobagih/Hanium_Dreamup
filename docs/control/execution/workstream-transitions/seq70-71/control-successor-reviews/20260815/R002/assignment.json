@@ -1,0 +1,240 @@
+{
+  "assigned_at": "2026-08-14T17:16:16+00:00",
+  "assigner": {
+    "agent_instance_id": "codex-root-current-acceptance-control-r002-assigner-20260815",
+    "canonical_task": "/root",
+    "role": "INTERNAL_REVIEW_ASSIGNER"
+  },
+  "evidence_type": "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_ASSIGNMENT",
+  "executor": {
+    "agent_instance_id": "codex-root-current-acceptance-control-r002-executor-20260815",
+    "canonical_task": "/root",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR"
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "approval_credit_added": 0,
+    "artifact_completion_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_independence_claimed": false,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "product_implementation_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "completion_formal_external_and_release_credit_remain_zero": true,
+      "current_goal_graph_consumes_validated_successors": true,
+      "full_receipt_and_missing_component_regressions_are_exact": true,
+      "managed_closure_predecessors_match_frozen_authority": true,
+      "managed_closure_source_successors_are_exact": true,
+      "only_declared_control_paths_changed_within_reviewed_cohort": true,
+      "production_verifier_is_bound_as_acceptance_evidence": true,
+      "r001_control_successor_review_remains_immutable": true,
+      "r014_transition_review_remains_immutable": true
+    },
+    "change_purpose": "Bind the production single-admin verifier and its strengthened receipt tests as exact managed-closure source successors, then consume them in current goal-graph acceptance without rewriting the approved R001 or seq70/71 evidence.",
+    "predecessor_control_successor_review_bindings": [
+      {
+        "byte_length": 10649,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R001/assignment.json",
+        "sha256": "efa407b37c7d13810ca5d4840e22e1abb3207ffbfcb9cb40938db4bce66e621f"
+      },
+      {
+        "byte_length": 10698,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R001/review-result.json",
+        "sha256": "faaa9118650a788c04cddc7c9a28c97200ae91f56ab2852c0676172fd2074649"
+      },
+      {
+        "byte_length": 10999,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R001/independent-review.json",
+        "sha256": "637c35a8c2747325f5d25ef6d56c47003e03c3e7462318d52e6ce58251af0f10"
+      }
+    ],
+    "predecessor_current_control_code_cohort_sha256": "b19cd5a791095511c1089a5cc4555db4c20d8e183b4a25bea79af1fe429d5934",
+    "reviewed_acceptance_evidence_sources": [
+      {
+        "byte_length": 12579,
+        "path": "backend/alembic/versions/202608150001_admin_recovery_expiry_candidate.py",
+        "sha256": "398baff89c8dca697c5b1ff2f449959d1d54c47935cbd9e55d3ebbfed82ea25a"
+      },
+      {
+        "byte_length": 2574,
+        "path": "docs/planning/repository-modernization-20260811/current-security-database-compatibility-binding-20260815.json",
+        "sha256": "d706d4c9c376fd25adac9fb1e1889708403095ecddcaf7d788f8043b411fc645"
+      },
+      {
+        "byte_length": 194397,
+        "path": "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+        "sha256": "06b3873f889498523be2503bdf920fc7264c01682173a796605d509ad558a18c"
+      },
+      {
+        "byte_length": 40942,
+        "path": "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+        "sha256": "14bd8f6bae65ecd5958a21b05206948f1c75db3f359572406f1c09b0826fcc99"
+      },
+      {
+        "byte_length": 26197,
+        "path": "tests/test_walksafe_test_database_preflight.py",
+        "sha256": "cda67576be26bc48782bda600a775a1dcf1d27161e2f24a6a67100440d315182"
+      }
+    ],
+    "reviewed_control_code_successors": [
+      {
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "predecessor": {
+          "byte_length": 566570,
+          "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+          "sha256": "e8e402509b295544eb7e3f8fc745b9b5befe924065c861b227583d85cf9bf76b"
+        },
+        "successor": {
+          "byte_length": 569914,
+          "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+          "sha256": "3db619447d70e6288ce8e3123aab7bfa8f6b40a681a28c57695a45cd1aa0196e"
+        }
+      },
+      {
+        "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "predecessor": {
+          "byte_length": 51398,
+          "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "sha256": "17222e52827fa2a069bcde3caace3e760acecd02a6b928b3cd0ae00a6ca6b26f"
+        },
+        "successor": {
+          "byte_length": 79654,
+          "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "sha256": "cefc70dfd6fe5802bf10fb738a12d65ccc1b491d6793d57ccf1acd25416de1f0"
+        }
+      },
+      {
+        "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "predecessor": {
+          "byte_length": 19666,
+          "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "sha256": "493e53a0a1fdbcfe321aaa086e62c0cb02dbcea49cdf3c8aaa8d77a0efcdc805"
+        },
+        "successor": {
+          "byte_length": 32950,
+          "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+          "sha256": "3ca921e6887e3e3ecee75b5b921505e934419f3814fc64ca0e818b013a309725"
+        }
+      }
+    ],
+    "reviewed_current_control_code_cohort": [
+      {
+        "byte_length": 287235,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "77456221900c351e15bf56f44d1860bd9369118f370e3658b735038890fc8147"
+      },
+      {
+        "byte_length": 86735,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "f7041d7db5dca436c53fa3440b90121f46736928bdefa393c26e3788a322e467"
+      },
+      {
+        "byte_length": 569914,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "3db619447d70e6288ce8e3123aab7bfa8f6b40a681a28c57695a45cd1aa0196e"
+      },
+      {
+        "byte_length": 299147,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "11d1411bd6cabd47b44c50cbb1f9643dc02e3d569cc23c251dc7c79d9e0a9a7f"
+      },
+      {
+        "byte_length": 65771,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "310a08dc2ee39168ea5b69cca69b13f78fa6a75b601ccc16e3fe808bd6327b04"
+      },
+      {
+        "byte_length": 38103,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "da70a357df6c38d21dcacc583fdd6eed8391d60ac0ca1c755387117d99bab361"
+      },
+      {
+        "byte_length": 24736,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "b3f415e21ac9d7fe141a6387076e37c01b666ac9f7c39ac43acbde834454b2ed"
+      },
+      {
+        "byte_length": 67953,
+        "path": "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "0387c2460aa5e01452cdddbb21efbc4383d38bd3c2b4a602771183d8d237860d"
+      },
+      {
+        "byte_length": 18971,
+        "path": "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+        "sha256": "ce3109e3824cc0b4288680e2dd7e9ac06c0ea21b0f90dbca9948eb744fde9af1"
+      },
+      {
+        "byte_length": 30144,
+        "path": "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "42e4efd47548c1bc32471595dc87c1e55e75bfe9b479da6b3ce2ca2a8304b901"
+      },
+      {
+        "byte_length": 13456,
+        "path": "tests/test_build_walksafe_fp022_gap_backlog_r028_20260814.py",
+        "sha256": "3bc2f17acefcda23ea9c9bc5b5bb95b267aeb02f8dc99e8981acbb40702e921e"
+      },
+      {
+        "byte_length": 50428,
+        "path": "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "c5335bc100cbcfa23c06901590bf75b1b19b00993ebd0c006bbd40e6aa542ed7"
+      },
+      {
+        "byte_length": 12797,
+        "path": "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+        "sha256": "a5dc5ac8be5c01462a56485b809e0133e3bb94f2da75f979a66bb04035dca3dd"
+      },
+      {
+        "byte_length": 79654,
+        "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "cefc70dfd6fe5802bf10fb738a12d65ccc1b491d6793d57ccf1acd25416de1f0"
+      },
+      {
+        "byte_length": 32950,
+        "path": "tests/test_build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+        "sha256": "3ca921e6887e3e3ecee75b5b921505e934419f3814fc64ca0e818b013a309725"
+      }
+    ],
+    "reviewed_current_control_code_cohort_sha256": "1ff366aed4fe85cae13dcf2e15e6732037581a28ce43bd0f7fcba70a533e3739",
+    "reviewed_managed_closure_source_successors": [
+      {
+        "path": "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+        "predecessor": {
+          "byte_length": 194311,
+          "path": "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+          "sha256": "c63ecfcdba92d93fdeb5a31e8cfdad1fe069d356776b41a942072aa53f85d195"
+        },
+        "successor": {
+          "byte_length": 194397,
+          "path": "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+          "sha256": "06b3873f889498523be2503bdf920fc7264c01682173a796605d509ad558a18c"
+        }
+      },
+      {
+        "path": "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+        "predecessor": {
+          "byte_length": 38085,
+          "path": "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+          "sha256": "4d841a53deab3669d29e39a929151728024ea16d0fc4b734f7a7e5640b49756f"
+        },
+        "successor": {
+          "byte_length": 40942,
+          "path": "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+          "sha256": "14bd8f6bae65ecd5958a21b05206948f1c75db3f359572406f1c09b0826fcc99"
+        }
+      }
+    ]
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-control-successor-r002-alt-reviewer-20260815",
+    "canonical_task": "/root/control_successor_r002_alt",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP022-SEQ70-71-CURRENT-ACCEPTANCE-CONTROL-SUCCESSOR-20260815-R002",
+  "schema_version": "1.0"
+}

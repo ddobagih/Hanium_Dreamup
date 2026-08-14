@@ -369,8 +369,17 @@ def test_readiness_binding_mismatch_is_non_secret(
     assert "sensitive-pass" not in serialized
 
 
-def test_readiness_reports_recovery_candidate_without_exposing_secret(
+@pytest.mark.parametrize(
+    ("classification", "binding"),
+    [
+        ("RECOVERY_CANDIDATE", "recovery_candidate"),
+        ("RECOVERY_EXPIRED_CANDIDATE", "recovery_expired_candidate"),
+    ],
+)
+def test_readiness_reports_recovery_candidates_without_exposing_secret(
     monkeypatch: pytest.MonkeyPatch,
+    classification: str,
+    binding: str,
 ) -> None:
     class Connection:
         def execute(self, statement, parameters=None):
@@ -387,7 +396,7 @@ def test_readiness_reports_recovery_candidate_without_exposing_secret(
                 return _FakeResult(True)
             assert "walksafe_classify_admin_startup_totp_binding" in sql
             assert parameters["runtime_totp_secret"] == "NEW-TOTP"
-            return _FakeResult("RECOVERY_CANDIDATE")
+            return _FakeResult(classification)
 
     class Begin:
         def __enter__(self):
@@ -424,7 +433,7 @@ def test_readiness_reports_recovery_candidate_without_exposing_secret(
 
     assert result == {
         "ready": True,
-        "admin_totp_binding": "recovery_candidate",
+        "admin_totp_binding": binding,
         "admin_credential_issuer_binding": "matched",
     }
     assert "NEW-TOTP" not in json.dumps(result)

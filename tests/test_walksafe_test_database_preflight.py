@@ -370,8 +370,8 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     run_unit_start = runner.index("run_unit() (")
     run_unit_end = runner.index("\n)\n\nrun_active_session_control", run_unit_start)
     run_unit = runner[run_unit_start:run_unit_end]
-    assert run_unit.index("./gradlew testDebugUnitTest") < run_unit.index(
-        '"${PYTHON_BIN}" -m pytest'
+    assert run_unit.index('"${PYTHON_BIN}" -m pytest') < run_unit.index(
+        "./gradlew testDebugUnitTest"
     )
     assert (
         'WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
@@ -414,26 +414,9 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
     fake_python.chmod(0o755)
     fake_node_bin = tmp_path / "locked-node/bin"
     fake_node_bin.mkdir(parents=True)
-    fake_repo = tmp_path / "repo"
-    fake_runner = fake_repo / "scripts/run_walksafe_test_layers_current.sh"
-    fake_runner.parent.mkdir(parents=True)
-    fake_runner.write_text(runner, encoding="utf-8")
-    fake_runner.chmod(0o755)
-    configured_tests = re.findall(
-        r"(?m)^  ((?:backend/tests|tests|model)/test_[^ ]+\.py)$",
-        runner,
-    )
-    for relative in configured_tests:
-        placeholder = fake_repo / relative
-        placeholder.parent.mkdir(parents=True, exist_ok=True)
-        placeholder.write_text("", encoding="utf-8")
-    fake_gradlew = fake_repo / "apps/android/gradlew"
-    fake_gradlew.parent.mkdir(parents=True)
-    fake_gradlew.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    fake_gradlew.chmod(0o755)
     completed = subprocess.run(
         ["bash", "scripts/run_walksafe_test_layers_current.sh", "unit"],
-        cwd=fake_repo,
+        cwd=Path(__file__).resolve().parents[1],
         env={
             **os.environ,
             "PYTHON_BIN": str(fake_python),

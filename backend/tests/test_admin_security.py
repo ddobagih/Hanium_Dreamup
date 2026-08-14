@@ -3,6 +3,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import base64
+import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
@@ -1636,6 +1638,141 @@ def test_admin_runtime_acl_hardening_migration_is_successor_head() -> None:
     assert "deferrable initially deferred" in normalized
 
 
+def test_admin_recovery_expiry_candidate_migration_is_successor_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150001_admin_recovery_expiry_candidate"
+    )
+    statements: list[str] = []
+    monkeypatch.setattr(migration.op, "execute", statements.append)
+    migration.upgrade()
+    normalized = " ".join("\n".join(statements).lower().split())
+
+    assert migration.revision == "202608150001"
+    assert migration.down_revision == "202608130001"
+    assert (
+        "create or replace function public.walksafe_expire_admin_recovery"
+        in normalized
+    )
+    assert (
+        "revoke all on function public.walksafe_expire_admin_recovery(text, "
+        "uuid, text, timestamptz, text, text) from public, "
+        "walksafe_backend_runtime"
+    ) in normalized
+    assert (
+        "grant execute on function public.walksafe_expire_admin_recovery(text, "
+        "uuid, text, timestamptz, text, text) to walksafe_backend_runtime"
+    ) in normalized
+    assert normalized.count("administrator recovery expiry authority differs") == 2
+    assert "procedure.proowner" in normalized
+    assert "acl.grantee = 0" in normalized
+    assert "acl.grantee not in" in normalized
+    assert "and not acl.is_grantable" in normalized
+    assert "pending_next_totp_fingerprint" in normalized
+    assert "pending_recovery_token_sha256" in normalized
+    assert "previous_totp_secret_fingerprint" in normalized
+
+    statements.clear()
+    migration.downgrade()
+    downgrade = " ".join("\n".join(statements).lower().split())
+    advisory_index = downgrade.index("pg_catalog.pg_advisory_xact_lock")
+    table_lock_index = downgrade.index(
+        "lock table public.admin_security_controls, "
+        "public.walksafe_recovery_custody_capabilities, "
+        "public.admin_security_recovery_transactions "
+        "in share row exclusive mode"
+    )
+    guard_index = downgrade.index(
+        "active administrator recovery must be cleared before downgrade"
+    )
+    assert advisory_index < table_lock_index < guard_index
+    assert "recovery.completed_at is null" in downgrade
+    assert "active administrator recovery must be cleared before downgrade" in downgrade
+    assert guard_index < (
+        downgrade.index(
+            "create or replace function public.walksafe_expire_admin_recovery"
+        )
+    )
+
+
+def test_admin_recovery_expired_proof_migration_is_successor_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150002_admin_recovery_expired_proof"
+    )
+    statements: list[str] = []
+    monkeypatch.setattr(migration.op, "execute", statements.append)
+    migration.upgrade()
+    normalized = " ".join("\n".join(statements).lower().split())
+
+    assert migration.revision == "202608150002"
+    assert migration.down_revision == "202608150001"
+    assert (
+        "create or replace function public.walksafe_lock_admin_device_proof_context"
+        in normalized
+    )
+    assert migration._PREDECESSOR_DEFINITION_SHA256 in normalized
+    assert migration._SUCCESSOR_DEFINITION_SHA256 in normalized
+    assert migration._CLASSIFIER_PREDECESSOR_DEFINITION_SHA256 in normalized
+    assert migration._CLASSIFIER_SUCCESSOR_DEFINITION_SHA256 in normalized
+    assert normalized.count("administrator device proof authority differs") == 2
+    assert normalized.count("administrator startup classifier authority differs") == 2
+    assert normalized.count("and not acl.is_grantable") == 4
+    assert "return 'recovery_expired_candidate'" in normalized
+    assert "exact_expired_recovery_count = 1" in normalized
+    assert "pending_recovery_token_sha256" in normalized
+    assert "pending_recovery_expires_at" in normalized
+    assert "pending_next_totp_fingerprint is not distinct from" in normalized
+    assert "previous_totp_secret_fingerprint is not distinct from" in normalized
+    assert "context_status := 'recovery_expired'" in normalized
+    assert "public_key_spki_der := null" in normalized
+    assert (
+        "revoke all on function public.walksafe_lock_admin_device_proof_context("
+        "text, text, bigint, text, timestamptz, text, text, text) from public, "
+        "walksafe_backend_runtime"
+    ) in normalized
+
+    statements.clear()
+    migration.downgrade()
+    downgrade = " ".join("\n".join(statements).lower().split())
+    advisory_index = downgrade.index("pg_catalog.pg_advisory_xact_lock")
+    table_lock_index = downgrade.index(
+        "lock table public.admin_security_controls, "
+        "public.walksafe_recovery_custody_capabilities, "
+        "public.admin_security_recovery_transactions "
+        "in share row exclusive mode"
+    )
+    guard_index = downgrade.index(
+        "active administrator recovery must be cleared before downgrade"
+    )
+    assert advisory_index < table_lock_index < guard_index
+    assert "recovery.completed_at is null" in downgrade
+    assert "active administrator recovery must be cleared before downgrade" in downgrade
+    assert guard_index < (
+        downgrade.index(
+            "create or replace function public.walksafe_lock_admin_device_proof_context"
+        )
+    )
+
+
+def test_admin_recovery_custody_applied_migration_is_immutable() -> None:
+    migration = (
+        Path(__file__).parents[1]
+        / "alembic"
+        / "versions"
+        / "202608120001_admin_recovery_custody.py"
+    ).read_bytes()
+
+    assert len(migration) == 134_131
+    assert hashlib.sha256(migration).hexdigest() == (
+        "40a6e86fe965cd3d08dc10450c9bde353a3d665707763cd777a49243e82da6eb"
+    )
+
+
 def test_recovery_custody_rpc_capabilities_precede_database_locks() -> None:
     migration = (
         Path(__file__).parents[1]
@@ -1903,7 +2040,7 @@ def test_postgres_recovery_custody_migration_preflights_control_count(
             assert revision == prior_revision
             assert custody_column_count == 0
         else:
-            assert revision == "202608130001"
+            assert revision == "202608150002"
             assert custody_column_count == 1
     finally:
         engine.dispose()

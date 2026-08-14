@@ -2518,6 +2518,109 @@ FP046_FINAL_SOURCE_COMPATIBILITY_SHA256 = (
 FP046_FINAL_SOURCE_SUCCESSOR_COMMIT = (
     "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
 )
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS = {
+    "backend/app/api/health.py": {
+        "reason_code": "FORWARD_MIGRATION_HEAD_SUCCESSOR",
+        "predecessor_byte_length": 19538,
+        "predecessor_sha256": (
+            "625a70a9010180c3f8818a9daffa62671c75c8048f970ed0b759a1e8680a8851"
+        ),
+        "successor_byte_length": 19738,
+        "successor_sha256": (
+            "5d4f29aae15af069dff62a466b4dbebc88a886f3322ee5de5aa0529639be3401"
+        ),
+    },
+    "backend/tests/test_admin_runtime_acl_hardening.py": {
+        "reason_code": "RECOVERY_EXPIRY_CANDIDATE_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 35848,
+        "predecessor_sha256": (
+            "3aaf3a09e6c2f02d26fc40ebdf214685983e8962f0d3ba46e50115820cabc59d"
+        ),
+        "successor_byte_length": 51596,
+        "successor_sha256": (
+            "4ba8105bb51838bcc148e669adb87fce9abdef5064430e5ea31e567397427977"
+        ),
+    },
+    "backend/tests/test_admin_security.py": {
+        "reason_code": "FORWARD_MIGRATION_CONTRACT_SUCCESSOR",
+        "predecessor_byte_length": 183858,
+        "predecessor_sha256": (
+            "4c228482e1cceab2a35693748c401d1009baf90c08fd283028995fc362e2e7a3"
+        ),
+        "successor_byte_length": 189546,
+        "successor_sha256": (
+            "97c08b17800d76c720a0fa615fee9025e2ad57c5278e01b2d04c901dc49f9acd"
+        ),
+    },
+    "backend/tests/test_fp046_postgres_integration.py": {
+        "reason_code": "CURRENT_SCHEMA_AND_ACL_EXPECTATION_SUCCESSOR",
+        "predecessor_byte_length": 89130,
+        "predecessor_sha256": (
+            "d3a05d37810a3b19dd67c71e4810ffb97ee8b23a579b3125df3cdea76449163d"
+        ),
+        "successor_byte_length": 89608,
+        "successor_sha256": (
+            "fba65428ac42eb506b6952f18319fd7b33e00695cd26b7278c2edda9699061e2"
+        ),
+    },
+    "backend/app/services/admin_device_proof.py": {
+        "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_SUCCESSOR",
+        "predecessor_byte_length": 40950,
+        "predecessor_sha256": (
+            "6c38ce0ab205799511820d529ab7e7b4bb14b4f2034b4443d6ddad09667ddbda"
+        ),
+        "successor_byte_length": 41147,
+        "successor_sha256": (
+            "46126623c650f4eab00062df02c119aa4bf7ed60c77d7e1afa71a94e613cb99a"
+        ),
+    },
+    "backend/tests/test_admin_device_proof.py": {
+        "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 73481,
+        "predecessor_sha256": (
+            "8c133048daaeede58b62d869502a5c5a9364a7da47c19c64e9266384984a2a61"
+        ),
+        "successor_byte_length": 87799,
+        "successor_sha256": (
+            "0276194d37cefa955cca09933ec2fe7f236f6d67c5199711228adc06d6d499cb"
+        ),
+    },
+    "backend/tests/test_admin_credential_issuer_binding.py": {
+        "reason_code": "EXPIRED_RECOVERY_STARTUP_READINESS_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 14728,
+        "predecessor_sha256": (
+            "a137ca62f6698ee5efed83942bdc724c5da5df7606c15b58531e3f65876993d0"
+        ),
+        "successor_byte_length": 14953,
+        "successor_sha256": (
+            "a6c60a4b32b83bbd49a1a711c12526e24a93ef2687bd883b8b080c47748ae602"
+        ),
+    },
+}
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES = {
+    "backend/alembic/versions/202608150001_admin_recovery_expiry_candidate.py": {
+        "reason_code": "FORWARD_RECOVERY_EXPIRY_MIGRATION",
+        "byte_length": 14917,
+        "sha256": (
+            "45f335f0309fe45af107a1b4814efdcf3b3460c52400016954e7b05f804a593a"
+        ),
+    },
+    "backend/alembic/versions/202608150002_admin_recovery_expired_proof.py": {
+        "reason_code": "FORWARD_RECOVERY_EXPIRED_PROOF_MIGRATION",
+        "byte_length": 31645,
+        "sha256": (
+            "e90f1cf797b6e07efff4828818b15410e8ec0b1597435faafef02442144fc590"
+        ),
+    },
+}
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH = (
+    "docs/planning/repository-modernization-20260811/"
+    "current-security-database-compatibility-binding-20260815.json"
+)
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT = 4240
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256 = (
+    "2931c49d5459d8cf023eb1925f2c0bdf89ed90f567f51e1feb2a71ad68b4a0e8"
+)
 FP046_COMPLETION_PATH = f"{FP046_RESULT_DIRECTORY}/completion-receipt.json"
 FP046_COMPLETION_SHA256 = (
     "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f"
@@ -5973,6 +6076,136 @@ def _npc_single_admin_recovery_v2_completion_evidence(
     return implementation
 
 
+def _overlay_reviewed_managed_closure_source_successors(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+) -> dict[str, str] | None:
+    """Overlay the exact frozen source successors approved by control R002."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R002_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {
+        path.as_posix(): pin
+        for path, pin in source_pins.items()
+    }
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
+def _overlay_reviewed_managed_closure_source_successors_r003(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+) -> dict[str, str] | None:
+    """Overlay only the exact source successors approved by control R003."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R003_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {
+        path.as_posix(): pin
+        for path, pin in source_pins.items()
+    }
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        raw = (
+            _npc_exact_live_bytes(root, Path(relative))
+            if isinstance(relative, str)
+            else None
+        )
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+            or raw is None
+            or len(raw) != successor.get("byte_length")
+            or continuation.sha256_bytes(raw) != successor.get("sha256")
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
 def _npc_single_admin_recovery_completion_managed_closure_matches(
     root: Path,
     checkpoint: dict[str, Any],
@@ -6059,9 +6292,16 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             if fp022_start_suffix
             else None
         )
-        fp022_completion_context = (
-            fp022_completion_review.validate_post_review(root)
+        fp022_control_successor_context = (
+            fp022_completion_review.validated_control_successor_r003_context(
+                root
+            )
             if fp022_completion_suffix
+            else None
+        )
+        fp022_completion_context = (
+            fp022_control_successor_context.current
+            if fp022_control_successor_context is not None
             else None
         )
         if fp022_completion_context is not None:
@@ -6339,6 +6579,34 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
                 return False
             mandatory[path.as_posix()] = continuation.sha256_bytes(raw)
 
+        if fp022_control_successor_context is not None:
+            r002_reviewed_sources = (
+                fp022_control_successor_context
+                .predecessor_managed_closure_source_successors
+            )
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors(
+                    root,
+                    mandatory,
+                    r002_reviewed_sources,
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            r003_reviewed_sources = (
+                fp022_control_successor_context.managed_closure_source_successors
+            )
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors_r003(
+                    root,
+                    overlaid_mandatory,
+                    r003_reviewed_sources,
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            mandatory = overlaid_mandatory
+
         snapshot = checkpoint.get("working_tree_snapshot")
         handoff = checkpoint.get("session_handoff")
         mirror = (
@@ -6399,6 +6667,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
         TypeError,
         UnicodeError,
         ValueError,
+        fp022_completion_review.ReviewError,
         npc_recovery.BuildError,
     ):
         return False
@@ -7107,9 +7376,164 @@ def _npc_single_admin_recovery_live_compatibility_artifacts(
     )
     if fp022_artifacts is None:
         return None
-    return _compose_completion_product_successors(
+    composed = _compose_completion_product_successors(
         npc_artifacts, fp022_artifacts
     )
+    current_security_artifacts = (
+        _current_security_database_compatibility_artifacts(root)
+    )
+    if composed is None or current_security_artifacts is None:
+        return None
+    return _compose_completion_product_successors(
+        composed,
+        current_security_artifacts,
+    )
+
+
+def _current_security_database_compatibility_artifacts(
+    root: Path,
+) -> dict[str, tuple[str, str]] | None:
+    """Bind immutable completion bytes to exact current DB/security successors."""
+
+    try:
+        context = npc_r004_review.prepare_frozen_r003_context(root)
+        implementation_raw = context.result_raw[
+            npc_recovery.V2_IMPLEMENTATION_REL
+        ]
+        implementation = npc_recovery.strict_json_bytes(
+            implementation_raw,
+            npc_recovery.V2_IMPLEMENTATION_REL.as_posix(),
+        )
+        input_closure = implementation.get("execution_input_closure")
+        input_files = (
+            input_closure.get("files")
+            if isinstance(input_closure, dict)
+            else None
+        )
+        if not isinstance(input_files, list):
+            return None
+        predecessor_authority: dict[str, tuple[int, str]] = {}
+        for row in input_files:
+            relative = row.get("path") if isinstance(row, dict) else None
+            if relative not in CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS:
+                continue
+            if relative in predecessor_authority:
+                return None
+            predecessor_authority[relative] = (
+                row.get("byte_count"),
+                row.get("sha256"),
+            )
+        if set(predecessor_authority) != set(
+            CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS
+        ) or any(
+            predecessor_authority[relative]
+            != (
+                amendment["predecessor_byte_length"],
+                amendment["predecessor_sha256"],
+            )
+            for relative, amendment in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+            )
+        ):
+            return None
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+    expected = {
+        "added_sources": [
+            {
+                "path": relative,
+                "reason_code": source["reason_code"],
+                "source": {
+                    "byte_length": source["byte_length"],
+                    "sha256": source["sha256"],
+                },
+            }
+            for relative, source in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES.items()
+            )
+        ],
+        "amendments": [
+            {
+                "path": relative,
+                "reason_code": amendment["reason_code"],
+                "predecessor_source": {
+                    "byte_length": amendment["predecessor_byte_length"],
+                    "sha256": amendment["predecessor_sha256"],
+                },
+                "successor_source": {
+                    "byte_length": amendment["successor_byte_length"],
+                    "sha256": amendment["successor_sha256"],
+                },
+            }
+            for relative, amendment in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+            )
+        ],
+        "claim_boundary": {
+            "formal_test_credit_added": 0,
+            "goal_completion_credit_added": 0,
+            "goal_event_created": False,
+            "historical_control_modified": False,
+            "release_credit_added": 0,
+        },
+        "record_id": "WS-CURRENT-SECURITY-DATABASE-COMPATIBILITY-BINDING-20260815-001",
+        "record_status": "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+        "recorded_on": "2026-08-15",
+        "schema_version": "walksafe.current-security-database-compatibility-binding.v1",
+    }
+    record_path = _exact_repo_file(
+        root,
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH,
+    )
+    record = _load_exact_json(
+        root,
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH,
+    )
+    if (
+        record_path is None
+        or record_path.stat().st_size
+        != CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT
+        or continuation.sha256_file(record_path)
+        != CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256
+        or record != expected
+    ):
+        return None
+    for relative, source in (
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES.items()
+    ):
+        live_path = _exact_repo_file(root, relative)
+        if (
+            live_path is None
+            or live_path.stat().st_size != source["byte_length"]
+            or continuation.sha256_file(live_path) != source["sha256"]
+        ):
+            return None
+    artifacts: dict[str, tuple[str, str]] = {}
+    for relative, amendment in (
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+    ):
+        live_path = _exact_repo_file(root, relative)
+        if (
+            live_path is None
+            or live_path.stat().st_size != amendment["successor_byte_length"]
+            or continuation.sha256_file(live_path)
+            != amendment["successor_sha256"]
+        ):
+            return None
+        artifacts[relative] = (
+            amendment["predecessor_sha256"],
+            amendment["successor_sha256"],
+        )
+    return artifacts
 
 
 def _npc_single_admin_recovery_live_artifact_successors(

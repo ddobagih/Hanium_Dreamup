@@ -9,6 +9,8 @@ import subprocess
 import sys
 from typing import Callable
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 import pytest
 
 from scripts import (
@@ -21,6 +23,45 @@ TEST_DATABASE_URL = (
     "postgresql+psycopg://verification-user:verification-password@"
     "db.invalid/walksafe_test"
 )
+
+
+def test_database_post_migration_head_matches_repository() -> None:
+    root = Path(__file__).parents[1]
+    config = Config(str(root / "backend/alembic.ini"))
+    config.set_main_option("script_location", str(root / "backend/alembic"))
+
+    assert ScriptDirectory.from_config(config).get_heads() == [
+        runner.DATABASE_POST_MIGRATION_HEAD
+    ]
+
+
+@pytest.fixture(autouse=True)
+def isolated_gradle_user_home(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
+    gradle_home = tmp_path / "gradle-user-home"
+    distribution_parent = (
+        gradle_home
+        / "wrapper/dists/gradle-9.3.1-bin/fixture-cache-key"
+    )
+    distribution = distribution_parent / "gradle-9.3.1"
+    (distribution / "bin").mkdir(parents=True)
+    (distribution / "bin/gradle").write_text(
+        "#!/bin/sh\nexit 99\n",
+        encoding="utf-8",
+    )
+    (distribution_parent / "gradle-9.3.1-bin.zip.ok").write_bytes(b"")
+    module_root = gradle_home / "caches/modules-2"
+    for name in ("files-2.1", "metadata-2.107"):
+        directory = module_root / name
+        directory.mkdir(parents=True)
+        (directory / "fixture-entry").write_text(
+            f"isolated {name}\n",
+            encoding="utf-8",
+        )
+    monkeypatch.setenv("GRADLE_USER_HOME", str(gradle_home))
+    return gradle_home
 
 
 def database_state(phase: str, *, post: bool) -> dict[str, object]:
@@ -240,6 +281,22 @@ def test_gradle_offline_seed_matches_fresh_gradle_9_cache(tmp_path: Path) -> Non
     }
 
 
+@pytest.mark.parametrize("missing", ["files-2.1", "metadata-2.107"])
+def test_gradle_offline_seed_rejects_missing_required_cache_namespace(
+    tmp_path: Path,
+    missing: str,
+) -> None:
+    module_root = tmp_path / "modules-2"
+    for name in {"files-2.1", "metadata-2.107"} - {missing}:
+        (module_root / name).mkdir(parents=True)
+
+    with pytest.raises(
+        runner.VerificationError,
+        match="Gradle offline module seed is incomplete",
+    ):
+        runner._gradle_offline_module_seed_directories(module_root)
+
+
 def test_fake_execution_builds_v2_in_memory_without_publication(
     tmp_path: Path,
 ) -> None:
@@ -265,11 +322,46 @@ def test_fake_execution_builds_v2_in_memory_without_publication(
     assert receipt["python_requirements_lock"]["path"] == "backend/requirements.lock"
     assert receipt["python_installed_distributions"]["distribution_count"] > 0
     assert receipt["gradle_distribution"]["file_count"] > 0
+    assert Path(receipt["gradle_distribution"]["resolved_path"]).is_relative_to(
+        tmp_path
+    )
     assert receipt["gradle_offline_module_seed"]["files-2.1"]["file_count"] > 0
+    assert set(receipt["gradle_offline_module_seed"]) == {
+        "files-2.1",
+        "metadata-2.107",
+    }
     assert receipt["jdk"]["modules"]["byte_count"] > 0
     assert receipt["android_sdk"]["platform_android_36"]["file_count"] > 0
     assert receipt["android_sdk"]["build_tools"]["file_count"] > 0
     assert not any((root / relative).exists() for relative in outputs)
+
+
+def test_fake_execution_binds_optional_gradle_resources_cache(
+    tmp_path: Path,
+    isolated_gradle_user_home: Path,
+) -> None:
+    resources = (
+        isolated_gradle_user_home
+        / "caches/modules-2/resources-2.1"
+    )
+    resources.mkdir()
+    (resources / "fixture-entry").write_text(
+        "isolated resources-2.1\n",
+        encoding="utf-8",
+    )
+    root = make_repository(tmp_path)
+
+    manifest, _ = build_in_memory(root)
+
+    receipt = manifest["runner_toolchain_receipt"]
+    assert set(receipt["gradle_offline_module_seed"]) == {
+        "files-2.1",
+        "metadata-2.107",
+        "resources-2.1",
+    }
+    assert receipt["gradle_offline_module_seed"]["resources-2.1"][
+        "file_count"
+    ] == 1
 
 
 def test_v2_closure_binds_every_nonexcluded_git_visible_input(

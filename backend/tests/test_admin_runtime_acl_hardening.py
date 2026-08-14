@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import importlib
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,172 @@ ISSUER_KEY = base64.urlsafe_b64encode(bytes(range(32))).decode("ascii").rstrip("
 
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_expiry_migration_authority_guard_rejects_acl_drift() -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150001_admin_recovery_expiry_candidate"
+    )
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"],
+        pool_pre_ping=True,
+    )
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            connection.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION "
+                    "public.walksafe_expire_admin_recovery("
+                    "text, uuid, text, timestamptz, text, text) TO PUBLIC"
+                )
+            )
+            with pytest.raises(SQLAlchemyError) as rejected:
+                connection.execute(text(migration._EXPIRY_FUNCTION_AUTHORITY_SQL))
+            assert getattr(rejected.value.orig, "sqlstate", None) == "42501"
+            transaction.rollback()
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_expired_proof_migration_authority_guard_rejects_acl_drift() -> None:
+    migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150002_admin_recovery_expired_proof"
+    )
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"],
+        pool_pre_ping=True,
+    )
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            connection.execute(
+                text(
+                    "GRANT EXECUTE ON FUNCTION "
+                    "public.walksafe_lock_admin_device_proof_context("
+                    "text, text, bigint, text, timestamptz, text, text, text) "
+                    "TO PUBLIC"
+                )
+            )
+            with pytest.raises(SQLAlchemyError) as rejected:
+                connection.execute(
+                    text(
+                        migration._device_proof_function_authority_sql(
+                            migration._SUCCESSOR_DEFINITION_SHA256
+                        )
+                    )
+                )
+            assert getattr(rejected.value.orig, "sqlstate", None) == "42501"
+            transaction.rollback()
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_recovery_migration_authority_rejects_runtime_grant_option() -> None:
+    expiry_migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150001_admin_recovery_expiry_candidate"
+    )
+    proof_migration = importlib.import_module(
+        "backend.alembic.versions."
+        "202608150002_admin_recovery_expired_proof"
+    )
+    cases = [
+        (
+            "public.walksafe_expire_admin_recovery("
+            "text, uuid, text, timestamptz, text, text)",
+            expiry_migration._EXPIRY_FUNCTION_AUTHORITY_SQL,
+        ),
+        (
+            "public.walksafe_lock_admin_device_proof_context("
+            "text, text, bigint, text, timestamptz, text, text, text)",
+            proof_migration._device_proof_function_authority_sql(
+                proof_migration._SUCCESSOR_DEFINITION_SHA256
+            ),
+        ),
+        (
+            "public.walksafe_classify_admin_startup_totp_binding("
+            "text, text, text)",
+            proof_migration._classifier_function_authority_sql(
+                proof_migration._CLASSIFIER_SUCCESSOR_DEFINITION_SHA256
+            ),
+        ),
+    ]
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"],
+        pool_pre_ping=True,
+    )
+    try:
+        for signature, authority_sql in cases:
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                connection.execute(
+                    text(
+                        f"GRANT EXECUTE ON FUNCTION {signature} "
+                        "TO walksafe_backend_runtime WITH GRANT OPTION"
+                    )
+                )
+                with pytest.raises(SQLAlchemyError) as rejected:
+                    connection.execute(text(authority_sql))
+                assert getattr(rejected.value.orig, "sqlstate", None) == "42501"
+                transaction.rollback()
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "202608150001_admin_recovery_expiry_candidate",
+        "202608150002_admin_recovery_expired_proof",
+    ],
+)
+@pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_recovery_downgrade_guard_blocks_concurrent_writes(
+    module_name: str,
+) -> None:
+    migration = importlib.import_module(
+        f"backend.alembic.versions.{module_name}"
+    )
+    engine = create_engine(
+        os.environ["WALKSAFE_TEST_DATABASE_URL"],
+        pool_pre_ping=True,
+    )
+    try:
+        with engine.connect() as guard_connection:
+            guard_transaction = guard_connection.begin()
+            guard_connection.execute(text(migration._UNSAFE_DOWNGRADE_SQL))
+            with engine.connect() as concurrent_connection:
+                concurrent_transaction = concurrent_connection.begin()
+                with pytest.raises(SQLAlchemyError) as rejected:
+                    concurrent_connection.execute(
+                        text(
+                            "LOCK TABLE public.admin_security_controls "
+                            "IN ROW EXCLUSIVE MODE NOWAIT"
+                        )
+                    )
+                assert getattr(rejected.value.orig, "sqlstate", None) == "55P03"
+                concurrent_transaction.rollback()
+            guard_transaction.rollback()
+    finally:
+        engine.dispose()
 
 
 @pytest.mark.skipif(
@@ -165,10 +332,15 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
     engine = create_engine(os.environ["WALKSAFE_TEST_DATABASE_URL"], pool_pre_ping=True)
     admin_id = f"startup-candidate-{uuid.uuid4().hex[:12]}"
     transaction_id = uuid.uuid4()
-    observed_at = datetime.now(timezone.utc).replace(microsecond=0)
+    observed_at = (
+        datetime.now(timezone.utc) - timedelta(minutes=5)
+    ).replace(microsecond=0)
     expires_at = observed_at + timedelta(minutes=10)
+    expired_binding_at = observed_at + timedelta(minutes=1)
     pending_token_sha256 = _sha256("startup-candidate-token")
     current_fingerprint = _sha256(CURRENT_TOTP)
+    proof_key_der = b"expired-recovery-proof-key"
+    proof_key_marker = hashlib.sha256(proof_key_der).hexdigest()
 
     def classify(
         runtime_totp_secret: str,
@@ -263,6 +435,22 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
                     "fingerprint": current_fingerprint,
                     "observed_at": observed_at,
                     "expires_at": expires_at,
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO admin_device_keys ("
+                    "id, admin_id, device_id, key_version, "
+                    "public_key_spki_der, key_marker, status, created_at) "
+                    "VALUES (:id, :admin_id, 'startup-device', 1, :key, "
+                    ":marker, 'ACTIVE', :observed_at)"
+                ),
+                {
+                    "id": uuid.uuid4(),
+                    "admin_id": admin_id,
+                    "key": proof_key_der,
+                    "marker": proof_key_marker,
+                    "observed_at": observed_at,
                 },
             )
             connection.execute(
@@ -396,6 +584,138 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
                 ),
                 {"id": second_code_id, "admin_id": admin_id},
             )
+            connection.execute(
+                text(
+                    "UPDATE admin_security_recovery_transactions "
+                    "SET expires_at = :expires_at WHERE id = :id"
+                ),
+                {"id": transaction_id, "expires_at": expired_binding_at},
+            )
+            connection.execute(
+                text(
+                    "UPDATE walksafe_recovery_custody_capabilities "
+                    "SET pending_recovery_expires_at = :expires_at "
+                    "WHERE admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id, "expires_at": expired_binding_at},
+            )
+
+        assert classify(CANDIDATE_TOTP) == "RECOVERY_EXPIRED_CANDIDATE"
+
+        def expired_proof_context(*, marker: str = proof_key_marker):
+            with engine.connect() as connection:
+                transaction = connection.begin()
+                connection.execute(
+                    text("SET SESSION AUTHORIZATION walksafe_backend_runtime")
+                )
+                row = connection.execute(
+                    text(
+                        "SELECT * FROM public."
+                        "walksafe_lock_admin_device_proof_context("
+                        ":admin_id, 'startup-device', 1, :marker, "
+                        ":observed_at, 'RECOVERY_COMPLETE', "
+                        ":runtime_totp_secret, :issuer_key)"
+                    ),
+                    {
+                        "admin_id": admin_id,
+                        "marker": marker,
+                        "observed_at": expires_at,
+                        "runtime_totp_secret": CANDIDATE_TOTP,
+                        "issuer_key": ISSUER_KEY,
+                    },
+                ).one()
+                transaction.commit()
+                connection.execute(text("RESET SESSION AUTHORIZATION"))
+                connection.commit()
+                return row
+
+        with engine.connect() as connection:
+            connection.execute(text("RESET SESSION AUTHORIZATION"))
+            proof_state_before = connection.execute(
+                text(
+                    "SELECT control.security_state, control.state_version, "
+                    "capability.pending_recovery_token_sha256, "
+                    "capability.pending_recovery_expires_at, "
+                    "capability.pending_next_totp_fingerprint "
+                    "FROM admin_security_controls AS control "
+                    "JOIN walksafe_recovery_custody_capabilities AS capability "
+                    "ON capability.admin_id = control.admin_id "
+                    "WHERE control.admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id},
+            ).one()
+        exact_expired_proof = expired_proof_context()
+        assert exact_expired_proof.context_status == "RECOVERY_EXPIRED"
+        assert bytes(exact_expired_proof.public_key_spki_der) == proof_key_der
+        wrong_key_proof = expired_proof_context(marker="f" * 64)
+        assert wrong_key_proof.context_status == "RECOVERY_EXPIRED"
+        assert wrong_key_proof.public_key_spki_der is None
+        with engine.connect() as connection:
+            connection.execute(text("RESET SESSION AUTHORIZATION"))
+            assert connection.execute(
+                text(
+                    "SELECT control.security_state, control.state_version, "
+                    "capability.pending_recovery_token_sha256, "
+                    "capability.pending_recovery_expires_at, "
+                    "capability.pending_next_totp_fingerprint "
+                    "FROM admin_security_controls AS control "
+                    "JOIN walksafe_recovery_custody_capabilities AS capability "
+                    "ON capability.admin_id = control.admin_id "
+                    "WHERE control.admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id},
+            ).one() == proof_state_before
+
+        with engine.connect() as connection:
+            drift = connection.begin()
+            connection.execute(
+                text(
+                    "UPDATE walksafe_recovery_custody_capabilities "
+                    "SET pending_recovery_token_sha256 = :different "
+                    "WHERE admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id, "different": "e" * 64},
+            )
+            connection.execute(text("SET LOCAL ROLE walksafe_backend_runtime"))
+            drifted = connection.execute(
+                text(
+                    "SELECT * FROM public."
+                    "walksafe_lock_admin_device_proof_context("
+                    ":admin_id, 'startup-device', 1, :marker, :observed_at, "
+                    "'RECOVERY_COMPLETE', :runtime_totp_secret, :issuer_key)"
+                ),
+                {
+                    "admin_id": admin_id,
+                    "marker": proof_key_marker,
+                    "observed_at": expires_at,
+                    "runtime_totp_secret": CANDIDATE_TOTP,
+                    "issuer_key": ISSUER_KEY,
+                },
+            ).one()
+            assert drifted.context_status == "RECOVERY_EXPIRED"
+            assert drifted.public_key_spki_der is None
+            drift.rollback()
+
+        expired_proof_migration = importlib.import_module(
+            "backend.alembic.versions."
+            "202608150002_admin_recovery_expired_proof"
+        )
+        with engine.connect() as connection:
+            unsafe_downgrade = connection.begin()
+            with pytest.raises(SQLAlchemyError) as downgrade_rejected:
+                connection.execute(
+                    text(expired_proof_migration._UNSAFE_DOWNGRADE_SQL)
+                )
+            assert getattr(
+                downgrade_rejected.value.orig,
+                "sqlstate",
+                None,
+            ) == "55000"
+            unsafe_downgrade.rollback()
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one() == "202608150002"
 
         with engine.connect() as connection:
             transaction = connection.begin()
@@ -445,6 +765,7 @@ def test_postgres_startup_totp_candidate_exact_binding_and_normal_ops_blocked() 
             for table_name in (
                 "admin_security_recovery_transactions",
                 "admin_security_recovery_codes",
+                "admin_device_keys",
                 "walksafe_recovery_custody_capabilities",
                 "admin_security_controls",
             ):
@@ -686,7 +1007,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608130001"
+            ).scalar_one() == "202608150002"
             assert connection.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM pg_extension "
@@ -740,7 +1061,7 @@ def test_postgres_runtime_acl_migration_downgrade_and_reupgrade_on_fresh_databas
         with disposable_engine.connect() as connection:
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == "202608130001"
+            ).scalar_one() == "202608150002"
             assert connection.execute(
                 text(
                     "SELECT count(*) FROM pg_trigger "

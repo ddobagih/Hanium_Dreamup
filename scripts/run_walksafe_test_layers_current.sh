@@ -423,10 +423,10 @@ require_backup_integrity_python() {
 run_unit() (
   activate_locked_node_path
   unset WALKSAFE_TEST_DATABASE_URL DATABASE_URL
-  (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
   PYTHONPATH="${REPO_ROOT}" "${PYTHON_BIN}" -m pytest -p no:cacheprovider -q "${UNIT_PYTHON_TESTS[@]}"
   run_locked_npm test
   run_locked_gateway_npm test
+  (cd "${REPO_ROOT}/apps/android" && ./gradlew testDebugUnitTest --no-daemon --rerun-tasks)
 )
 
 run_active_session_control() (

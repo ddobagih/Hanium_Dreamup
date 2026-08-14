@@ -394,13 +394,13 @@ def test_recovery_complete_issue_and_verify_use_guarded_postgresql_context_rpc(
         "load_admin_credential_issuer_key_for_settings",
         lambda _settings_value: credential_issuer_key,
     )
-    rpc_row = SimpleNamespace(
-        context_status="OK",
+    issue_rpc_row = SimpleNamespace(
+        context_status="RECOVERY_EXPIRED",
         public_key_spki_der=key.public_key_spki_der,
     )
     issue_db = _FakeSession(
         [
-            _Result(values=[rpc_row]),
+            _Result(values=[issue_rpc_row]),
             _Result(values=[]),
         ],
         dialect="postgresql",
@@ -430,10 +430,14 @@ def test_recovery_complete_issue_and_verify_use_guarded_postgresql_context_rpc(
             ec.ECDSA(hashes.SHA256()),
         )
     )
+    expired_verify_rpc_row = SimpleNamespace(
+        context_status="RECOVERY_EXPIRED",
+        public_key_spki_der=key.public_key_spki_der,
+    )
     verify_db = _FakeSession(
         [
             _Result(one=challenge),
-            _Result(values=[rpc_row]),
+            _Result(values=[expired_verify_rpc_row]),
         ],
         dialect="postgresql",
     )
@@ -466,6 +470,58 @@ def test_recovery_complete_issue_and_verify_use_guarded_postgresql_context_rpc(
     assert challenge.consumed_at == now + timedelta(seconds=1)
 
 
+@pytest.mark.parametrize(
+    ("purpose", "expose_public_key"),
+    [
+        ("RECOVERY_COMPLETE", False),
+        ("ACTION", True),
+    ],
+)
+def test_postgresql_expired_context_fails_closed_without_exact_cleanup_authority(
+    monkeypatch: pytest.MonkeyPatch,
+    purpose: str,
+    expose_public_key: bool,
+) -> None:
+    key = _device_key(_private_key())
+    now = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        admin_device_proof_service,
+        "load_admin_credential_issuer_key_for_settings",
+        lambda _settings_value: "issuer-key-for-device-proof-tests-1234567890",
+    )
+    db = _FakeSession(
+        [
+            _Result(
+                values=[
+                    SimpleNamespace(
+                        context_status="RECOVERY_EXPIRED",
+                        public_key_spki_der=(
+                            key.public_key_spki_der if expose_public_key else None
+                        ),
+                    )
+                ]
+            )
+        ],
+        dialect="postgresql",
+    )
+    request = (
+        _recovery_challenge_request(key)
+        if purpose == "RECOVERY_COMPLETE"
+        else _challenge_request(key)
+    )
+
+    with pytest.raises(AdminSecurityError) as rejected:
+        AdminDeviceProofService(db, _settings()).issue_challenge(
+            **request,
+            now=now,
+        )
+
+    assert rejected.value.code == "admin_recovery_expired"
+    assert rejected.value.status_code == 410
+    assert db.added == []
+    assert db.rollbacks == 1
+
+
 def test_recovery_complete_issue_fails_closed_without_exact_context() -> None:
     key = _device_key(_private_key())
     now = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
@@ -478,8 +534,6 @@ def test_recovery_complete_issue_fails_closed_without_exact_context() -> None:
         now,
         device_id="android-device-9999",
     )
-    expired_transaction = _recovery_transaction(now)
-    expired_transaction.expires_at = now
     completed_transaction = _recovery_transaction(now)
     completed_transaction.completed_at = now
     invalid_results = [
@@ -515,20 +569,28 @@ def test_recovery_complete_issue_fails_closed_without_exact_context() -> None:
         assert db.added == []
         assert db.rollbacks == 1
 
-    expired_db = _FakeSession(
+def test_recovery_complete_issue_rejects_expired_recovery_device() -> None:
+    key = _device_key(_private_key())
+    now = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
+    expired_transaction = _recovery_transaction(now)
+    expired_transaction.expires_at = now
+    db = _FakeSession(
         [
             _Result(values=[_recovery_control()]),
             _Result(values=[expired_transaction]),
         ]
     )
-    with pytest.raises(AdminSecurityError) as expired:
-        AdminDeviceProofService(expired_db).issue_challenge(
+
+    with pytest.raises(AdminSecurityError) as rejected:
+        AdminDeviceProofService(db).issue_challenge(
             **_recovery_challenge_request(key),
             now=now,
         )
-    assert expired.value.code == "admin_recovery_expired"
-    assert expired.value.status_code == 410
-    assert expired_db.rollbacks == 1
+
+    assert rejected.value.code == "admin_recovery_expired"
+    assert rejected.value.status_code == 410
+    assert db.added == []
+    assert db.rollbacks == 1
 
 
 def test_read_issue_and_verify_use_read_postgresql_context_purpose(
@@ -959,6 +1021,291 @@ def test_postgres_two_session_issuance_serializes_at_the_outstanding_cap(
                 )
             )
         engine.dispose()
+
+
+@pytest.mark.skipif(
+    not os.environ.get("WALKSAFE_TEST_DATABASE_URL", "").strip(),
+    reason="WALKSAFE_TEST_DATABASE_URL is not configured",
+)
+def test_postgres_expired_recovery_proof_reaches_real_cleanup_route(
+    clean_test_storage: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import pyotp
+    from sqlalchemy import create_engine, event, text
+    from sqlalchemy.orm import sessionmaker
+
+    from backend.app import database as database_api
+    from backend.app.services.admin_security import AdminSecurityService
+
+    assert callable(clean_test_storage)
+    clean_test_storage()
+    database_url = os.environ["WALKSAFE_TEST_DATABASE_URL"].strip()
+    engine = create_engine(database_url, pool_pre_ping=True)
+    owner_sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    runtime_sessions = sessionmaker(bind=engine, expire_on_commit=False)
+
+    def assume_runtime_role(_session: Any, _transaction: Any, connection: Any) -> None:
+        connection.exec_driver_sql("SET LOCAL ROLE walksafe_backend_runtime")
+
+    event.listen(runtime_sessions, "after_begin", assume_runtime_role)
+    admin_id = f"proof.expired.{uuid.uuid4().hex[:16]}"
+    device_id = f"proof-device-{uuid.uuid4().hex}"
+    private_key = _private_key()
+    public_key_der = _spki_der(private_key)
+    key_marker = hashlib.sha256(public_key_der).hexdigest()
+    recovery_code = "EXPIRED-PROOF-RECOVERY-CODE-0001"
+    initial_totp_secret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+    replacement_totp_secret = "KRSXG5DSNFXGOIDBNZQW2ZLOMRSXG5DS"
+    credential_issuer_key = _base64url(
+        hashlib.sha256(b"expired-proof-http-regression-issuer").digest()
+    )
+    issuer_key_file = tmp_path / "issuer.key"
+    issuer_key_file.write_text(credential_issuer_key, encoding="ascii")
+    issuer_key_file.chmod(0o600)
+    settings = _settings()
+    settings.admin_id = admin_id
+    settings.admin_totp_secret = initial_totp_secret
+    settings.admin_credential_issuer_key_file = issuer_key_file
+    settings.admin_session_ttl_seconds = 43_200
+    settings.admin_step_up_ttl_seconds = 300
+    settings.admin_recovery_ttl_seconds = 900
+    settings.admin_auth_rate_limit_attempts = 5
+    settings.admin_auth_rate_limit_window_seconds = 300
+    settings.max_upload_bytes = 4096
+    settings.max_report_metadata_bytes = 4096
+    started_at = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(
+        minutes=10
+    )
+
+    try:
+        with engine.connect() as connection:
+            database_name = connection.execute(
+                text("SELECT current_database()")
+            ).scalar_one()
+            assert "test" in database_name.lower()
+            assert connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one() == "202608150002"
+
+        with owner_sessions() as db:
+            provision_admin_security(
+                db,
+                admin_id=admin_id,
+                password="initial expired proof password",
+                totp_secret=initial_totp_secret,
+                recovery_codes=[recovery_code],
+                credential_issuer_key=credential_issuer_key,
+                now=started_at,
+            )
+        with owner_sessions() as db:
+            provisioned_key = provision_admin_device_key(
+                db,
+                admin_id=admin_id,
+                device_id=device_id,
+                key_version=1,
+                public_key_spki_der=public_key_der,
+                now=started_at,
+            )
+        with runtime_sessions() as db:
+            assert db.execute(text("SELECT current_user")).scalar_one() == (
+                "walksafe_backend_runtime"
+            )
+            recovery = AdminSecurityService(db, settings).start_recovery(
+                admin_id=admin_id,
+                recovery_code=recovery_code,
+                device_id=device_id,
+                device_label="expired recovery device",
+                source="127.0.0.1",
+                now=started_at,
+            )
+
+        settings.admin_totp_secret = replacement_totp_secret
+        with runtime_sessions() as db:
+            AdminDeviceProofService(db, settings).issue_challenge(
+                purpose="RECOVERY_COMPLETE",
+                action=None,
+                admin_id=admin_id,
+                body_sha256=raw_body_sha256(b'{"candidate":"binding"}'),
+                correlation_id=str(uuid.uuid4()),
+                device_id=device_id,
+                device_key_marker=provisioned_key.key_marker,
+                device_key_version=1,
+                method="POST",
+                path="/admin/security/recovery/complete",
+                query_sha256=canonical_admin_query_sha256(b""),
+                read_purpose=None,
+                session_id=None,
+                identity=None,
+            )
+
+        expired_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        with engine.begin() as connection:
+            transaction_id = connection.execute(
+                text(
+                    "UPDATE admin_security_recovery_transactions "
+                    "SET expires_at = :expired_at "
+                    "WHERE admin_id = :admin_id AND completed_at IS NULL "
+                    "RETURNING id"
+                ),
+                {"admin_id": admin_id, "expired_at": expired_at},
+            ).scalar_one()
+            connection.execute(
+                text(
+                    "UPDATE walksafe_recovery_custody_capabilities "
+                    "SET pending_recovery_expires_at = :expired_at "
+                    "WHERE admin_id = :admin_id"
+                ),
+                {"admin_id": admin_id, "expired_at": expired_at},
+            )
+
+        correlation_id = uuid.uuid4()
+        body = json.dumps(
+            {
+                "device_id": device_id,
+                "device_label": "expired recovery device",
+                "new_password": "replacement expired proof password",
+                "recovery_token": recovery.recovery_token,
+                "totp_code": pyotp.TOTP(replacement_totp_secret).now(),
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        with runtime_sessions() as db:
+            challenge_response = AdminDeviceProofService(db, settings).issue_challenge(
+                purpose="RECOVERY_COMPLETE",
+                action=None,
+                admin_id=admin_id,
+                body_sha256=raw_body_sha256(body),
+                correlation_id=str(correlation_id),
+                device_id=device_id,
+                device_key_marker=key_marker,
+                device_key_version=1,
+                method="POST",
+                path="/admin/security/recovery/complete",
+                query_sha256=canonical_admin_query_sha256(b""),
+                read_purpose=None,
+                session_id=None,
+                identity=None,
+            )
+        signature = _base64url(
+            private_key.sign(
+                challenge_response["signing_payload"].encode("utf-8"),
+                ec.ECDSA(hashes.SHA256()),
+            )
+        )
+
+        state_sql = text(
+            "SELECT control.password_hash, control.totp_secret_fingerprint, "
+            "control.last_totp_timecode, control.security_state, "
+            "control.state_version, code.code_sha256, code.used_at, "
+            "recovery.expires_at, recovery.completed_at, "
+            "capability.totp_secret_fingerprint AS private_totp_fingerprint, "
+            "capability.pending_recovery_token_sha256, "
+            "capability.pending_recovery_expires_at, "
+            "capability.pending_next_totp_fingerprint "
+            "FROM admin_security_controls AS control "
+            "JOIN admin_security_recovery_transactions AS recovery "
+            "ON recovery.admin_id = control.admin_id "
+            "JOIN admin_security_recovery_codes AS code "
+            "ON code.id = recovery.recovery_code_id "
+            "JOIN walksafe_recovery_custody_capabilities AS capability "
+            "ON capability.admin_id = control.admin_id "
+            "WHERE control.admin_id = :admin_id AND recovery.id = :transaction_id"
+        )
+        state_parameters = {"admin_id": admin_id, "transaction_id": transaction_id}
+        with engine.connect() as connection:
+            before = connection.execute(
+                state_sql,
+                state_parameters,
+            ).mappings().one()
+        expected_candidate = hashlib.sha256(
+            replacement_totp_secret.encode("utf-8")
+        ).hexdigest()
+        assert before["security_state"] == "RECOVERY_IN_PROGRESS"
+        assert before["completed_at"] is None
+        assert before["pending_recovery_token_sha256"] == hashlib.sha256(
+            recovery.recovery_token.encode("utf-8")
+        ).hexdigest()
+        assert before["pending_recovery_expires_at"] == before["expires_at"]
+        assert before["pending_next_totp_fingerprint"] == expected_candidate
+
+        monkeypatch.setattr(database_api, "SessionLocal", runtime_sessions)
+        app = FastAPI()
+        app.include_router(admin_security_api.create_router(settings))
+        app.add_middleware(FieldTestSecurityMiddleware, settings=settings)
+        response = ASGITestClient(app).post(
+            "/admin/security/recovery/complete",
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-WalkSafe-App-Kind": ADMIN_APP_KIND,
+                "X-WalkSafe-Role": ADMIN_ROLE,
+                "X-WalkSafe-Audience": ADMIN_AUDIENCE,
+                "X-WalkSafe-Device-Id": device_id,
+                "X-WalkSafe-Device-Challenge-Id": challenge_response[
+                    "challenge_id"
+                ],
+                "X-WalkSafe-Device-Signature": signature,
+                "X-WalkSafe-Correlation-Id": str(correlation_id),
+            },
+        )
+
+        assert response.status_code == 410
+        assert response.json()["detail"]["code"] == "admin_recovery_expired"
+        with engine.connect() as connection:
+            after = connection.execute(
+                state_sql,
+                state_parameters,
+            ).mappings().one()
+            consumed_at = connection.execute(
+                text(
+                    "SELECT consumed_at FROM admin_device_proof_challenges "
+                    "WHERE id = :challenge_id"
+                ),
+                {"challenge_id": uuid.UUID(challenge_response["challenge_id"])},
+            ).scalar_one()
+            audit = connection.execute(
+                text(
+                    "SELECT action, outcome, admin_id, device_id, details "
+                    "FROM admin_security_audits "
+                    "WHERE admin_id = :admin_id AND action = 'recovery.complete' "
+                    "ORDER BY sequence DESC LIMIT 1"
+                ),
+                {"admin_id": admin_id},
+            ).mappings().one()
+
+        assert consumed_at is not None
+        assert after["security_state"] == "RECOVERY_REQUIRED"
+        assert after["state_version"] == before["state_version"] + 1
+        assert (
+            after["pending_recovery_token_sha256"],
+            after["pending_recovery_expires_at"],
+            after["pending_next_totp_fingerprint"],
+        ) == (None, None, None)
+        for unchanged in (
+            "password_hash",
+            "totp_secret_fingerprint",
+            "last_totp_timecode",
+            "code_sha256",
+            "used_at",
+            "expires_at",
+            "completed_at",
+            "private_totp_fingerprint",
+        ):
+            assert after[unchanged] == before[unchanged]
+        assert audit == {
+            "action": "recovery.complete",
+            "outcome": "DENIED",
+            "admin_id": admin_id,
+            "device_id": device_id,
+            "details": {"reason": "expired", "next_state": "RECOVERY_REQUIRED"},
+        }
+    finally:
+        event.remove(runtime_sessions, "after_begin", assume_runtime_role)
+        engine.dispose()
+        clean_test_storage()
 
 
 def test_provision_register_rotate_and_idempotent_releases_row_lock() -> None:
@@ -1639,7 +1986,7 @@ def test_recovery_complete_middleware_requires_registered_device_proof() -> None
     assert downstream[-1]["raw_body"] == body
 
 
-def test_signed_recovery_complete_reaches_middleware_route_and_service() -> None:
+def test_signed_expired_recovery_complete_reaches_route_cleanup() -> None:
     private_key = _private_key()
     key = _device_key(private_key)
     now = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
@@ -1676,6 +2023,7 @@ def test_signed_recovery_complete_reaches_middleware_route_and_service() -> None
             ec.ECDSA(hashes.SHA256()),
         )
     )
+    transaction.expires_at = now
 
     class RecoveryService:
         def __init__(self) -> None:
@@ -1697,15 +2045,23 @@ def test_signed_recovery_complete_reaches_middleware_route_and_service() -> None
 
     def verify(_settings_value: Any, **kwargs: Any) -> VerifiedAdminDeviceProof:
         return verify_admin_device_proof(
-                _FakeSession(
-                    [
-                        _Result(one=challenge),
-                        _Result(values=[control]),
-                        _Result(values=[transaction]),
-                        _Result(one=key),
-                    ]
-                ),
+            _FakeSession(
+                [
+                    _Result(one=challenge),
+                    _Result(
+                        values=[
+                            SimpleNamespace(
+                                context_status="RECOVERY_EXPIRED",
+                                public_key_spki_der=key.public_key_spki_der,
+                            )
+                        ]
+                    ),
+                ],
+                dialect="postgresql",
+            ),
             **kwargs,
+            runtime_totp_secret=settings.admin_totp_secret,
+            credential_issuer_key="issuer-key-for-device-proof-tests-1234567890",
             now=now + timedelta(seconds=1),
         )
 

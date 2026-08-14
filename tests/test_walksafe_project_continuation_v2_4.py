@@ -1381,6 +1381,110 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         self.assertEqual(artifact_bindings, {})
         self.assertEqual(transitions, {})
 
+    def test_current_security_database_successors_preserve_completion_sources(
+        self,
+    ) -> None:
+        amendments = (
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS
+        )
+        self.assertEqual(
+            goal_graph._current_security_database_compatibility_artifacts(ROOT),
+            {
+                relative: (
+                    amendment["predecessor_sha256"],
+                    amendment["successor_sha256"],
+                )
+                for relative, amendment in amendments.items()
+            },
+        )
+
+        record_path = (
+            ROOT / goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH
+        )
+        self.assertEqual(
+            record_path.stat().st_size,
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT,
+        )
+        self.assertEqual(
+            sha256_file(record_path),
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256,
+        )
+
+    def test_current_security_database_successor_rejects_third_digest(
+        self,
+    ) -> None:
+        target = ROOT / "backend/tests/test_admin_runtime_acl_hardening.py"
+        real_sha256_file = goal_graph.continuation.sha256_file
+
+        def changed_sha256(path: Path) -> str:
+            if path == target:
+                return "f" * 64
+            return real_sha256_file(path)
+
+        with mock.patch.object(
+            goal_graph.continuation,
+            "sha256_file",
+            side_effect=changed_sha256,
+        ):
+            self.assertIsNone(
+                goal_graph._current_security_database_compatibility_artifacts(
+                    ROOT
+                )
+            )
+
+    def test_current_security_database_added_source_rejects_third_digest(
+        self,
+    ) -> None:
+        real_sha256_file = goal_graph.continuation.sha256_file
+        for relative in (
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES
+        ):
+            with self.subTest(relative=relative):
+                target = ROOT / relative
+
+                def changed_sha256(path: Path) -> str:
+                    if path == target:
+                        return "f" * 64
+                    return real_sha256_file(path)
+
+                with mock.patch.object(
+                    goal_graph.continuation,
+                    "sha256_file",
+                    side_effect=changed_sha256,
+                ):
+                    self.assertIsNone(
+                        goal_graph._current_security_database_compatibility_artifacts(
+                            ROOT
+                        )
+                    )
+
+    def test_current_security_database_rejects_unsealed_predecessor(
+        self,
+    ) -> None:
+        real_strict_json_bytes = goal_graph.npc_recovery.strict_json_bytes
+
+        def changed_predecessor(raw: bytes, label: str) -> dict[str, object]:
+            document = real_strict_json_bytes(raw, label)
+            if label != goal_graph.npc_recovery.V2_IMPLEMENTATION_REL.as_posix():
+                return document
+            document = copy.deepcopy(document)
+            for row in document["execution_input_closure"]["files"]:
+                if row["path"] == "backend/tests/test_fp046_postgres_integration.py":
+                    row["sha256"] = "f" * 64
+                    break
+            return document
+
+        with mock.patch.object(
+            goal_graph.npc_recovery,
+            "strict_json_bytes",
+            side_effect=changed_predecessor,
+        ):
+            self.assertIsNone(
+                goal_graph._current_security_database_compatibility_artifacts(
+                    ROOT
+                )
+            )
+
     def test_standalone_goal_graph_passes_with_historical_witness(self) -> None:
         completed = subprocess.run(
             [
