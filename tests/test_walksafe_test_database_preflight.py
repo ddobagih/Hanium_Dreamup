@@ -227,13 +227,23 @@ def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> Non
     workflow = Path(".github/workflows/quality.yml").read_text(encoding="utf-8")
 
     checkout = workflow.index("actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5")
+    fp046_fetch = workflow.index("Fetch FP046 successor source commit")
+    npc_fetch = workflow.index("Fetch NPC start-control ancestry")
     setup_python = workflow.index(
         "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
     )
     restore_modes = workflow.index("Restore private evidence modes")
     secret_scan = workflow.index("Verify current tree contains no new secrets")
     dependency_install = workflow.index("Install Node regression dependencies")
-    assert checkout < setup_python < restore_modes < secret_scan < dependency_install
+    assert (
+        checkout
+        < fp046_fetch
+        < npc_fetch
+        < setup_python
+        < restore_modes
+        < secret_scan
+        < dependency_install
+    )
     assert workflow.count("actions/setup-python@") == 2
     assert 'python-version: "3.14.6"' in workflow
     assert "update-environment: false" in workflow

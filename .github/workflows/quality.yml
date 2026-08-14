@@ -37,22 +37,27 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: Fetch historical source commits
+      - name: Fetch FP046 successor source commit
         shell: bash
         env:
           FP046_SUCCESSOR_SOURCE_COMMIT: "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
+        run: |
+          set -euo pipefail
+          test "${FP046_SUCCESSOR_SOURCE_COMMIT:?}" = "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
+          git fetch --no-tags --no-write-fetch-head --depth=1 \
+            origin "${FP046_SUCCESSOR_SOURCE_COMMIT:?}"
+          test "$(git cat-file -t "${FP046_SUCCESSOR_SOURCE_COMMIT:?}")" = commit
+      - name: Fetch NPC start-control ancestry
+        shell: bash
+        env:
           NPC_REANCHOR_BASE_COMMIT: "f0093863e82bfc80d9f11915cef33a51d44b8730"
           NPC_REANCHOR_HEAD_COMMIT: "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
         run: |
           set -euo pipefail
-          test "${FP046_SUCCESSOR_SOURCE_COMMIT:?}" = "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
           test "${NPC_REANCHOR_BASE_COMMIT:?}" = "f0093863e82bfc80d9f11915cef33a51d44b8730"
           test "${NPC_REANCHOR_HEAD_COMMIT:?}" = "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
-          git fetch --no-tags --no-write-fetch-head --depth=1 \
-            origin "${FP046_SUCCESSOR_SOURCE_COMMIT:?}"
           git fetch --no-tags --no-write-fetch-head --depth=8 \
             origin "${NPC_REANCHOR_HEAD_COMMIT:?}"
-          test "$(git cat-file -t "${FP046_SUCCESSOR_SOURCE_COMMIT:?}")" = commit
           test "$(git cat-file -t "${NPC_REANCHOR_BASE_COMMIT:?}")" = commit
           test "$(git cat-file -t "${NPC_REANCHOR_HEAD_COMMIT:?}")" = commit
           git merge-base --is-ancestor \
