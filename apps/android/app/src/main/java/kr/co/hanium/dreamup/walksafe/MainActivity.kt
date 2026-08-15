@@ -163,7 +163,11 @@ import kr.co.hanium.dreamup.walksafe.navigation.GatewayProxyHttpException
 import kr.co.hanium.dreamup.walksafe.navigation.LocationTrustPolicy
 import kr.co.hanium.dreamup.walksafe.navigation.haversineMeters
 import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigator
+import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorDecisionToken
+import kr.co.hanium.dreamup.walksafe.navigation.RouteNavigatorUserDecision
 import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchResult
+import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceCommand
+import kr.co.hanium.dreamup.walksafe.navigation.DestinationSearchVoiceState
 import kr.co.hanium.dreamup.walksafe.navigation.EarthOrientationAccuracy
 import kr.co.hanium.dreamup.walksafe.navigation.RoutePoint
 import kr.co.hanium.dreamup.walksafe.navigation.StepLengthEstimator
@@ -173,7 +177,6 @@ import kr.co.hanium.dreamup.walksafe.navigation.TactileRouteGuidanceResult
 import kr.co.hanium.dreamup.walksafe.navigation.TrustedLocation
 import kr.co.hanium.dreamup.walksafe.navigation.WalkingRouteRequest
 import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationDistance
-import kr.co.hanium.dreamup.walksafe.navigation.formatDestinationSearchVoicePrompt
 import kr.co.hanium.dreamup.walksafe.navigation.reliableMovementHeadingDegrees
 import kr.co.hanium.dreamup.walksafe.navigation.selectAndroidVoiceAction
 import kr.co.hanium.dreamup.walksafe.navigation.createProductionAndroidTactileFrameCoordinator
@@ -710,6 +713,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var currentDestination: RoutePoint? = null
     @Volatile
     private var latestStepCount: Int = 0
+    private var routeStartStepCount: Int? = null
     private var stepTrackingEpoch: WalkRuntimeEpoch? = null
     @Volatile
     private var latestReportCandidateStatus = "reportCandidate=blocked"
@@ -729,6 +733,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var isRouteActive = false
     @Volatile
     private var latestTmapOnRoute = false
+    private var directionGuidancePauseReason: String? = null
     @Volatile
     private var latestTactileRouteState = "localRoute=tmap:navigation_inactive"
     private var navigationPermissionsRequestedForRoute = false
@@ -739,6 +744,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private var destinationSearchPage = 1
     private val destinationSearchResults = mutableListOf<DestinationSearchResult>()
     private var pendingVoiceDestinationQuery: String? = null
+    private var pendingVoiceDestinationPageIndex: Int? = null
+    private var destinationSearchVoiceState: DestinationSearchVoiceState? = null
     private var routeRequestGeneration = 0
     private val routeExecutor = newNavigationRequestExecutor()
     private var reportRuntimeConfig: TwoModelRuntimeConfig? = null
@@ -7380,12 +7387,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         destinationSearchGeneration += 1
         destinationSearchInFlight = false
         pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
         isRouteActive = false
         latestTmapOnRoute = false
         latestTactileRouteState = "localRoute=tmap:navigation_inactive"
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        routeStartStepCount = null
         destinationSearchResults.clear()
         updateDestinationSearchUi()
         updateRouteButtonText()
@@ -17243,6 +17253,11 @@ generation != cameraFallbackGeneration
         } else {
             null
         }
+        val expectedNavigationDecisionToken = if (purpose == VoiceRecognitionPurpose.COMMAND) {
+            routeNavigator.pendingDecisionToken()
+        } else {
+            null
+        }
         val mayListen = when (purpose) {
             VoiceRecognitionPurpose.COMMAND -> {
                 walkSessionLifecycle.isRuntimeEpochCurrent(expectedWalkEpoch) &&
@@ -17333,6 +17348,7 @@ generation != cameraFallbackGeneration
                 expectedWalkEpoch = expectedWalkEpoch,
                 expectedResumeToken = expectedResumeToken,
                 expectedGatewayWalkOperationId = expectedGatewayWalkOperationId,
+                expectedNavigationDecisionToken = expectedNavigationDecisionToken,
             ),
         )
         voiceRecognitionActive = true
@@ -17385,6 +17401,7 @@ generation != cameraFallbackGeneration
         expectedWalkEpoch: WalkRuntimeEpoch,
         expectedResumeToken: WalkSessionConfirmationToken?,
         expectedGatewayWalkOperationId: String?,
+        expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
     ): RecognitionListener {
         return object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) = Unit
@@ -17460,7 +17477,11 @@ generation != cameraFallbackGeneration
                     VoiceRecognitionPurpose.WALK_SESSION_TAKEOVER ->
                         handleGatewayWalkTakeoverRecognition(phrases)
                     VoiceRecognitionPurpose.COMMAND ->
-                        handleVoiceCommandPhrases(phrases, confidenceScores)
+                        handleVoiceCommandPhrases(
+                            phrases,
+                            confidenceScores,
+                            expectedNavigationDecisionToken,
+                        )
                 }
             }
         }
@@ -17507,12 +17528,27 @@ generation != cameraFallbackGeneration
         }
     }
 
-    private fun handleVoiceCommandPhrases(phrases: List<String>, confidenceScores: FloatArray?) {
+    private fun handleVoiceCommandPhrases(
+        phrases: List<String>,
+        confidenceScores: FloatArray?,
+        expectedNavigationDecisionToken: RouteNavigatorDecisionToken?,
+    ) {
         val recognized = phrases.firstOrNull { it.isNotBlank() }.orEmpty()
         val action = selectAndroidVoiceAction(phrases, confidenceScores)
         if (action == null) {
             updateNavigationStatus("voice=command_unmatched phrase=${recognized.toStatusToken(maxLength = 48)}")
             speakInteraction("명령을 이해하지 못했습니다. 다시 말씀해 주세요.")
+            return
+        }
+        if (
+            action in setOf(
+                AndroidVoiceAction.RequestReroute,
+                AndroidVoiceAction.ConfirmArrival,
+                AndroidVoiceAction.RejectArrival,
+            ) && expectedNavigationDecisionToken != routeNavigator.pendingDecisionToken()
+        ) {
+            updateNavigationStatus("voice=navigation_decision_stale")
+            speakInteraction("경로 상태가 바뀌어 이전 음성 결정을 적용하지 않았습니다. 다시 확인해 주세요.")
             return
         }
         executeVoiceAction(action)
@@ -17526,8 +17562,12 @@ generation != cameraFallbackGeneration
             }
             is AndroidVoiceAction.SearchDestination -> startVoiceDestinationSearch(action.query)
             is AndroidVoiceAction.SelectDestinationCandidate -> selectVoiceDestinationCandidate(action.oneBasedIndex)
+            AndroidVoiceAction.HearMoreDestinationCandidates -> hearMoreVoiceDestinationCandidates()
             AndroidVoiceAction.CancelDestination -> cancelDestinationFromVoice()
             AndroidVoiceAction.SpeakNextNavigationInstruction -> speakNextNavigationInstruction()
+            AndroidVoiceAction.RequestReroute -> requestRerouteFromVoice()
+            AndroidVoiceAction.ConfirmArrival -> confirmArrivalFromVoice()
+            AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
             AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
         }
     }
@@ -17538,11 +17578,40 @@ generation != cameraFallbackGeneration
         }
         destinationQueryInput.setText(query)
         pendingVoiceDestinationQuery = query
+        pendingVoiceDestinationPageIndex = 0
+        destinationSearchVoiceState = null
         if (performDestinationSearch(reset = true)) {
             updateNavigationStatus("voice=destination_search query=${query.toStatusToken(maxLength = 48)}")
             speakInteraction("${query} 목적지를 검색합니다.")
         } else {
             pendingVoiceDestinationQuery = null
+            pendingVoiceDestinationPageIndex = null
+        }
+    }
+
+    private fun hearMoreVoiceDestinationCandidates() {
+        val state = destinationSearchVoiceState
+        if (state == null) {
+            speakInteraction("먼저 목적지를 검색해 주세요.")
+            return
+        }
+        val transition = state.onCommand(DestinationSearchVoiceCommand.HearMore)
+        if (transition.accepted) {
+            destinationSearchVoiceState = transition.state
+            speakInteraction(transition.state.voicePrompt())
+            return
+        }
+        val canLoadMore = destinationSearchResults.size >= destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE &&
+            destinationSearchResults.size < DESTINATION_SEARCH_MAX_RESULTS
+        if (!canLoadMore || destinationSearchInFlight) {
+            speakInteraction("더 안내할 목적지 후보가 없습니다.")
+            return
+        }
+        pendingVoiceDestinationQuery = destinationSearchQuery
+        pendingVoiceDestinationPageIndex = state.pageIndex + 1
+        if (!performDestinationSearch(reset = false)) {
+            pendingVoiceDestinationQuery = null
+            pendingVoiceDestinationPageIndex = null
         }
     }
 
@@ -17555,6 +17624,8 @@ generation != cameraFallbackGeneration
             (::destinationLatInput.isInitialized && destinationLatInput.text?.isNotBlank() == true) ||
             (::destinationLngInput.isInitialized && destinationLngInput.text?.isNotBlank() == true)
         pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
         if (destinationSearchInFlight) cancelDestinationSearch()
         resetRouteState()
         destinationSearchQuery = ""
@@ -17573,7 +17644,10 @@ generation != cameraFallbackGeneration
 
     private fun selectVoiceDestinationCandidate(oneBasedIndex: Int) {
         if (!requireReporterUserId("login_required_voice_destination_select")) return
-        val selected = destinationSearchResults.getOrNull(oneBasedIndex - 1)
+        val voiceSelection = destinationSearchVoiceState?.onCommand(
+            DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex),
+        )
+        val selected = voiceSelection?.selectedResult
         if (selected == null) {
             val message = if (destinationSearchInFlight) {
                 "목적지 검색이 끝난 뒤 후보 번호를 말씀해 주세요."
@@ -17585,9 +17659,51 @@ generation != cameraFallbackGeneration
             return
         }
         pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
         onDestinationSelected(selected)
         updateNavigationStatus("voice=destination_candidate_selected index=$oneBasedIndex")
         speakInteraction("${selected.name} 목적지를 선택했습니다. TMAP 경로를 확인합니다.")
+    }
+
+    private fun requestRerouteFromVoice() {
+        val destination = currentDestination
+        if (
+            destination == null ||
+            !isRouteActive ||
+            routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
+        ) {
+            speakInteraction("지금은 새 경로를 요청할 이탈 상태가 아닙니다.")
+            return
+        }
+        val decision = routeNavigator.approveReroute()
+        updateNavigationStatus("navigation=off_route_reroute_user_confirmed")
+        speakInteraction(requireNotNull(decision.instruction))
+        requestRoute(destination, reason = "off_route")
+        if (!routeRequestInFlight.get() && routeNavigator.hasRoute()) {
+            retainRouteAfterRerouteFailure("TMAP 새 경로 요청을 시작할 수 없어 방향 안내를 중지했습니다.")
+        }
+    }
+
+    private fun confirmArrivalFromVoice() {
+        val decision = routeNavigator.confirmArrival()
+        if (!decision.arrived) {
+            speakInteraction("지금은 확인할 도착 후보가 없습니다.")
+            return
+        }
+        resetRouteState()
+        updateNavigationStatus("navigation=arrival_confirmed_by_user")
+        speakInteraction(requireNotNull(decision.instruction))
+    }
+
+    private fun rejectArrivalFromVoice() {
+        val decision = routeNavigator.rejectArrival()
+        if (decision.reason != "arrival_rejected_route_retained") {
+            speakInteraction("지금은 거절할 도착 후보가 없습니다.")
+            return
+        }
+        updateNavigationStatus("navigation=arrival_rejected_route_retained")
+        speakInteraction(requireNotNull(decision.instruction))
     }
 
     private fun speakNextNavigationInstruction() {
@@ -17646,6 +17762,10 @@ generation != cameraFallbackGeneration
         }
         if (!::fusedLocationClient.isInitialized || !hasLocationPermission()) {
             updateNavigationStatus("navigation=gps_permission_missing hazard_only")
+            pauseDirectionGuidance(
+                reason = "location_permission_missing",
+                message = "정확한 위치 권한이 없어 방향 안내를 중지했습니다.",
+            )
             return
         }
         val walkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: run {
@@ -17675,6 +17795,10 @@ generation != cameraFallbackGeneration
                     )
                     clearTrustedLocation()
                     updateNavigationStatus("navigation=gps_unavailable")
+                    pauseDirectionGuidance(
+                        reason = "gps_unavailable",
+                        message = "GPS 위치를 확인할 수 없어 방향 안내를 중지했습니다.",
+                    )
                 }
             }
         }
@@ -17710,7 +17834,13 @@ generation != cameraFallbackGeneration
     ): TrustedLocation? {
         val current = latestTrustedLocation
         val fresh = LocationTrustPolicy.freshOrNull(current, nowElapsedRealtimeMs)
-        if (current != null && fresh == null) clearLocationDerivedState()
+        if (current != null && fresh == null) {
+            clearLocationDerivedState()
+            pauseDirectionGuidance(
+                reason = "gps_stale",
+                message = "GPS 위치가 오래되어 방향 안내를 중지했습니다.",
+            )
+        }
         return fresh
     }
 
@@ -17785,6 +17915,10 @@ generation != cameraFallbackGeneration
             // continue to block it from reports and routing once it is older than maxAgeMs.
             clearLocationDerivedState()
             updateNavigationStatus("navigation=gps_untrusted accuracy=${accuracy?.toInt() ?: "null"}m")
+            pauseDirectionGuidance(
+                reason = "gps_untrusted",
+                message = "GPS 정확도를 신뢰할 수 없어 방향 안내를 중지했습니다.",
+            )
             return
         }
         latestTrustedLocation = freshTrusted
@@ -17796,7 +17930,7 @@ generation != cameraFallbackGeneration
             "navigation=gps_trusted accuracy=${freshTrusted.accuracyM.toInt()}m steps=$latestStepCount heading=${latestHeadingDeg?.let { String.format(Locale.US, "%.1f", it) } ?: "null"}",
         )
         if (isRouteActive && !routeRequestInFlight.get() && !routeNavigator.hasRoute()) {
-            currentDestination?.let { destination -> requestRoute(destination, reason = "trusted_gps_ready") }
+            updateNavigationStatus("navigation=route_waiting user_route_decision_required trusted_gps_ready")
         }
         updateRouteGuidance(freshTrusted)
     }
@@ -18028,7 +18162,9 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        routeStartStepCount = null
         destinationSearchResults.clear()
+        destinationSearchVoiceState = null
         updateDestinationSearchUi()
         updateRouteButtonText()
         updateNavigationStatus("navigation=destination_none hazard_only")
@@ -18057,6 +18193,7 @@ generation != cameraFallbackGeneration
         currentDestination = null
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        routeStartStepCount = null
         updateRouteButtonText()
         updateNavigationStatus("navigation=route_request_cancelled hazard_only")
     }
@@ -18070,11 +18207,14 @@ generation != cameraFallbackGeneration
         destinationSearchGeneration += 1
         destinationSearchInFlight = false
         pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
+        destinationSearchVoiceState = null
         isRouteActive = false
         latestTmapOnRoute = false
         latestTactileRouteState = "localRoute=tmap:navigation_inactive"
         navigationPermissionsRequestedForRoute = false
         routeNavigator.clear()
+        routeStartStepCount = null
         currentDestination = retainedDestination
         destinationSearchResults.clear()
         updateDestinationSearchUi()
@@ -18118,11 +18258,13 @@ generation != cameraFallbackGeneration
             destinationSearchPage = 1
             destinationSearchResults.clear()
             destinationSearchQuery = query
+            destinationSearchVoiceState = null
             updateDestinationSearchUi()
         } else if (destinationSearchQuery != query) {
             destinationSearchPage = 1
             destinationSearchResults.clear()
             destinationSearchQuery = query
+            destinationSearchVoiceState = null
             updateDestinationSearchUi()
         } else {
             destinationSearchPage += 1
@@ -18182,6 +18324,7 @@ generation != cameraFallbackGeneration
                             }
                             if (pendingVoiceDestinationQuery == query) {
                                 pendingVoiceDestinationQuery = null
+                                pendingVoiceDestinationPageIndex = null
                             }
                             updateNavigationStatus(
                                 "navigation=destination_search_wait " +
@@ -18213,7 +18356,10 @@ generation != cameraFallbackGeneration
                             destinationCancelButton.isEnabled = false
                             updateDestinationSearchUi()
                             updateNavigationStatus("navigation=destination_search_cancelled session_changed")
-                            if (pendingVoiceDestinationQuery == query) pendingVoiceDestinationQuery = null
+                            if (pendingVoiceDestinationQuery == query) {
+                                pendingVoiceDestinationQuery = null
+                                pendingVoiceDestinationPageIndex = null
+                            }
                         }
                         return@execute
                     }
@@ -18231,7 +18377,10 @@ generation != cameraFallbackGeneration
                             destinationCancelButton.isEnabled = false
                             updateDestinationSearchUi()
                             updateNavigationStatus("navigation=destination_search_cancelled session_changed")
-                            if (pendingVoiceDestinationQuery == query) pendingVoiceDestinationQuery = null
+                            if (pendingVoiceDestinationQuery == query) {
+                                pendingVoiceDestinationQuery = null
+                                pendingVoiceDestinationPageIndex = null
+                            }
                             return@runOnUiThread
                         }
                         destinationSearchInFlight = false
@@ -18246,7 +18395,27 @@ generation != cameraFallbackGeneration
                         updateNavigationStatus("navigation=search_results query=${result.query} count=${result.results.size}")
                         if (pendingVoiceDestinationQuery == query) {
                             pendingVoiceDestinationQuery = null
-                            speakInteraction(formatDestinationSearchVoicePrompt(query, destinationSearchResults))
+                            val requestedPageIndex = pendingVoiceDestinationPageIndex ?: 0
+                            pendingVoiceDestinationPageIndex = null
+                            val lastPageIndex = if (destinationSearchResults.isEmpty()) {
+                                0
+                            } else {
+                                (destinationSearchResults.size - 1) / DESTINATION_SEARCH_PAGE_SIZE
+                            }
+                            if (requestedPageIndex <= lastPageIndex) {
+                                destinationSearchVoiceState = DestinationSearchVoiceState(
+                                    query = query,
+                                    results = destinationSearchResults.toList(),
+                                    pageIndex = requestedPageIndex,
+                                    moreResultsAvailable =
+                                        destinationSearchResults.size >=
+                                            destinationSearchPage * DESTINATION_SEARCH_PAGE_SIZE &&
+                                            destinationSearchResults.size < DESTINATION_SEARCH_MAX_RESULTS,
+                                )
+                                speakInteraction(requireNotNull(destinationSearchVoiceState).voicePrompt())
+                            } else {
+                                speakInteraction("더 안내할 목적지 후보가 없습니다.")
+                            }
                         }
                     }
                 } catch (_: CancellationException) {
@@ -18284,7 +18453,10 @@ generation != cameraFallbackGeneration
                         destinationCancelButton.isEnabled = false
                         updateDestinationSearchUi()
                         val voiceRequest = pendingVoiceDestinationQuery == query
-                        if (voiceRequest) pendingVoiceDestinationQuery = null
+                        if (voiceRequest) {
+                            pendingVoiceDestinationQuery = null
+                            pendingVoiceDestinationPageIndex = null
+                        }
                         if (failureGuard == null || !isGatewayFailureUiGuardCurrent(gatewaySession, failureGuard)) {
                             return@runOnUiThread
                         }
@@ -18312,6 +18484,7 @@ generation != cameraFallbackGeneration
             updateNavigationStatus("navigation=destination_search_failed executor_rejected")
             if (pendingVoiceDestinationQuery == query) {
                 pendingVoiceDestinationQuery = null
+                pendingVoiceDestinationPageIndex = null
                 speakInteraction("${query} 목적지 검색을 시작할 수 없습니다.")
             }
             return false
@@ -18333,6 +18506,7 @@ generation != cameraFallbackGeneration
     private fun clearDestinationSearchState(transportWasActive: Boolean) {
         if (!destinationSearchInFlight && !transportWasActive) return
         pendingVoiceDestinationQuery = null
+        pendingVoiceDestinationPageIndex = null
         destinationSearchGeneration += 1
         destinationSearchInFlight = false
         destinationSearchButton.isEnabled = true
@@ -18505,11 +18679,19 @@ generation != cameraFallbackGeneration
                                     logoutRemote = false,
                                     expectedSession = gatewaySession,
                                 )
+                            } else if (preserveExistingRoute) {
+                                routeRequestInFlight.set(false)
+                                latestTmapOnRoute = false
+                                retainRouteAfterRerouteFailure(
+                                    "Gateway가 새 TMAP 경로를 아직 확인하지 못해 방향 안내를 중지했습니다.",
+                                )
+                                updateRouteButtonText()
                             } else {
                                 routeRequestInFlight.set(false)
                                 isRouteActive = false
                                 latestTmapOnRoute = false
                                 routeNavigator.clear()
+                                routeStartStepCount = null
                                 currentDestination = destination
                                 updateRouteButtonText()
                             }
@@ -18568,8 +18750,9 @@ generation != cameraFallbackGeneration
                         routeNavigator.setRoute(
                             route,
                             destination = destination,
-                            resetRerouteBudget = !preserveExistingRoute,
                         )
+                        routeStartStepCount = latestStepCount
+                        directionGuidancePauseReason = null
                         latestTmapOnRoute = true
                         routeRequestInFlight.set(false)
                         updateRouteButtonText()
@@ -18590,6 +18773,9 @@ generation != cameraFallbackGeneration
                         if (!preserveExistingRoute) isRouteActive = false
                         latestTmapOnRoute = false
                         if (!preserveExistingRoute) currentDestination = null
+                        if (preserveExistingRoute) {
+                            retainRouteAfterRerouteFailure("TMAP 새 경로 요청이 취소되어 방향 안내를 중지했습니다.")
+                        }
                         updateRouteButtonText()
                         updateNavigationStatus("navigation=route_cancelled")
                     }
@@ -18624,6 +18810,11 @@ generation != cameraFallbackGeneration
                                 "navigation=route_failed ${error::class.java.simpleName}"
                             },
                         )
+                        if (preserveExistingRoute) {
+                            retainRouteAfterRerouteFailure("TMAP 새 경로를 확인할 수 없어 방향 안내를 중지했습니다.")
+                        } else {
+                            speakInteraction("TMAP 경로를 확인할 수 없어 길안내를 시작하지 않았습니다.")
+                        }
                     }
                 } finally {
                     completeRouteRequest(routeCall)
@@ -18645,6 +18836,11 @@ generation != cameraFallbackGeneration
                     "navigation=route_failed executor_rejected"
                 },
             )
+            if (preserveExistingRoute) {
+                retainRouteAfterRerouteFailure("TMAP 새 경로를 확인할 수 없어 방향 안내를 중지했습니다.")
+            } else {
+                speakInteraction("TMAP 경로를 확인할 수 없어 길안내를 시작하지 않았습니다.")
+            }
         }
     }
 
@@ -18658,25 +18854,41 @@ generation != cameraFallbackGeneration
 
     private fun updateRouteGuidance(location: TrustedLocation) {
         val expectedWalkEpoch = walkSessionLifecycle.currentRuntimeEpochOrNull() ?: return
+        if (directionGuidancePauseReason == "tmap_unavailable") {
+            latestTmapOnRoute = false
+            updateNavigationStatus("navigation=direction_paused reason=tmap_unavailable")
+            return
+        }
         val nowMs = SystemClock.elapsedRealtime()
         val update = routeNavigator.update(
             location = location,
             nowMs = nowMs,
             requestInFlight = routeRequestInFlight.get(),
+            stepProgressM = routeStepProgressMOrNull(),
         )
+        if (!update.userDecisionRequired && !update.offRoute && update.reason !in setOf("route_missing", "polyline_missing")) {
+            directionGuidancePauseReason = null
+        }
         latestTmapOnRoute = isRouteActive &&
             !routeRequestInFlight.get() &&
             update.reason != "route_missing" &&
             update.reason != "polyline_missing" &&
             !update.offRoute &&
             !update.shouldReroute &&
-            !update.arrived
-        if (update.shouldReroute) {
-            currentDestination?.let { destination -> requestRoute(destination, reason = "off_route") }
-        }
+            !update.arrived &&
+            !update.userDecisionRequired
         maybePlayProgressBeep(nowMs, offRoute = update.offRoute, arrived = update.arrived)
+        updateNavigationStatus(
+            "navigation=${update.reason} offRoute=${update.offRoute} " +
+                "arrived=${update.arrived} decisionRequired=${update.userDecisionRequired}",
+        )
+        if (update.reason in setOf("route_missing", "polyline_missing")) {
+            pauseDirectionGuidance(
+                reason = "route_invalid",
+                message = "저장된 TMAP 경로를 확인할 수 없어 방향 안내를 중지했습니다.",
+            )
+        }
         val instruction = update.instruction ?: return
-        updateNavigationStatus("navigation=${update.reason} offRoute=${update.offRoute} arrived=${update.arrived}")
         if (feedbackPolicy.canSpeakNavigation(nowMs)) {
             val requestGeneration = routeRequestGeneration
             speakNavigation(instruction) {
@@ -18689,14 +18901,31 @@ generation != cameraFallbackGeneration
                         requestGeneration != routeRequestGeneration
                     ) return@runOnUiThread
                     routeNavigator.acknowledgeInstruction(update, SystemClock.elapsedRealtime())
-                    if (update.arrived) {
-                        isRouteActive = false
-                        latestTmapOnRoute = false
-                        updateRouteButtonText()
-                        navigationPermissionsRequestedForRoute = false
-                    }
                 }
             }
+        }
+    }
+
+    private fun routeStepProgressMOrNull(): Double? {
+        val baseline = routeStartStepCount ?: return null
+        if (!isRouteActive || !routeNavigator.hasRoute()) return null
+        val deltaSteps = latestStepCount - baseline
+        if (deltaSteps < 0) return null
+        return deltaSteps * stepLengthEstimator.stepLengthM.toDouble()
+    }
+
+    private fun retainRouteAfterRerouteFailure(message: String) {
+        routeNavigator.rerouteRequestFailed()
+        pauseDirectionGuidance(reason = "tmap_unavailable", message = message)
+    }
+
+    private fun pauseDirectionGuidance(reason: String, message: String) {
+        if (!isRouteActive) return
+        latestTmapOnRoute = false
+        updateNavigationStatus("navigation=direction_paused reason=$reason")
+        if (isRouteActive && directionGuidancePauseReason != reason) {
+            directionGuidancePauseReason = reason
+            speakInteraction(message)
         }
     }
 
@@ -19981,7 +20210,7 @@ generation != cameraFallbackGeneration
         const val MIN_STEP_CALIBRATION_DISTANCE_M = 4.0f
         const val MIN_STEP_CALIBRATION_DURATION_MS = 8_000L
         const val MAX_STEP_CALIBRATION_GAP_MS = 45_000L
-        const val DESTINATION_SEARCH_PAGE_SIZE = 5
+        const val DESTINATION_SEARCH_PAGE_SIZE = 3
         const val DESTINATION_SEARCH_MAX_RESULTS = 10
         const val UI_UPDATE_INTERVAL_MS = 500L
         const val TALKBACK_RISK_DUP_WINDOW_MS = 1_000L

@@ -9,6 +9,49 @@ import org.junit.Test;
 
 public final class AdminHighRiskActionGateTest {
     @Test
+    public void actionCatalogIsExactlyTheThreeCanonicalTriples() {
+        String[][] expected = {
+            {"RELEASE_APPROVAL", "release.approval", "POST", "/admin/operations/release-approvals"},
+            {"PRIVILEGE_CHANGE", "privilege.change", "POST", "/admin/operations/privilege-changes"},
+            {"DATA_DELETE", "data.delete", "POST", "/admin/operations/data-deletions"}
+        };
+        AdminHighRiskActionGate.Action[] actions = AdminHighRiskActionGate.Action.values();
+
+        assertEquals(3, actions.length);
+        for (int index = 0; index < expected.length; index++) {
+            assertEquals(expected[index][0], actions[index].name());
+            assertEquals(expected[index][1], actions[index].reauthenticationAction());
+            assertEquals(expected[index][2], actions[index].method());
+            assertEquals(expected[index][3], actions[index].path());
+            assertEquals(
+                actions[index],
+                AdminHighRiskActionGate.Action.fromExactTriple(
+                    expected[index][0], expected[index][2], expected[index][3]
+                )
+            );
+        }
+    }
+
+    @Test
+    public void arbitraryOrCrossPairedTriplesAreRejected() {
+        String[][] rejected = {
+            {"report.status.update", "PATCH", "/reports/report-1/status"},
+            {"RELEASE_APPROVAL", "GET", "/admin/operations/release-approvals"},
+            {"RELEASE_APPROVAL", "POST", "/admin/operations/privilege-changes"},
+            {"PRIVILEGE_CHANGE", "POST", "/admin/security/privilege-changes"},
+            {"DATA_DELETE", "POST", "/admin/security/data-deletions"}
+        };
+        for (String[] triple : rejected) {
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> AdminHighRiskActionGate.Action.fromExactTriple(
+                    triple[0], triple[1], triple[2]
+                )
+            );
+        }
+    }
+
+    @Test
     public void recoveryAndUnknownStatesAlwaysFreezeEveryHighRiskAction() {
         for (AdminSecurityState state : new AdminSecurityState[] {
             AdminSecurityState.SIGNED_OUT,
@@ -18,10 +61,36 @@ public final class AdminHighRiskActionGateTest {
             AdminSecurityState.FAIL_CLOSED
         }) {
             for (AdminHighRiskActionGate.Action action : AdminHighRiskActionGate.Action.values()) {
-                var decision = AdminHighRiskActionGate.evaluate(action, state, 20_000L, 10_000L, true);
+                var decision = AdminHighRiskActionGate.evaluate(
+                    action,
+                    state,
+                    AdminRecoveryCustodyState.ATTESTED,
+                    20_000L,
+                    10_000L,
+                    true
+                );
                 assertFalse(decision.isAllowed());
                 assertEquals("administrator_access_not_normal", decision.reason());
             }
+        }
+    }
+
+    @Test
+    public void normalAuthenticationStillFreezesHighRiskActionsWithoutConfirmedCustody() {
+        for (AdminRecoveryCustodyState custodyState : new AdminRecoveryCustodyState[] {
+            null,
+            AdminRecoveryCustodyState.UNATTESTED
+        }) {
+            var decision = AdminHighRiskActionGate.evaluate(
+                AdminHighRiskActionGate.Action.RELEASE_APPROVAL,
+                AdminSecurityState.NORMAL,
+                custodyState,
+                20_000L,
+                10_000L,
+                true
+            );
+            assertFalse(decision.isAllowed());
+            assertEquals("recovery_custody_not_attested", decision.reason());
         }
     }
 
@@ -30,6 +99,7 @@ public final class AdminHighRiskActionGateTest {
         var decision = AdminHighRiskActionGate.evaluate(
             AdminHighRiskActionGate.Action.DATA_DELETE,
             AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
             20_000L,
             10_000L,
             false
@@ -42,35 +112,38 @@ public final class AdminHighRiskActionGateTest {
     @Test
     public void exactBindingRejectsExpiryAndMismatchAndCarriesOnlyTheNonceHeader() {
         var binding = new AdminHighRiskActionGate.Binding(
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             "AAECAwQFBgcICQoLDA0ODw",
             20_000L
         );
         var expired = AdminHighRiskActionGate.evaluate(
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
             binding,
             20_000L,
             true
         );
         var mismatch = AdminHighRiskActionGate.evaluate(
-            "report.status.update",
-            "POST",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.PRIVILEGE_CHANGE,
             AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
             binding,
             10_000L,
             true
         );
         var current = AdminHighRiskActionGate.evaluate(
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             AdminSecurityState.NORMAL,
+            AdminRecoveryCustodyState.ATTESTED,
+            binding,
+            10_000L,
+            true
+        );
+        var custodyUnknown = AdminHighRiskActionGate.evaluate(
+            AdminHighRiskActionGate.Action.DATA_DELETE,
+            AdminSecurityState.NORMAL,
+            null,
             binding,
             10_000L,
             true
@@ -80,6 +153,8 @@ public final class AdminHighRiskActionGateTest {
         assertEquals("recent_reauthentication_required", expired.reason());
         assertFalse(mismatch.isAllowed());
         assertEquals("reconfirmation_binding_mismatch", mismatch.reason());
+        assertFalse(custodyUnknown.isAllowed());
+        assertEquals("recovery_custody_not_attested", custodyUnknown.reason());
         assertTrue(current.isAllowed());
         assertEquals(
             "AAECAwQFBgcICQoLDA0ODw",
@@ -98,9 +173,7 @@ public final class AdminHighRiskActionGateTest {
             assertThrows(
                 IllegalArgumentException.class,
                 () -> new AdminHighRiskActionGate.Binding(
-                    "report.status.update",
-                    "PATCH",
-                    "/reports/report-1/status",
+                    AdminHighRiskActionGate.Action.RELEASE_APPROVAL,
                     nonce,
                     20_000L
                 )

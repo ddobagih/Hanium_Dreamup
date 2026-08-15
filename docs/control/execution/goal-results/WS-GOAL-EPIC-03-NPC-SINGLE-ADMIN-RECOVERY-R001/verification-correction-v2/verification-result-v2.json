@@ -1,0 +1,68 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-CORRECTION-20260813-002",
+  "evidence_schema": "V2_CORRECTION_ONLY",
+  "execution_input_content_set_sha256": "23a4249119546354a1073004a5eebf87739e7efb8e4b373a7a79f6aedcd3727d",
+  "execution_source_boundary": {
+    "concurrent_uncooperative_same_uid_writer_in_scope": false,
+    "consumer_must_revalidate_current_tree": true,
+    "kind": "BYTE_SEALED_DISPOSABLE_SNAPSHOT",
+    "live_tree_atomic_binding_claimed": false,
+    "pre_publication_live_match_checked": true
+  },
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "implementation_content_set_sha256": "2926c4af6c2547e68b2da148506097ea7a4b593301829300eb8970eb76317f6b",
+  "implementation_record_sha256": "eae0f5cd70574bb22551239bdb958370f1167524a3e823bceabd0a80d8b44fe5",
+  "internal_lane_count": 4,
+  "kind": "VERIFICATION_RESULT",
+  "lane_receipts": [
+    {
+      "lane_id": "ADMIN_ANDROID_UNIT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/lanes/admin_android_unit-v2.json",
+      "sha256": "0a9dbbf38e834f6899d666d4fa335cf699726d89e81e4741096bee6df25c7a1c"
+    },
+    {
+      "lane_id": "ADMIN_ANDROID_ASSEMBLE_LINT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/lanes/admin_android_assemble_lint-v2.json",
+      "sha256": "9f4e7ee1ed249fc28fb37c2b55f6c634ea899b40bb516588f52a57a465081527"
+    },
+    {
+      "lane_id": "BACKEND_RECOVERY_PYTEST",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/lanes/backend_recovery_pytest-v2.json",
+      "sha256": "bc3130a47aaaf4ff977a4a3c2c8707a30d938cdb667d590745598fb65dad135f"
+    },
+    {
+      "lane_id": "RECOVERY_GATE_CLI_PYTEST",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/lanes/recovery_gate_cli_pytest-v2.json",
+      "sha256": "bdc792703f3e6a397796933413739e37843f5b802aa506d44887e01bad60f1fd"
+    }
+  ],
+  "observed_at": "2026-08-13T12:54:30.302879+09:00",
+  "schema_version": "1.0",
+  "status": "PASS_INTERNAL",
+  "verification_observation_binding": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/verification-observations-v2.json",
+    "schema_version": "walksafe.npc-single-admin-recovery-verification.v2",
+    "sha256": "33215d635060f68979a77f97e99c442ea3791344cbc50b66249757cfc9bcf7c3"
+  },
+  "verification_result_content_sha256": "94120140a51462016baf695ac8ec0f7ff0f6d93f95c308c4be5d6a5dd7695a7e"
+}

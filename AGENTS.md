@@ -12,7 +12,7 @@
 6. `docs/control/goals/walksafe-completion-graph-v2-2/00-master-goal.md`
 7. `docs/control/walksafe-project-continuation-checkpoint.json`
 
-재개 안내서, v2.4 내부 README와 과거 패키지 문서는 당시 상태를 byte-exact하게 보존한 감사 자료다. 그 안의 `PREPARED_NOT_ACTIVATED`, 과거 focus, 활성화 프롬프트, v2.3·전환 준비 시점의 v2.4 gate 명령을 현재 지시로 실행하지 않는다. 동적 현재 상태는 checkpoint가 우선하며, 2026-08-11 기준 v2.4 package는 `ACTIVE`, focus는 `WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001` Goal `READY`, 내부 시작 gate는 `NOT_RUN`이다.
+재개 안내서, v2.4 내부 README와 과거 패키지 문서는 당시 상태를 byte-exact하게 보존한 감사 자료다. 그 안의 `PREPARED_NOT_ACTIVATED`, 과거 focus, 활성화 프롬프트, v2.3·전환 준비 시점의 v2.4 gate 명령을 현재 지시로 실행하지 않는다. 동적 현재 상태는 checkpoint가 우선하며, 2026-08-14 기준 v2.4 package는 `ACTIVE`, focus는 `WS-GOAL-EPIC-04` Goal `READY`, 내부 시작 gate는 `NOT_RUN`이다.
 
 ## 시작 검사
 

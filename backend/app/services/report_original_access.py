@@ -14,7 +14,8 @@ import secrets
 import stat
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -25,7 +26,13 @@ from backend.app.models import (
     ReportOriginalAccessAudit,
     ReportOriginalAccessGrant,
 )
-from backend.app.services.admin_security import AdminSessionIdentity, SecurityState
+from backend.app.services.admin_security import (
+    AdminSecurityError,
+    AdminSessionIdentity,
+    SecurityState,
+    _is_postgresql_session,
+    _resolve_admin_credential_issuer_key,
+)
 from backend.app.services.report_image_crypto import (
     MAX_ENVELOPE_BYTES,
     ReportImageCryptoError,
@@ -280,14 +287,71 @@ def _lock_and_revalidate_admin_session(
     identity: AdminSessionIdentity,
     report_id: uuid.UUID,
     observed_at: datetime,
+    runtime_totp_secret: str | None = None,
+    credential_issuer_key: str | None = None,
 ) -> tuple[AdminSecurityControl, AdminSecuritySession]:
     """Lock control then session so recovery/revocation cannot race plaintext release."""
 
-    controls = db.execute(
-        select(AdminSecurityControl)
-        .order_by(AdminSecurityControl.admin_id)
-        .with_for_update()
-    ).scalars().all()
+    postgresql_session = _is_postgresql_session(db)
+    if postgresql_session:
+        if runtime_totp_secret is None:
+            raise ReportOriginalAccessError(
+                "report_original_unavailable",
+                "Administrator security state is temporarily unavailable.",
+                status_code=503,
+            )
+        try:
+            resolved_issuer_key = _resolve_admin_credential_issuer_key(
+                db,
+                credential_issuer_key,
+            )
+            locked = db.execute(
+                text(
+                    "SELECT public.walksafe_lock_admin_original_access_session("
+                    "CAST(:admin_id AS text), CAST(:session_id AS uuid), "
+                    "CAST(:device_id AS text), CAST(:observed_at AS timestamptz), "
+                    "CAST(:runtime_totp_secret AS text), "
+                    "CAST(:credential_issuer_key AS text))"
+                ),
+                {
+                    "admin_id": identity.admin_id,
+                    "session_id": identity.session_id,
+                    "device_id": identity.device_id,
+                    "observed_at": observed_at,
+                    "runtime_totp_secret": runtime_totp_secret,
+                    "credential_issuer_key": resolved_issuer_key,
+                },
+            ).scalar_one()
+        except (AdminSecurityError, SQLAlchemyError) as exc:
+            db.rollback()
+            raise ReportOriginalAccessError(
+                "report_original_unavailable",
+                "Administrator security state is temporarily unavailable.",
+                status_code=503,
+            ) from exc
+        if locked is not True:
+            _audit_then_raise(
+                db,
+                identity=identity,
+                report_id=report_id,
+                action="ACCESS_DENIED",
+                outcome="DENIED",
+                reason_code="admin_session_or_security_state_changed",
+                code="report_original_access_denied",
+                message="A valid administrator session is required.",
+                status_code=403,
+            )
+        controls = db.execute(
+            select(AdminSecurityControl).where(
+                AdminSecurityControl.admin_id == identity.admin_id
+            )
+        ).scalars().all()
+    else:
+        controls = db.execute(
+            select(AdminSecurityControl)
+            .order_by(AdminSecurityControl.admin_id)
+            .with_for_update()
+        ).scalars().all()
     if len(controls) != 1 or controls[0].admin_id != identity.admin_id:
         _audit_then_raise(
             db,
@@ -301,14 +365,13 @@ def _lock_and_revalidate_admin_session(
             status_code=503,
         )
     control = controls[0]
-    session = db.execute(
-        select(AdminSecuritySession)
-        .where(
-            AdminSecuritySession.id == identity.session_id,
-            AdminSecuritySession.admin_id == identity.admin_id,
-        )
-        .with_for_update()
-    ).scalar_one_or_none()
+    session_query = select(AdminSecuritySession).where(
+        AdminSecuritySession.id == identity.session_id,
+        AdminSecuritySession.admin_id == identity.admin_id,
+    )
+    if not postgresql_session:
+        session_query = session_query.with_for_update()
+    session = db.execute(session_query).scalar_one_or_none()
     if control.security_state != SecurityState.NORMAL.value:
         _audit_then_raise(
             db,
@@ -391,6 +454,8 @@ def access_report_original(
     raw_access_token: str,
     identity: AdminSessionIdentity,
     key_manager: ReportImageKeyManager,
+    runtime_totp_secret: str | None = None,
+    credential_issuer_key: str | None = None,
     now: datetime | None = None,
 ) -> AccessedReportOriginal:
     """Consume one grant and commit its audit before releasing authenticated bytes."""
@@ -442,6 +507,8 @@ def access_report_original(
         identity=identity,
         report_id=report_id,
         observed_at=observed_at,
+        runtime_totp_secret=runtime_totp_secret,
+        credential_issuer_key=credential_issuer_key,
     )
     grant = db.execute(
         select(ReportOriginalAccessGrant)

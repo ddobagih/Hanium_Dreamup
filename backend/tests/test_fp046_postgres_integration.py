@@ -255,7 +255,7 @@ def test_fp046_schema_migration_constraints_and_append_only_evidence() -> None:
         return table is not None and table.name in privacy_tables
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608090001"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "202608150002"
         assert compare_metadata(
             MigrationContext.configure(
                 connection,
@@ -1734,19 +1734,35 @@ def test_fp046_receipt_purge_is_expiry_only_and_function_scoped() -> None:
         expected_update_tables = {
             "reports",
             "report_original_access_grants",
-            "admin_security_controls",
-            "admin_security_sessions",
-            "admin_security_recovery_codes",
-            "admin_security_recovery_transactions",
-            "admin_device_keys",
-            "admin_device_proof_challenges",
             "account_deletion_requests",
             "account_deletion_items",
             "account_deletion_device_targets",
         }
-        assert len(app_table_privileges) == 28
-        assert all(row["runtime_select"] for row in app_table_privileges.values())
-        assert all(row["runtime_insert"] for row in app_table_privileges.values())
+        assert len(app_table_privileges) == 30
+        assert {
+            table_name
+            for table_name, row in app_table_privileges.items()
+            if not row["runtime_select"]
+        } == {
+            "admin_security_recovery_codes",
+            "admin_security_recovery_transactions",
+            "walksafe_recovery_custody_capabilities",
+            "walksafe_recovery_custody_markers",
+        }
+        assert {
+            table_name
+            for table_name, row in app_table_privileges.items()
+            if not row["runtime_insert"]
+        } == {
+            "admin_device_keys",
+            "admin_security_controls",
+            "admin_security_reconfirmations",
+            "admin_security_recovery_codes",
+            "admin_security_recovery_transactions",
+            "admin_security_sessions",
+            "walksafe_recovery_custody_capabilities",
+            "walksafe_recovery_custody_markers",
+        }
         assert {
             table_name
             for table_name, row in app_table_privileges.items()

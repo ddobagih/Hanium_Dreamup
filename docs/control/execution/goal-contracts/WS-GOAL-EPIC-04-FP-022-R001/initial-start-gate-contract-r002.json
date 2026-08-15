@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.1",
+  "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260814-002",
+  "contract_id": "WS-FP022-INTERNAL-START-GATE-R002",
+  "contract_version": "2026-08-14.1",
+  "target_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "target_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+  "gate_purpose": "INITIAL_START",
+  "successor_reason_code": "SEQ67_READY_TRUST_ANCHOR_AND_CURRENT_CONTROL_COHORT_REQUIRED",
+  "supersedes": {
+    "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260813-001",
+    "contract_id": "WS-FP022-INTERNAL-START-GATE-R001",
+    "contract_version": "2026-08-13.1",
+    "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json",
+    "file_sha256": "14ad8eee8a6c972c1e9091c2065b0779acdde427d0176b84fb83b18840865c25",
+    "canonical_sha256": "a5d39ea4a1c7f919e4d3d08f3a429f7de0bdadec9d03756df7f32f4bbef074ab",
+    "source_ready_event_sequence": 67,
+    "source_ready_event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP022-20260813-001",
+    "source_ready_event_sha256": "37207b4393dd5820de6b71c7e167885f8592875f8b54d9d75d650aef230a87a2"
+  },
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "command": "PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json"
+    },
+    {
+      "check_id": "V24_ARTIFACT_WORK_QUEUE",
+      "command": "/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -c 'from pathlib import Path; from scripts import check_walksafe_goal_graph_v2_4 as g; root=Path(\".\").resolve(); checkpoint=g.continuation.load_json(root/g.continuation.V24_CHECKPOINT_RELATIVE); errors=g.validate_v24_artifact_work_queue(root, checkpoint); print(\"WalkSafe v2.4 artifact work queue check: PASS\" if not errors else \"\\n\".join([\"WalkSafe v2.4 artifact work queue check: FAIL\", *[f\"- {error}\" for error in errors]])); raise SystemExit(bool(errors))'"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "command": "PYTHON_BIN=/home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python bash scripts/run_walksafe_test_layers_current.sh validate"
+    },
+    {
+      "check_id": "BACKEND_NAVIGATION_INTERNAL",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q backend/tests/test_navigation_routes.py"
+    },
+    {
+      "check_id": "ANDROID_USER_INTERNAL",
+      "command": "(cd apps/android && GRADLE_USER_HOME=/home/ddobagi/.gradle ./gradlew --offline --no-daemon --max-workers=1 :app:testDebugUnitTest :app:assembleDebug :app:lintDebug)"
+    },
+    {
+      "check_id": "ROOT_FP022_CONTROL_REGRESSION",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B -m pytest -p no:cacheprovider -q tests/test_walksafe_fp022_goal_seq66_67_20260813.py tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py tests/test_walksafe_fp022_goal_start_gate_20260813.py tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py tests/test_build_walksafe_fp022_seq68_69_review_20260814.py tests/test_walksafe_project_continuation_v2_4.py"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "command": ": \"${WALKSAFE_GATE_EVENT_ID:?required}\" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. /home/ddobagi/.local/share/hanium-dreamup/walksafe-general-cpu-verify-20260715/bin/python -B scripts/check_walksafe_project_continuation_v2_4.py --root . --checkpoint docs/control/walksafe-project-continuation-checkpoint.json --print-gate-repository-state --gate-event-id \"${WALKSAFE_GATE_EVENT_ID}\""
+    }
+  ],
+  "claim_boundary": {
+    "seq67_ready_event_modified": false,
+    "binding_replacement_effective_without_reanchor_event": false,
+    "append_only_reanchor_event_required": true,
+    "goal_started": false,
+    "start_gate_status": "NOT_RUN",
+    "product_implementation_credit_delta": 0,
+    "artifact_completion_credit_delta": 0,
+    "test_credit_delta": 0,
+    "formal_test_credit_delta": 0,
+    "approval_credit_delta": 0,
+    "actual_event_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE",
+    "intended_use": "ADD_ONLY_SEQ68_START_CONTROL_REANCHOR_THEN_PRIVATE_GATE"
+  }
+}

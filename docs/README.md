@@ -32,12 +32,13 @@
 
 ## 현재 상태
 
-기준일 2026-08-11의 요약이며 checkpoint가 우선합니다.
+기준일 2026-08-13의 요약이며 checkpoint가 우선합니다.
 
 - 제품: Android 사용자 앱과 별도 Android 관리자 앱
 - 지원: Android Gateway, Backend, 모델·데이터·계약·배포 도구
 - Web/PWA: `LEGACY_REFERENCE_ONLY`
-- 다음 Goal: `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`, Goal `READY`; 내부 시작 gate `NOT_RUN`
+- `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`: 저장소 내부 구현·자동검증 `COMPLETE_AT_TARGET`, Gap `PARTIAL`
+- 다음 통제 작업: `EPIC-03` workstream 완료 조건 평가; 다음 구현 후보는 `FP-022 / GAP-031`
 - 정식 시험: 279/279 `NOT_RUN`
 - 출시 gate: 5/5 `NOT_RUN`, 미면제
 - 출시: `NOT_ELIGIBLE`
@@ -60,7 +61,7 @@
 
 - `control/goals/walksafe-completion-graph-v2-4/README.md` 등 package 내부 설명은 당시 활성화 상태를 byte-exact하게 보존합니다. 그 문구가 현재 checkpoint와 달라도 직접 수정하지 않습니다.
 - 현재 v2.4 package는 checkpoint 기준 `ACTIVE`입니다.
-- 최신 Gap·Backlog는 [r025 Gap](control/audits/walksafe-implementation-gap-analysis-20260810-r025.json)과 [r025 Backlog](control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json)입니다.
+- 최신 Gap·Backlog는 [r026 Gap](control/audits/walksafe-implementation-gap-analysis-20260812-r026.json)과 [r026 Backlog](control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)입니다.
 - frozen Goal·기존 gate 원출력·완료 영수증·canonical binding은 경로와 bytes를 보존합니다.
 
 ## 역사 문서 사용 규칙

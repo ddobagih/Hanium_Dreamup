@@ -9,12 +9,15 @@ v2.4 paths.
 from __future__ import annotations
 
 import argparse
+import base64
 import copy
+import hashlib
 import importlib.util
 import json
 import re
 import subprocess
 import sys
+import zlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,8 +27,28 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import check_walksafe_project_continuation_v2_4 as continuation  # noqa: E402
+from scripts import (  # noqa: E402
+    build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812 as npc_review,
+)
+from scripts import (  # noqa: E402
+    build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813 as npc_r004_review,
+)
+from scripts import (  # noqa: E402
+    build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813 as npc_r010_review,
+)
+from scripts import (  # noqa: E402
+    build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813 as npc_r011_review,
+)
+from scripts import (  # noqa: E402
+    build_walksafe_workstream_aggregate_review_20260813 as workstream_aggregate_review,
+)
+from scripts import (  # noqa: E402
+    build_walksafe_npc_single_admin_recovery_trace_20260812 as npc_recovery,
+)
 from scripts import check_walksafe_goal_graph_v2_3 as frozen_goal  # noqa: E402
+from scripts import (  # noqa: E402
+    check_walksafe_project_continuation_v2_4 as continuation,
+)
 
 
 def _run_git_bytes(*args, **kwargs):
@@ -48,6 +71,375 @@ def _contains_symlink(root: Path, relative: str) -> bool:
         if current.is_symlink():
             return True
     return False
+
+
+def _git_object_sha1(kind: str, payload: bytes) -> str:
+    header = f"{kind} {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload).hexdigest()
+
+
+def _parse_git_tree(payload: bytes) -> dict[str, tuple[str, str]] | None:
+    entries: dict[str, tuple[str, str]] = {}
+    offset = 0
+    while offset < len(payload):
+        space = payload.find(b" ", offset)
+        nul = payload.find(b"\0", space + 1)
+        if space <= offset or nul <= space + 1 or nul + 21 > len(payload):
+            return None
+        try:
+            mode = payload[offset:space].decode("ascii")
+            name = payload[space + 1:nul].decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+        object_id = payload[nul + 1:nul + 21].hex()
+        if (
+            mode not in {"100644", "100755", "120000", "160000", "40000"}
+            or not name
+            or name in {".", ".."}
+            or "/" in name
+            or name in entries
+        ):
+            return None
+        entries[name] = mode, object_id
+        offset = nul + 21
+    return entries if offset == len(payload) else None
+
+
+def validate_historical_git_witness(
+    root: Path,
+    archive: dict[str, Any] | None = None,
+) -> tuple[list[str], dict[str, tuple[bool, str | None]]]:
+    """Validate the add-only a3ad7ee commit/path/blob Merkle witness."""
+    errors: list[str] = []
+    relative = HISTORICAL_GIT_WITNESS_MANIFEST_RELATIVE.as_posix()
+    manifest_path = _exact_repo_file(root, relative)
+    if manifest_path is None or _contains_symlink(root, relative):
+        return ["historical Git witness manifest is missing or unsafe"], {}
+    if continuation.sha256_file(manifest_path) != HISTORICAL_GIT_WITNESS_MANIFEST_SHA256:
+        return ["historical Git witness manifest SHA-256 differs"], {}
+    try:
+        manifest = continuation.load_json(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [f"historical Git witness manifest cannot be loaded: {exc}"], {}
+
+    expected_sources = [
+        {
+            "source_id": "PRIVATE_BACKUP_20260802T0125KST",
+            "bundle_sha256": (
+                "56a95dd2b43612d27b5140dddb2857830cd2ce82571cad3748f7886dade10751"
+            ),
+            "bundle_byte_count": 430056267,
+            "commit_ref": "refs/heads/codex/walksafe-rc2-hardening-20260715",
+        },
+        {
+            "source_id": "PRE_STANDALONE_RECOVERY_20260810",
+            "bundle_sha256": (
+                "2c966e841f5be2a195c1690d11c29f21104c284f75ec5276a36ecc38abb7bf9c"
+            ),
+            "bundle_byte_count": 430057800,
+            "commit_ref": "refs/heads/codex/walksafe-rc2-hardening-20260715",
+        },
+    ]
+    expected_boundary = {
+        "external_bundle_required_at_runtime": False,
+        "git_history_fetched_or_grafted": False,
+        "historical_control_modified": False,
+        "goal_completion_credit_added": 0,
+        "formal_test_credit_added": 0,
+        "release_credit_added": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "use": "READ_ONLY_HISTORICAL_COMMIT_PATH_BLOB_WITNESS",
+    }
+    expected_top_fields = {
+        "schema_version",
+        "witness_id",
+        "status",
+        "generated_on",
+        "source_bundle_provenance",
+        "source_agreement",
+        "commit",
+        "start_head_paths",
+        "historical_artifact_refs",
+        "paths",
+        "objects",
+        "integrity",
+        "claim_boundary",
+    }
+    for label, actual, expected in (
+        ("field set", set(manifest), expected_top_fields),
+        ("schema", manifest.get("schema_version"), "walksafe.git-history-witness.v1"),
+        (
+            "witness ID",
+            manifest.get("witness_id"),
+            "WS-GIT-HISTORY-WITNESS-A3AD7EE-20260812-001",
+        ),
+        ("status", manifest.get("status"), "BYTE_PINNED_ADD_ONLY_FIXTURE"),
+        ("generated_on", manifest.get("generated_on"), "2026-08-12"),
+        ("source provenance", manifest.get("source_bundle_provenance"), expected_sources),
+        (
+            "source agreement",
+            manifest.get("source_agreement"),
+            {
+                "independent_source_count": 2,
+                "commit_tree_path_blob_bytes_equal": True,
+            },
+        ),
+        ("claim boundary", manifest.get("claim_boundary"), expected_boundary),
+    ):
+        if actual != expected:
+            errors.append(f"historical Git witness {label} differs")
+
+    commit = manifest.get("commit")
+    expected_commit = {
+        "object_format": "sha1",
+        "object_id": HISTORICAL_GIT_WITNESS_COMMIT,
+        "tree_object_id": "743d92ee9f65fdee544c692e0890f91b3481919c",
+        "parent_object_ids": ["68cdaa255146ff5fee83a7e979bfd40f73bdc533"],
+    }
+    if commit != expected_commit:
+        errors.append("historical Git witness commit binding differs")
+
+    start_paths = manifest.get("start_head_paths")
+    if start_paths != list(HISTORICAL_GIT_WITNESS_START_HEAD_PATHS):
+        errors.append("historical Git witness start-head path set differs")
+        start_paths = []
+    historical_refs = manifest.get("historical_artifact_refs")
+    if not isinstance(historical_refs, list):
+        errors.append("historical Git witness artifact refs must be a list")
+        historical_refs = []
+    expected_ref_keys = {
+        (goal_id, index)
+        for goal_id, indexes in HISTORICAL_GIT_WITNESS_ARTIFACT_INDEXES.items()
+        for index in indexes
+    }
+    observed_ref_keys: set[tuple[str, int]] = set()
+    historical_paths: set[str] = set()
+    for ref in historical_refs:
+        if not isinstance(ref, dict) or set(ref) != {
+            "goal_id",
+            "artifact_index",
+            "path",
+            "after_sha256",
+        }:
+            errors.append("historical Git witness artifact ref is malformed")
+            continue
+        key = ref.get("goal_id"), ref.get("artifact_index")
+        if (
+            not isinstance(key[0], str)
+            or not isinstance(key[1], int)
+            or key in observed_ref_keys
+        ):
+            errors.append("historical Git witness artifact ref identity differs")
+            continue
+        observed_ref_keys.add(key)
+        if isinstance(ref.get("path"), str):
+            historical_paths.add(ref["path"])
+        if archive is not None:
+            expected_artifact = _historical_changed_artifact(
+                root,
+                archive,
+                goal_id=key[0],
+                artifact_index=key[1],
+            )
+            if expected_artifact != (ref.get("path"), ref.get("after_sha256")):
+                errors.append(
+                    "historical Git witness artifact ref differs: "
+                    f"{key[0]}[{key[1]}]"
+                )
+    if observed_ref_keys != expected_ref_keys:
+        errors.append("historical Git witness artifact ref set differs")
+
+    object_rows = manifest.get("objects")
+    if not isinstance(object_rows, list):
+        return errors + ["historical Git witness objects must be a list"], {}
+    object_payloads: dict[str, tuple[str, bytes]] = {}
+    expected_fixture_paths = {relative}
+    for row in object_rows:
+        if not isinstance(row, dict) or set(row) != {
+            "object_type",
+            "object_id",
+            "raw_byte_count",
+            "raw_sha256",
+            "encoding",
+            "fixture_path",
+            "fixture_byte_count",
+            "fixture_sha256",
+        }:
+            errors.append("historical Git witness object row is malformed")
+            continue
+        kind = row.get("object_type")
+        object_id = row.get("object_id")
+        fixture_relative = row.get("fixture_path")
+        if (
+            kind not in {"commit", "tree", "blob"}
+            or not isinstance(object_id, str)
+            or re.fullmatch(r"[0-9a-f]{40}", object_id) is None
+            or object_id in object_payloads
+            or row.get("encoding") != "GZIP_BASE64_RFC4648_MTIME_0"
+            or not isinstance(fixture_relative, str)
+            or _contains_symlink(root, fixture_relative)
+        ):
+            errors.append("historical Git witness object identity differs")
+            continue
+        fixture_path = _exact_repo_file(root, fixture_relative)
+        expected_fixture_paths.add(fixture_relative)
+        if fixture_path is None:
+            errors.append(f"historical Git witness object is missing: {object_id}")
+            continue
+        try:
+            fixture_byte_count = fixture_path.stat().st_size
+        except OSError as exc:
+            errors.append(
+                f"historical Git witness object cannot be inspected: {object_id}: {exc}"
+            )
+            continue
+        if (
+            fixture_byte_count != row.get("fixture_byte_count")
+            or fixture_byte_count > HISTORICAL_GIT_WITNESS_MAX_ENCODED_OBJECT_BYTES
+        ):
+            errors.append(f"historical Git witness encoded object differs: {object_id}")
+            continue
+        encoded = fixture_path.read_bytes()
+        if (
+            continuation.sha256_bytes(encoded) != row.get("fixture_sha256")
+            or not encoded.endswith(b"\n")
+        ):
+            errors.append(f"historical Git witness encoded object differs: {object_id}")
+            continue
+        try:
+            compressed = base64.b64decode(encoded[:-1], validate=True)
+            decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
+            payload = decompressor.decompress(
+                compressed,
+                HISTORICAL_GIT_WITNESS_MAX_RAW_OBJECT_BYTES + 1,
+            )
+        except (ValueError, zlib.error) as exc:
+            errors.append(f"historical Git witness object cannot be decoded: {object_id}: {exc}")
+            continue
+        if (
+            len(payload) != row.get("raw_byte_count")
+            or len(payload) > HISTORICAL_GIT_WITNESS_MAX_RAW_OBJECT_BYTES
+            or not decompressor.eof
+            or decompressor.unconsumed_tail
+            or decompressor.unused_data
+            or continuation.sha256_bytes(payload) != row.get("raw_sha256")
+            or _git_object_sha1(kind, payload) != object_id
+        ):
+            errors.append(f"historical Git witness raw object differs: {object_id}")
+            continue
+        object_payloads[object_id] = kind, payload
+
+    fixture_root = root / HISTORICAL_GIT_WITNESS_ROOT_RELATIVE
+    actual_fixture_paths = {
+        path.relative_to(root).as_posix()
+        for path in fixture_root.rglob("*")
+        if path.is_file()
+    } if fixture_root.is_dir() else set()
+    if actual_fixture_paths != expected_fixture_paths:
+        errors.append("historical Git witness fixture path set differs")
+
+    commit_payload = object_payloads.get(HISTORICAL_GIT_WITNESS_COMMIT)
+    if commit_payload is None or commit_payload[0] != "commit":
+        errors.append("historical Git witness commit object is missing")
+    else:
+        header_lines = commit_payload[1].split(b"\n\n", 1)[0].splitlines()
+        tree_headers = [line[5:].decode("ascii", "ignore") for line in header_lines if line.startswith(b"tree ")]
+        parent_headers = [line[7:].decode("ascii", "ignore") for line in header_lines if line.startswith(b"parent ")]
+        if tree_headers != [expected_commit["tree_object_id"]] or parent_headers != expected_commit["parent_object_ids"]:
+            errors.append("historical Git witness commit object headers differ")
+
+    path_rows = manifest.get("paths")
+    if not isinstance(path_rows, list):
+        return errors + ["historical Git witness paths must be a list"], {}
+    row_by_path: dict[str, dict[str, Any]] = {}
+    for row in path_rows:
+        path_value = row.get("path") if isinstance(row, dict) else None
+        if not isinstance(path_value, str) or path_value in row_by_path:
+            errors.append("historical Git witness path identity differs")
+            continue
+        row_by_path[path_value] = row
+    expected_paths = set(start_paths) | historical_paths
+    if set(row_by_path) != expected_paths or list(row_by_path) != sorted(row_by_path):
+        errors.append("historical Git witness path order or membership differs")
+
+    lookup: dict[str, tuple[bool, str | None]] = {}
+    used_object_ids = {HISTORICAL_GIT_WITNESS_COMMIT}
+    root_tree = expected_commit["tree_object_id"]
+    for path_value, row in row_by_path.items():
+        consumers = []
+        if path_value in start_paths:
+            consumers.append("START_HEAD")
+        if path_value in historical_paths:
+            consumers.append("FROZEN_CHANGED_ARTIFACT")
+        object_id = root_tree
+        derived: tuple[str, str | None, str | None] = ("ABSENT", None, None)
+        for index, part in enumerate(path_value.split("/")):
+            tree_object = object_payloads.get(object_id)
+            if tree_object is None or tree_object[0] != "tree":
+                errors.append(f"historical Git witness tree proof is missing: {path_value}")
+                derived = ("INVALID", None, None)
+                break
+            used_object_ids.add(object_id)
+            tree_entries = _parse_git_tree(tree_object[1])
+            if tree_entries is None:
+                errors.append(f"historical Git witness tree object is malformed: {object_id}")
+                derived = ("INVALID", None, None)
+                break
+            entry = tree_entries.get(part)
+            if entry is None:
+                derived = ("ABSENT", None, None)
+                break
+            mode, child_id = entry
+            if index < len(path_value.split("/")) - 1:
+                if mode != "40000":
+                    derived = ("ABSENT", None, None)
+                    break
+                object_id = child_id
+                continue
+            derived = ("PRESENT", mode, child_id)
+        if derived[0] == "PRESENT":
+            blob = object_payloads.get(str(derived[2]))
+            if blob is None or blob[0] != "blob":
+                errors.append(f"historical Git witness blob is missing: {path_value}")
+                continue
+            used_object_ids.add(str(derived[2]))
+            expected_row = {
+                "path": path_value,
+                "state": "PRESENT",
+                "consumers": consumers,
+                "mode": derived[1],
+                "blob_object_id": derived[2],
+                "blob_byte_count": len(blob[1]),
+                "blob_sha256": continuation.sha256_bytes(blob[1]),
+            }
+            lookup[path_value] = True, expected_row["blob_sha256"]
+        else:
+            expected_row = {
+                "path": path_value,
+                "state": "ABSENT",
+                "consumers": consumers,
+            }
+            lookup[path_value] = False, None
+        if row != expected_row:
+            errors.append(f"historical Git witness path binding differs: {path_value}")
+
+    if used_object_ids != set(object_payloads):
+        errors.append("historical Git witness reachable object set differs")
+    integrity = manifest.get("integrity")
+    expected_integrity = {
+        "path_count": len(row_by_path),
+        "present_path_count": sum(state[0] for state in lookup.values()),
+        "absent_path_count": sum(not state[0] for state in lookup.values()),
+        "start_head_path_count": len(start_paths),
+        "historical_artifact_ref_count": len(historical_refs),
+        "object_count": len(object_rows),
+        "commit_object_count": 1,
+        "tree_object_count": sum(row.get("object_type") == "tree" for row in object_rows if isinstance(row, dict)),
+        "blob_object_count": sum(row.get("object_type") == "blob" for row in object_rows if isinstance(row, dict)),
+    }
+    if integrity != expected_integrity:
+        errors.append("historical Git witness integrity summary differs")
+    return (errors, {}) if errors else ([], lookup)
 
 
 def validate_canonical_preimage_archive(
@@ -530,12 +922,26 @@ def validate_phase1_android_report_successor_binding(
             if isinstance(loaded_checkpoint, dict):
                 checkpoint = loaded_checkpoint
     fp046_transitions: dict[str, tuple[str, str]] = {}
+    completion_transitions: dict[str, tuple[str, str]] = {}
     if isinstance(checkpoint, dict):
+        validated_completion_transitions = (
+            _npc_single_admin_recovery_live_compatibility_artifacts(
+                root, checkpoint
+            )
+        )
+        if validated_completion_transitions is None:
+            errors.append("NPC/FP022 successor authority differs")
+        else:
+            completion_transitions = validated_completion_transitions
         (
             fp046_authority_errors,
             _fp046_artifact_bindings,
             fp046_transitions,
-        ) = validate_fp046_r014_successor_authority(root, checkpoint)
+        ) = validate_fp046_r014_successor_authority(
+            root,
+            checkpoint,
+            successor_artifacts=completion_transitions,
+        )
         errors.extend(fp046_authority_errors)
 
     fp048_bindings: dict[str, str] = {}
@@ -600,6 +1006,15 @@ def validate_phase1_android_report_successor_binding(
                 )
                 continue
             expected_live_digest = fp046_transition[1]
+        completion_transition = completion_transitions.get(relative)
+        if completion_transition is not None:
+            if completion_transition[0] != expected_live_digest:
+                errors.append(
+                    "phase1 Android report completion successor lineage "
+                    f"differs: {relative}"
+                )
+                continue
+            expected_live_digest = completion_transition[1]
         expected_live_by_path[relative] = expected_live_digest
         if (
             (
@@ -1576,6 +1991,154 @@ V24_PLAN_VERSION = continuation.V24_PLAN_VERSION
 V24_MANIFEST_RELATIVE = continuation.V24_MANIFEST_RELATIVE
 V24_CHECKPOINT_RELATIVE = continuation.V24_CHECKPOINT_RELATIVE
 
+HISTORICAL_GIT_WITNESS_ROOT_RELATIVE = Path(
+    "docs/control/history/git-witnesses/a3ad7ee-20260812"
+)
+HISTORICAL_GIT_WITNESS_MANIFEST_RELATIVE = (
+    HISTORICAL_GIT_WITNESS_ROOT_RELATIVE / "manifest.json"
+)
+HISTORICAL_GIT_WITNESS_MANIFEST_SHA256 = (
+    "3971f50109190577a7ea08074d6885807da868c2508eac95f4f762466760737c"
+)
+HISTORICAL_GIT_WITNESS_COMMIT = (
+    "a3ad7eead6b5d834d3e0675422475a9aad351e3d"
+)
+HISTORICAL_GIT_WITNESS_MAX_ENCODED_OBJECT_BYTES = 1024 * 1024
+HISTORICAL_GIT_WITNESS_MAX_RAW_OBJECT_BYTES = 2 * 1024 * 1024
+HISTORICAL_GIT_WITNESS_START_HEAD_PATHS = (
+    "apps/android-gateway/src/integrated-consent.ts",
+    "apps/android-gateway/src/privacy-rights.ts",
+    "apps/android-gateway/test/integrated-consent.test.ts",
+    "apps/android-gateway/test/privacy-rights.test.ts",
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "fieldlog/FieldSessionLog.kt"
+    ),
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "network/AndroidIntegratedConsentClient.kt"
+    ),
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "network/AndroidPrivacyDeletionClient.kt"
+    ),
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "report/AndroidReportUploader.kt"
+    ),
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "session/IntegratedConsentPolicy.kt"
+    ),
+    (
+        "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/"
+        "session/PrivacyDeletionPolicy.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "MainActivityAccountDeletionStaticTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "MainActivityIntegratedConsentStaticTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "MainActivityWithdrawalRestartStaticTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "MainActivityWithdrawalStaticTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "fieldlog/FieldSessionAccountDeletionPrivacyFenceTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "fieldlog/PersistentFieldSessionLogTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "network/AndroidPrivacyDeletionAccountDeletionTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "network/AndroidPrivacyDeletionOriginHardeningTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "report/AndroidReportPurposeHeaderStaticTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "report/AndroidReportUploaderTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "report/ReportPrivacyAccountDeletionTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "session/IntegratedConsentPolicyTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "session/IntegratedConsentRevisionHardeningTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "session/IntegratedConsentWithdrawalTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "session/PrivacyAccountDeletionPolicyTest.kt"
+    ),
+    (
+        "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/"
+        "session/PrivacyDeletionHardeningTest.kt"
+    ),
+    "scripts/build_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+    "scripts/build_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+    "tests/test_walksafe_fp014_permission_denial_revocation_trace_20260726.py",
+    "tests/test_walksafe_fp015_withdrawal_account_deletion_trace_20260725.py",
+)
+HISTORICAL_GIT_WITNESS_ARTIFACT_INDEXES = {
+    "WS-GOAL-EPIC-02-FP-005-R001": (0, 7, 8, 9, 11, 12, 18, 19),
+    "WS-GOAL-EPIC-02-FP-006-R001": (0, 1, 4, 5, 9, 10),
+    "WS-GOAL-EPIC-02-FP-010-R001": (0, 2, 3, 5, 7, 8, 10),
+    "WS-GOAL-EPIC-02-FP-018-R001": (0, 4, 5, 7, 8, 9, 10, 11, 14, 16),
+    "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": (
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        26,
+        27,
+    ),
+    "WS-GOAL-EPIC-02-FP-004-R001": (1, 2, 5, 6, 8),
+}
+
 V23_CHECKER_RELATIVE = Path("scripts/check_walksafe_goal_graph_v2_3.py")
 V24_PACKAGE_RELATIVE = Path(
     "docs/control/goals/walksafe-completion-graph-v2-4"
@@ -1955,11 +2518,220 @@ FP046_FINAL_SOURCE_COMPATIBILITY_SHA256 = (
 FP046_FINAL_SOURCE_SUCCESSOR_COMMIT = (
     "1e976419dc98a2ee336c02e1d08ccbd62e4625c0"
 )
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS = {
+    "backend/app/api/health.py": {
+        "reason_code": "FORWARD_MIGRATION_HEAD_SUCCESSOR",
+        "predecessor_byte_length": 19538,
+        "predecessor_sha256": (
+            "625a70a9010180c3f8818a9daffa62671c75c8048f970ed0b759a1e8680a8851"
+        ),
+        "successor_byte_length": 19738,
+        "successor_sha256": (
+            "5d4f29aae15af069dff62a466b4dbebc88a886f3322ee5de5aa0529639be3401"
+        ),
+    },
+    "backend/tests/test_admin_runtime_acl_hardening.py": {
+        "reason_code": "RECOVERY_EXPIRY_CANDIDATE_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 35848,
+        "predecessor_sha256": (
+            "3aaf3a09e6c2f02d26fc40ebdf214685983e8962f0d3ba46e50115820cabc59d"
+        ),
+        "successor_byte_length": 51596,
+        "successor_sha256": (
+            "4ba8105bb51838bcc148e669adb87fce9abdef5064430e5ea31e567397427977"
+        ),
+    },
+    "backend/tests/test_admin_security.py": {
+        "reason_code": "FORWARD_MIGRATION_CONTRACT_SUCCESSOR",
+        "predecessor_byte_length": 183858,
+        "predecessor_sha256": (
+            "4c228482e1cceab2a35693748c401d1009baf90c08fd283028995fc362e2e7a3"
+        ),
+        "successor_byte_length": 189546,
+        "successor_sha256": (
+            "97c08b17800d76c720a0fa615fee9025e2ad57c5278e01b2d04c901dc49f9acd"
+        ),
+    },
+    "backend/tests/test_fp046_postgres_integration.py": {
+        "reason_code": "CURRENT_SCHEMA_AND_ACL_EXPECTATION_SUCCESSOR",
+        "predecessor_byte_length": 89130,
+        "predecessor_sha256": (
+            "d3a05d37810a3b19dd67c71e4810ffb97ee8b23a579b3125df3cdea76449163d"
+        ),
+        "successor_byte_length": 89608,
+        "successor_sha256": (
+            "fba65428ac42eb506b6952f18319fd7b33e00695cd26b7278c2edda9699061e2"
+        ),
+    },
+    "backend/app/services/admin_device_proof.py": {
+        "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_SUCCESSOR",
+        "predecessor_byte_length": 40950,
+        "predecessor_sha256": (
+            "6c38ce0ab205799511820d529ab7e7b4bb14b4f2034b4443d6ddad09667ddbda"
+        ),
+        "successor_byte_length": 41147,
+        "successor_sha256": (
+            "46126623c650f4eab00062df02c119aa4bf7ed60c77d7e1afa71a94e613cb99a"
+        ),
+    },
+    "backend/tests/test_admin_device_proof.py": {
+        "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 73481,
+        "predecessor_sha256": (
+            "8c133048daaeede58b62d869502a5c5a9364a7da47c19c64e9266384984a2a61"
+        ),
+        "successor_byte_length": 87799,
+        "successor_sha256": (
+            "0276194d37cefa955cca09933ec2fe7f236f6d67c5199711228adc06d6d499cb"
+        ),
+    },
+    "backend/tests/test_admin_credential_issuer_binding.py": {
+        "reason_code": "EXPIRED_RECOVERY_STARTUP_READINESS_REGRESSION_SUCCESSOR",
+        "predecessor_byte_length": 14728,
+        "predecessor_sha256": (
+            "a137ca62f6698ee5efed83942bdc724c5da5df7606c15b58531e3f65876993d0"
+        ),
+        "successor_byte_length": 14953,
+        "successor_sha256": (
+            "a6c60a4b32b83bbd49a1a711c12526e24a93ef2687bd883b8b080c47748ae602"
+        ),
+    },
+}
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES = {
+    "backend/alembic/versions/202608150001_admin_recovery_expiry_candidate.py": {
+        "reason_code": "FORWARD_RECOVERY_EXPIRY_MIGRATION",
+        "byte_length": 14917,
+        "sha256": (
+            "45f335f0309fe45af107a1b4814efdcf3b3460c52400016954e7b05f804a593a"
+        ),
+    },
+    "backend/alembic/versions/202608150002_admin_recovery_expired_proof.py": {
+        "reason_code": "FORWARD_RECOVERY_EXPIRED_PROOF_MIGRATION",
+        "byte_length": 31645,
+        "sha256": (
+            "e90f1cf797b6e07efff4828818b15410e8ec0b1597435faafef02442144fc590"
+        ),
+    },
+}
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH = (
+    "docs/planning/repository-modernization-20260811/"
+    "current-security-database-compatibility-binding-20260815.json"
+)
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT = 4240
+CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256 = (
+    "2931c49d5459d8cf023eb1925f2c0bdf89ed90f567f51e1feb2a71ad68b4a0e8"
+)
 FP046_COMPLETION_PATH = f"{FP046_RESULT_DIRECTORY}/completion-receipt.json"
 FP046_COMPLETION_SHA256 = (
     "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f"
 )
 FP046_COMPLETION_BYTE_COUNT = 10986
+NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID = npc_recovery.GOAL_ID
+NPC_SINGLE_ADMIN_RECOVERY_GOAL_PATH = npc_recovery.GOAL_REL.as_posix()
+NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256 = npc_recovery.EXPECTED_GOAL_SHA256
+NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE = (
+    f"WORK_ITEM_COMPLETION::{NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID}"
+)
+NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_DOCUMENT_ID = (
+    "WS-NPC-SINGLE-ADMIN-RECOVERY-WORK-ITEM-COMPLETION-20260813-002"
+)
+NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_PATH = (
+    npc_review.COMPLETION_RECEIPT_REL.as_posix()
+)
+NPC_SINGLE_ADMIN_RECOVERY_CANONICAL_UPDATE_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-"
+    "NPC-SINGLE-ADMIN-RECOVERY-20260812-001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-"
+    "NPC-SINGLE-ADMIN-RECOVERY-20260812-001"
+)
+NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256 = (
+    "24f586dda8e19d9c1315bee80e546906359869c49e5fa776bb891ec76beb13c1"
+)
+NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID = (
+    "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027"
+)
+NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH = (
+    npc_recovery.BACKLOG_R027_REL.as_posix()
+)
+NPC_SINGLE_ADMIN_RECOVERY_NEXT_ACTION = {
+    "action": (
+        "남은 거리는 GPS와 저장 TMAP 경로를 기준으로, 보폭은 보조 검증으로 "
+        "사용한다. GPS·경로 끝·보폭을 함께 본 뒤 사용자 확인으로 도착을 "
+        "확정한다."
+    ),
+    "epic_id": "EPIC-04",
+    "gap_id": "GAP-031",
+    "priority_rank": 24,
+    "source_policy_id": "FP-022",
+    "status": "PLANNED_NEXT",
+    "work_item_id": "WS-GOAL-EPIC-04-FP-022-R001",
+}
+NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION = {
+    "current_status": "PLANNED",
+    "deferred_release_gate_ids": [
+        "GATE-PHONE-QUEUE-BYTE-LIMIT",
+        "GATE-RAW-COLLECTION-RELEASE-REVIEW",
+        "GATE-SERVER-CAPACITY-STATE-CONTRACT",
+    ],
+    "epic_id": "EPIC-04",
+    "gap_ids": ["GAP-007", "GAP-031", "GAP-032", "GAP-033"],
+    "source_policy_ids": [
+        "NPC-NAVIGATION-ROUTE-DIRECTION",
+        "FP-022",
+        "FP-023",
+        "FP-024",
+    ],
+    "target_completion_level": "IMPLEMENTATION_READY",
+    "title": "경로·도착·이탈 사용자 결정 흐름",
+}
+NPC_SINGLE_ADMIN_RECOVERY_CHANGED_ROLES = sorted(
+    [
+        "ARTIFACT_CHANGE_LOG",
+        "ARTIFACT_REGISTER",
+        "DESIGN_TRACEABILITY",
+        "IMPLEMENTATION_BACKLOG",
+        "IMPLEMENTATION_GAP",
+        "MODULE_REGISTER",
+        "REQUIREMENTS_TRACEABILITY",
+        NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE,
+    ]
+)
+NPC_SINGLE_ADMIN_RECOVERY_DLV_SUBJECT_IDS = [
+    "DLV-DES-06",
+    "DLV-DEV-01",
+    "DLV-DEV-18",
+    "DLV-DOC-01",
+    "DLV-DOC-05",
+    "DLV-REQ-16",
+]
+NPC_SINGLE_ADMIN_RECOVERY_CHANGED_SUBJECT_IDS_BY_ROLE = {
+    "ARTIFACT_CHANGE_LOG": NPC_SINGLE_ADMIN_RECOVERY_DLV_SUBJECT_IDS,
+    "ARTIFACT_REGISTER": NPC_SINGLE_ADMIN_RECOVERY_DLV_SUBJECT_IDS,
+    "DESIGN_TRACEABILITY": ["NPC-SINGLE-ADMIN-RECOVERY"],
+    "IMPLEMENTATION_BACKLOG": ["NPC-SINGLE-ADMIN-RECOVERY"],
+    "IMPLEMENTATION_GAP": ["GAP-008", "NPC-SINGLE-ADMIN-RECOVERY"],
+    "MODULE_REGISTER": ["NPC-SINGLE-ADMIN-RECOVERY"],
+    "REQUIREMENTS_TRACEABILITY": ["NPC-SINGLE-ADMIN-RECOVERY"],
+}
+NPC_SINGLE_ADMIN_RECOVERY_PRODUCER_SUBJECT_IDS_BY_ROLE = {
+    "IMPLEMENTATION_BACKLOG": ["NPC-SINGLE-ADMIN-RECOVERY"],
+    "IMPLEMENTATION_GAP": ["GAP-008", "NPC-SINGLE-ADMIN-RECOVERY"],
+}
+NPC_SINGLE_ADMIN_RECOVERY_FINAL_FOCUS_GOAL_ID = "WS-GOAL-EPIC-02"
+NPC_SINGLE_ADMIN_RECOVERY_FINAL_FOCUS_GOAL_PATH = (
+    "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/"
+    "epic-02-safe-walk-state-and-permissions.md"
+)
+NPC_SINGLE_ADMIN_RECOVERY_FINAL_READY_FRONTIER = [
+    "WS-GOAL-EPIC-02",
+    "WS-GOAL-EPIC-03",
+    "WS-GOAL-EPIC-12",
+]
+NPC_SINGLE_ADMIN_RECOVERY_PRODUCT_PATHS = tuple(
+    npc_recovery.verification_runner.NPC_PRODUCT_SOURCE_PATHS
+)
 FP046_START_GATE_PATH = (
     "docs/control/execution/goal-gates/"
     "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-20260809-005/"
@@ -3909,6 +4681,707 @@ def _sha256_binding_matches(
     )
 
 
+def _fp022_completion_suffix_is_declared(
+    checkpoint: dict[str, Any],
+) -> bool:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 71:
+        return False
+    update, completion = history[69:71]
+    return bool(
+        isinstance(update, dict)
+        and isinstance(completion, dict)
+        and update.get("sequence") == 70
+        and update.get("event_id") == continuation.FP022_COMPLETION_UPDATE_EVENT_ID
+        and update.get("event_type") == "CANONICAL_BINDINGS_UPDATED"
+        and update.get("event_sha256") == continuation.event_sha256(update)
+        and completion.get("sequence") == 71
+        and completion.get("event_id") == continuation.FP022_COMPLETION_EVENT_ID
+        and completion.get("event_type") == "GOAL_COMPLETED"
+        and completion.get("subject_goal_id") == continuation.FP022_GOAL_ID
+        and completion.get("previous_event_sha256") == update.get("event_sha256")
+        and completion.get("event_sha256") == continuation.event_sha256(completion)
+    )
+
+
+def _npc_single_admin_recovery_r027_backlog_projection_matches(
+    root: Path,
+    checkpoint: dict[str, Any],
+    *,
+    require_operational_pointer: bool = True,
+) -> bool:
+    """Prove the exact physical R027 backlog and its derived handoff pointer."""
+
+    binding = _binding_by_role(checkpoint, "IMPLEMENTATION_BACKLOG")
+    if _fp022_completion_suffix_is_declared(checkpoint):
+        history = checkpoint["goal_execution"]["transition_history"]
+        update_snapshot = history[60].get("canonical_binding_snapshot_after")
+        completion_snapshot = history[61].get(
+            "canonical_binding_snapshot_after"
+        )
+        if update_snapshot != completion_snapshot:
+            return False
+        historical = (
+            update_snapshot.get("IMPLEMENTATION_BACKLOG")
+            if isinstance(update_snapshot, dict)
+            else None
+        )
+        binding = (
+            {
+                **historical,
+                "identity_json_path": "metadata.backlog_id",
+                "mutable": False,
+            }
+            if isinstance(historical, dict)
+            else None
+        )
+    if (
+        not isinstance(binding, dict)
+        or set(binding)
+        != {
+            "role",
+            "document_id",
+            "path",
+            "file_sha256",
+            "identity_json_path",
+            "mutable",
+        }
+        or binding.get("role") != "IMPLEMENTATION_BACKLOG"
+        or binding.get("document_id")
+        != NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID
+        or binding.get("path") != NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH
+        or binding.get("identity_json_path") != "metadata.backlog_id"
+        or binding.get("mutable") is not False
+        or not _sha256_binding_matches(
+            root,
+            binding,
+            expected_path=NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH,
+        )
+    ):
+        return False
+    backlog = _load_exact_json(
+        root,
+        NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_PATH,
+    )
+    metadata = backlog.get("metadata") if isinstance(backlog, dict) else None
+    content_sha256 = (
+        backlog.get("backlog_content_sha256")
+        if isinstance(backlog, dict)
+        else None
+    )
+    sealed = copy.deepcopy(backlog) if isinstance(backlog, dict) else None
+    if isinstance(sealed, dict):
+        sealed.pop("backlog_content_sha256", None)
+    if (
+        not isinstance(backlog, dict)
+        or not isinstance(metadata, dict)
+        or metadata.get("backlog_id")
+        != NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID
+        or metadata.get("version") != "0.27.0"
+        or not isinstance(content_sha256, str)
+        or continuation.canonical_json_sha256(sealed) != content_sha256
+        or backlog.get("next_single_action")
+        != NPC_SINGLE_ADMIN_RECOVERY_NEXT_ACTION
+        or not isinstance(
+            backlog.get("npc_single_admin_recovery_evidence_correction"),
+            dict,
+        )
+    ):
+        return False
+    epics = backlog.get("epics")
+    selected = (
+        [
+            row
+            for row in epics
+            if isinstance(row, dict) and row.get("epic_id") == "EPIC-04"
+        ]
+        if isinstance(epics, list)
+        else []
+    )
+    if len(selected) != 1:
+        return False
+    epic = selected[0]
+    if {
+        field: epic.get(field)
+        for field in NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION
+    } != NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION:
+        return False
+    if not require_operational_pointer:
+        return True
+
+    action = NPC_SINGLE_ADMIN_RECOVERY_NEXT_ACTION
+    epic_projection = NPC_SINGLE_ADMIN_RECOVERY_EPIC04_PROJECTION
+    expected_current_work = {
+        "current_focus": (
+            "FP-022/GAP-031 PLANNED_NEXT; EPIC-04 canonical Backlog aggregate"
+        ),
+        "deferred_release_gate_ids": epic_projection[
+            "deferred_release_gate_ids"
+        ],
+        "epic_id": "WS-GOAL-EPIC-04",
+        "gap_ids": epic_projection["gap_ids"],
+        "gap_ids_semantics": (
+            "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE"
+        ),
+        "last_completed_work_summary": (
+            "NPC-SINGLE-ADMIN-RECOVERY/GAP-008 repository-internal "
+            "implementation, regression, review and successor evidence completed"
+        ),
+        "next_action": action["action"],
+        "policy_change_required": False,
+        "release_completion_claimed": False,
+        "scope_kind": "BACKLOG_EPIC_AGGREGATE",
+        "source_policy_ids": epic_projection["source_policy_ids"],
+        "source_policy_ids_semantics": (
+            "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE"
+        ),
+        "status": epic_projection["current_status"],
+        "status_scope": "IMPLEMENTATION_BACKLOG_EPIC_STATUS_NOT_GOAL_STATUS",
+        "target_completion_level": epic_projection["target_completion_level"],
+        "title": epic_projection["title"],
+        "work_item_id": action["work_item_id"],
+        "work_item_id_semantics": "NEXT_ACTION_POINTER_ONLY",
+    }
+    handoff = checkpoint.get("session_handoff")
+    current_handoff_matches = bool(
+        checkpoint.get("current_work") == expected_current_work
+        and isinstance(handoff, dict)
+        and handoff.get("current_epic")
+        == "EPIC-04 / FP-022/GAP-031 PLANNED_NEXT"
+        and handoff.get("next_single_action") == action["action"]
+        and handoff.get("last_updated_by_work_item")
+        == npc_recovery.WORK_ITEM_ID
+        and handoff.get("last_verification_status")
+        == "PASS_INTERNAL_ONLY_FORMAL_EXTERNAL_DEVICE_RELEASE_NOT_RUN"
+    )
+    return current_handoff_matches
+
+
+WORKSTREAM_AGGREGATE_R003_TRANSITION_REVIEW_BINDING = {
+    "assignment": {
+        "path": (
+            "docs/control/execution/workstream-transitions/seq63-65/"
+            "review-rounds/R003/review-assignment.json"
+        ),
+        "sha256": "b5f5b512286ad70b9a0833126dadd71bb5a11fc0244d22acc27b82c289626b09",
+        "byte_length": 19_307,
+    },
+    "review_result": {
+        "path": (
+            "docs/control/execution/workstream-transitions/seq63-65/"
+            "review-rounds/R003/review-result.json"
+        ),
+        "sha256": "92666a5536e9b1abce5b9f141d5438328b2859c321e9c681906207bf14876b81",
+        "byte_length": 25_434,
+    },
+    "independent_review": {
+        "path": (
+            "docs/control/execution/workstream-transitions/seq63-65/"
+            "review-rounds/R003/independent-review.json"
+        ),
+        "sha256": "c4c54175acf47b8823d9d22fa5833b423a42ea3d6726c2133c45e8725c700e4e",
+        "byte_length": 25_714,
+    },
+}
+
+
+def _frozen_workstream_aggregate_r003_review_binding(
+    root: Path,
+) -> dict[str, dict[str, Any]] | None:
+    for binding in WORKSTREAM_AGGREGATE_R003_TRANSITION_REVIEW_BINDING.values():
+        path = _exact_repo_file(root, binding["path"])
+        if (
+            path is None
+            or path.stat().st_size != binding["byte_length"]
+            or continuation.sha256_file(path) != binding["sha256"]
+        ):
+            return None
+    return copy.deepcopy(WORKSTREAM_AGGREGATE_R003_TRANSITION_REVIEW_BINDING)
+
+
+def _fp022_transition_review_binding(
+    root: Path,
+) -> dict[str, dict[str, Any]] | None:
+    try:
+        from scripts import (
+            build_walksafe_fp022_seq66_67_review_20260814 as fp022_review,
+        )
+        from scripts import (
+            build_walksafe_fp022_seq68_69_review_20260814
+            as fp022_start_review,
+        )
+        fp022_review.prepare_frozen_review_context(root)
+        return {
+            "assignment": {
+                "path": fp022_review.ASSIGNMENT_REL.as_posix(),
+                "sha256": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.ASSIGNMENT_REL
+                ][0],
+                "byte_length": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.ASSIGNMENT_REL
+                ][1],
+            },
+            "review_result": {
+                "path": fp022_review.RESULT_REL.as_posix(),
+                "sha256": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.RESULT_REL
+                ][0],
+                "byte_length": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.RESULT_REL
+                ][1],
+            },
+            "independent_review": {
+                "path": fp022_review.INDEPENDENT_REL.as_posix(),
+                "sha256": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.INDEPENDENT_REL
+                ][0],
+                "byte_length": fp022_review.R002_REVIEW_PINS[
+                    fp022_review.INDEPENDENT_REL
+                ][1],
+            },
+        }
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+
+def _fp022_seq66_67_successor_matches(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> bool:
+    """Accept only the exact FP-022 materialized/READY successor of seq65."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if isinstance(history, list) and len(history) >= 68:
+        if len(history) >= 70 and not _fp022_completion_suffix_is_declared(checkpoint):
+            return False
+        prefix = copy.deepcopy(checkpoint)
+        prefix_state = prefix["goal_execution"]
+        seq67 = history[66]
+        if not isinstance(seq67, dict):
+            return False
+        prefix_state["transition_history"] = copy.deepcopy(history[:67])
+        prefix_state["transition_history_anchor_sha256"] = seq67.get(
+            "event_sha256"
+        )
+        prefix_state["validation_cutoff_at"] = seq67.get("occurred_at")
+        runtime = seq67.get("runtime_after")
+        if not isinstance(runtime, dict):
+            return False
+        for field in (
+            "focus_goal_id",
+            "focus_goal_path",
+            "focus_work_item_id",
+            "focus_source",
+            "ready_frontier_goal_ids",
+        ):
+            prefix_state[field] = copy.deepcopy(runtime.get(field))
+        prefix_state["status_by_goal"][
+            "WS-GOAL-EPIC-04-FP-022-R001"
+        ] = "READY"
+        prefix_state["goal_status"] = "READY"
+        prefix_state["dynamic_goal_inventory"] = copy.deepcopy(
+            seq67.get("dynamic_goal_inventory_after")
+        )
+        prefix_state["materialized_child_goal_ids_by_parent"] = copy.deepcopy(
+            seq67.get("materialized_child_goal_ids_by_parent_after")
+        )
+        prefix_state["blockers_by_goal"] = copy.deepcopy(
+            seq67.get("blockers_after")
+        )
+        prefix_state["blocker_resolution_ids"] = copy.deepcopy(
+            seq67.get("blocker_resolution_ids_after")
+        )
+        completion_evidence = prefix_state.get("completion_evidence_by_goal")
+        if isinstance(completion_evidence, dict):
+            completion_evidence.pop("WS-GOAL-EPIC-04-FP-022-R001", None)
+        canonical = seq67.get("canonical_binding_snapshot_after")
+        if not isinstance(canonical, dict):
+            return False
+        prefix["canonical_bindings"] = copy.deepcopy(list(canonical.values()))
+        current = prefix.get("current_work")
+        if isinstance(current, dict):
+            current["work_item_id"] = (
+                "WS-GOAL-EPIC-04-FP-022-R001"
+            )
+            current["status"] = "READY"
+            current["current_focus"] = (
+                "FP-022/GAP-031 Goal READY; active internal start gate not run"
+            )
+            current["release_completion_claimed"] = False
+        handoff = prefix.get("session_handoff")
+        if isinstance(handoff, dict):
+            handoff["current_epic"] = (
+                "EPIC-04 / FP-022/GAP-031 READY_NOT_STARTED"
+            )
+            handoff["last_updated_by_work_item"] = (
+                "WS-GOAL-EPIC-04-FP-022-R001"
+            )
+            handoff["last_verification_status"] = (
+                "PASS_INTERNAL_ONLY_FORMAL_EXTERNAL_DEVICE_RELEASE_NOT_RUN"
+            )
+        return _fp022_seq66_67_successor_matches(root, prefix)
+    if not isinstance(history, list) or len(history) != 67:
+        return False
+    seq66, seq67 = history[65:67]
+    if not isinstance(seq66, dict) or not isinstance(seq67, dict):
+        return False
+
+    prefix = copy.deepcopy(checkpoint)
+    prefix_state = prefix["goal_execution"]
+    prefix_state["transition_history"] = copy.deepcopy(history[:65])
+    prefix_state["transition_history_anchor_sha256"] = history[64].get(
+        "event_sha256"
+    )
+    prefix_state["status_by_goal"].pop(
+        "WS-GOAL-EPIC-04-FP-022-R001", None
+    )
+    prefix_state["materialized_child_goal_ids_by_parent"].pop(
+        "WS-GOAL-EPIC-04", None
+    )
+    prefix_state.update(
+        {
+            "focus_goal_id": "WS-GOAL-EPIC-04",
+            "focus_goal_path": (
+                "docs/control/goals/walksafe-completion-graph-v2-2/"
+                "workstreams/epic-04-navigation-arrival-deviation.md"
+            ),
+            "focus_work_item_id": "",
+            "focus_source": "WORKSTREAM_GRAPH",
+            "ready_frontier_goal_ids": ["WS-GOAL-EPIC-04", "WS-GOAL-EPIC-12"],
+        }
+    )
+    if not _workstream_aggregate_seq63_65_successor_matches(root, prefix):
+        return False
+
+    goal_id = "WS-GOAL-EPIC-04-FP-022-R001"
+    parent_id = "WS-GOAL-EPIC-04"
+    predecessor_id = NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+    goal_path = (
+        "docs/control/goals/walksafe-completion-graph-v2-4/work-items/"
+        "epic-04/epic-04-fp022-tmap-destination-route-r001.md"
+    )
+    goal_sha256 = (
+        "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b"
+    )
+    contract_binding = {
+        "schema_version": "1.0",
+        "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260813-001",
+        "path": (
+            "docs/control/execution/goal-contracts/"
+            "WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json"
+        ),
+        "file_sha256": (
+            "14ad8eee8a6c972c1e9091c2065b0779acdde427d0176b84fb83b18840865c25"
+        ),
+        "contract_id": "WS-FP022-INTERNAL-START-GATE-R001",
+        "contract_version": "2026-08-13.1",
+        "canonical_contract_sha256": (
+            "a5d39ea4a1c7f919e4d3d08f3a429f7de0bdadec9d03756df7f32f4bbef074ab"
+        ),
+    }
+    goal_file = _exact_repo_file(root, goal_path)
+    contract_file = _exact_repo_file(root, contract_binding["path"])
+    if (
+        goal_file is None
+        or contract_file is None
+        or continuation.sha256_file(goal_file) != goal_sha256
+        or continuation.sha256_file(contract_file)
+        != contract_binding["file_sha256"]
+    ):
+        return False
+
+    canonical = continuation.canonical_binding_snapshot(checkpoint)
+    inventory = state.get("dynamic_goal_inventory")
+    record = inventory.get(goal_id) if isinstance(inventory, dict) else None
+    children = state.get("materialized_child_goal_ids_by_parent")
+    statuses = state.get("status_by_goal")
+    current = checkpoint.get("current_work")
+    handoff = checkpoint.get("session_handoff")
+    package_paths = state.get("managed_goal_paths")
+    if not isinstance(package_paths, list):
+        return False
+    package_hashes = continuation.package_hashes(root, package_paths)
+    expected_basis = {
+        "dependency_completion_events": [
+            {
+                "goal_id": "WS-GOAL-EPIC-02",
+                "event_sha256": (
+                    "e3cae0925f1e3bcf36335b68ead21786bd3c690c2cb4414e675412a0b76e7dd7"
+                ),
+            }
+        ],
+        "predecessor_goal_id": predecessor_id,
+        "predecessor_completion_event_sha256": (
+            NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256
+        ),
+    }
+    transition_review = _fp022_transition_review_binding(root)
+    source_checkpoint_binding = {
+        "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+        "sequence": 65,
+        "sha256": (
+            "25ff4d3f630ccbaffe1aa9e4eb5a1c922050d1705171bbaa162e6dad0d692644"
+        ),
+        "byte_length": 1_922_305,
+        "tail_event_sha256": (
+            "c8eb9b6b90f546af6960fa929c93b1c97b6115d690938c09a33dd9a4155f0a49"
+        ),
+    }
+    return bool(
+        seq66.get("sequence") == 66
+        and seq66.get("event_id")
+        == "WS-GOAL-GRAPH-V2-4-GOAL-MATERIALIZED-FP022-20260813-001"
+        and seq66.get("event_type") == "GOAL_MATERIALIZED"
+        and seq66.get("previous_event_sha256") == history[64].get("event_sha256")
+        and seq66.get("materialized_goal_id") == goal_id
+        and seq66.get("materialized_goal_path") == goal_path
+        and seq66.get("materialized_goal_content_sha256") == goal_sha256
+        and seq66.get("predecessor_goal_id") == predecessor_id
+        and seq66.get("from_status") is None
+        and seq66.get("to_status") == "PLANNED"
+        and seq66.get("status_changes") == {goal_id: "PLANNED"}
+        and seq66.get("evidence_refs")
+        == ["IMPLEMENTATION_BACKLOG", "IMPLEMENTATION_GAP"]
+        and transition_review is not None
+        and seq66.get("transition_control_review_binding") == transition_review
+        and seq66.get("source_checkpoint_binding") == source_checkpoint_binding
+        and seq66.get("event_sha256") == continuation.event_sha256(seq66)
+        and seq67.get("sequence") == 67
+        and seq67.get("event_id")
+        == "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP022-20260813-001"
+        and seq67.get("event_type") == "GOAL_READY"
+        and seq67.get("previous_event_sha256") == seq66.get("event_sha256")
+        and seq67.get("subject_goal_id") == goal_id
+        and seq67.get("from_status") == "PLANNED"
+        and seq67.get("to_status") == "READY"
+        and seq67.get("status_changes") == {goal_id: "READY"}
+        and seq67.get("readiness_basis") == expected_basis
+        and seq67.get("implementation_start_gate_contract_binding")
+        == contract_binding
+        and seq67.get("event_sha256") == continuation.event_sha256(seq67)
+        and all(
+            event.get("canonical_binding_snapshot_after") == canonical
+            for event in (seq66, seq67)
+        )
+        and isinstance(record, dict)
+        and record.get("goal_id") == goal_id
+        and record.get("path") == goal_path
+        and record.get("sha256") == goal_sha256
+        and record.get("materialized_event_sha256") == seq66.get("event_sha256")
+        and record.get("predecessor_goal_id") == predecessor_id
+        and isinstance(children, dict)
+        and children.get(parent_id) == [goal_id]
+        and seq67.get("dynamic_goal_inventory_after") == inventory
+        and seq67.get("materialized_child_goal_ids_by_parent_after") == children
+        and isinstance(statuses, dict)
+        and statuses.get(goal_id) == "READY"
+        and statuses.get("WS-GOAL-EPIC-02") == "COMPLETE_AT_TARGET"
+        and statuses.get("WS-GOAL-EPIC-03") == "COMPLETE_AT_TARGET"
+        and statuses.get(parent_id) == "READY"
+        and "IN_PROGRESS" not in statuses.values()
+        and state.get("transition_history_anchor_sha256") == seq67.get("event_sha256")
+        and state.get("focus_goal_id") == goal_id
+        and state.get("focus_goal_path") == goal_path
+        and state.get("focus_work_item_id") == goal_id
+        and state.get("focus_source") == "IMPLEMENTATION_BACKLOG"
+        and state.get("ready_frontier_goal_ids")
+        == [goal_id, parent_id, "WS-GOAL-EPIC-12"]
+        and seq66.get("runtime_after", {}).get("completion_boundary_sha256")
+        == "80b93ba193b5cf85df7b3b76c427c51481c061503ee025cbeb0bc88733066656"
+        and seq67.get("runtime_after", {}).get("completion_boundary_sha256")
+        == "d2af49d56117b96af9785e1f95dc0ac8914f11defefb469eda3e3b794c4ef7a1"
+        and state.get("goal_document_count") == 31
+        and state.get("managed_goal_path_count") == 37
+        and state.get("goal_document_paths", []).count(goal_path) == 1
+        and package_paths.count(goal_path) == 1
+        and (state.get("path_set_sha256"), state.get("content_set_sha256"))
+        == package_hashes
+        and isinstance(current, dict)
+        and current.get("work_item_id") == goal_id
+        and current.get("status") == "READY"
+        and current.get("current_focus")
+        == "FP-022/GAP-031 Goal READY; active internal start gate not run"
+        and current.get("release_completion_claimed") is False
+        and isinstance(handoff, dict)
+        and handoff.get("current_epic")
+        == "EPIC-04 / FP-022/GAP-031 READY_NOT_STARTED"
+        and handoff.get("last_updated_by_work_item") == goal_id
+    )
+def _workstream_aggregate_seq63_65_successor_matches(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> bool:
+    """Accept only the reviewed exact seq63-65 successor of NPC seq62."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) != 65:
+        return False
+    seq62, seq63, seq64, seq65 = history[61:65]
+    if any(not isinstance(event, dict) for event in (seq62, seq63, seq64, seq65)):
+        return False
+    review_binding = _frozen_workstream_aggregate_r003_review_binding(root)
+    if review_binding is None:
+        return False
+    epic02 = "WS-GOAL-EPIC-02"
+    epic03 = "WS-GOAL-EPIC-03"
+    epic04 = "WS-GOAL-EPIC-04"
+    epic12 = "WS-GOAL-EPIC-12"
+    materialized = state.get("materialized_child_goal_ids_by_parent")
+    statuses = state.get("status_by_goal")
+    completion_evidence = state.get("completion_evidence_by_goal")
+    canonical = continuation.canonical_binding_snapshot(checkpoint)
+    epic02_children = (
+        "WS-GOAL-EPIC-02-FP-018-R001",
+        "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+        "WS-GOAL-EPIC-02-FP-004-R001",
+        "WS-GOAL-EPIC-02-FP-005-R001",
+        "WS-GOAL-EPIC-02-FP-006-R001",
+        "WS-GOAL-EPIC-02-FP-010-R001",
+        "WS-GOAL-EPIC-02-FP-011-R001",
+        "WS-GOAL-EPIC-02-FP-013-R001",
+        "WS-GOAL-EPIC-02-FP-015-R001",
+        "WS-GOAL-EPIC-02-FP-014-R001",
+        "WS-GOAL-EPIC-02-FP-016-R001",
+        "WS-GOAL-EPIC-02-FP-012-R001",
+    )
+    epic03_children = (
+        "WS-GOAL-EPIC-03-FP-047-R001",
+        "WS-GOAL-EPIC-03-FP-048-R001",
+        "WS-GOAL-EPIC-03-FP-008-R001",
+        "WS-GOAL-EPIC-03-FP-046-R001",
+        NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+    )
+    epic02_refs = [
+        "EPIC02_PHASE_A_RECORD",
+        "IMPLEMENTATION_BACKLOG",
+        *(f"WORK_ITEM_COMPLETION::{goal_id}" for goal_id in epic02_children),
+    ]
+    epic03_refs = [
+        "IMPLEMENTATION_BACKLOG",
+        *(f"WORK_ITEM_COMPLETION::{goal_id}" for goal_id in epic03_children),
+    ]
+
+    def completion_bindings(event: dict[str, Any], refs: list[str]) -> bool:
+        return bool(
+            event.get("evidence_refs") == refs
+            and event.get("completion_evidence_bindings")
+            == {role: canonical.get(role) for role in refs}
+            and all(isinstance(canonical.get(role), dict) for role in refs)
+        )
+
+    runtimes = (
+        (
+            seq63,
+            epic03,
+            "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-03-account-admin-security.md",
+            [epic03, epic12],
+        ),
+        (
+            seq64,
+            epic03,
+            "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-03-account-admin-security.md",
+            [epic03, epic04, epic12],
+        ),
+        (
+            seq65,
+            epic04,
+            "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md",
+            [epic04, epic12],
+        ),
+    )
+    if any(
+        not isinstance(event.get("runtime_after"), dict)
+        or event["runtime_after"].get("focus_goal_id") != focus
+        or event["runtime_after"].get("focus_goal_path") != path
+        or event["runtime_after"].get("focus_work_item_id") != ""
+        or event["runtime_after"].get("focus_source") != "WORKSTREAM_GRAPH"
+        or event["runtime_after"].get("ready_frontier_goal_ids") != frontier
+        or event["runtime_after"].get("artifact_work_queue_sha256")
+        != "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc"
+        or continuation.SHA256_RE.fullmatch(
+            str(event["runtime_after"].get("completion_boundary_sha256", ""))
+        )
+        is None
+        for event, focus, path, frontier in runtimes
+    ):
+        return False
+    expected_ids = (
+        "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-EPIC02-20260813-001",
+        "WS-GOAL-GRAPH-V2-4-GOAL-READY-EPIC04-20260813-001",
+        "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-EPIC03-20260813-001",
+    )
+    return bool(
+        seq62.get("event_sha256")
+        == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256
+        and [seq63.get("sequence"), seq64.get("sequence"), seq65.get("sequence")]
+        == [63, 64, 65]
+        and [seq63.get("event_id"), seq64.get("event_id"), seq65.get("event_id")]
+        == list(expected_ids)
+        and [seq63.get("event_type"), seq64.get("event_type"), seq65.get("event_type")]
+        == ["GOAL_COMPLETED", "GOAL_READY", "GOAL_COMPLETED"]
+        and seq63.get("previous_event_sha256") == seq62.get("event_sha256")
+        and seq64.get("previous_event_sha256") == seq63.get("event_sha256")
+        and seq65.get("previous_event_sha256") == seq64.get("event_sha256")
+        and all(
+            event.get("event_sha256") == continuation.event_sha256(event)
+            for event in (seq63, seq64, seq65)
+        )
+        and seq63.get("subject_goal_id") == epic02
+        and seq63.get("from_status") == "READY"
+        and seq63.get("to_status") == "COMPLETE_AT_TARGET"
+        and seq63.get("status_changes") == {epic02: "COMPLETE_AT_TARGET"}
+        and completion_bindings(seq63, epic02_refs)
+        and seq63.get("transition_control_review_binding") == review_binding
+        and seq63.get("source_checkpoint_binding")
+        == workstream_aggregate_review.SOURCE_CHECKPOINT
+        and seq64.get("subject_goal_id") == epic04
+        and seq64.get("from_status") == "PLANNED"
+        and seq64.get("to_status") == "READY"
+        and seq64.get("status_changes") == {epic04: "READY"}
+        and seq64.get("evidence_refs") == []
+        and seq64.get("readiness_basis")
+        == {
+            "dependency_completion_events": [
+                {"goal_id": epic02, "event_sha256": seq63.get("event_sha256")}
+            ]
+        }
+        and seq65.get("subject_goal_id") == epic03
+        and seq65.get("from_status") == "READY"
+        and seq65.get("to_status") == "COMPLETE_AT_TARGET"
+        and seq65.get("status_changes") == {epic03: "COMPLETE_AT_TARGET"}
+        and completion_bindings(seq65, epic03_refs)
+        and isinstance(materialized, dict)
+        and materialized.get(epic02) == list(epic02_children)
+        and materialized.get(epic03) == list(epic03_children)
+        and isinstance(statuses, dict)
+        and statuses.get(epic02) == "COMPLETE_AT_TARGET"
+        and statuses.get(epic03) == "COMPLETE_AT_TARGET"
+        and statuses.get(epic04) == "READY"
+        and isinstance(completion_evidence, dict)
+        and completion_evidence.get(epic02) == epic02_refs
+        and completion_evidence.get(epic03) == epic03_refs
+        and state.get("transition_history_anchor_sha256") == seq65.get("event_sha256")
+        and state.get("focus_goal_id") == epic04
+        and state.get("focus_goal_path")
+        == "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md"
+        and state.get("focus_work_item_id") == ""
+        and state.get("focus_source") == "WORKSTREAM_GRAPH"
+        and state.get("ready_frontier_goal_ids") == [epic04, epic12]
+    )
+
+
 def _implementation_content_set_sha256(
     changed_artifacts: list[dict[str, Any]],
 ) -> str:
@@ -4353,6 +5826,1874 @@ def _fp048_sealed_product_successor_artifacts(
     return result if len(result) == 78 else None
 
 
+def _npc_single_admin_recovery_successor_is_declared(
+    checkpoint: dict[str, Any],
+) -> bool:
+    state = checkpoint.get("goal_execution")
+    if not isinstance(state, dict):
+        return False
+    statuses = state.get("status_by_goal")
+    history = state.get("transition_history")
+    binding = _binding_by_role(
+        checkpoint,
+        NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE,
+    )
+    return bool(
+        isinstance(statuses, dict)
+        and statuses.get(NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID)
+        == "COMPLETE_AT_TARGET"
+        or binding is not None
+        or isinstance(history, list)
+        and any(
+            isinstance(event, dict)
+            and event.get("event_id")
+            in {
+                NPC_SINGLE_ADMIN_RECOVERY_CANONICAL_UPDATE_EVENT_ID,
+                NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID,
+            }
+            for event in history
+        )
+    )
+
+
+def _npc_exact_live_bytes(root: Path, relative: Path) -> bytes | None:
+    try:
+        return npc_review._read_review_bytes(root, relative)
+    except (OSError, ValueError, npc_recovery.BuildError):
+        return None
+
+
+def _npc_rebuilt_output_bytes(
+    root: Path,
+    rebuilt: Any,
+    expected_paths: tuple[Path, ...],
+) -> dict[Path, bytes] | None:
+    """Require a builder's exact inventory and byte-for-byte live outputs."""
+    if (
+        not isinstance(rebuilt, dict)
+        or len(expected_paths) != len(set(expected_paths))
+        or set(rebuilt) != set(expected_paths)
+    ):
+        return None
+    result: dict[Path, bytes] = {}
+    for relative in expected_paths:
+        expected = rebuilt.get(relative)
+        if type(expected) is str:
+            expected_raw = expected.encode("utf-8")
+        elif type(expected) is bytes:
+            expected_raw = expected
+        else:
+            return None
+        live_raw = _npc_exact_live_bytes(root, relative)
+        if live_raw is None or live_raw != expected_raw:
+            return None
+        result[relative] = live_raw
+    return result
+
+
+def _npc_single_admin_recovery_v2_completion_evidence(
+    root: Path,
+) -> dict[str, Any] | None:
+    """Replay the strict correction-v2 review chain and compare exact bytes."""
+    try:
+        review_context = npc_r004_review.prepare_frozen_r003_context(root)
+        expected_result_paths = (
+            *(lane.receipt_rel for lane in npc_recovery.LANES),
+            npc_recovery.V2_IMPLEMENTATION_REL,
+            npc_recovery.V2_VERIFICATION_REL,
+            npc_recovery.V2_SUCCESSOR_REL,
+            npc_recovery.V2_REVIEW_SUBJECT_REL,
+        )
+        expected_consumer_specs = (
+            ("GAP_R027", npc_recovery.GAP_R027_REL),
+            ("BACKLOG_R027", npc_recovery.BACKLOG_R027_REL),
+            *npc_recovery.EXACT6_CONSUMERS,
+            *npc_recovery.R016_CONSUMERS,
+            (
+                "REJECTED_REVIEW_R001",
+                npc_review.R001_REVIEW_RESULT_REL,
+            ),
+        )
+        expected_review_dir = (
+            npc_recovery.RESULT_DIR_REL / "review-rounds" / "R003"
+        )
+        expected_post_review_paths = (
+            npc_review.INDEPENDENT_REVIEW_REL,
+            npc_review.COMPLETION_RECEIPT_REL,
+        )
+        if (
+            set(review_context.result_raw) != set(expected_result_paths)
+            or len(review_context.result_raw) != len(expected_result_paths)
+            or len(review_context.consumer_bindings)
+            != len(expected_consumer_specs)
+            or len({role for role, _ in expected_consumer_specs})
+            != len(expected_consumer_specs)
+            or len({path for _, path in expected_consumer_specs})
+            != len(expected_consumer_specs)
+            or npc_review.R001_REVIEW_RESULT_REL
+            != npc_recovery.RESULT_DIR_REL
+            / "review-rounds"
+            / "R001"
+            / "review-result.json"
+            or npc_review.REVIEW_ASSIGNMENT_REL
+            != expected_review_dir / "review-assignment.json"
+            or npc_review.REVIEW_RESULT_REL
+            != expected_review_dir / "review-result.json"
+            or npc_review.INDEPENDENT_REVIEW_REL
+            != expected_review_dir / "independent-review.json"
+            or tuple(npc_review.POST_REVIEW_OUTPUT_PATHS)
+            != expected_post_review_paths
+        ):
+            return None
+        for relative in expected_result_paths:
+            if (
+                not isinstance(review_context.result_raw.get(relative), bytes)
+                or _npc_exact_live_bytes(root, relative)
+                != review_context.result_raw[relative]
+            ):
+                return None
+        observation_raw = _npc_exact_live_bytes(
+            root,
+            npc_recovery.V2_OBSERVATION_MANIFEST_REL,
+        )
+        observation_bindings = [
+            row
+            for row in review_context.evidence_manifest
+            if isinstance(row, dict)
+            and row.get("path")
+            == npc_recovery.V2_OBSERVATION_MANIFEST_REL.as_posix()
+        ]
+        if observation_raw is None or observation_bindings != [
+            {
+                "path": npc_recovery.V2_OBSERVATION_MANIFEST_REL.as_posix(),
+                "sha256": continuation.sha256_bytes(observation_raw),
+            }
+        ]:
+            return None
+        for binding, (role, relative) in zip(
+            review_context.consumer_bindings,
+            expected_consumer_specs,
+            strict=True,
+        ):
+            raw = _npc_exact_live_bytes(root, relative)
+            if (
+                raw is None
+                or not isinstance(binding, dict)
+                or binding.get("role") != role
+                or binding.get("path") != relative.as_posix()
+                or binding.get("sha256")
+                != continuation.sha256_bytes(raw)
+                or binding.get("byte_length") != len(raw)
+            ):
+                return None
+        predecessor_review = review_context.predecessor_review
+        r001_raw = _npc_exact_live_bytes(
+            root,
+            npc_review.R001_REVIEW_RESULT_REL,
+        )
+        if (
+            r001_raw is None
+            or not isinstance(predecessor_review, dict)
+            or predecessor_review.get("path")
+            != npc_review.R001_REVIEW_RESULT_REL.as_posix()
+            or predecessor_review.get("sha256")
+            != continuation.sha256_bytes(r001_raw)
+            or predecessor_review.get("decision") != "REJECTED"
+        ):
+            return None
+        immutable_history = (
+            npc_review.load_immutable_predecessor_history_sha256_by_path(root)
+        )
+        evidence_by_path = {
+            row.get("path"): row.get("sha256")
+            for row in review_context.evidence_manifest
+            if isinstance(row, dict)
+        }
+        if (
+            tuple(immutable_history)
+            != npc_review.IMMUTABLE_PREDECESSOR_HISTORY_PATHS
+            or any(
+                evidence_by_path.get(path.as_posix()) != digest
+                for path, digest in immutable_history.items()
+            )
+        ):
+            return None
+        prior_approved_review = review_context.prior_approved_review
+        if (
+            not isinstance(prior_approved_review, dict)
+            or prior_approved_review.get("round_id") != npc_review.R002_ROUND_ID
+            or prior_approved_review.get("decision") != "APPROVED"
+        ):
+            return None
+        assignment, assignment_raw, review_result, review_result_raw = (
+            npc_review.load_review_inputs(root, review_context)
+        )
+        if (
+            _npc_exact_live_bytes(root, npc_review.REVIEW_ASSIGNMENT_REL)
+            != assignment_raw
+            or _npc_exact_live_bytes(root, npc_review.REVIEW_RESULT_REL)
+            != review_result_raw
+        ):
+            return None
+        post_review_raw = _npc_rebuilt_output_bytes(
+            root,
+            npc_review.build_post_review_outputs(
+                review_context,
+                assignment,
+                assignment_raw,
+                review_result,
+                review_result_raw,
+            ),
+            expected_post_review_paths,
+        )
+        if (
+            post_review_raw is None
+            or npc_review.COMPLETION_RECEIPT_REL
+            != npc_recovery.CORRECTION_DIR_REL / "completion-receipt-v3.json"
+        ):
+            return None
+        implementation_raw = review_context.result_raw.get(
+            npc_recovery.V2_IMPLEMENTATION_REL
+        )
+        if not isinstance(implementation_raw, bytes):
+            return None
+        implementation = npc_recovery.strict_json_bytes(
+            implementation_raw,
+            npc_recovery.V2_IMPLEMENTATION_REL.as_posix(),
+        )
+        if implementation.get("evidence_schema") != "V2_CORRECTION_ONLY":
+            return None
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+    return implementation
+
+
+def _overlay_reviewed_managed_closure_source_successors(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+) -> dict[str, str] | None:
+    """Overlay the exact frozen source successors approved by control R002."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R002_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {
+        path.as_posix(): pin
+        for path, pin in source_pins.items()
+    }
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
+def _overlay_reviewed_managed_closure_source_successors_r003(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+    *,
+    superseded_paths: frozenset[str] = frozenset(),
+) -> dict[str, str] | None:
+    """Overlay exact R003 successors, exempting only the declared R004 delta."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R003_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {
+        path.as_posix(): pin
+        for path, pin in source_pins.items()
+    }
+    permitted_superseded_paths = frozenset(
+        path.as_posix()
+        for path in (
+            fp022_completion_review
+            .CONTROL_SUCCESSOR_R004_MANAGED_CLOSURE_SOURCE_PINS
+        )
+    )
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+        or superseded_paths not in {frozenset(), permitted_superseded_paths}
+        or not superseded_paths.issubset(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        raw = (
+            _npc_exact_live_bytes(root, Path(relative))
+            if isinstance(relative, str)
+            else None
+        )
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+            or (
+                relative not in superseded_paths
+                and (
+                    raw is None
+                    or len(raw) != successor.get("byte_length")
+                    or continuation.sha256_bytes(raw)
+                    != successor.get("sha256")
+                )
+            )
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
+def _overlay_reviewed_managed_closure_source_successors_r004(
+    root: Path,
+    mandatory: dict[str, str],
+    rows: tuple[dict[str, Any], ...],
+) -> dict[str, str] | None:
+    """Overlay only the exact live source successor approved by control R004."""
+
+    from scripts import (
+        build_walksafe_fp022_completion_seq70_71_review_20260814
+        as fp022_completion_review,
+    )
+
+    source_pins = (
+        fp022_completion_review.CONTROL_SUCCESSOR_R004_MANAGED_CLOSURE_SOURCE_PINS
+    )
+    expected = {path.as_posix(): pin for path, pin in source_pins.items()}
+    if (
+        not isinstance(rows, tuple)
+        or len(rows) != len(expected)
+        or {
+            row.get("path") if isinstance(row, dict) else None
+            for row in rows
+        }
+        != set(expected)
+    ):
+        return None
+
+    overlaid = dict(mandatory)
+    seen: set[str] = set()
+    for row in rows:
+        relative = row.get("path") if isinstance(row, dict) else None
+        predecessor = row.get("predecessor") if isinstance(row, dict) else None
+        successor = row.get("successor") if isinstance(row, dict) else None
+        pin = expected.get(relative) if isinstance(relative, str) else None
+        raw = (
+            _npc_exact_live_bytes(root, Path(relative))
+            if isinstance(relative, str)
+            else None
+        )
+        if (
+            not isinstance(row, dict)
+            or set(row) != {"path", "predecessor", "successor"}
+            or relative in seen
+            or not isinstance(predecessor, dict)
+            or not isinstance(successor, dict)
+            or set(predecessor) != {"path", "sha256", "byte_length"}
+            or set(successor) != {"path", "sha256", "byte_length"}
+            or predecessor.get("path") != relative
+            or successor.get("path") != relative
+            or pin is None
+            or predecessor.get("sha256") != pin["predecessor_sha256"]
+            or predecessor.get("byte_length")
+            != pin["predecessor_byte_length"]
+            or successor.get("sha256") != pin["successor_sha256"]
+            or successor.get("byte_length") != pin["successor_byte_length"]
+            or overlaid.get(relative) != predecessor.get("sha256")
+            or raw is None
+            or len(raw) != successor.get("byte_length")
+            or continuation.sha256_bytes(raw) != successor.get("sha256")
+        ):
+            return None
+        seen.add(relative)
+        overlaid[relative] = successor["sha256"]
+    return overlaid
+
+
+def _npc_single_admin_recovery_completion_managed_closure_matches(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> bool:
+    """Reproduce the mandatory R004 final-managed subset and snapshot mirror."""
+
+    try:
+        from scripts import (
+            build_walksafe_fp022_seq66_67_review_20260814 as fp022_review,
+        )
+        from scripts import (
+            build_walksafe_fp022_seq68_69_review_20260814
+            as fp022_start_review,
+        )
+        from scripts import (
+            build_walksafe_fp022_completion_seq70_71_review_20260814
+            as fp022_completion_review,
+        )
+
+        context = npc_r004_review.prepare_frozen_r003_context(root)
+        followup_context = (
+            workstream_aggregate_review.prepare_frozen_r011_context(root)
+        )
+        followup_assignment, followup_assignment_raw, followup_result, followup_result_raw = (
+            npc_r011_review.load_review_inputs(root, followup_context)
+        )
+        followup_independent_raw = npc_r011_review.build_independent_review(
+            followup_context,
+            followup_assignment,
+            followup_assignment_raw,
+            followup_result,
+            followup_result_raw,
+        ).encode("utf-8")
+        if (
+            _npc_exact_live_bytes(root, npc_r011_review.INDEPENDENT_REVIEW_REL)
+            != followup_independent_raw
+        ):
+            return False
+        if _frozen_workstream_aggregate_r003_review_binding(root) is None:
+            return False
+        aggregate_assignment = _load_exact_json(
+            root, workstream_aggregate_review.ASSIGNMENT_REL.as_posix()
+        )
+        aggregate_scope = (
+            aggregate_assignment.get("review_scope")
+            if isinstance(aggregate_assignment, dict)
+            else None
+        )
+        aggregate_controls = (
+            aggregate_scope.get("reviewed_control_code_cohort")
+            if isinstance(aggregate_scope, dict)
+            else None
+        )
+        if not isinstance(aggregate_controls, list):
+            return False
+        history = checkpoint.get("goal_execution", {}).get("transition_history")
+        fp022_suffix = bool(
+            isinstance(history, list)
+            and len(history) >= 67
+            and history[65].get("event_id")
+            == "WS-GOAL-GRAPH-V2-4-GOAL-MATERIALIZED-FP022-20260813-001"
+            and history[66].get("event_id")
+            == "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP022-20260813-001"
+        )
+        fp022_context = (
+            fp022_review.prepare_frozen_review_context(root)
+            if fp022_suffix
+            else None
+        )
+        fp022_start_suffix = bool(
+            fp022_suffix
+            and len(history) >= 68
+            and history[67].get("event_id")
+            == "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-"
+            "FP022-20260814-001"
+        )
+        fp022_completion_suffix = _fp022_completion_suffix_is_declared(
+            checkpoint
+        )
+        fp022_start_context = (
+            fp022_completion_review.prepare_frozen_start_review_context(root)
+            if fp022_completion_suffix
+            else fp022_start_review.validate_post_review(root)
+            if fp022_start_suffix
+            else None
+        )
+        fp022_control_successor_context = (
+            fp022_completion_review.validated_control_successor_r004_context(
+                root
+            )
+            if fp022_completion_suffix
+            else None
+        )
+        fp022_completion_context = (
+            fp022_control_successor_context.current
+            if fp022_control_successor_context is not None
+            else None
+        )
+        if fp022_completion_context is not None:
+            expected_completion_review_binding = {
+                role: fp022_completion_review._binding(
+                    relative,
+                    fp022_completion_review._raw(root, relative),
+                )
+                for role, relative in (
+                    ("assignment", fp022_completion_review.ASSIGNMENT_REL),
+                    ("review_result", fp022_completion_review.RESULT_REL),
+                    (
+                        "independent_review",
+                        fp022_completion_review.INDEPENDENT_REL,
+                    ),
+                )
+            }
+            if history[69].get("transition_control_review_binding") != (
+                expected_completion_review_binding
+            ):
+                return False
+        assignment, assignment_raw, result, result_raw = (
+            npc_review.load_review_inputs(root, context)
+        )
+        post_review = npc_review.build_post_review_outputs(
+            context,
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        )
+        mandatory: dict[str, str] = {
+            path.as_posix(): digest
+            for path, digest in (
+                npc_review.load_immutable_predecessor_history_sha256_by_path(
+                    root
+                )
+            ).items()
+        }
+        for path, (digest, _byte_length) in (
+            npc_review.R002_REVIEW_HISTORY_SHA256_BY_PATH.items()
+        ):
+            if path.as_posix() in mandatory:
+                return False
+            mandatory[path.as_posix()] = digest
+        for row in context.control_code_cohort:
+            path = row.get("path")
+            digest = row.get("sha256")
+            if (
+                not isinstance(path, str)
+                or not isinstance(digest, str)
+                or path in mandatory
+            ):
+                return False
+            mandatory[path] = digest
+        for row in followup_context.control_code_cohort:
+            path = row.get("path")
+            digest = row.get("sha256")
+            if not isinstance(path, str) or not isinstance(digest, str):
+                return False
+            mandatory[path] = digest
+        for row in aggregate_controls:
+            path = row.get("path")
+            digest = row.get("sha256")
+            if not isinstance(path, str) or not isinstance(digest, str):
+                return False
+            mandatory[path] = digest
+        if fp022_context is not None:
+            for row in fp022_context.control_code_cohort:
+                path = row.get("path")
+                digest = row.get("sha256")
+                if not isinstance(path, str) or not isinstance(digest, str):
+                    return False
+                mandatory[path] = digest
+        if fp022_start_context is not None:
+            for row in fp022_start_context.control_code_cohort:
+                path = row.get("path")
+                digest = row.get("sha256")
+                if not isinstance(path, str) or not isinstance(digest, str):
+                    return False
+                mandatory[path] = digest
+        if fp022_completion_context is not None:
+            unmanaged_completion_evidence = {
+                path.as_posix()
+                for path in fp022_completion_review.UNMANAGED_EVIDENCE_PATHS
+            }
+            for row in fp022_completion_context.control_code_cohort:
+                path = row.get("path")
+                digest = row.get("sha256")
+                if not isinstance(path, str) or not isinstance(digest, str):
+                    return False
+                mandatory[path] = digest
+            for row in fp022_completion_context.completion_evidence_bindings:
+                path = row.get("path")
+                digest = row.get("sha256")
+                if not isinstance(path, str) or not isinstance(digest, str):
+                    return False
+                if path not in unmanaged_completion_evidence:
+                    mandatory[path] = digest
+            implementation = _load_exact_json(
+                root,
+                (
+                    "docs/control/execution/goal-results/"
+                    "WS-GOAL-EPIC-04-FP-022-R001/implementation-record.json"
+                ),
+            )
+            manifest = (
+                implementation.get("final_content_manifest")
+                if isinstance(implementation, dict)
+                else None
+            )
+            files = manifest.get("files") if isinstance(manifest, dict) else None
+            if (
+                not isinstance(files, list)
+                or len(files) != 22
+                or any(not isinstance(row, dict) for row in files)
+            ):
+                return False
+            for row in files:
+                path = row.get("path")
+                digest = row.get("sha256")
+                byte_length = row.get("byte_length")
+                raw = (
+                    _npc_exact_live_bytes(root, Path(path))
+                    if isinstance(path, str)
+                    else None
+                )
+                if (
+                    raw is None
+                    or not isinstance(digest, str)
+                    or len(raw) != byte_length
+                    or continuation.sha256_bytes(raw) != digest
+                ):
+                    return False
+                mandatory[path] = digest
+        dynamic_raw = {
+            npc_review.REVIEW_ASSIGNMENT_REL: assignment_raw,
+            npc_review.REVIEW_RESULT_REL: result_raw,
+            **{
+                path: text.encode("utf-8")
+                for path, text in post_review.items()
+            },
+            **{
+                Path(row["path"]): _npc_exact_live_bytes(
+                    root, Path(row["path"])
+                )
+                for row in followup_context.superseded_assignment_bindings
+            },
+            **{
+                Path(row["path"]): _npc_exact_live_bytes(
+                    root, Path(row["path"])
+                )
+                for row in followup_context.predecessor_bindings
+            },
+            npc_r011_review.REVIEW_ASSIGNMENT_REL: followup_assignment_raw,
+            npc_r011_review.REVIEW_RESULT_REL: followup_result_raw,
+            npc_r011_review.INDEPENDENT_REVIEW_REL: followup_independent_raw,
+            workstream_aggregate_review.ASSIGNMENT_REL: _npc_exact_live_bytes(
+                root, workstream_aggregate_review.ASSIGNMENT_REL
+            ),
+            workstream_aggregate_review.RESULT_REL: _npc_exact_live_bytes(
+                root, workstream_aggregate_review.RESULT_REL
+            ),
+            workstream_aggregate_review.INDEPENDENT_REL: _npc_exact_live_bytes(
+                root, workstream_aggregate_review.INDEPENDENT_REL
+            ),
+        }
+        if fp022_context is not None:
+            dynamic_raw.update(
+                {
+                    fp022_review.ASSIGNMENT_REL: _npc_exact_live_bytes(
+                        root, fp022_review.ASSIGNMENT_REL
+                    ),
+                    fp022_review.RESULT_REL: _npc_exact_live_bytes(
+                        root, fp022_review.RESULT_REL
+                    ),
+                    fp022_review.INDEPENDENT_REL: _npc_exact_live_bytes(
+                        root, fp022_review.INDEPENDENT_REL
+                    ),
+                }
+            )
+        if fp022_start_context is not None:
+            dynamic_raw.update(
+                {
+                    fp022_start_review.ASSIGNMENT_REL: _npc_exact_live_bytes(
+                        root, fp022_start_review.ASSIGNMENT_REL
+                    ),
+                    fp022_start_review.RESULT_REL: _npc_exact_live_bytes(
+                        root, fp022_start_review.RESULT_REL
+                    ),
+                    fp022_start_review.INDEPENDENT_REL: _npc_exact_live_bytes(
+                        root, fp022_start_review.INDEPENDENT_REL
+                    ),
+                }
+            )
+        if fp022_completion_context is not None:
+            dynamic_raw.update(
+                {
+                    **{
+                        Path(row["path"]): _npc_exact_live_bytes(
+                            root, Path(row["path"])
+                        )
+                        for row in (
+                            fp022_completion_context.superseded_assignment_bindings
+                        )
+                    },
+                    fp022_completion_review.ASSIGNMENT_REL: _npc_exact_live_bytes(
+                        root, fp022_completion_review.ASSIGNMENT_REL
+                    ),
+                    fp022_completion_review.RESULT_REL: _npc_exact_live_bytes(
+                        root, fp022_completion_review.RESULT_REL
+                    ),
+                    fp022_completion_review.INDEPENDENT_REL: _npc_exact_live_bytes(
+                        root, fp022_completion_review.INDEPENDENT_REL
+                    ),
+                }
+            )
+        expected_dynamic_paths = {
+            npc_review.REVIEW_ASSIGNMENT_REL,
+            npc_review.REVIEW_RESULT_REL,
+            npc_review.INDEPENDENT_REVIEW_REL,
+            npc_review.COMPLETION_RECEIPT_REL,
+            *(
+                Path(row["path"])
+                for row in followup_context.superseded_assignment_bindings
+            ),
+            *(
+                Path(row["path"])
+                for row in followup_context.predecessor_bindings
+            ),
+            npc_r011_review.REVIEW_ASSIGNMENT_REL,
+            npc_r011_review.REVIEW_RESULT_REL,
+            npc_r011_review.INDEPENDENT_REVIEW_REL,
+            workstream_aggregate_review.ASSIGNMENT_REL,
+            workstream_aggregate_review.RESULT_REL,
+            workstream_aggregate_review.INDEPENDENT_REL,
+        }
+        if fp022_context is not None:
+            expected_dynamic_paths.update(
+                {
+                    fp022_review.ASSIGNMENT_REL,
+                    fp022_review.RESULT_REL,
+                    fp022_review.INDEPENDENT_REL,
+                }
+            )
+        if fp022_start_context is not None:
+            expected_dynamic_paths.update(
+                {
+                    fp022_start_review.ASSIGNMENT_REL,
+                    fp022_start_review.RESULT_REL,
+                    fp022_start_review.INDEPENDENT_REL,
+                }
+            )
+        if fp022_completion_context is not None:
+            expected_dynamic_paths.update(
+                {
+                    *(
+                        Path(row["path"])
+                        for row in (
+                            fp022_completion_context.superseded_assignment_bindings
+                        )
+                    ),
+                    fp022_completion_review.ASSIGNMENT_REL,
+                    fp022_completion_review.RESULT_REL,
+                    fp022_completion_review.INDEPENDENT_REL,
+                }
+            )
+        if (
+            any(raw is None for raw in dynamic_raw.values())
+            or set(dynamic_raw) != expected_dynamic_paths
+        ):
+            return False
+        for path, raw in dynamic_raw.items():
+            if path.as_posix() in mandatory:
+                return False
+            mandatory[path.as_posix()] = continuation.sha256_bytes(raw)
+
+        if fp022_control_successor_context is not None:
+            r002_reviewed_sources = (
+                fp022_control_successor_context.predecessor
+                .predecessor_managed_closure_source_successors
+            )
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors(
+                    root,
+                    mandatory,
+                    r002_reviewed_sources,
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            r003_reviewed_sources = (
+                fp022_control_successor_context
+                .predecessor.managed_closure_source_successors
+            )
+            r004_reviewed_sources = (
+                fp022_control_successor_context.managed_closure_source_successors
+            )
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors_r003(
+                    root,
+                    overlaid_mandatory,
+                    r003_reviewed_sources,
+                    superseded_paths=frozenset(
+                        row["path"] for row in r004_reviewed_sources
+                    ),
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            overlaid_mandatory = (
+                _overlay_reviewed_managed_closure_source_successors_r004(
+                    root,
+                    overlaid_mandatory,
+                    r004_reviewed_sources,
+                )
+            )
+            if overlaid_mandatory is None:
+                return False
+            mandatory = overlaid_mandatory
+
+        snapshot = checkpoint.get("working_tree_snapshot")
+        handoff = checkpoint.get("session_handoff")
+        mirror = (
+            handoff.get("source_commit_or_snapshot")
+            if isinstance(handoff, dict)
+            else None
+        )
+        paths = (
+            snapshot.get("managed_changed_paths")
+            if isinstance(snapshot, dict)
+            else None
+        )
+        if (
+            not isinstance(paths, list)
+            or paths != sorted(set(paths))
+            or not set(mandatory).issubset(paths)
+            or not isinstance(handoff, dict)
+            or handoff.get("changed_files") != paths
+            or not isinstance(mirror, dict)
+        ):
+            return False
+        raw_by_path: dict[str, bytes] = {}
+        for relative in paths:
+            raw = _npc_exact_live_bytes(root, Path(relative))
+            if raw is None:
+                return False
+            raw_by_path[relative] = raw
+        if any(
+            continuation.sha256_bytes(raw_by_path[relative]) != digest
+            for relative, digest in mandatory.items()
+        ):
+            return False
+        path_hash = hashlib.sha256(
+            ("\n".join(paths) + "\n").encode("utf-8")
+        ).hexdigest()
+        content = hashlib.sha256()
+        for relative in paths:
+            content.update(relative.encode("utf-8"))
+            content.update(b"\0")
+            content.update(
+                continuation.sha256_bytes(raw_by_path[relative]).encode("ascii")
+            )
+            content.update(b"\n")
+        content_hash = content.hexdigest()
+        return bool(
+            snapshot.get("managed_changed_path_count") == len(paths)
+            and snapshot.get("path_set_sha256") == path_hash
+            and snapshot.get("content_set_sha256") == content_hash
+            and mirror.get("file_count") == len(paths)
+            and mirror.get("path_set_sha256") == path_hash
+            and mirror.get("content_set_sha256") == content_hash
+        )
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        fp022_completion_review.ReviewError,
+        npc_recovery.BuildError,
+    ):
+        return False
+
+
+def _npc_single_admin_recovery_completion_package(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Validate the add-only NPC result/review package bound by seq61/62."""
+
+    state = checkpoint.get("goal_execution")
+    statuses = state.get("status_by_goal") if isinstance(state, dict) else None
+    inventory = (
+        state.get("dynamic_goal_inventory")
+        if isinstance(state, dict)
+        else None
+    )
+    completion_roles = (
+        state.get("completion_evidence_by_goal")
+        if isinstance(state, dict)
+        else None
+    )
+    history = (
+        state.get("transition_history")
+        if isinstance(state, dict)
+        else None
+    )
+    goal = (
+        inventory.get(NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID)
+        if isinstance(inventory, dict)
+        else None
+    )
+    goal_path = _exact_repo_file(root, NPC_SINGLE_ADMIN_RECOVERY_GOAL_PATH)
+    completion_binding = _binding_by_role(
+        checkpoint,
+        NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE,
+    )
+    binding_projection = (
+        {
+            key: completion_binding.get(key)
+            for key in ("role", "document_id", "path", "file_sha256")
+        }
+        if isinstance(completion_binding, dict)
+        else None
+    )
+    exact_seq62_projection = bool(
+        isinstance(history, list)
+        and len(history) == 62
+        and history[-1].get("event_sha256")
+        == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256
+        and state.get("focus_goal_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_FINAL_FOCUS_GOAL_ID
+        and state.get("focus_goal_path")
+        == NPC_SINGLE_ADMIN_RECOVERY_FINAL_FOCUS_GOAL_PATH
+        and state.get("focus_work_item_id") == ""
+        and state.get("focus_source") == "WORKSTREAM_GRAPH"
+        and state.get("ready_frontier_goal_ids")
+        == NPC_SINGLE_ADMIN_RECOVERY_FINAL_READY_FRONTIER
+    )
+    aggregate_projection = _workstream_aggregate_seq63_65_successor_matches(
+        root, checkpoint
+    )
+    fp022_projection = _fp022_seq66_67_successor_matches(root, checkpoint)
+    if (
+        not isinstance(state, dict)
+        or not isinstance(statuses, dict)
+        or statuses.get(NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID)
+        != "COMPLETE_AT_TARGET"
+        or not isinstance(goal, dict)
+        or goal.get("goal_id") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        or goal.get("path") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_PATH
+        or goal.get("sha256") != NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256
+        or goal_path is None
+        or continuation.sha256_file(goal_path)
+        != NPC_SINGLE_ADMIN_RECOVERY_GOAL_SHA256
+        or not isinstance(completion_roles, dict)
+        or completion_roles.get(NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID)
+        != [NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE]
+        or not isinstance(history, list)
+        or len(history) < 3
+        or binding_projection
+        != {
+            "role": NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE,
+            "document_id": NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_DOCUMENT_ID,
+            "path": NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_PATH,
+            "file_sha256": (
+                completion_binding.get("file_sha256")
+                if isinstance(completion_binding, dict)
+                else None
+            ),
+        }
+        or completion_binding.get("identity_json_path") != "/document_id"
+        or completion_binding.get("mutable") is not False
+        or not _sha256_binding_matches(
+            root,
+            completion_binding,
+            expected_path=NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_PATH,
+        )
+        or not _npc_single_admin_recovery_r027_backlog_projection_matches(
+            root,
+            checkpoint,
+            require_operational_pointer=not fp022_projection,
+        )
+        or not (
+            exact_seq62_projection
+            or aggregate_projection
+            or fp022_projection
+        )
+    ):
+        return None
+
+    indexed_start = [
+        (index, event)
+        for index, event in enumerate(history)
+        if isinstance(event, dict)
+        and (
+            event.get("sequence")
+            == npc_recovery.EXPECTED_START_EVENT_SEQUENCE
+            or event.get("event_id") == npc_recovery.EXPECTED_START_EVENT_ID
+        )
+    ]
+    indexed_update = [
+        (index, event)
+        for index, event in enumerate(history)
+        if isinstance(event, dict)
+        and (
+            event.get("sequence") == 61
+            or event.get("event_id")
+            == NPC_SINGLE_ADMIN_RECOVERY_CANONICAL_UPDATE_EVENT_ID
+        )
+    ]
+    indexed_completion = [
+        (index, event)
+        for index, event in enumerate(history)
+        if isinstance(event, dict)
+        and (
+            event.get("sequence") == 62
+            or event.get("event_id")
+            == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID
+        )
+    ]
+    if not (
+        len(indexed_start) == 1
+        and len(indexed_update) == 1
+        and len(indexed_completion) == 1
+        and indexed_update[0][0] == indexed_start[0][0] + 1
+        and indexed_completion[0][0] == indexed_update[0][0] + 1
+    ):
+        return None
+    start = indexed_start[0][1]
+    update = indexed_update[0][1]
+    completion = indexed_completion[0][1]
+    canonical_snapshot = continuation.canonical_binding_snapshot(checkpoint)
+    update_snapshot = update.get("canonical_binding_snapshot_after")
+    completion_snapshot = completion.get("canonical_binding_snapshot_after")
+    if not (
+        start.get("sequence") == npc_recovery.EXPECTED_START_EVENT_SEQUENCE
+        and start.get("event_id") == npc_recovery.EXPECTED_START_EVENT_ID
+        and start.get("event_type") == "GOAL_STARTED"
+        and start.get("subject_goal_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        and start.get("event_sha256")
+        == npc_recovery.EXPECTED_START_EVENT_SHA256
+        and continuation.event_sha256(start)
+        == npc_recovery.EXPECTED_START_EVENT_SHA256
+        and update.get("sequence") == 61
+        and update.get("event_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_CANONICAL_UPDATE_EVENT_ID
+        and update.get("event_type") == "CANONICAL_BINDINGS_UPDATED"
+        and update.get("from_status") == "IN_PROGRESS"
+        and update.get("to_status") == "IN_PROGRESS"
+        and update.get("status_changes") == {}
+        and update.get("previous_event_sha256")
+        == npc_recovery.EXPECTED_START_EVENT_SHA256
+        and update.get("produced_by_goal_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        and update.get("evidence_refs")
+        == NPC_SINGLE_ADMIN_RECOVERY_CHANGED_ROLES
+        and update.get("changed_binding_roles")
+        == NPC_SINGLE_ADMIN_RECOVERY_CHANGED_ROLES
+        and update.get("produced_binding_roles")
+        == ["IMPLEMENTATION_BACKLOG", "IMPLEMENTATION_GAP"]
+        and update.get("changed_subject_ids_by_role")
+        == NPC_SINGLE_ADMIN_RECOVERY_CHANGED_SUBJECT_IDS_BY_ROLE
+        and update.get("producer_output_subject_ids_by_role")
+        == NPC_SINGLE_ADMIN_RECOVERY_PRODUCER_SUBJECT_IDS_BY_ROLE
+        and update.get("impact_closure_goal_ids") == ["WS-GOAL-EPIC-03"]
+        and update.get("impact_disposition_by_goal")
+        == {
+            "WS-GOAL-EPIC-03": {
+                "result": "REVALIDATION_REFRESH_REQUIRED",
+                "target_status": "READY",
+            }
+        }
+        and update.get("reopened_completion_event_sha256_by_goal") == {}
+        and update.get("producer_completion_receipt_binding")
+        == binding_projection
+        and update_snapshot == completion_snapshot
+        and isinstance(completion_snapshot, dict)
+        and completion_snapshot.get(NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE)
+        == binding_projection
+        and update.get("event_sha256")
+        == continuation.event_sha256(update)
+        and completion.get("sequence") == 62
+        and completion.get("event_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID
+        and completion.get("event_type") == "GOAL_COMPLETED"
+        and completion.get("subject_goal_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+        and completion.get("focus_goal_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_FINAL_FOCUS_GOAL_ID
+        and completion.get("focus_goal_content_sha256")
+        == "40fafdf86acf23c8c7243bebc3e7c4c0566a56123b5c4c815f29d5fc3eb15665"
+        and completion.get("from_status") == "IN_PROGRESS"
+        and completion.get("to_status") == "COMPLETE_AT_TARGET"
+        and completion.get("status_changes")
+        == {NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID: "COMPLETE_AT_TARGET"}
+        and completion.get("previous_event_sha256")
+        == update.get("event_sha256")
+        and completion.get("canonical_update_event_sha256")
+        == update.get("event_sha256")
+        and completion.get("evidence_refs")
+        == [NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE]
+        and completion.get("completion_receipt_binding")
+        == binding_projection
+        and completion.get("completion_evidence_bindings")
+        == {NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE: binding_projection}
+        and completion.get("event_sha256")
+        == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256
+        and completion.get("event_sha256")
+        == continuation.event_sha256(completion)
+        and canonical_snapshot.get(
+            NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE
+        )
+        == binding_projection
+    ):
+        return None
+
+    implementation = _npc_single_admin_recovery_v2_completion_evidence(root)
+    if (
+        implementation is None
+        or not _npc_single_admin_recovery_completion_managed_closure_matches(
+            root,
+            checkpoint,
+        )
+    ):
+        return None
+    return implementation
+
+
+def _npc_single_admin_recovery_start_to_final_transitions(
+    root: Path,
+    implementation: dict[str, Any],
+) -> dict[str, tuple[str, str]] | None:
+    state_path = _exact_repo_file(
+        root,
+        npc_recovery.START_GATE_REPOSITORY_STATE_REL.as_posix(),
+    )
+    repository_state = _load_exact_json(
+        root,
+        npc_recovery.START_GATE_REPOSITORY_STATE_REL.as_posix(),
+    )
+    dirty = (
+        repository_state.get("dirty_snapshot")
+        if isinstance(repository_state, dict)
+        else None
+    )
+    dirty_rows = dirty.get("paths") if isinstance(dirty, dict) else None
+    repository = (
+        repository_state.get("repository")
+        if isinstance(repository_state, dict)
+        else None
+    )
+    start_commit = (
+        repository.get("head_commit")
+        if isinstance(repository, dict)
+        else None
+    )
+    manifest = implementation.get("final_content_manifest")
+    files = manifest.get("files") if isinstance(manifest, dict) else None
+    if (
+        state_path is None
+        or continuation.sha256_file(state_path)
+        != npc_recovery.EXPECTED_START_GATE_REPOSITORY_STATE_SHA256
+        or not isinstance(repository_state, dict)
+        or repository_state.get("evidence_type") != "GATE_REPOSITORY_STATE"
+        or repository_state.get("gate_event_id")
+        != npc_recovery.EXPECTED_START_EVENT_ID
+        or not isinstance(start_commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", start_commit) is None
+        or not isinstance(dirty_rows, list)
+        or any(not isinstance(row, dict) for row in dirty_rows)
+        or not isinstance(files, list)
+    ):
+        return None
+    file_paths = [
+        row.get("path") for row in files if isinstance(row, dict)
+    ]
+    if (
+        len(file_paths) != len(files)
+        or any(not isinstance(path, str) for path in file_paths)
+        or file_paths != sorted(set(file_paths))
+    ):
+        return None
+    try:
+        expected_product_paths = set(
+            npc_recovery.verification_runner.product_source_paths_for_inventory(
+                file_paths
+            )
+        )
+    except (TypeError, ValueError, npc_recovery.verification_runner.VerificationError):
+        return None
+    if set(file_paths) != expected_product_paths:
+        return None
+    dirty_paths = {
+        row.get("path")
+        for row in dirty_rows
+        if row.get("path_role") == "CURRENT"
+    }
+    if dirty_paths.intersection(expected_product_paths):
+        return None
+
+    try:
+        continuation._v23_utility._reject_gate_git_environment_overrides()
+        commit = _run_git_bytes(
+            root,
+            ["cat-file", "-e", f"{start_commit}^{{commit}}"],
+            accepted_returncodes=(0,),
+        )
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        return None
+    if commit.returncode != 0:
+        return None
+
+    transitions: dict[str, tuple[str, str]] = {}
+    added: set[str] = set()
+    unchanged: set[str] = set()
+    for row in files:
+        relative = row["path"]
+        try:
+            blob = _run_git_bytes(
+                root,
+                ["cat-file", "blob", f"{start_commit}:{relative}"],
+                accepted_returncodes=(0, 128),
+            )
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+            return None
+        before_sha256 = (
+            continuation.sha256_bytes(blob.stdout)
+            if blob.returncode == 0
+            else None
+        )
+        after_sha256 = row["sha256"]
+        if before_sha256 is None:
+            added.add(relative)
+        elif before_sha256 == after_sha256:
+            unchanged.add(relative)
+        else:
+            transitions[relative] = before_sha256, after_sha256
+    expected_added = {
+        (
+            "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/"
+            "walksafe/admin/security/AdminRecoveryCustodyState.java"
+        ),
+        "backend/alembic/versions/202608120001_admin_recovery_custody.py",
+        "backend/app/services/admin_credential_issuer_key.py",
+        "backend/tests/test_admin_credential_issuer_binding.py",
+        "backend/tests/test_admin_credential_issuer_key.py",
+        "backend/tests/test_admin_runtime_acl_hardening.py",
+        "deploy/config/walksafe-backend-migration.env.example",
+        "deploy/systemd/walksafe-admin-issuer-bind.service",
+        "deploy/sysusers.d/walksafe-backend.conf",
+        "scripts/bind_walksafe_admin_credential_issuer_key.py",
+        "tests/test_bind_walksafe_admin_credential_issuer_key.py",
+    }
+    runtime_acl_migration = (
+        "backend/alembic/versions/202608130001_admin_runtime_acl_hardening.py"
+    )
+    if runtime_acl_migration in expected_product_paths:
+        expected_added.add(runtime_acl_migration)
+    expected_unchanged = {
+        "backend/tests/test_health_readiness.py",
+        "backend/tests/test_report_image_keyring.py",
+    }
+    expected_unchanged.update(
+        path
+        for path in expected_product_paths
+        if path not in NPC_SINGLE_ADMIN_RECOVERY_PRODUCT_PATHS
+        and path != runtime_acl_migration
+    )
+    if (
+        len(transitions) != 55
+        or added != expected_added
+        or unchanged != expected_unchanged
+        or set(transitions) | added | unchanged
+        != expected_product_paths
+    ):
+        return None
+    return transitions
+
+
+def _fp022_completion_start_to_final_transitions(
+    root: Path,
+    checkpoint: dict[str, Any],
+    *,
+    require_completion_review: bool = True,
+) -> dict[str, tuple[str, str]] | None:
+    """Return the exact nine FP022 start-to-completion product changes."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if (
+        not require_completion_review
+        and isinstance(history, list)
+        and len(history) < 69
+    ):
+        return {}
+    if (
+        require_completion_review
+        and not _fp022_completion_suffix_is_declared(checkpoint)
+    ):
+        return {}
+    if (
+        require_completion_review
+        and continuation.validate_fp022_completion_seq70_71(root, checkpoint)
+    ):
+        return None
+    try:
+        from scripts import (
+            build_walksafe_fp022_completion_seq70_71_review_20260814
+            as completion_review,
+        )
+        from scripts import (
+            build_walksafe_fp022_navigation_internal_evidence_20260814
+            as fp022_evidence,
+        )
+
+        if require_completion_review:
+            completion_review.validate_post_review(root)
+        else:
+            completion_review._validate_product_chain(root)
+        implementation = _load_exact_json(
+            root, fp022_evidence.IMPLEMENTATION_REL.as_posix()
+        )
+        manifest = (
+            implementation.get("final_content_manifest")
+            if isinstance(implementation, dict)
+            else None
+        )
+        if not isinstance(manifest, dict):
+            return None
+        fp022_evidence.validate_final_content_manifest(manifest, root=root)
+
+        minimum_history = 71 if require_completion_review else 69
+        if not isinstance(history, list) or len(history) < minimum_history:
+            return None
+        started = history[68]
+        gate_binding = (
+            started.get("implementation_start_gate_binding")
+            if isinstance(started, dict)
+            else None
+        )
+        authority = implementation.get("authority_bindings")
+        start_authority = (
+            authority.get("start_gate")
+            if isinstance(authority, dict)
+            else None
+        )
+        if (
+            not isinstance(gate_binding, dict)
+            or not isinstance(start_authority, dict)
+            or start_authority.get("event_sequence") != 69
+            or start_authority.get("event_id") != started.get("event_id")
+            or start_authority.get("path") != gate_binding.get("path")
+            or start_authority.get("sha256")
+            != gate_binding.get("file_sha256")
+        ):
+            return None
+        receipt_path = _exact_repo_file(root, gate_binding.get("path"))
+        if (
+            receipt_path is None
+            or receipt_path.stat().st_size
+            != start_authority.get("byte_length")
+            or continuation.sha256_file(receipt_path)
+            != gate_binding.get("file_sha256")
+        ):
+            return None
+        receipt = _load_exact_json(root, gate_binding["path"])
+        runs = receipt.get("check_runs") if isinstance(receipt, dict) else None
+        repository_run = runs[-1] if isinstance(runs, list) and runs else None
+        repository_snapshot = (
+            receipt.get("repository_snapshot")
+            if isinstance(receipt, dict)
+            else None
+        )
+        repository_state_path = (
+            repository_run.get("output_path")
+            if isinstance(repository_run, dict)
+            else None
+        )
+        repository_state = _load_exact_json(root, repository_state_path)
+        repository_state_file = _exact_repo_file(root, repository_state_path)
+        dirty = (
+            repository_state.get("dirty_snapshot")
+            if isinstance(repository_state, dict)
+            else None
+        )
+        dirty_rows = dirty.get("paths") if isinstance(dirty, dict) else None
+        repository = (
+            repository_state.get("repository")
+            if isinstance(repository_state, dict)
+            else None
+        )
+        start_commit = (
+            repository.get("head_commit")
+            if isinstance(repository, dict)
+            else None
+        )
+        files = manifest.get("files")
+        if (
+            receipt.get("status") != "PASS"
+            or receipt.get("target_transition_event_id")
+            != started.get("event_id")
+            or started.get("repository_snapshot_before")
+            != repository_snapshot
+            or not isinstance(repository_run, dict)
+            or repository_run.get("check_id") != "REPOSITORY_STATE"
+            or repository_run.get("exit_code") != 0
+            or repository_state_file is None
+            or continuation.sha256_file(repository_state_file)
+            != repository_run.get("output_sha256")
+            or not isinstance(repository_snapshot, dict)
+            or repository_snapshot.get("gate_repository_state_output_sha256")
+            != repository_run.get("output_sha256")
+            or repository_state.get("evidence_type")
+            != "GATE_REPOSITORY_STATE"
+            or repository_state.get("gate_event_id") != started.get("event_id")
+            or start_commit != repository_snapshot.get("head_commit")
+            or start_commit != "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
+            or not isinstance(dirty_rows, list)
+            or any(not isinstance(row, dict) for row in dirty_rows)
+            or not isinstance(files, list)
+            or len(files) != 22
+        ):
+            return None
+        product_paths = [row.get("path") for row in files]
+        if (
+            len(set(product_paths)) != 22
+            or any(not isinstance(path, str) for path in product_paths)
+            or {
+                row.get("path")
+                for row in dirty_rows
+                if row.get("path_role") == "CURRENT"
+            }.intersection(product_paths)
+        ):
+            return None
+        continuation._v23_utility._reject_gate_git_environment_overrides()
+        commit = _run_git_bytes(
+            root,
+            ["cat-file", "-e", f"{start_commit}^{{commit}}"],
+            accepted_returncodes=(0,),
+        )
+        if commit.returncode != 0:
+            return None
+
+        transitions: dict[str, tuple[str, str]] = {}
+        unchanged: set[str] = set()
+        for row in files:
+            relative = row["path"]
+            blob = _run_git_bytes(
+                root,
+                ["cat-file", "blob", f"{start_commit}:{relative}"],
+                accepted_returncodes=(0, 128),
+            )
+            if blob.returncode != 0:
+                return None
+            before_sha256 = continuation.sha256_bytes(blob.stdout)
+            after_sha256 = row.get("sha256")
+            live = _exact_repo_file(root, relative)
+            if (
+                live is None
+                or live.stat().st_size != row.get("byte_length")
+                or continuation.sha256_file(live) != after_sha256
+            ):
+                return None
+            if before_sha256 == after_sha256:
+                unchanged.add(relative)
+            else:
+                transitions[relative] = before_sha256, after_sha256
+        if (
+            len(transitions) != 9
+            or len(unchanged) != 13
+            or set(transitions) | unchanged != set(product_paths)
+        ):
+            return None
+        return transitions
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        subprocess.SubprocessError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+
+def _compose_completion_product_successors(
+    predecessor: dict[str, tuple[str, str]],
+    successor: dict[str, tuple[str, str]],
+) -> dict[str, tuple[str, str]] | None:
+    combined = dict(predecessor)
+    for relative, edge in successor.items():
+        previous = combined.get(relative)
+        if previous is None:
+            combined[relative] = edge
+        elif previous[1] == edge[0]:
+            combined[relative] = previous[0], edge[1]
+        else:
+            return None
+    return combined
+
+
+def _npc_single_admin_recovery_sealed_product_successor_artifacts(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, tuple[str, str]] | None:
+    """Return only completion-bound NPC modified-source transitions."""
+    if not _npc_single_admin_recovery_successor_is_declared(checkpoint):
+        return {}
+    implementation = _npc_single_admin_recovery_completion_package(
+        root,
+        checkpoint,
+    )
+    if implementation is None:
+        return None
+    return _npc_single_admin_recovery_start_to_final_transitions(
+        root,
+        implementation,
+    )
+
+
+def _npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+    root: Path,
+) -> dict[str, tuple[str, str]] | None:
+    """Validate the frozen R002 product successor without granting completion."""
+
+    try:
+        context = npc_r004_review.prepare_frozen_r003_context(root)
+        implementation_raw = context.result_raw.get(
+            npc_recovery.V2_IMPLEMENTATION_REL
+        )
+        if not isinstance(implementation_raw, bytes):
+            return None
+        implementation = npc_recovery.strict_json_bytes(
+            implementation_raw,
+            npc_recovery.V2_IMPLEMENTATION_REL.as_posix(),
+        )
+        if (
+            implementation.get("goal_id")
+            != NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID
+            or implementation.get("evidence_schema") != "V2_CORRECTION_ONLY"
+            or implementation.get("status") != "PASS_INTERNAL"
+            or implementation.get("completion_boundary")
+            != npc_recovery.completion_boundary()
+        ):
+            return None
+        return _npc_single_admin_recovery_start_to_final_transitions(
+            root,
+            implementation,
+        )
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+
+def _npc_single_admin_recovery_live_compatibility_artifacts(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, tuple[str, str]] | None:
+    # Product-byte compatibility is intentionally independent of completion
+    # credit.  Replaying the sealed completion package here would make later
+    # reviewed control successors invalidate the immutable R003 product edge.
+    npc_artifacts = (
+        _npc_single_admin_recovery_precompletion_live_compatibility_artifacts(
+            root
+        )
+    )
+    if npc_artifacts is None:
+        return None
+    fp022_artifacts = _fp022_completion_start_to_final_transitions(
+        root,
+        checkpoint,
+        require_completion_review=False,
+    )
+    if fp022_artifacts is None:
+        return None
+    composed = _compose_completion_product_successors(
+        npc_artifacts, fp022_artifacts
+    )
+    current_security_artifacts = (
+        _current_security_database_compatibility_artifacts(root)
+    )
+    if composed is None or current_security_artifacts is None:
+        return None
+    return _compose_completion_product_successors(
+        composed,
+        current_security_artifacts,
+    )
+
+
+def _current_security_database_compatibility_artifacts(
+    root: Path,
+) -> dict[str, tuple[str, str]] | None:
+    """Bind immutable completion bytes to exact current DB/security successors."""
+
+    try:
+        context = npc_r004_review.prepare_frozen_r003_context(root)
+        implementation_raw = context.result_raw[
+            npc_recovery.V2_IMPLEMENTATION_REL
+        ]
+        implementation = npc_recovery.strict_json_bytes(
+            implementation_raw,
+            npc_recovery.V2_IMPLEMENTATION_REL.as_posix(),
+        )
+        input_closure = implementation.get("execution_input_closure")
+        input_files = (
+            input_closure.get("files")
+            if isinstance(input_closure, dict)
+            else None
+        )
+        if not isinstance(input_files, list):
+            return None
+        predecessor_authority: dict[str, tuple[int, str]] = {}
+        for row in input_files:
+            relative = row.get("path") if isinstance(row, dict) else None
+            if relative not in CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS:
+                continue
+            if relative in predecessor_authority:
+                return None
+            predecessor_authority[relative] = (
+                row.get("byte_count"),
+                row.get("sha256"),
+            )
+        if set(predecessor_authority) != set(
+            CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS
+        ) or any(
+            predecessor_authority[relative]
+            != (
+                amendment["predecessor_byte_length"],
+                amendment["predecessor_sha256"],
+            )
+            for relative, amendment in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+            )
+        ):
+            return None
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+    expected = {
+        "added_sources": [
+            {
+                "path": relative,
+                "reason_code": source["reason_code"],
+                "source": {
+                    "byte_length": source["byte_length"],
+                    "sha256": source["sha256"],
+                },
+            }
+            for relative, source in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES.items()
+            )
+        ],
+        "amendments": [
+            {
+                "path": relative,
+                "reason_code": amendment["reason_code"],
+                "predecessor_source": {
+                    "byte_length": amendment["predecessor_byte_length"],
+                    "sha256": amendment["predecessor_sha256"],
+                },
+                "successor_source": {
+                    "byte_length": amendment["successor_byte_length"],
+                    "sha256": amendment["successor_sha256"],
+                },
+            }
+            for relative, amendment in (
+                CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+            )
+        ],
+        "claim_boundary": {
+            "formal_test_credit_added": 0,
+            "goal_completion_credit_added": 0,
+            "goal_event_created": False,
+            "historical_control_modified": False,
+            "release_credit_added": 0,
+        },
+        "record_id": "WS-CURRENT-SECURITY-DATABASE-COMPATIBILITY-BINDING-20260815-001",
+        "record_status": "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+        "recorded_on": "2026-08-15",
+        "schema_version": "walksafe.current-security-database-compatibility-binding.v1",
+    }
+    record_path = _exact_repo_file(
+        root,
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH,
+    )
+    record = _load_exact_json(
+        root,
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH,
+    )
+    if (
+        record_path is None
+        or record_path.stat().st_size
+        != CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT
+        or continuation.sha256_file(record_path)
+        != CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256
+        or record != expected
+    ):
+        return None
+    for relative, source in (
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES.items()
+    ):
+        live_path = _exact_repo_file(root, relative)
+        if (
+            live_path is None
+            or live_path.stat().st_size != source["byte_length"]
+            or continuation.sha256_file(live_path) != source["sha256"]
+        ):
+            return None
+    artifacts: dict[str, tuple[str, str]] = {}
+    for relative, amendment in (
+        CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS.items()
+    ):
+        live_path = _exact_repo_file(root, relative)
+        if (
+            live_path is None
+            or live_path.stat().st_size != amendment["successor_byte_length"]
+            or continuation.sha256_file(live_path)
+            != amendment["successor_sha256"]
+        ):
+            return None
+        artifacts[relative] = (
+            amendment["predecessor_sha256"],
+            amendment["successor_sha256"],
+        )
+    return artifacts
+
+
+def _npc_single_admin_recovery_live_artifact_successors(
+    root: Path,
+) -> dict[str, tuple[str, str]] | None:
+    """Project exact R002-reviewed artifact bytes without completion credit."""
+
+    try:
+        context = npc_r004_review.prepare_frozen_r003_context(root)
+        current_by_role = {
+            row["role"]: row
+            for row in context.consumer_bindings
+            if isinstance(row, dict)
+            and row.get("role") in FP046_R014_ARTIFACT_BINDING_BY_ROLE
+        }
+        if set(current_by_role) != set(FP046_R014_ARTIFACT_BINDING_BY_ROLE):
+            return None
+        result: dict[str, tuple[str, str]] = {}
+        for role, predecessor in FP046_R014_ARTIFACT_BINDING_BY_ROLE.items():
+            current = current_by_role[role]
+            if current.get("path") != predecessor["path"]:
+                return None
+            result[predecessor["path"]] = (
+                predecessor["sha256"],
+                current["sha256"],
+            )
+        return result
+    except (
+        AttributeError,
+        KeyError,
+        OSError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        npc_recovery.BuildError,
+    ):
+        return None
+
+
+def validate_npc_single_admin_recovery_canonical_completion(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    if not _npc_single_admin_recovery_successor_is_declared(checkpoint):
+        return []
+    if (
+        _npc_single_admin_recovery_sealed_product_successor_artifacts(
+            root,
+            checkpoint,
+        )
+        is None
+    ):
+        return [
+            (
+                "NPC single-admin recovery completion package or source "
+                "successor differs"
+            )
+        ]
+    return []
+
+
 def _fp046_completion_is_present(checkpoint: dict[str, Any]) -> bool:
     state = checkpoint.get("goal_execution")
     if not isinstance(state, dict):
@@ -4525,6 +7866,8 @@ def _validate_fp046_final_source_compatibility_binding(root: Path) -> list[str]:
 def validate_fp046_r014_successor_authority(
     root: Path,
     checkpoint: dict[str, Any],
+    *,
+    successor_artifacts: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[
     list[str],
     dict[str, str],
@@ -4533,6 +7876,18 @@ def validate_fp046_r014_successor_authority(
     """Consume sealed R014 exact6 authority without granting completion credit."""
     if not _fp046_completion_is_present(checkpoint):
         return [], {}, {}
+    if successor_artifacts is None or (
+        not successor_artifacts
+        and not _npc_single_admin_recovery_successor_is_declared(checkpoint)
+    ):
+        successor_artifacts = (
+            _npc_single_admin_recovery_live_compatibility_artifacts(
+                root,
+                checkpoint,
+            )
+        )
+        if successor_artifacts is None:
+            return ["NPC successor authority differs"], {}, {}
     if not _fp046_completion_is_declared(root, checkpoint):
         return ["FP046 R014 successor declaration differs"], {}, {}
     compatibility_errors = _validate_fp046_final_source_compatibility_binding(root)
@@ -4775,6 +8130,17 @@ def validate_fp046_r014_successor_authority(
         relative = row["path"]
         path = _exact_repo_file(root, relative)
         amendment = FP046_FINAL_SOURCE_BINDING_AMENDMENTS.get(relative)
+        final_byte_length = (
+            amendment["current_byte_length"]
+            if amendment is not None
+            else row["byte_length"]
+        )
+        final_sha256 = (
+            amendment["current_sha256"]
+            if amendment is not None
+            else row["sha256"]
+        )
+        successor = successor_artifacts.get(relative)
         actual_size = path.stat().st_size if path is not None else None
         actual_sha256 = (
             continuation.sha256_file(path) if path is not None else None
@@ -4782,28 +8148,28 @@ def validate_fp046_r014_successor_authority(
         if (
             path is None
             or (
-                amendment is None
-                and (
-                    actual_size != row["byte_length"]
-                    or actual_sha256 != row["sha256"]
-                )
-            )
-            or (
                 amendment is not None
                 and (
                     row["byte_length"] != amendment["sealed_byte_length"]
                     or row["sha256"] != amendment["sealed_sha256"]
-                    or actual_size != amendment["current_byte_length"]
-                    or actual_sha256 != amendment["current_sha256"]
+                )
+            )
+            or (
+                successor is None
+                and (
+                    actual_size != final_byte_length
+                    or actual_sha256 != final_sha256
+                )
+            )
+            or (
+                successor is not None
+                and (
+                    successor[0] != final_sha256
+                    or actual_sha256 != successor[1]
                 )
             )
         ):
             return [f"FP046 final source binding differs: {relative}"], {}, {}
-        final_sha256 = (
-            amendment["current_sha256"]
-            if amendment is not None
-            else row["sha256"]
-        )
         final_bindings[relative] = final_sha256
         before = before_by_path.get(relative)
         if before is None:
@@ -4815,14 +8181,26 @@ def validate_fp046_r014_successor_authority(
     if (len(final_bindings), len(transitions), missing, unchanged) != (103, 67, 29, 7):
         return ["FP046 start-to-final source split differs"], {}, {}
 
-    artifact_bindings = {
-        binding["path"]: binding["sha256"]
-        for binding in FP046_R014_ARTIFACT_BINDING_BY_ROLE.values()
-    }
-    for relative, digest in artifact_bindings.items():
+    npc_artifact_successors = (
+        _npc_single_admin_recovery_live_artifact_successors(root)
+    )
+    artifact_bindings: dict[str, str] = {}
+    for binding in FP046_R014_ARTIFACT_BINDING_BY_ROLE.values():
+        relative = binding["path"]
+        digest = binding["sha256"]
         path = _exact_repo_file(root, relative)
-        if path is None or continuation.sha256_file(path) != digest:
+        live_digest = continuation.sha256_file(path) if path is not None else None
+        successor = (
+            npc_artifact_successors.get(relative)
+            if isinstance(npc_artifact_successors, dict)
+            else None
+        )
+        if path is None or not (
+            live_digest == digest
+            or successor == (digest, live_digest)
+        ):
             return [f"FP046 R014 artifact successor differs: {relative}"], {}, {}
+        artifact_bindings[relative] = digest
     return [], artifact_bindings, transitions
 
 
@@ -4990,6 +8368,36 @@ def _fp008_admin_review_completion_is_declared(
     handoff = checkpoint.get("session_handoff")
     metadata = checkpoint.get("metadata")
     repository = checkpoint.get("repository")
+    npc_seq62_r027_candidate = bool(
+        isinstance(history, list)
+        and history
+        and isinstance(history[-1], dict)
+        and history[-1].get("sequence") == 62
+        and history[-1].get("event_id")
+        == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID
+    )
+    expected_rtm_binding = FP008_REQUIREMENTS_TRACEABILITY_CANONICAL_BINDING
+    canonical_inventory_matches = bool(
+        isinstance(canonical_bindings, list)
+        and len(canonical_bindings) == 40
+        and len(canonical_roles) == 40
+        and len(set(canonical_roles)) == 40
+        and continuation.canonical_json_sha256(canonical_bindings)
+        == FP008_ADMIN_REVIEW_CANONICAL_BINDINGS_SHA256
+    )
+    if npc_seq62_r027_candidate:
+        expected_rtm_binding = _binding_by_role(
+            checkpoint,
+            "REQUIREMENTS_TRACEABILITY",
+        )
+        canonical_inventory_matches = bool(
+            isinstance(canonical_bindings, list)
+            and len(canonical_bindings) == 42
+            and len(canonical_roles) == 42
+            and len(set(canonical_roles)) == 42
+            and set(FP008_ADMIN_REVIEW_CHANGED_ROLES).issubset(canonical_roles)
+            and NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_ROLE in canonical_roles
+        )
     if (
         not isinstance(state, dict)
         or not isinstance(statuses, dict)
@@ -4998,16 +8406,10 @@ def _fp008_admin_review_completion_is_declared(
         or not isinstance(completion_roles, dict)
         or completion_binding
         != FP008_ADMIN_REVIEW_COMPLETION_CANONICAL_BINDING
-        or rtm_binding
-        != FP008_REQUIREMENTS_TRACEABILITY_CANONICAL_BINDING
+        or rtm_binding != expected_rtm_binding
         or not isinstance(history, list)
         or len(history) < 50
-        or not isinstance(canonical_bindings, list)
-        or len(canonical_bindings) != 40
-        or len(canonical_roles) != 40
-        or len(set(canonical_roles)) != 40
-        or continuation.canonical_json_sha256(canonical_bindings)
-        != FP008_ADMIN_REVIEW_CANONICAL_BINDINGS_SHA256
+        or not canonical_inventory_matches
         or checkpoint.get("authority_boundary")
         != FP008_ADMIN_REVIEW_AUTHORITY_BOUNDARY
         or checkpoint.get("verification_boundary")
@@ -5258,12 +8660,17 @@ def _fp008_admin_review_completion_is_declared(
         != FP008_ADMIN_REVIEW_UPDATE_OCCURRED_AT
         or receipt.get("completion_boundary")
         != FP008_ADMIN_REVIEW_COMPLETION_BOUNDARY
-        or rtm_bindings != [FP008_REQUIREMENTS_TRACEABILITY_BINDING]
-        or rtm_path is None
-        or continuation.sha256_file(rtm_path)
-        != FP008_REQUIREMENTS_TRACEABILITY_BINDING["sha256"]
-        or rtm_path.stat().st_size
-        != FP008_REQUIREMENTS_TRACEABILITY_BYTE_COUNT
+        or (
+            not npc_seq62_r027_candidate
+            and (
+                rtm_bindings != [FP008_REQUIREMENTS_TRACEABILITY_BINDING]
+                or rtm_path is None
+                or continuation.sha256_file(rtm_path)
+                != FP008_REQUIREMENTS_TRACEABILITY_BINDING["sha256"]
+                or rtm_path.stat().st_size
+                != FP008_REQUIREMENTS_TRACEABILITY_BYTE_COUNT
+            )
+        )
     ):
         return False
 
@@ -5368,6 +8775,19 @@ def _fp008_admin_review_completion_is_declared(
             if isinstance(latest_runtime, dict)
             else None
         )
+        npc_seq62_r027_suffix = bool(
+            isinstance(latest, dict)
+            and latest.get("sequence") == 62
+            and latest.get("event_id")
+            == NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID
+            and _npc_single_admin_recovery_completion_package(
+                root,
+                checkpoint,
+            )
+            is not None
+        )
+        if npc_seq62_r027_candidate and not npc_seq62_r027_suffix:
+            return False
         if (
             any(
                 completion_roles.get(goal_id) != evidence_roles
@@ -5379,8 +8799,11 @@ def _fp008_admin_review_completion_is_declared(
                 for field, expected
                 in FP008_ADMIN_REVIEW_SUFFIX_CURRENT_WORK_SAFE_FIELDS.items()
             )
-            or current_work.get("deferred_release_gate_ids")
-            != FP008_ADMIN_REVIEW_DEFERRED_RELEASE_GATE_IDS
+            or (
+                not npc_seq62_r027_suffix
+                and current_work.get("deferred_release_gate_ids")
+                != FP008_ADMIN_REVIEW_DEFERRED_RELEASE_GATE_IDS
+            )
             or handoff.get("last_verification_status")
             != FP008_ADMIN_REVIEW_HANDOFF_SAFE_FIELDS[
                 "last_verification_status"
@@ -5394,7 +8817,10 @@ def _fp008_admin_review_completion_is_declared(
                 for value in progress_texts
                 for token in FP008_ADMIN_REVIEW_FORBIDDEN_FUTURE_ACTION_TOKENS
             )
-            or current_work.get("status") not in {"READY", "IN_PROGRESS"}
+            or (
+                current_work.get("status") not in {"READY", "IN_PROGRESS"}
+                and not npc_seq62_r027_suffix
+            )
             or not isinstance(latest_runtime, dict)
             or any(
                 field not in latest_runtime
@@ -6393,8 +9819,13 @@ def _fp013_start_head_path_sha256(
         commit_check = _run_git_bytes(
             root,
             ["cat-file", "-e", f"{head_commit}^{{commit}}"],
-            accepted_returncodes=(0,),
+            accepted_returncodes=(0, 128),
         )
+        if commit_check.returncode == 128:
+            if head_commit != HISTORICAL_GIT_WITNESS_COMMIT:
+                return None
+            witness_errors, witness = validate_historical_git_witness(root)
+            return None if witness_errors else witness.get(relative)
         if commit_check.returncode != 0:
             return None
         tree = _run_git_bytes(
@@ -9749,6 +13180,35 @@ def _fp047_gate_remediation_after_sha256(
     return FP047_GATE_REMEDIATION_POST_SHA256
 
 
+def _sealed_start_gate_runtime_successor(
+    root: Path,
+    relative: str,
+    sealed_sha256: str,
+) -> tuple[str, str] | None:
+    """Consume the exact continuation-approved runtime binding amendment."""
+    transitions = {
+        (
+            amendment.get(relative, {}).get("sealed_sha256"),
+            amendment.get(relative, {}).get("current_sha256"),
+        )
+        for amendment in continuation.START_GATE_RUNTIME_BINDING_AMENDMENTS.values()
+        if relative in amendment
+    }
+    if len(transitions) != 1:
+        return None
+    predecessor, successor = next(iter(transitions))
+    path = _exact_repo_file(root, relative)
+    if (
+        predecessor != sealed_sha256
+        or not isinstance(successor, str)
+        or continuation.SHA256_RE.fullmatch(successor) is None
+        or path is None
+        or continuation.sha256_file(path) != successor
+    ):
+        return None
+    return predecessor, successor
+
+
 def _fp016_successor_product_artifacts(
     root: Path,
     checkpoint: dict[str, Any],
@@ -9944,6 +13404,19 @@ def _fp016_successor_product_artifacts(
         canonical_successor = successor
         if (
             successor is None
+            and isinstance(relative, str)
+            and isinstance(after_sha256, str)
+        ):
+            runtime_successor = _sealed_start_gate_runtime_successor(
+                root,
+                relative,
+                after_sha256,
+            )
+            if runtime_successor is not None:
+                successor = runtime_successor
+                canonical_successor = runtime_successor
+        if (
+            successor is None
             and relative == FP047_GATE_REMEDIATION_RUNNER_PATH
         ):
             remediated_after_sha256 = (
@@ -10015,6 +13488,7 @@ def _fp014_successor_product_artifacts(
     checkpoint: dict[str, Any],
     *,
     require_live_successors: bool = True,
+    successor_artifacts: dict[str, tuple[str, str]] | None = None,
 ) -> dict[str, tuple[str, str]] | None:
     state = checkpoint.get("goal_execution")
     fp046_required = _fp046_completion_is_present(checkpoint)
@@ -10022,7 +13496,11 @@ def _fp014_successor_product_artifacts(
     fp046_artifacts: dict[str, tuple[str, str]] = {}
     if fp046_required:
         fp046_errors, _, fp046_artifacts = (
-            validate_fp046_r014_successor_authority(root, checkpoint)
+            validate_fp046_r014_successor_authority(
+                root,
+                checkpoint,
+                successor_artifacts=successor_artifacts,
+            )
         )
     if fp046_required and fp046_errors:
         return None
@@ -10031,7 +13509,11 @@ def _fp014_successor_product_artifacts(
         _fp012_successor_product_artifacts(
             root,
             checkpoint,
-            successor_artifacts=fp046_artifacts,
+            successor_artifacts=(
+                fp046_artifacts
+                if fp046_required
+                else (successor_artifacts or {})
+            ),
         )
         if fp012_required
         else {}
@@ -10044,7 +13526,11 @@ def _fp014_successor_product_artifacts(
             root,
             checkpoint,
             successor_artifacts={
-                **fp046_artifacts,
+                **(
+                    fp046_artifacts
+                    if fp046_required
+                    else (successor_artifacts or {})
+                ),
                 **(
                     fp012_artifacts
                     if isinstance(fp012_artifacts, dict)
@@ -10437,10 +13923,25 @@ def _successor_lineage_reaches_live(
     fp047_artifacts: dict[str, tuple[str, str]],
     fp048_artifacts: dict[str, tuple[str, str]],
     fp046_artifacts: dict[str, tuple[str, str]] | None = None,
+    npc_recovery_artifacts: dict[str, tuple[str, str]] | None = None,
     resource_pilot_current_bindings: (
         dict[str, tuple[str, str]] | None
     ) = None,
 ) -> bool:
+    npc_recovery_required = _npc_single_admin_recovery_successor_is_declared(
+        checkpoint
+    )
+    if npc_recovery_artifacts is None:
+        npc_recovery_artifacts = (
+            _npc_single_admin_recovery_live_compatibility_artifacts(
+                root,
+                checkpoint,
+            )
+        )
+        if npc_recovery_artifacts is None:
+            if npc_recovery_required:
+                return False
+            npc_recovery_artifacts = {}
     relative = historical_artifact[0]
     lineage_head = _historical_artifact_lineage_head(
         root,
@@ -10455,6 +13956,7 @@ def _successor_lineage_reaches_live(
     fp047 = fp047_artifacts.get(relative)
     fp048 = fp048_artifacts.get(relative)
     fp046 = (fp046_artifacts or {}).get(relative)
+    npc_successor = npc_recovery_artifacts.get(relative)
     fp011 = fp011_transitions.get(relative)
     if fp013 is None and fp015 is None and fp014 is None:
         if fp011 is None:
@@ -10475,19 +13977,76 @@ def _successor_lineage_reaches_live(
         if fp014[0] != lineage_head:
             return False
         lineage_head = fp014[1]
-    if fp047 is not None:
-        if lineage_head == fp047[0]:
-            lineage_head = fp047[1]
-    if fp048 is not None:
-        if lineage_head == fp048[0]:
-            lineage_head = fp048[1]
-    if fp046 is not None:
-        if lineage_head == fp046[0]:
-            lineage_head = fp046[1]
     live_path = _exact_repo_file(root, relative)
     if live_path is None:
         return False
     live_sha256 = continuation.sha256_file(live_path)
+    later_edges = [
+        edge for edge in (fp047, fp048, fp046) if edge is not None
+    ]
+    converged_edges = [*later_edges]
+    if npc_successor is not None:
+        converged_edges.append(npc_successor)
+    if lineage_head == live_sha256 and converged_edges:
+        if (
+            any(
+                previous[1] != following[0]
+                for previous, following in zip(
+                    converged_edges,
+                    converged_edges[1:],
+                    strict=False,
+                )
+            )
+            or converged_edges[-1][1] != live_sha256
+        ):
+            return False
+        vertices = [
+            converged_edges[0][0],
+            *(edge[1] for edge in converged_edges),
+        ]
+        return len(vertices) == len(set(vertices))
+    if (
+        fp047 is not None
+        and fp048 is None
+        and fp046 is not None
+        and fp047[1] != fp046[0]
+    ):
+        snapshot_overlay = _fp047_start_snapshot_successor(
+            root,
+            checkpoint,
+            relative,
+            fp047[0],
+        )
+        if (
+            lineage_head != fp047[0]
+            or snapshot_overlay != (fp047[0], fp046[1])
+        ):
+            return False
+        # FP047's exact start snapshot is the pre-existing authority for
+        # changes made between its sealed result and FP046's sealed start.
+        # Accept that bridge only when it terminates at FP046's exact final
+        # digest; arbitrary or disconnected declared edges still fail closed.
+        later_edges = [snapshot_overlay]
+    if later_edges:
+        if any(
+            previous[1] != following[0]
+            for previous, following in zip(
+                later_edges,
+                later_edges[1:],
+                strict=False,
+            )
+        ):
+            return False
+        later_vertices = [later_edges[0][0], *(edge[1] for edge in later_edges)]
+        if len(later_vertices) != len(set(later_vertices)):
+            return False
+        if lineage_head not in later_vertices:
+            return False
+        lineage_head = later_vertices[-1]
+    if npc_successor is not None:
+        if npc_successor[0] != lineage_head:
+            return False
+        lineage_head = npc_successor[1]
     if live_sha256 == lineage_head:
         return True
     # Preserve the pre-existing exact FP047 start-snapshot overlay for paths
@@ -10560,8 +14119,22 @@ def fp011_successor_artifact_reaches_live(
         checkpoint,
         archive,
     )
+    npc_recovery_artifacts = (
+        _npc_single_admin_recovery_live_compatibility_artifacts(
+            root,
+            checkpoint,
+        )
+    )
+    if npc_recovery_artifacts is None:
+        if _npc_single_admin_recovery_successor_is_declared(checkpoint):
+            return False
+        npc_recovery_artifacts = {}
     fp046_errors, _, fp046_artifacts = (
-        validate_fp046_r014_successor_authority(root, checkpoint)
+        validate_fp046_r014_successor_authority(
+            root,
+            checkpoint,
+            successor_artifacts=npc_recovery_artifacts,
+        )
     )
     if fp046_errors:
         return False
@@ -10571,6 +14144,7 @@ def fp011_successor_artifact_reaches_live(
             root,
             checkpoint,
             require_live_successors=not bool(fp046_artifacts),
+            successor_artifacts=npc_recovery_artifacts,
         )
         if fp014_required
         else {}
@@ -10659,6 +14233,7 @@ def fp011_successor_artifact_reaches_live(
             else {}
         ),
         fp046_artifacts=fp046_artifacts,
+        npc_recovery_artifacts=npc_recovery_artifacts,
         resource_pilot_current_bindings=resource_pilot_current_bindings,
     )
 
@@ -10722,10 +14297,30 @@ def filter_frozen_v23_successor_errors(
     )
     fp046_errors: list[str] = []
     fp046_artifacts: dict[str, tuple[str, str]] = {}
-    if fp046_required:
-        fp046_errors, _, fp046_artifacts = (
-            validate_fp046_r014_successor_authority(root, checkpoint)
+    npc_recovery_required = bool(
+        dynamic_errors
+        and isinstance(checkpoint, dict)
+        and _npc_single_admin_recovery_successor_is_declared(checkpoint)
+    )
+    npc_recovery_artifacts = (
+        _npc_single_admin_recovery_live_compatibility_artifacts(
+            root,
+            checkpoint,
         )
+        if dynamic_errors and isinstance(checkpoint, dict)
+        else {}
+    )
+    if fp046_required:
+        if npc_recovery_artifacts is None:
+            fp046_errors = ["NPC successor authority differs"]
+        else:
+            fp046_errors, _, fp046_artifacts = (
+                validate_fp046_r014_successor_authority(
+                    root,
+                    checkpoint,
+                    successor_artifacts=npc_recovery_artifacts,
+                )
+            )
     fp011_live_artifacts = (
         _fp011_successor_product_artifacts(root, checkpoint, archive)
         if (
@@ -10745,6 +14340,11 @@ def filter_frozen_v23_successor_errors(
             root,
             checkpoint,
             require_live_successors=not bool(fp046_artifacts),
+            successor_artifacts=(
+                npc_recovery_artifacts
+                if isinstance(npc_recovery_artifacts, dict)
+                else None
+            ),
         )
         if fp014_required
         else {}
@@ -10883,6 +14483,11 @@ def filter_frozen_v23_successor_errors(
                     else {}
                 ),
                 fp046_artifacts=fp046_artifacts,
+                npc_recovery_artifacts=(
+                    npc_recovery_artifacts
+                    if isinstance(npc_recovery_artifacts, dict)
+                    else {}
+                ),
                 resource_pilot_current_bindings=(
                     resource_pilot_current_bindings
                 ),
@@ -10892,6 +14497,7 @@ def filter_frozen_v23_successor_errors(
             or (fp047_required and fp047_artifacts is None)
             or (fp048_required and fp048_artifacts is None)
             or (fp046_required and bool(fp046_errors))
+            or (npc_recovery_required and npc_recovery_artifacts is None)
         ):
             remaining.append(error)
     return remaining
@@ -11252,11 +14858,20 @@ def validate_imported_goal_projection(
             continue
         path_value = source.get("path")
         path = continuation.resolve_repo_file(root, path_value)
-        expected_sha = (
-            continuation.sha256_file(path) if path is not None else None
-        )
+        expected_sha = source.get("sha256")
+        if (
+            not isinstance(expected_sha, str)
+            or continuation.SHA256_RE.fullmatch(expected_sha) is None
+        ):
+            errors.append(f"{goal_id}: predecessor Goal archive SHA-256 differs")
+            expected_sha = None
         if path is None:
             errors.append(f"{goal_id}: predecessor Goal path is missing")
+        elif (
+            expected_sha is not None
+            and continuation.sha256_file(path) != expected_sha
+        ):
+            errors.append(f"{goal_id}: predecessor Goal SHA-256 differs")
         expected_base = {
             "goal_id": goal_id,
             "path": path_value,
@@ -11789,6 +15404,117 @@ def validate_v24_artifact_work_queue(
     return errors
 
 
+def validate_fp022_completion_seq70_71(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate the FP-022 completion evidence semantics behind exact seq70/71."""
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 70:
+        return []
+    errors = continuation.validate_fp022_completion_seq70_71(root, checkpoint)
+    if len(history) < 71 or not isinstance(history[69], dict):
+        return errors
+    update = history[69]
+    try:
+        from scripts import (  # noqa: E402
+            build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+        )
+
+        expected_review = review.transition_review_binding(root)
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        errors.append(f"FP022 completion transition review cannot be replayed: {exc}")
+    else:
+        if update.get("transition_control_review_binding") != expected_review:
+            errors.append("FP022 completion transition review replay differs")
+    documents: dict[str, dict[str, Any]] = {}
+    for label, relative in (
+        ("completion", continuation.FP022_COMPLETION_PATH),
+        ("R028 Gap", continuation.FP022_R028_GAP_PATH),
+        ("R028 backlog", continuation.FP022_R028_BACKLOG_PATH),
+    ):
+        path = continuation.resolve_repo_file(root, relative)
+        if path is None:
+            errors.append(f"FP022 completion {label} document is missing")
+            continue
+        try:
+            documents[label] = continuation.load_json(path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"FP022 completion {label} cannot be loaded: {exc}")
+    receipt = documents.get("completion")
+    if isinstance(receipt, dict):
+        expected_boundary = {
+            "formal_test_ids": [
+                "TC-FP-022-01",
+                "TC-FP-022-02",
+                "TC-FP-022-03",
+                "TC-FP-022-04",
+            ],
+            "formal_test_status": "NOT_RUN",
+            "actual_device_status": "NOT_RUN",
+            "field_gps_status": "NOT_RUN",
+            "external_tmap_status": "NOT_RUN",
+            "external_review_status": "NOT_RUN",
+            "production_deployment_status": "NOT_RUN",
+            "release_status": "NOT_ELIGIBLE",
+            "formal_test_credit_delta": 0,
+            "device_credit_delta": 0,
+            "external_credit_delta": 0,
+            "deployment_credit_delta": 0,
+            "release_credit_delta": 0,
+            "external_independence_claimed": False,
+        }
+        for label, actual, expected in (
+            ("schema", receipt.get("schema_version"), "walksafe.fp022-work-item-completion-receipt.v1"),
+            ("document ID", receipt.get("document_id"), continuation.FP022_COMPLETION_DOCUMENT_ID),
+            ("kind", receipt.get("kind"), "WORK_ITEM_COMPLETION_RECEIPT"),
+            ("status", receipt.get("status"), "ACCEPTED"),
+            ("result", receipt.get("result"), "PASS"),
+            ("target Goal", receipt.get("goal_id"), continuation.FP022_GOAL_ID),
+            ("policy", receipt.get("source_policy_ids"), ["FP-022"]),
+            ("Gap", receipt.get("gap_ids"), ["GAP-031"]),
+            ("completion level", receipt.get("target_completion_level"), "INTERNAL_POLICY_CONFORMANCE_REASSESSED"),
+            (
+                "start event",
+                receipt.get("execution_session_event"),
+                {
+                    "sequence": 69,
+                    "event_id": continuation.FP022_STARTED_EVENT_ID,
+                    "event_type": "GOAL_STARTED",
+                    "event_sha256": continuation.event_sha256(history[68]),
+                },
+            ),
+            ("zero-credit boundary", receipt.get("completion_boundary"), expected_boundary),
+        ):
+            if actual != expected:
+                errors.append(f"FP022 completion receipt {label} differs")
+    gap = documents.get("R028 Gap")
+    if isinstance(gap, dict):
+        assessments = gap.get("assessments")
+        rows = [
+            row for row in assessments
+            if isinstance(row, dict)
+            and row.get("source_policy_id") == "FP-022"
+            and row.get("gap_id") == "GAP-031"
+        ] if isinstance(assessments, list) else []
+        if len(rows) != 1 or rows[0].get("status") != "PARTIAL":
+            errors.append("FP022 completion R028 GAP-031 reassessment differs")
+    backlog = documents.get("R028 backlog")
+    if isinstance(backlog, dict):
+        action = backlog.get("next_single_action")
+        if (
+            not isinstance(action, dict)
+            or action.get("epic_id") != "EPIC-04"
+            or action.get("source_policy_id") != "FP-023"
+            or action.get("gap_id") != "GAP-032"
+            or action.get("priority_rank") != 25
+            or action.get("status") != "PLANNED_NEXT"
+        ):
+            errors.append("FP022 completion R028 FP023/GAP-032 pointer differs")
+    return errors
+
+
 def validate(
     root: Path = ROOT,
     checkpoint_path: Path = V24_CHECKPOINT_RELATIVE,
@@ -11826,10 +15552,16 @@ def validate(
         checkpoint = continuation.load_json(checkpoint_file)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return errors + [f"v2.4 input cannot be loaded: {exc}"]
+    errors.extend(validate_fp022_completion_seq70_71(root, checkpoint))
     preimage_errors, canonical_preimages = (
         validate_canonical_preimage_archive(root)
     )
     errors.extend(preimage_errors)
+    witness_errors, _ = validate_historical_git_witness(
+        root,
+        archive if isinstance(archive, dict) else None,
+    )
+    errors.extend(witness_errors)
     android_successor_errors, _ = (
         validate_phase1_android_report_successor_binding(
             root,
@@ -11853,6 +15585,12 @@ def validate(
     )
     errors.extend(validate_fp014_canonical_completion(root, checkpoint))
     errors.extend(validate_fp047_canonical_completion(root, checkpoint))
+    errors.extend(
+        validate_npc_single_admin_recovery_canonical_completion(
+            root,
+            checkpoint,
+        )
+    )
     if archive:
         errors.extend(
             validate_manifest_successor_boundary(

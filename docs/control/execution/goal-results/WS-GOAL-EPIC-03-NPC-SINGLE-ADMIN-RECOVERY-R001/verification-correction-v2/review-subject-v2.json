@@ -1,0 +1,122 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-REVIEW-SUBJECT-CORRECTION-20260813-002",
+  "evidence_schema": "V2_CORRECTION_ONLY",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "kind": "INTERNAL_REVIEW_SUBJECT",
+  "observed_at": "2026-08-13T12:58:36+09:00",
+  "review_subject_content_sha256": "73c1abe4044d66fc0a7fd057af28a888456602f7f2f22c52f6747f768723f8d6",
+  "reviewed_consumer_bindings": [
+    {
+      "byte_length": 527521,
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.json",
+      "role": "GAP_R027",
+      "sha256": "ec04719873e80d7769e49c6b959fa3d712907272c3c968640147e26081b4c04f"
+    },
+    {
+      "byte_length": 65457,
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.json",
+      "role": "BACKLOG_R027",
+      "sha256": "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45"
+    },
+    {
+      "byte_length": 146421,
+      "document_id": "ART-DOC-05-001",
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "role": "ARTIFACT_CHANGE_LOG",
+      "sha256": "4ba96ca95cf3c299d16d8fe14e2c30bf1efa13e363e4badbfb38d8ca3de235af"
+    },
+    {
+      "byte_length": 3845074,
+      "document_id": "ART-DOC-01-001",
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "role": "ARTIFACT_REGISTER",
+      "sha256": "401e580e6931ac55f33f610b525e4652281b8bba8cd127ce2cf78c48dc6ed350"
+    },
+    {
+      "byte_length": 2062744,
+      "document_id": "WS-REQ-RTM-DRAFT-20260721-R001",
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "role": "REQUIREMENTS_TRACEABILITY",
+      "sha256": "cdc550e44f127164d85342628d9775fb0085f2e4dcd4f6039c33b87fcffadda9"
+    },
+    {
+      "byte_length": 592974,
+      "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "role": "DESIGN_TRACEABILITY",
+      "sha256": "f203b1c4dbb4d9b46cf0db06232b20971f7dcba9a99e344f654e8ee92bab0e58"
+    },
+    {
+      "byte_length": 392564,
+      "document_id": "DEV-01",
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "role": "IMPLEMENTATION_MANIFEST",
+      "sha256": "72b15f0edb89b74893ccebd247f6b92f7d1e7ad6298755cbdeb59e7e2c1d869b"
+    },
+    {
+      "byte_length": 195745,
+      "document_id": "DEV-18",
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "role": "MODULE_REGISTER",
+      "sha256": "4943fa953dd93c0258a5ade054aedcccf9123fc3b2669cad24d3cdb36362df7c"
+    },
+    {
+      "byte_length": 2744955,
+      "document_id": "WS-PHASE1-EXACT257-SUCCESSOR-LEDGER-20260813-R016",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-ledger-r016.json",
+      "role": "EXACT257_R016_LEDGER",
+      "sha256": "94b5f3322f03a6475fbc2023081f41debdcbb1854d64cc659f5308d10ce04c0e"
+    },
+    {
+      "byte_length": 7871,
+      "document_id": "WS-PHASE1-EXACT257-SUCCESSOR-EVIDENCE-20260813-R016",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/evidence.json",
+      "role": "EXACT257_R016_EVIDENCE",
+      "sha256": "27d256d47243af80ea9beee270ac2de61499e24fb1a345e57d4c24cdd39ee954"
+    },
+    {
+      "byte_length": 9306,
+      "document_id": "WS-PHASE1-EXACT257-SUCCESSOR-CHECK-RECEIPT-20260813-R016",
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-check-receipt-r016.json",
+      "role": "EXACT257_R016_CHECK_RECEIPT",
+      "sha256": "ad6e47d654d5f78761d462edbe787f5a5f670f14a29db35803740967c6c4c052"
+    },
+    {
+      "byte_length": 11802,
+      "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-REVIEW-REJECTED-20260813-001",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R001/review-result.json",
+      "role": "REJECTED_REVIEW_R001",
+      "sha256": "562d4a0bbf30c5c93bd5291fe046acd911d801f5798055a1e310da120e508a36"
+    }
+  ],
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "eae0f5cd70574bb22551239bdb958370f1167524a3e823bceabd0a80d8b44fe5",
+    "SUCCESSOR_TRACE": "b3c89fb747b746e5a22994718f31b1b08eb130d53b3d919965143257caafe485",
+    "VERIFICATION_RESULT": "3ff147da580c7702d885d8508995e4aa1a4b77b913a900af30acf0706d4907f7"
+  },
+  "reviewer_must_be_independent_of_executor": true,
+  "schema_version": "1.0",
+  "status": "READY_FOR_SEPARATE_INTERNAL_REVIEW"
+}

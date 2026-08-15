@@ -1,0 +1,117 @@
+{
+  "added_sources": [
+    {
+      "path": "backend/alembic/versions/202608150001_admin_recovery_expiry_candidate.py",
+      "reason_code": "FORWARD_RECOVERY_EXPIRY_MIGRATION",
+      "source": {
+        "byte_length": 14917,
+        "sha256": "45f335f0309fe45af107a1b4814efdcf3b3460c52400016954e7b05f804a593a"
+      }
+    },
+    {
+      "path": "backend/alembic/versions/202608150002_admin_recovery_expired_proof.py",
+      "reason_code": "FORWARD_RECOVERY_EXPIRED_PROOF_MIGRATION",
+      "source": {
+        "byte_length": 31645,
+        "sha256": "e90f1cf797b6e07efff4828818b15410e8ec0b1597435faafef02442144fc590"
+      }
+    }
+  ],
+  "amendments": [
+    {
+      "path": "backend/app/api/health.py",
+      "reason_code": "FORWARD_MIGRATION_HEAD_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 19538,
+        "sha256": "625a70a9010180c3f8818a9daffa62671c75c8048f970ed0b759a1e8680a8851"
+      },
+      "successor_source": {
+        "byte_length": 19738,
+        "sha256": "5d4f29aae15af069dff62a466b4dbebc88a886f3322ee5de5aa0529639be3401"
+      }
+    },
+    {
+      "path": "backend/tests/test_admin_runtime_acl_hardening.py",
+      "reason_code": "RECOVERY_EXPIRY_CANDIDATE_REGRESSION_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 35848,
+        "sha256": "3aaf3a09e6c2f02d26fc40ebdf214685983e8962f0d3ba46e50115820cabc59d"
+      },
+      "successor_source": {
+        "byte_length": 51596,
+        "sha256": "4ba8105bb51838bcc148e669adb87fce9abdef5064430e5ea31e567397427977"
+      }
+    },
+    {
+      "path": "backend/tests/test_admin_security.py",
+      "reason_code": "FORWARD_MIGRATION_CONTRACT_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 183858,
+        "sha256": "4c228482e1cceab2a35693748c401d1009baf90c08fd283028995fc362e2e7a3"
+      },
+      "successor_source": {
+        "byte_length": 189546,
+        "sha256": "97c08b17800d76c720a0fa615fee9025e2ad57c5278e01b2d04c901dc49f9acd"
+      }
+    },
+    {
+      "path": "backend/tests/test_fp046_postgres_integration.py",
+      "reason_code": "CURRENT_SCHEMA_AND_ACL_EXPECTATION_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 89130,
+        "sha256": "d3a05d37810a3b19dd67c71e4810ffb97ee8b23a579b3125df3cdea76449163d"
+      },
+      "successor_source": {
+        "byte_length": 89608,
+        "sha256": "fba65428ac42eb506b6952f18319fd7b33e00695cd26b7278c2edda9699061e2"
+      }
+    },
+    {
+      "path": "backend/app/services/admin_device_proof.py",
+      "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 40950,
+        "sha256": "6c38ce0ab205799511820d529ab7e7b4bb14b4f2034b4443d6ddad09667ddbda"
+      },
+      "successor_source": {
+        "byte_length": 41147,
+        "sha256": "46126623c650f4eab00062df02c119aa4bf7ed60c77d7e1afa71a94e613cb99a"
+      }
+    },
+    {
+      "path": "backend/tests/test_admin_device_proof.py",
+      "reason_code": "EXPIRED_RECOVERY_PROOF_ROUTE_REGRESSION_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 73481,
+        "sha256": "8c133048daaeede58b62d869502a5c5a9364a7da47c19c64e9266384984a2a61"
+      },
+      "successor_source": {
+        "byte_length": 87799,
+        "sha256": "0276194d37cefa955cca09933ec2fe7f236f6d67c5199711228adc06d6d499cb"
+      }
+    },
+    {
+      "path": "backend/tests/test_admin_credential_issuer_binding.py",
+      "reason_code": "EXPIRED_RECOVERY_STARTUP_READINESS_REGRESSION_SUCCESSOR",
+      "predecessor_source": {
+        "byte_length": 14728,
+        "sha256": "a137ca62f6698ee5efed83942bdc724c5da5df7606c15b58531e3f65876993d0"
+      },
+      "successor_source": {
+        "byte_length": 14953,
+        "sha256": "a6c60a4b32b83bbd49a1a711c12526e24a93ef2687bd883b8b080c47748ae602"
+      }
+    }
+  ],
+  "claim_boundary": {
+    "formal_test_credit_added": 0,
+    "goal_completion_credit_added": 0,
+    "goal_event_created": false,
+    "historical_control_modified": false,
+    "release_credit_added": 0
+  },
+  "record_id": "WS-CURRENT-SECURITY-DATABASE-COMPATIBILITY-BINDING-20260815-001",
+  "record_status": "NOT_GOAL_EVENT_NO_COMPLETION_CREDIT",
+  "recorded_on": "2026-08-15",
+  "schema_version": "walksafe.current-security-database-compatibility-binding.v1"
+}

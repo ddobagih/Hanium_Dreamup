@@ -29,6 +29,12 @@ _DEVICE_PROOF_PUBLIC_PURPOSES = {
     ("post", "/admin/security/recovery/complete"): "RECOVERY_COMPLETE",
 }
 _DEVICE_PROOF_WORKFLOW_PATHS = {
+    "/admin/security/recovery-custody/attest": {
+        "post": ("recovery.custody.attest", None),
+    },
+    "/admin/security/devices/{device_id}/report-lost": {
+        "post": ("device.report_lost", None),
+    },
     "/reports/{report_id}/review-decisions": {
         "post": ("report.review.decide", None),
         "get": (None, "report.review_decisions"),
@@ -296,6 +302,29 @@ def install_walksafe_openapi_contract(app: FastAPI, settings: Any) -> None:
             for method, operation in path_item.items():
                 if method not in _HTTP_METHODS:
                     continue
+                if (
+                    admin_security_enabled
+                    and admin_device_proof_enabled
+                    and method == "post"
+                    and path == ADMIN_DEVICE_PROOF_CHALLENGE_PATH
+                ):
+                    operation.setdefault("responses", {})["410"] = {
+                        "description": (
+                            "The recovery transaction for a RECOVERY_COMPLETE "
+                            "device-proof challenge expired."
+                        ),
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": (
+                                        "#/components/schemas/"
+                                        "AdminRecoveryExpiredErrorResponse"
+                                    )
+                                }
+                            }
+                        },
+                        "x-walksafe-when-purpose": "RECOVERY_COMPLETE",
+                    }
                 access = required_field_test_access(path, method)
                 if access is None:
                     is_public_admin_auth = (

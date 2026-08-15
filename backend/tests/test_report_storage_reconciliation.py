@@ -357,6 +357,11 @@ def test_backend_lifespan_runs_storage_reconciliation_before_serving(monkeypatch
         calls += 1
 
     monkeypatch.setattr(main_app, "reconcile_report_storage", reconcile)
+    monkeypatch.setattr(
+        main_app,
+        "validate_admin_credential_issuer_binding",
+        lambda: None,
+    )
     monkeypatch.setattr(main_app, "bind_privacy_hmac_key", lambda: None)
     monkeypatch.setattr(main_app, "inference_runner", None)
 

@@ -60,6 +60,7 @@ def create_router(settings: Settings, key_manager: ReportImageKeyManager) -> API
                     raw_access_token=(x_walksafe_original_access_grant or "").strip(),
                     identity=identity,
                     key_manager=key_manager,
+                    runtime_totp_secret=settings.admin_totp_secret,
                 )
             )
         except ReportOriginalAccessError as exc:

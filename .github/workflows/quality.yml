@@ -47,6 +47,21 @@ jobs:
           git fetch --no-tags --no-write-fetch-head --depth=1 \
             origin "${FP046_SUCCESSOR_SOURCE_COMMIT:?}"
           test "$(git cat-file -t "${FP046_SUCCESSOR_SOURCE_COMMIT:?}")" = commit
+      - name: Fetch NPC start-control ancestry
+        shell: bash
+        env:
+          NPC_REANCHOR_BASE_COMMIT: "f0093863e82bfc80d9f11915cef33a51d44b8730"
+          NPC_REANCHOR_HEAD_COMMIT: "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
+        run: |
+          set -euo pipefail
+          test "${NPC_REANCHOR_BASE_COMMIT:?}" = "f0093863e82bfc80d9f11915cef33a51d44b8730"
+          test "${NPC_REANCHOR_HEAD_COMMIT:?}" = "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"
+          git fetch --no-tags --no-write-fetch-head --depth=8 \
+            origin "${NPC_REANCHOR_HEAD_COMMIT:?}"
+          test "$(git cat-file -t "${NPC_REANCHOR_BASE_COMMIT:?}")" = commit
+          test "$(git cat-file -t "${NPC_REANCHOR_HEAD_COMMIT:?}")" = commit
+          git merge-base --is-ancestor \
+            "${NPC_REANCHOR_BASE_COMMIT:?}" "${NPC_REANCHOR_HEAD_COMMIT:?}"
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         id: general_base_python
         with:
@@ -195,7 +210,7 @@ jobs:
           PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" scripts/generate_walksafe_openapi.py --check
       - name: Verify current continuation boundary
         run: |
-          "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B scripts/check_walksafe_project_continuation_v2_4.py
+          PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B scripts/check_walksafe_project_continuation_v2_4.py
       - name: Run current checkpoint control tests
         run: |
           PYTHON_BIN="${WALKSAFE_GENERAL_PYTHON_BIN:?}" scripts/run_walksafe_test_layers_current.sh active-session-control

@@ -1880,6 +1880,31 @@ def atomic_write(
             )
             if commit_guard is not None:
                 commit_guard()
+            final_published = os.stat(
+                path.name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            final_displaced = os.stat(
+                temporary_name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            _require(
+                _canonical_parent_matches(path.parent, parent_identity)
+                and _stable_file_identity(final_published) == staged_identity
+                and _stable_file_identity(final_displaced)
+                == source_stable_identity
+                and _read_entry_exact(parent_fd, path.name, len(content))
+                == content
+                and _read_entry_exact(
+                    parent_fd,
+                    temporary_name,
+                    len(expected_source),
+                )
+                == expected_source,
+                "checkpoint or publication parent changed after final commit guard",
+            )
             os.unlink(temporary_name, dir_fd=parent_fd)
             temporary_name = None
             exchanged = False
@@ -1895,14 +1920,13 @@ def atomic_write(
                     exchanged = False
                 except BaseException as rollback_error:
                     preserve_temporary = True
-                    try:
-                        primary.add_note(
-                            "checkpoint CAS rollback also failed: "
-                            f"{type(rollback_error).__name__}: {rollback_error}; "
-                            f"retained recovery entry: {temporary_name}"
-                        )
-                    except BaseException:
-                        pass
+                    raise CompletionPostCommitError(
+                        "checkpoint publication validation failed and CAS rollback "
+                        "also failed; state is uncertain; retained recovery entry: "
+                        f"{temporary_name}; validation error: "
+                        f"{type(primary).__name__}: {primary}; rollback error: "
+                        f"{type(rollback_error).__name__}: {rollback_error}"
+                    ) from rollback_error
             raise
         try:
             directory_sync_attempted = True

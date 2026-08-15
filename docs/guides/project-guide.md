@@ -28,7 +28,7 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 | 과거 재개 절차 감사 자료 | [hash로 봉인된 재개 안내서](../control/walksafe-project-resumption-runbook.md). 상태·focus·활성화·gate 명령을 현행으로 실행하지 않음 |
 | 산출물별 현재 상태 | [산출물 current notice](../deliverables/00-control/artifact-register-current-notice-20260728-r001.md)에서 연결하는 DOC-01 |
 | 요구사항과 예정 시험 연결 | [요구사항 추적표](../deliverables/03-requirements/rtm.json) |
-| 현재 구현 차이와 수정 후보 | [구현 Gap r025](../control/audits/walksafe-implementation-gap-analysis-20260810-r025.json), [수정 백로그 r025](../control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json) |
+| 현재 구현 차이와 수정 후보 | [구현 Gap r026](../control/audits/walksafe-implementation-gap-analysis-20260812-r026.json), [수정 백로그 r026](../control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json) |
 
 날짜가 오래된 README, 과거 Web/PWA 계획, 구현 코드 자체를 승인 정책으로 역승격하지 않습니다.
 
@@ -49,7 +49,7 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 작업을 고를 때는 다음 순서를 지킵니다.
 
 1. [프로젝트 체크포인트](../control/walksafe-project-continuation-checkpoint.json)에서 현재 focus와 실행 가능 경계를 확인합니다.
-2. [수정 백로그 r025](../control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json)에서 의존성과 남은 작업을 확인합니다.
+2. [수정 백로그 r026](../control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)에서 의존성과 남은 작업을 확인합니다.
 3. [기능 구현·분담 목록](../planning/walksafe_feature_implementation_catalog.html)에서 담당과 충돌 여부를 조정합니다.
 4. 현재 코드 지도, 실제 source·OpenAPI·lock·runtime config와 관련 테스트를 확인한 뒤 범위를 확정합니다. 날짜형·hash 결속 README는 역사 snapshot으로 구분합니다.
 

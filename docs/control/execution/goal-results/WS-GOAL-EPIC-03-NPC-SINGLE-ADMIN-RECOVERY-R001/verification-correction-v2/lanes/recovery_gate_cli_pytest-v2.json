@@ -1,0 +1,57 @@
+{
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-RECOVERY_GATE_CLI_PYTEST-CORRECTION-RECEIPT-20260813-002",
+  "evidence_schema": "V2_CORRECTION_ONLY",
+  "evidence_type": "INTERNAL_VERIFICATION_LANE_RECEIPT",
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "observation": {
+    "command": [
+      "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=. python3 -B -m pytest -p no:cacheprovider -q tests/test_walksafe_admin_high_risk_data_delete_gate.py"
+    ],
+    "cwd": ".",
+    "database_preflight_receipt_sha256": "129f44d712774d2117c749d1f826d7a8143fab9a3520649e29226a0956480256",
+    "database_runtime_receipt_sha256": "e08b46685505b4b52141e5a9acf44be9829334384471e9a25a58b284db22634e",
+    "ended_at": "2026-08-13T12:54:15.395296+09:00",
+    "environment_receipt_sha256": "5739b235edaf5470799474bd1cf0b5ec93fa3e01fce5044aed8a61ac2a00b4dc",
+    "execution_input_content_set_sha256": "23a4249119546354a1073004a5eebf87739e7efb8e4b373a7a79f6aedcd3727d",
+    "exit_code": 0,
+    "lane_id": "RECOVERY_GATE_CLI_PYTEST",
+    "log_byte_count": 1288,
+    "log_header_marker": "WALKSAFE_NPC_VERIFICATION_LOG_BEGIN",
+    "log_path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/logs/recovery_gate_cli_pytest.log",
+    "log_sha256": "e04cb3bd15f7363a0c11c53d4c16cf105c1d0be69890cd515ed1c176a2bd7310",
+    "log_tail_marker": "WALKSAFE_NPC_VERIFICATION_LOG_END",
+    "run_id": "NPC-RECOVERY-90c3addd9209478e2f6b48dbcdc643ae",
+    "source_content_set_sha256": "c3560526a30b6f7b0f3e8442bbe972bc5bc20064b6bda8488ad76aff45449145",
+    "started_at": "2026-08-13T12:54:13.396964+09:00",
+    "status": "PASS",
+    "toolchain_receipt_sha256": "145839f4ecf8210c1519bd364ee8e86e88520a5b7ffdd9510daf77114e4eb2f6"
+  },
+  "raw_output_binding": {
+    "byte_length": 1288,
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/logs/recovery_gate_cli_pytest.log",
+    "sha256": "e04cb3bd15f7363a0c11c53d4c16cf105c1d0be69890cd515ed1c176a2bd7310"
+  },
+  "receipt_content_sha256": "4acea9bf7774782d7f2724a3d954dcc143c3667133cf8347d743ce1184293dcb",
+  "schema_version": "1.0",
+  "status": "PASS"
+}

@@ -724,9 +724,75 @@ class WalkSafeFp048GoalCompletedSeq4344Test(unittest.TestCase):
 
         self.assertEqual(self.checkpoint_path.read_bytes(), before)
         self.assertEqual(stat.S_IMODE(self.checkpoint_path.stat().st_mode), 0o640)
+
+    def test_final_guard_checkpoint_swap_is_rejected_before_source_unlink(self) -> None:
+        before = self.checkpoint_path.read_bytes()
+        calls = 0
+
+        def guard() -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                foreign = self.checkpoint_path.with_name("foreign-final.json")
+                foreign.write_bytes(b"foreign-final")
+                foreign.chmod(0o600)
+                os.replace(foreign, self.checkpoint_path)
+
+        with self.assertRaisesRegex(
+            apply.CompletionPostCommitError,
+            "CAS rollback also failed.*state is uncertain",
+        ):
+            apply.atomic_write(
+                self.checkpoint_path,
+                b"replacement",
+                expected_source=before,
+                commit_guard=guard,
+            )
+
+        self.assertEqual(calls, 3)
+        self.assertEqual(self.checkpoint_path.read_bytes(), b"foreign-final")
+        retained = list(
+            self.checkpoint_path.parent.glob(
+                f".{self.checkpoint_path.name}.fp048-seq43-44.*.tmp"
+            )
+        )
+        self.assertEqual(len(retained), 1)
+        self.assertEqual(retained[0].read_bytes(), before)
+
+    def test_final_guard_parent_replacement_is_rejected(self) -> None:
+        before = self.checkpoint_path.read_bytes()
+        original_parent = self.checkpoint_path.parent
+        detached_parent = original_parent.with_name("detached-final-parent")
+        calls = 0
+
+        def guard() -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                os.rename(original_parent, detached_parent)
+                original_parent.mkdir()
+                self.checkpoint_path.write_bytes(b"foreign-parent")
+                self.checkpoint_path.chmod(0o600)
+
+        with self.assertRaisesRegex(
+            apply.CompletionApplyError,
+            "publication parent changed after final commit guard",
+        ):
+            apply.atomic_write(
+                self.checkpoint_path,
+                b"replacement",
+                expected_source=before,
+                commit_guard=guard,
+            )
+
+        self.assertEqual(calls, 3)
+        self.assertEqual(self.checkpoint_path.read_bytes(), b"foreign-parent")
+        self.assertEqual(
+            (detached_parent / self.checkpoint_path.name).read_bytes(), before
+        )
         self.assertFalse(
             list(
-                self.checkpoint_path.parent.glob(
+                detached_parent.glob(
                     f".{self.checkpoint_path.name}.fp048-seq43-44.*.tmp"
                 )
             )
@@ -873,8 +939,8 @@ class WalkSafeFp048GoalCompletedSeq4344Test(unittest.TestCase):
             os.fsync(parent_fd)
 
         with self.assertRaisesRegex(
-            apply.CompletionApplyError,
-            "atomic compare-exchange boundary",
+            apply.CompletionPostCommitError,
+            "CAS rollback also failed.*state is uncertain",
         ):
             apply.atomic_write(
                 self.checkpoint_path,
@@ -916,8 +982,8 @@ class WalkSafeFp048GoalCompletedSeq4344Test(unittest.TestCase):
             raise OSError("synthetic failure-state fsync failure")
 
         with self.assertRaisesRegex(
-            apply.CompletionApplyError,
-            "atomic compare-exchange boundary",
+            apply.CompletionPostCommitError,
+            "CAS rollback also failed.*state is uncertain",
         ) as captured:
             apply.atomic_write(
                 self.checkpoint_path,

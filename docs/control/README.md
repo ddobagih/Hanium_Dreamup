@@ -1,10 +1,10 @@
 # WalkSafe 산출물·기준선 통제
 
-## 2026-08-11 current override
+## 2026-08-14 current override
 
 > 이 절이 아래의 v2.4 전환 준비·FP011 활성화 지시보다 우선한다. 아래 `PREPARED_NOT_ACTIVATED`, `READY_NOT_ACTIVATED`, FP011과 과거 활성화 승인문은 감사 이력이며 현행 작업 지시가 아니다.
 
-현재 checkpoint의 package는 v2.4 `ACTIVE`다. focus는 `WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001`이고 Goal은 `READY`, 내부 시작 gate는 `NOT_RUN`이다. 정식 시험 279개와 release gate 5개는 모두 `NOT_RUN`, 출시는 `NOT_ELIGIBLE`이다. 현재 탐색·재개 절차는 저장소 [`AGENTS.md`](../../AGENTS.md), [프로젝트 가이드](../guides/project-guide.md), 현재 [`walksafe-project-continuation-checkpoint.json`](walksafe-project-continuation-checkpoint.json)을 따른다.
+현재 checkpoint의 package는 v2.4 `ACTIVE`다. focus는 `WS-GOAL-EPIC-04`이고 Goal은 `READY`, 내부 시작 gate는 `NOT_RUN`이다. 정식 시험 279개와 release gate 5개는 모두 `NOT_RUN`, 출시는 `NOT_ELIGIBLE`이다. 현재 탐색·재개 절차는 저장소 [`AGENTS.md`](../../AGENTS.md), [프로젝트 가이드](../guides/project-guide.md), 현재 [`walksafe-project-continuation-checkpoint.json`](walksafe-project-continuation-checkpoint.json)을 따른다.
 
 이 문서의 아래 본문은 당시 통제 계약을 보존한다. 현재 checkpoint와 충돌하는 상태·focus·명령을 재실행하지 않는다.
 

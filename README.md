@@ -18,10 +18,11 @@ WalkSafe는 시각장애인의 도심 보행을 돕는 Android 보행 보조 프
 
 ## 현재 상태
 
-기준일은 2026-08-11이며, 동적 현재 상태의 정본은 [checkpoint](docs/control/walksafe-project-continuation-checkpoint.json)입니다.
+기준일은 2026-08-13이며, 동적 현재 상태의 정본은 [checkpoint](docs/control/walksafe-project-continuation-checkpoint.json)입니다.
 
 - Goal package: v2.4 `ACTIVE`
-- 다음 내부 작업: `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`, Goal `READY`; 내부 시작 gate `NOT_RUN`
+- `NPC-SINGLE-ADMIN-RECOVERY / GAP-008`: 저장소 내부 구현·자동검증 `COMPLETE_AT_TARGET`, Gap `PARTIAL`
+- 다음 통제 작업: `EPIC-03` workstream 완료 조건 평가; 다음 구현 후보는 `FP-022 / GAP-031`
 - 정식 시험: 279/279 `NOT_RUN`
 - 출시 gate: 5/5 `NOT_RUN`, 면제 없음
 - 실제 기기·현장·운영 배포·외부 수락: `NOT_RUN`
@@ -62,8 +63,8 @@ python3 -B scripts/check_walksafe_project_continuation_v2_4.py
 ## 산출물과 구현 상태
 
 - 산출물 작성·변경 절차: [산출물 가이드](docs/guides/deliverables-guide.md)
-- 최신 구현 Gap: [r025 Gap](docs/control/audits/walksafe-implementation-gap-analysis-20260810-r025.json)
-- 최신 수정 백로그: [r025 Backlog](docs/control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json)
+- 최신 구현 Gap: [r026 Gap](docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json)
+- 최신 수정 백로그: [r026 Backlog](docs/control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json)
 - 기능별 분담: [팀 기능 카탈로그](docs/planning/walksafe_feature_implementation_catalog.html)
 
 기존 승인 기록·Goal event·gate 증거와 canonical register는 직접 수정하지 않습니다. 변경 절차는 가이드와 checkpoint를 따릅니다.

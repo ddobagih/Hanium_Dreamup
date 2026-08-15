@@ -1,0 +1,214 @@
+{
+  "assignment_status": "NOT_ISSUED_LEGACY_ROUND",
+  "completion_boundary": {
+    "actual_device_credit_count": 0,
+    "actual_device_status": "NOT_RUN",
+    "actual_recovery_drill_status": "NOT_RUN",
+    "artifact_approval_claimed": false,
+    "external_accessibility_review_status": "NOT_RUN",
+    "external_legal_review_status": "NOT_RUN",
+    "external_security_review_status": "NOT_RUN",
+    "formal_test_credit_count": 0,
+    "formal_test_status": "NOT_RUN",
+    "planned_test_ids": [
+      "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+    ],
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_count": 0,
+    "release_gate_status": "NOT_RUN",
+    "release_gates_waived": false,
+    "release_status": "NOT_ELIGIBLE",
+    "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_IMPLEMENTATION_AND_AUTOMATED_VERIFICATION_ONLY"
+  },
+  "decision": "REJECTED",
+  "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-REVIEW-REJECTED-20260813-001",
+  "finding_counts": {
+    "blocking": 7,
+    "major_open": 2,
+    "minor_open": 0
+  },
+  "findings": {
+    "blocking": [
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json"
+        ],
+        "finding_id": "NPC-R001-B001",
+        "summary": "The documented replacement-TOTP restart order is a catch-22: startup rejects the new fingerprint before a RECOVERY_COMPLETE device-proof request can pin it."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log"
+        ],
+        "finding_id": "NPC-R001-B002",
+        "summary": "The runtime database role can commit consumed_at=NULL on a used device-proof challenge, defeating the claimed single-use replay boundary."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-observations.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_unit.log",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log"
+        ],
+        "finding_id": "NPC-R001-B003",
+        "summary": "The official add-only publisher accepts an injected command runner and can publish indistinguishable four-lane PASS evidence without real subprocess execution."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-observations.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json"
+        ],
+        "finding_id": "NPC-R001-B004",
+        "summary": "The sealed 67-file cohort omits direct lane inputs such as Gradle wrapper/build files, database preflight, Alembic configuration, and requirements lock, so their drift is undetected."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-observations.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/successor-trace.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-subject.json"
+        ],
+        "finding_id": "NPC-R001-B005",
+        "summary": "Reviewer identity and approval are unauthenticated hard-coded strings, and the gate accepts a review timestamp earlier than the observation, successor, consumers, and review subject."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-subject.json"
+        ],
+        "finding_id": "NPC-R001-B006",
+        "summary": "The reviewed manifest omits the runner, trace/review builders, completion apply, and graph checkers, allowing post-review control-code changes to self-validate."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-observations.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_assemble_lint.log",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_unit.log",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/recovery_gate_cli_pytest.log"
+        ],
+        "finding_id": "NPC-R001-B007",
+        "summary": "Sequential hard-link publication can leave four immutable logs without their manifest; the next run then differs by run ID and timestamps and cannot recover add-only."
+      }
+    ],
+    "major_open": [
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log"
+        ],
+        "finding_id": "NPC-R001-M001",
+        "summary": "Initial UNATTESTED recovery start can bypass the database same-transaction audit guard; the normal service writes an audit, but database-level completeness is not enforced."
+      },
+      {
+        "evidence_paths": [
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+          "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log"
+        ],
+        "finding_id": "NPC-R001-M002",
+        "summary": "An older reusable database retained an earlier function signature under the same Alembic revision; fresh-head and the sealed final lane passed, so this is forward-migration hygiene drift rather than a fresh-deploy failure."
+      }
+    ],
+    "minor_open": []
+  },
+  "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+  "review_subject_binding": {
+    "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-subject.json",
+    "sha256": "c189d082ab3ab2e5efe671c65e124cc43374b3403be9385c87168b9d28553576"
+  },
+  "reviewed_at": "2026-08-13T08:31:00.349333+09:00",
+  "reviewed_evidence_manifest": [
+    {
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+      "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1"
+    },
+    {
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260812-r026.json",
+      "sha256": "4d3b91b3db17e154a97b2e4913045a546e73afcc5c6b84a16979de3f666cdd6c"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/evidence.json",
+      "sha256": "e4d5134703909d91b9b043626903cd5f5601043d8d43f3cf2b02f78aa2c52104"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-check-receipt-r015.json",
+      "sha256": "2e693d3ee0d5259b2542734444af7b19ec94ea230899ffaf7ceb50919137ce04"
+    },
+    {
+      "path": "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-ledger-r015.json",
+      "sha256": "dfb74531e1922b639667645ab9949fa754a3b93474215f65b93481c8c939f4e9"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+      "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_assemble_lint.log",
+      "sha256": "6a73bcffd5a14d371e3ea7f3f84cc5d4db86df88b2d1e2bb60362cc64957e41d"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/admin_android_unit.log",
+      "sha256": "b3bc182c0324179c7dcede4cc8988226bf168d5d0c2d12555cf0ccd64fde0ad6"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/backend_recovery_pytest.log",
+      "sha256": "0b29af36114a915b8be7c508e5883a54b994be4ef4d46f73a4cf76c3172fe563"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/logs/recovery_gate_cli_pytest.log",
+      "sha256": "19397c45304e61f57df4118a319a9878646754056a87ce682307e3f559bd339b"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-subject.json",
+      "sha256": "c189d082ab3ab2e5efe671c65e124cc43374b3403be9385c87168b9d28553576"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/successor-trace.json",
+      "sha256": "c93966bcc213d3bcdca4e2019f59c5f465813eeb1625615ba346efae496024cf"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-observations.json",
+      "sha256": "b07615579c4c65d156e4d21c020b21cf7d63ca0bf0a22a4337d03c5dd52f0525"
+    },
+    {
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+      "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-change-log.json",
+      "sha256": "09c5fdb8eee426a7d60cf10639bf7d6ec9fc41ef2862bec8912282635a5ba96c"
+    },
+    {
+      "path": "docs/deliverables/00-control/artifact-register.json",
+      "sha256": "70305918b52204097db9376de642f191b19b4c4f7925d2a1bedf0f5e115465b0"
+    },
+    {
+      "path": "docs/deliverables/03-requirements/rtm.json",
+      "sha256": "2bfb1420660e48fb9df1a0d8311da98fa95381a0ea932dc4fc942f84b3695cab"
+    },
+    {
+      "path": "docs/deliverables/04-design/design-traceability-register.json",
+      "sha256": "4159a80cc7cdf74011db80c08dbfcbf68eade6f652a543d8cc6979b168a0dea6"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/implementation-manifest.json",
+      "sha256": "b2b4f25dbd21781dbd3624bc4ba90c70080cd05bbd4b247bb5dc1f5c64408a03"
+    },
+    {
+      "path": "docs/deliverables/05-implementation/module-register.json",
+      "sha256": "2e4b3dc105efc07adcd851d770a20cf79925a06bcb7c128381f87bd8f96bb709"
+    }
+  ],
+  "reviewed_result_sha256_by_kind": {
+    "IMPLEMENTATION_RECORD": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4",
+    "SUCCESSOR_TRACE": "c93966bcc213d3bcdca4e2019f59c5f465813eeb1625615ba346efae496024cf",
+    "VERIFICATION_RESULT": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-npc-independent-reviewer-20260813-r001",
+    "canonical_task": "/root/npc_single_admin_recovery_independent_review",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-REVIEW-20260813-R001",
+  "schema_version": "walksafe.npc-single-admin-recovery.review-result.v2"
+}

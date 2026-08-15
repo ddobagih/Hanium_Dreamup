@@ -1,0 +1,38 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :adminapp:preBuild UP-TO-DATE
+> Task :adminapp:preDebugBuild UP-TO-DATE
+> Task :adminapp:generateDebugBuildConfig
+> Task :adminapp:generateDebugResources
+> Task :adminapp:packageDebugResources
+> Task :adminapp:processDebugNavigationResources
+> Task :adminapp:parseDebugLocalResources
+> Task :adminapp:generateDebugRFile
+> Task :adminapp:compileDebugKotlin NO-SOURCE
+> Task :adminapp:javaPreCompileDebug
+> Task :adminapp:compileDebugJavaWithJavac
+> Task :adminapp:checkDebugAarMetadata
+> Task :adminapp:mapDebugSourceSetPaths
+> Task :adminapp:compileDebugNavigationResources FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':adminapp:compileDebugNavigationResources'.
+> A failure occurred while executing com.android.build.gradle.tasks.CompileNavigationXmlTask$CompileNavigationResourcesAction
+   > Could not isolate value com.android.build.gradle.tasks.CompileNavigationXmlTask$CompileNavigationResourcesParams_Decorated@7705d6bc of type CompileNavigationXmlTask.CompileNavigationResourcesParams
+      > Could not resolve all files for configuration ':adminapp:detachedConfiguration2'.
+         > Could not resolve com.android.tools.build:aapt2:9.1.0-14792394.
+           Required by:
+               project ':adminapp'
+            > No cached version of com.android.tools.build:aapt2:9.1.0-14792394 available for offline mode.
+            > No cached version of com.android.tools.build:aapt2:9.1.0-14792394 available for offline mode.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4s
+11 actionable tasks: 11 executed

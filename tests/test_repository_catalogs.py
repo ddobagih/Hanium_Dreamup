@@ -33,11 +33,16 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
 
         self.assertEqual([entry["path"] for entry in entries], list(source_paths))
         self.assertEqual(document["path_count"], len(source_paths))
-        self.assertEqual(document["checkpoint"]["managed_path_count"], 818)
-        self.assertEqual(document["checkpoint"]["canonical_binding_count"], 41)
+        checkpoint = json.loads(
+            (ROOT / catalogs.CHECKPOINT_PATH).read_text(encoding="utf-8")
+        )
+        managed_count = checkpoint["working_tree_snapshot"]["managed_changed_path_count"]
+        canonical_count = len(checkpoint["canonical_bindings"])
+        self.assertEqual(document["checkpoint"]["managed_path_count"], managed_count)
+        self.assertEqual(document["checkpoint"]["canonical_binding_count"], canonical_count)
         self.assertEqual(document["bound_or_protected_archive_count"], 0)
-        self.assertEqual(sum(entry["managed"]["bound"] for entry in entries), 818)
-        self.assertEqual(sum(entry["canonical"]["bound"] for entry in entries), 41)
+        self.assertEqual(sum(entry["managed"]["bound"] for entry in entries), managed_count)
+        self.assertEqual(sum(entry["canonical"]["bound"] for entry in entries), canonical_count)
         self.assertEqual(
             set(document["classification_counts"]),
             catalogs.REPOSITORY_CLASSES,
@@ -73,6 +78,27 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             self.assertNotIn('"generated_at"', text)
             self.assertNotIn('"timestamp"', text)
         self.assertEqual(len(hashes), 1)
+
+    def test_candidate_checkpoint_override_drives_repository_catalog(self) -> None:
+        checkpoint = json.loads(
+            (ROOT / catalogs.CHECKPOINT_PATH).read_text(encoding="utf-8")
+        )
+        checkpoint["working_tree_snapshot"]["managed_changed_paths"] = ["README.md"]
+        checkpoint["working_tree_snapshot"]["managed_changed_path_count"] = 1
+
+        repository = json.loads(
+            catalogs.build_catalog_bytes(
+                ROOT,
+                checkpoint_override=checkpoint,
+            )[catalogs.OUTPUT_PATHS[0]]
+        )
+        managed = {
+            entry["path"]
+            for entry in repository["entries"]
+            if entry["managed"]["bound"]
+        }
+        self.assertEqual(repository["checkpoint"]["managed_path_count"], 1)
+        self.assertEqual(managed, {"README.md"})
 
     def test_script_catalog_is_exhaustive_and_has_required_boundaries(self) -> None:
         source_paths = catalogs.discover_source_paths(ROOT)
@@ -147,6 +173,22 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             "scripts/evaluate_predictions_manifest_presence_20260531.py": "REPOSITORY_WRITE",
             "scripts/evaluate_yolo_image_level_presence_20260523.py": "REPOSITORY_WRITE",
             "scripts/export_android_tflite_models_20260531.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_historical_git_witness_20260812.py": "REPOSITORY_WRITE",
+            "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py": "REPOSITORY_WRITE",
+            "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py": "REPOSITORY_WRITE",
+            "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py": "REPOSITORY_WRITE",
+            "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py": "REPOSITORY_WRITE",
+            "scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_trace_20260812.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r027_20260813.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_phase1_exact257_successor_r015_20260812.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_phase1_exact257_successor_r016_20260813.py": "REPOSITORY_WRITE",
+            "scripts/build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py": "REPOSITORY_WRITE",
+            "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py": "REPOSITORY_WRITE",
+            "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py": "DB_DEVICE",
             "scripts/manage_local_model_registry.py": "REPOSITORY_WRITE",
             "scripts/run_walksafe_submission_python_20260714.py": "REPOSITORY_WRITE",
             "scripts/run_walksafe_test_layers_20260711.sh": "DB_DEVICE",
@@ -206,8 +248,45 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
         for path in (
             "scripts/apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py",
             "scripts/materialize_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py",
+            "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+            "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+            "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+            "scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_trace_20260812.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+            "scripts/apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+            "scripts/build_walksafe_workstream_aggregate_review_20260813.py",
+            "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
+            "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+            "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+            "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+            "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
+            "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+            "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+            "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+            "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+            "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+            "scripts/build_walksafe_phase1_exact257_successor_r015_20260812.py",
+            "scripts/build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+            "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+            "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
         ):
             self.assertEqual(entries[path]["lifecycle"], "CURRENT", path)
+            if "followup_review" in path:
+                self.assertEqual(
+                    entries[path]["strongest_side_effect"],
+                    "REPOSITORY_WRITE",
+                    path,
+                )
 
     def test_test_catalog_is_exhaustive_and_excludes_helpers(self) -> None:
         source_paths = catalogs.discover_source_paths(ROOT)
@@ -258,6 +337,32 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             },
             {"tests/test_walksafe_project_continuation_v2_4.py"},
         )
+        for path in (
+            "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
+            "tests/test_build_walksafe_phase1_exact257_successor_r015_20260812.py",
+            "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py",
+        ):
+            self.assertEqual(entries[path]["lifecycle"], "CURRENT", path)
+        for path in (
+            "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+            "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+            "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+            "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+            "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+            "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+            "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+            "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+            "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+            "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        ):
+            self.assertEqual(entries[path]["lifecycle"], "HISTORICAL", path)
+            self.assertEqual(
+                entries[path]["lifecycle_rule"],
+                "test-runner-historical-array",
+                path,
+            )
         self.assertTrue(all(entry["lifecycle"] == "HISTORICAL" for entry in entries.values() if entry["area"] == "LEGACY_WEB"))
         self.assertTrue(
             all(
@@ -335,6 +440,7 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             {
                 "apps/web/README.md",
                 "apps/web/legacy-runtime-boundary.ts",
+                "apps/web/next.config.mjs",
                 "apps/web/package.json",
                 "apps/web/proxy.ts",
                 "apps/web/tests/api-client-contract-policy.test.ts",

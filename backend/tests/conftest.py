@@ -9,6 +9,7 @@ the field database from ``backend/.env``.
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable, Iterator
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,8 @@ _UNCONFIGURED_TEST_DATABASE_URL = (
     "walksafe_pytest_unconfigured"
 )
 _ADMIN_SECURITY_CLEANUP_TABLES = (
+    "walksafe_recovery_custody_markers",
+    "walksafe_recovery_custody_capabilities",
     "admin_security_audits",
     "admin_security_auth_attempts",
     "admin_security_reconfirmations",
@@ -148,11 +151,11 @@ os.environ["WALKSAFE_PRIVACY_HMAC_SECRET"] = (
 
 
 @pytest.fixture(scope="session", autouse=True)
-def clean_test_storage() -> None:
+def clean_test_storage() -> Iterator[Callable[[], None] | None]:
     """Start and finish with an empty, explicitly isolated report table."""
 
     if _TEST_DATABASE_URL is None:
-        yield
+        yield None
         _UPLOAD_TMP.cleanup()
         _REPORT_IMAGE_KEY_TMP.cleanup()
         return
@@ -205,27 +208,41 @@ def clean_test_storage() -> None:
                     connection.execute(
                         text(f"ALTER TABLE {table_name} ENABLE TRIGGER USER")
                     )
-            for table_name in (
-                *_FP008_CLEANUP_TABLES,
-                *_REPORT_IMAGE_CLEANUP_TABLES,
-                *_ADMIN_SECURITY_CLEANUP_TABLES,
-                "report_export_audits",
-                "report_status_audits",
-                "report_read_audits",
-                "actor_rate_limit_events",
-            ):
-                if connection.execute(text("SELECT to_regclass(:table_name)"), {"table_name": table_name}).scalar_one() is None:
-                    continue
+            cleanup_tables = [
+                table_name
+                for table_name in (
+                    *_FP008_CLEANUP_TABLES,
+                    *_REPORT_IMAGE_CLEANUP_TABLES,
+                    *_ADMIN_SECURITY_CLEANUP_TABLES,
+                    "report_export_audits",
+                    "report_status_audits",
+                    "report_read_audits",
+                    "actor_rate_limit_events",
+                )
+                if connection.execute(
+                    text("SELECT to_regclass(:table_name)"),
+                    {"table_name": table_name},
+                ).scalar_one()
+                is not None
+            ]
+            for table_name in cleanup_tables:
                 # Test cleanup is the only controlled bypass for append-only
                 # audit tables. Mutable control/rate-limit tables have no
                 # mutation trigger, so disabling USER triggers is harmless.
                 connection.execute(text(f"ALTER TABLE {table_name} DISABLE TRIGGER USER"))
-                connection.execute(text(f"TRUNCATE TABLE {table_name}"))
+            if cleanup_tables:
+                # PostgreSQL requires a referenced parent and every referencing
+                # child to be truncated by the same statement even when the
+                # child is already empty.
+                connection.execute(
+                    text("TRUNCATE TABLE " + ", ".join(cleanup_tables))
+                )
+            for table_name in cleanup_tables:
                 connection.execute(text(f"ALTER TABLE {table_name} ENABLE TRIGGER USER"))
 
     try:
         truncate_reports_if_present()
-        yield
+        yield truncate_reports_if_present
     finally:
         try:
             truncate_reports_if_present()
@@ -239,3 +256,14 @@ def clean_test_storage() -> None:
                 engine.dispose()
                 _UPLOAD_TMP.cleanup()
                 _REPORT_IMAGE_KEY_TMP.cleanup()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def clean_test_storage_before_module(
+    clean_test_storage: Callable[[], None] | None,
+) -> Iterator[None]:
+    """Keep PostgreSQL integration modules independent in one pytest process."""
+
+    if clean_test_storage is not None:
+        clean_test_storage()
+    yield

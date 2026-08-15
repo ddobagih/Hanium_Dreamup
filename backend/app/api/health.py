@@ -6,7 +6,6 @@ import asyncio
 from concurrent.futures import Future
 import os
 from pathlib import Path
-import secrets
 import stat
 from threading import Lock, Thread
 import time
@@ -19,7 +18,10 @@ from sqlalchemy.pool import NullPool
 
 from backend.app.config import DEPLOYMENT_ENVIRONMENTS, Settings
 from backend.app.database import SessionLocal
-from backend.app.services.admin_security import totp_secret_fingerprint
+from backend.app.services.admin_security import (
+    AdminCredentialIssuerUnavailable,
+    load_admin_credential_issuer_key_for_settings,
+)
 from backend.app.services.detect_v2 import detect_v2_health
 from backend.app.services.privacy_lifecycle import (
     PrivacyLifecycleError,
@@ -39,7 +41,7 @@ from backend.app.services.tmap_pedestrian import (
 )
 
 
-EXPECTED_ALEMBIC_HEAD = "202608090001"
+EXPECTED_ALEMBIC_HEAD = "202608150002"
 READINESS_LOCAL_CHECK_TIMEOUT_SECONDS = 5.0
 TMAP_READINESS_FAILURE_COOLDOWN_SECONDS = 5.0
 
@@ -57,6 +59,7 @@ def _database_readiness(database_url: str) -> dict[str, object]:
         database_url,
         poolclass=NullPool,
         connect_args={"connect_timeout": 2},
+        hide_parameters=True,
     )
     try:
         with probe_engine.begin() as connection:
@@ -78,31 +81,91 @@ def _database_readiness(database_url: str) -> dict[str, object]:
 def _admin_totp_binding_readiness(settings: Settings) -> dict[str, object]:
     """Ensure this API replica uses the factor fingerprint held by PostgreSQL."""
 
+    try:
+        credential_issuer_key = load_admin_credential_issuer_key_for_settings(
+            settings
+        )
+    except AdminCredentialIssuerUnavailable:
+        return {
+            "ready": False,
+            "reason": "admin_credential_issuer_key_unavailable",
+        }
     probe_engine = create_engine(
         settings.database_url,
         poolclass=NullPool,
         connect_args={"connect_timeout": 2},
+        hide_parameters=True,
     )
     try:
         with probe_engine.begin() as connection:
             connection.execute(text("SET LOCAL statement_timeout = 1500"))
             controls = connection.execute(
                 text(
-                    "SELECT admin_id, totp_secret_fingerprint "
+                    "SELECT admin_id "
                     "FROM admin_security_controls"
                 )
             ).mappings().all()
-        if len(controls) != 1 or controls[0]["admin_id"] != settings.admin_id:
-            return {"ready": False, "reason": "admin_security_not_provisioned"}
-        expected = totp_secret_fingerprint(settings.admin_totp_secret)
-        if not secrets.compare_digest(
-            str(controls[0]["totp_secret_fingerprint"]), expected
-        ):
-            return {
-                "ready": False,
-                "reason": "admin_totp_configuration_mismatch",
-            }
-        return {"ready": True, "admin_totp_binding": "matched"}
+            if (
+                len(controls) != 1
+                or controls[0]["admin_id"] != settings.admin_id
+            ):
+                return {
+                    "ready": False,
+                    "reason": "admin_security_not_provisioned",
+                }
+            issuer_key_matched = bool(
+                connection.execute(
+                    text(
+                        "SELECT public."
+                        "walksafe_assert_admin_credential_issuer_key("
+                        "CAST(:admin_id AS text), "
+                        "CAST(:credential_issuer_key AS text))"
+                    ),
+                    {
+                        "admin_id": settings.admin_id,
+                        "credential_issuer_key": credential_issuer_key,
+                    },
+                ).scalar_one()
+            )
+            if not issuer_key_matched:
+                return {
+                    "ready": False,
+                    "reason": "admin_credential_issuer_binding_mismatch",
+                }
+            totp_binding = str(
+                connection.execute(
+                    text(
+                        "SELECT public."
+                        "walksafe_classify_admin_startup_totp_binding("
+                        "CAST(:admin_id AS text), "
+                        "CAST(:runtime_totp_secret AS text), "
+                        "CAST(:credential_issuer_key AS text))"
+                    ),
+                    {
+                        "admin_id": settings.admin_id,
+                        "runtime_totp_secret": settings.admin_totp_secret,
+                        "credential_issuer_key": credential_issuer_key,
+                    },
+                ).scalar_one()
+            )
+            if totp_binding not in {
+                "CURRENT",
+                "RECOVERY_CANDIDATE",
+                "RECOVERY_EXPIRED_CANDIDATE",
+            }:
+                return {
+                    "ready": False,
+                    "reason": "admin_totp_configuration_mismatch",
+                }
+        return {
+            "ready": True,
+            "admin_totp_binding": {
+                "CURRENT": "matched",
+                "RECOVERY_CANDIDATE": "recovery_candidate",
+                "RECOVERY_EXPIRED_CANDIDATE": "recovery_expired_candidate",
+            }[totp_binding],
+            "admin_credential_issuer_binding": "matched",
+        }
     finally:
         probe_engine.dispose()
 
@@ -113,6 +176,16 @@ def _database_and_admin_readiness(settings: Settings) -> dict[str, object]:
         return database
     binding = _admin_totp_binding_readiness(settings)
     return {**database, **binding}
+
+
+def assert_admin_credential_issuer_startup_ready(settings: Settings) -> None:
+    """Reject startup when the configured issuer authority is not DB-bound."""
+
+    if not settings.admin_security_enabled:
+        return
+    result = _admin_totp_binding_readiness(settings)
+    if result.get("ready") is not True:
+        raise RuntimeError("administrator credential issuer binding is not ready")
 
 
 def _privacy_hmac_binding_readiness(settings: Settings) -> dict[str, object]:

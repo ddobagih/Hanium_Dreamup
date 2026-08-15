@@ -1030,6 +1030,9 @@ def create_source_repo(root: Path) -> str:
         "deploy/config/walksafe-backend.env.example": (
             ROOT / "deploy/config/walksafe-backend.env.example"
         ).read_bytes(),
+        "deploy/config/walksafe-backend-migration.env.example": (
+            ROOT / "deploy/config/walksafe-backend-migration.env.example"
+        ).read_bytes(),
         "deploy/config/walksafe-report-retention.env.example": (
             ROOT / "deploy/config/walksafe-report-retention.env.example"
         ).read_bytes(),
@@ -1047,6 +1050,12 @@ def create_source_repo(root: Path) -> str:
         ).read_bytes(),
         "deploy/systemd/walksafe-backend-migrate.service": (
             ROOT / "deploy/systemd/walksafe-backend-migrate.service"
+        ).read_bytes(),
+        "deploy/systemd/walksafe-admin-issuer-bind.service": (
+            ROOT / "deploy/systemd/walksafe-admin-issuer-bind.service"
+        ).read_bytes(),
+        "deploy/sysusers.d/walksafe-backend.conf": (
+            ROOT / "deploy/sysusers.d/walksafe-backend.conf"
         ).read_bytes(),
         "deploy/systemd/walksafe-report-retention.service": (
             ROOT / "deploy/systemd/walksafe-report-retention.service"
@@ -1645,6 +1654,27 @@ def test_report_retention_scheduler_is_in_provenance_and_backend_runtime() -> No
     assert runtime_files <= set(builder._backend_runtime_files(ROOT))
 
 
+def test_issuer_binding_cli_is_provenance_and_in_backend_archive(
+    tmp_path: Path,
+) -> None:
+    relative = "scripts/bind_walksafe_admin_credential_issuer_key.py"
+    assert relative in builder.RELEASE_SOURCE_INPUTS
+    assert relative in validator.REQUIRED_PROVENANCE_PATHS
+    assert relative in builder._backend_runtime_files(ROOT)
+
+    source, output, _apk, _apksigner = build_fixture(tmp_path)
+    manifest = json.loads(
+        (output / "walksafe-full-rc-manifest.json").read_text(encoding="utf-8")
+    )
+    archive_path = output / manifest["components"]["backend"]["artifact"]["path"]
+    member_name = f"walksafe-backend/{relative}"
+    with tarfile.open(archive_path, mode="r:gz") as archive:
+        member = archive.getmember(member_name)
+        archived = archive.extractfile(member)
+        assert member.isfile() and archived is not None
+        assert archived.read() == (source / relative).read_bytes()
+
+
 def test_android_builder_rejects_model_asset_that_differs_from_source(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source_commit = create_source_repo(source)
@@ -1678,6 +1708,129 @@ def test_runtime_contract_requires_remote_database_to_disable_gss_encryption(tmp
     )
 
     with pytest.raises(validator.ValidationError, match="gssencmode=disable"):
+        validator._validate_runtime_contracts(source)
+
+
+def test_runtime_contract_rejects_migration_database_url_in_api_environment(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    create_source_repo(source)
+    runtime_environment = source / "deploy/config/walksafe-backend.env.example"
+    write(
+        runtime_environment,
+        runtime_environment.read_text(encoding="utf-8")
+        + "WALKSAFE_MIGRATION_DATABASE_URL="
+        "postgresql+psycopg://walksafe_migrator:CHANGE_ME@db.example.invalid:5432/"
+        "walksafe?sslmode=verify-full&gssencmode=disable\n",
+    )
+
+    with pytest.raises(validator.ValidationError, match="backend runtime example"):
+        validator._validate_runtime_contracts(source)
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    [
+        (
+            "DATABASE_URL=postgresql+psycopg://walksafe_backend_app:CHANGE_ME@"
+            "db.example.invalid:5432/walksafe?sslmode=verify-full&gssencmode=disable"
+        ),
+        "WALKSAFE_ADMIN_TOTP_SECRET=CHANGE_ME_CANONICAL_UNPADDED_BASE32_MIN_160_BITS",
+    ],
+    ids=("runtime-database-url", "admin-totp-secret"),
+)
+def test_runtime_contract_rejects_api_secret_in_migration_environment(
+    tmp_path: Path,
+    assignment: str,
+) -> None:
+    source = tmp_path / "source"
+    create_source_repo(source)
+    migration_environment = (
+        source / "deploy/config/walksafe-backend-migration.env.example"
+    )
+    write(
+        migration_environment,
+        migration_environment.read_text(encoding="utf-8") + assignment + "\n",
+    )
+
+    with pytest.raises(validator.ValidationError, match="backend migration example"):
+        validator._validate_runtime_contracts(source)
+
+
+def test_runtime_contract_rejects_api_reading_migration_environment(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    create_source_repo(source)
+    runtime_unit = source / "deploy/systemd/walksafe-backend.service"
+    trusted = "EnvironmentFile=/etc/walksafe/backend-runtime.env"
+    payload = runtime_unit.read_text(encoding="utf-8")
+    assert trusted in payload
+    write(
+        runtime_unit,
+        payload.replace(
+            trusted,
+            "EnvironmentFile=/etc/walksafe/backend-migration.env",
+            1,
+        ),
+    )
+
+    with pytest.raises(validator.ValidationError, match="backend runtime unit"):
+        validator._validate_runtime_contracts(source)
+
+
+def test_runtime_contract_rejects_migration_running_as_runtime_identity(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    create_source_repo(source)
+    migration_unit = source / "deploy/systemd/walksafe-backend-migrate.service"
+    payload = migration_unit.read_text(encoding="utf-8")
+    for trusted, unsafe in (
+        ("User=walksafe-maintenance", "User=walksafe-backend"),
+        ("Group=walksafe-maintenance", "Group=walksafe-backend"),
+        (
+            "EnvironmentFile=/etc/walksafe/backend-migration.env",
+            "EnvironmentFile=/etc/walksafe/backend-runtime.env",
+        ),
+    ):
+        assert trusted in payload
+        payload = payload.replace(trusted, unsafe, 1)
+    write(migration_unit, payload)
+
+    with pytest.raises(validator.ValidationError, match="backend migration unit"):
+        validator._validate_runtime_contracts(source)
+
+
+@pytest.mark.parametrize(
+    ("trusted", "unsafe"),
+    [
+        (
+            "User=walksafe-issuer-bind\nGroup=walksafe-issuer-bind",
+            "User=root\nGroup=root",
+        ),
+        (
+            "LoadCredential=admin-credential-issuer.key:"
+            "/etc/walksafe/admin-credential-issuer.key\n",
+            "",
+        ),
+    ],
+    ids=("root-execution", "missing-load-credential"),
+)
+def test_runtime_contract_rejects_privileged_or_uncredentialed_issuer_binding(
+    tmp_path: Path,
+    trusted: str,
+    unsafe: str,
+) -> None:
+    source = tmp_path / "source"
+    create_source_repo(source)
+    binding_unit = source / "deploy/systemd/walksafe-admin-issuer-bind.service"
+    payload = binding_unit.read_text(encoding="utf-8")
+    assert trusted in payload
+    write(binding_unit, payload.replace(trusted, unsafe, 1))
+
+    with pytest.raises(validator.ValidationError, match="backend issuer binding unit"):
         validator._validate_runtime_contracts(source)
 
 
@@ -2564,6 +2717,9 @@ def test_validator_rejects_component_record_contract_mutations(tmp_path: Path) -
         ("backend", "runtime_unit"),
         ("backend", "migration_unit"),
         ("backend", "configuration_example"),
+        ("backend", "migration_configuration_example"),
+        ("backend", "issuer_binding_unit"),
+        ("backend", "issuer_binding_cli"),
         ("voice", "runtime_unit"),
         ("voice", "configuration_example"),
     )

@@ -3,10 +3,15 @@ package kr.co.hanium.dreamup.walksafe.admin.security;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public final class AdminSecurityController implements AutoCloseable {
@@ -16,9 +21,12 @@ public final class AdminSecurityController implements AutoCloseable {
         private final AdminSecurityState securityState;
         private final String currentSessionId;
         private final List<AdminSecurityApi.SessionInfo> sessions;
+        private final List<AdminSecurityApi.DeviceInfo> devices;
         private final long reauthenticatedUntilEpochMs;
         private final String stateVersion;
         private final String observedAt;
+        private final AdminRecoveryCustodyState recoveryCustodyState;
+        private final String recoveryCustodyAttestedAt;
         private final boolean accessSessionActive;
         private final boolean recoveryActive;
 
@@ -26,18 +34,24 @@ public final class AdminSecurityController implements AutoCloseable {
             AdminSecurityState securityState,
             String currentSessionId,
             List<AdminSecurityApi.SessionInfo> sessions,
+            List<AdminSecurityApi.DeviceInfo> devices,
             long reauthenticatedUntilEpochMs,
             String stateVersion,
             String observedAt,
+            AdminRecoveryCustodyState recoveryCustodyState,
+            String recoveryCustodyAttestedAt,
             boolean accessSessionActive,
             boolean recoveryActive
         ) {
             this.securityState = securityState;
             this.currentSessionId = currentSessionId;
             this.sessions = Collections.unmodifiableList(new ArrayList<>(sessions));
+            this.devices = Collections.unmodifiableList(new ArrayList<>(devices));
             this.reauthenticatedUntilEpochMs = reauthenticatedUntilEpochMs;
             this.stateVersion = stateVersion;
             this.observedAt = observedAt;
+            this.recoveryCustodyState = recoveryCustodyState;
+            this.recoveryCustodyAttestedAt = recoveryCustodyAttestedAt;
             this.accessSessionActive = accessSessionActive;
             this.recoveryActive = recoveryActive;
         }
@@ -45,9 +59,12 @@ public final class AdminSecurityController implements AutoCloseable {
         public AdminSecurityState securityState() { return securityState; }
         public String currentSessionId() { return currentSessionId; }
         public List<AdminSecurityApi.SessionInfo> sessions() { return sessions; }
+        public List<AdminSecurityApi.DeviceInfo> devices() { return devices; }
         public long reauthenticatedUntilEpochMs() { return reauthenticatedUntilEpochMs; }
         public String stateVersion() { return stateVersion; }
         public String observedAt() { return observedAt; }
+        public AdminRecoveryCustodyState recoveryCustodyState() { return recoveryCustodyState; }
+        public String recoveryCustodyAttestedAt() { return recoveryCustodyAttestedAt; }
         public boolean isAccessSessionActive() { return accessSessionActive; }
         public boolean isRecoveryActive() { return recoveryActive; }
     }
@@ -63,10 +80,13 @@ public final class AdminSecurityController implements AutoCloseable {
     private String recoveryAdminId;
     private String currentSessionId;
     private List<AdminSecurityApi.SessionInfo> sessions = List.of();
+    private List<AdminSecurityApi.DeviceInfo> devices = List.of();
     private long reauthenticatedUntilEpochMs;
     private AdminHighRiskActionGate.Binding pendingReconfirmation;
     private String stateVersion;
     private String observedAt;
+    private AdminRecoveryCustodyState recoveryCustodyState;
+    private String recoveryCustodyAttestedAt;
 
     public AdminSecurityController(AdminSecurityApi api) {
         this(api, null, AdminSecurityTelemetry.androidLogRecorder());
@@ -100,9 +120,12 @@ public final class AdminSecurityController implements AutoCloseable {
             securityState,
             currentSessionId,
             sessions,
+            devices,
             reauthenticatedUntilEpochMs,
             stateVersion,
             observedAt,
+            recoveryCustodyState,
+            recoveryCustodyAttestedAt,
             accessToken != null,
             recoveryToken != null
         );
@@ -117,6 +140,8 @@ public final class AdminSecurityController implements AutoCloseable {
     ) throws IOException {
         String correlationId = AdminSecurityTelemetry.newCorrelationId();
         securityState = AdminSecurityState.AUTHENTICATING;
+        recoveryCustodyState = null;
+        recoveryCustodyAttestedAt = null;
         recoveryToken = null;
         recoveryAdminId = null;
         boolean sessionIssued = false;
@@ -151,10 +176,13 @@ public final class AdminSecurityController implements AutoCloseable {
                 currentSessionId = null;
             }
             sessions = List.of();
+            devices = List.of();
             reauthenticatedUntilEpochMs = 0L;
             pendingReconfirmation = null;
             stateVersion = null;
             observedAt = null;
+            recoveryCustodyState = null;
+            recoveryCustodyAttestedAt = null;
             securityState = AdminSecurityState.FAIL_CLOSED;
             recordTelemetry(
                 AdminSecurityTelemetry.AUTH_FAILED,
@@ -171,7 +199,10 @@ public final class AdminSecurityController implements AutoCloseable {
         String token = requireAccessToken();
         try {
             loadRemoteState(token, null);
-            if (securityState != AdminSecurityState.NORMAL) clearReconfirmation();
+            if (securityState != AdminSecurityState.NORMAL
+                || recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+                clearReconfirmation();
+            }
         } catch (IOException | RuntimeException error) {
             failClosed();
             throw error;
@@ -186,12 +217,14 @@ public final class AdminSecurityController implements AutoCloseable {
     public synchronized void reauthenticate(
         String password,
         String totpCode,
-        String action,
-        String method,
-        String path,
+        AdminHighRiskActionGate.Action action,
         long nowEpochMs
     ) throws IOException {
         if (securityState != AdminSecurityState.NORMAL) throw new IllegalStateException("administrator access is not normal");
+        if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+            throw new IllegalStateException("recovery custody is not attested");
+        }
+        if (action == null) throw new IllegalArgumentException("high-risk action is required");
         String token = requireAccessToken();
         String nonce = newNonce();
         try {
@@ -199,22 +232,20 @@ public final class AdminSecurityController implements AutoCloseable {
                 token,
                 password,
                 totpCode,
-                action,
-                method,
-                path,
+                action.reauthenticationAction(),
+                action.method(),
+                action.path(),
                 nonce
             );
             long until = result.reauthenticatedUntilEpochMs();
             if (until <= nowEpochMs) throw new IOException("invalid reauthentication expiry");
-            if (!action.equals(result.action())
-                || !method.equals(result.method())
-                || !path.equals(result.path())) {
+            if (!action.reauthenticationAction().equals(result.action())
+                || !action.method().equals(result.method())
+                || !action.path().equals(result.path())) {
                 throw new IOException("reauthentication binding response does not match the request");
             }
             pendingReconfirmation = new AdminHighRiskActionGate.Binding(
                 action,
-                method,
-                path,
                 nonce,
                 until
             );
@@ -237,18 +268,80 @@ public final class AdminSecurityController implements AutoCloseable {
                 clearLocalSession();
                 return;
             }
-            securityState = next;
-            stateVersion = requiredMetadata(state.stateVersion(), "invalid_revoke_state_version");
-            observedAt = requiredMetadata(state.observedAt(), "invalid_revoke_observed_at");
+            applyRemoteState(state, null);
             List<AdminSecurityApi.SessionInfo> remaining = new ArrayList<>();
             for (AdminSecurityApi.SessionInfo item : sessions) {
                 if (!item.sessionId().equals(sessionId)) remaining.add(item);
             }
             sessions = List.copyOf(remaining);
-            if (next != AdminSecurityState.NORMAL) clearReconfirmation();
+            if (next != AdminSecurityState.NORMAL
+                || recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+                clearReconfirmation();
+            }
         } catch (IOException | RuntimeException error) {
             if (revokingCurrent) clearLocalSession();
             else failClosed();
+            throw error;
+        }
+    }
+
+    public synchronized void attestRecoveryCustody(
+        AdminSecurityApi.RecoveryMaterialKind materialKind
+    ) throws IOException {
+        if (securityState != AdminSecurityState.NORMAL) {
+            throw new IllegalStateException("administrator access is not normal");
+        }
+        String token = requireAccessToken();
+        AdminSecurityApi.RecoveryCustodyAttestation attestation =
+            new AdminSecurityApi.RecoveryCustodyAttestation(
+                newCustodyReference(),
+                materialKind,
+                AdminSecurityApi.RecoveryStorageLocation.OFF_PHONE,
+                true
+            );
+        try {
+            AdminSecurityApi.StateSnapshot state = api.attestRecoveryCustody(token, attestation);
+            applyRemoteState(state, AdminSecurityState.NORMAL);
+            if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+                throw new IOException("recovery custody attestation was not confirmed");
+            }
+            clearReconfirmation();
+        } catch (IOException | RuntimeException error) {
+            failClosed();
+            throw error;
+        }
+    }
+
+    public synchronized void reportLostDevice(String deviceId) throws IOException {
+        String token = requireAccessToken();
+        if (deviceId != null && deviceId.equals(authenticatedDeviceId)) {
+            throw new IllegalArgumentException("current device cannot be reported lost");
+        }
+        boolean activeRemoteDevice = false;
+        for (AdminSecurityApi.DeviceInfo device : devices) {
+            if (!device.deviceId().equals(deviceId)) continue;
+            if (device.isCurrent()) {
+                throw new IllegalArgumentException("current device cannot be reported lost");
+            }
+            activeRemoteDevice = true;
+        }
+        if (!activeRemoteDevice) throw new IllegalArgumentException("active remote device key is required");
+        try {
+            AdminSecurityApi.StateSnapshot state = api.reportLostDevice(token, deviceId);
+            applyRemoteState(state, null);
+            List<AdminSecurityApi.SessionInfo> remaining = new ArrayList<>();
+            for (AdminSecurityApi.SessionInfo session : sessions) {
+                if (!session.deviceId().equals(deviceId)) remaining.add(session);
+            }
+            sessions = List.copyOf(remaining);
+            List<AdminSecurityApi.DeviceInfo> remainingDevices = new ArrayList<>();
+            for (AdminSecurityApi.DeviceInfo device : devices) {
+                if (!device.deviceId().equals(deviceId)) remainingDevices.add(device);
+            }
+            devices = List.copyOf(remainingDevices);
+            clearReconfirmation();
+        } catch (IOException | RuntimeException error) {
+            failClosed();
             throw error;
         }
     }
@@ -371,6 +464,7 @@ public final class AdminSecurityController implements AutoCloseable {
         return AdminHighRiskActionGate.evaluate(
             action,
             securityState,
+            recoveryCustodyState,
             reauthenticatedUntilEpochMs,
             nowEpochMs,
             operationalWorkflowsEnabled
@@ -422,9 +516,7 @@ public final class AdminSecurityController implements AutoCloseable {
     }
 
     public synchronized AdminHighRiskActionGate.Decision consumeHighRiskAuthorization(
-        String action,
-        String method,
-        String path,
+        AdminHighRiskActionGate.Action action,
         long nowEpochMs,
         boolean operationalWorkflowsEnabled
     ) {
@@ -432,9 +524,8 @@ public final class AdminSecurityController implements AutoCloseable {
         clearReconfirmation();
         AdminHighRiskActionGate.Decision decision = AdminHighRiskActionGate.evaluate(
             action,
-            method,
-            path,
             securityState,
+            recoveryCustodyState,
             binding,
             nowEpochMs,
             operationalWorkflowsEnabled
@@ -470,6 +561,9 @@ public final class AdminSecurityController implements AutoCloseable {
         if (securityState != AdminSecurityState.NORMAL) {
             throw new IllegalStateException("administrator access is not normal");
         }
+        if (recoveryCustodyState != AdminRecoveryCustodyState.ATTESTED) {
+            throw new IllegalStateException("recovery custody is not attested");
+        }
         if (accessToken == null || authenticatedAdminId == null
             || currentSessionId == null || authenticatedDeviceId == null) {
             throw new IllegalStateException("administrator session binding is unavailable");
@@ -490,20 +584,27 @@ public final class AdminSecurityController implements AutoCloseable {
     private void failClosed() {
         securityState = AdminSecurityState.FAIL_CLOSED;
         sessions = List.of();
+        devices = List.of();
         clearReconfirmation();
         stateVersion = null;
         observedAt = null;
+        recoveryCustodyState = null;
+        recoveryCustodyAttestedAt = null;
     }
 
     private void clearLocalSession() {
+        api.clearLocalBinding();
         accessToken = null;
         authenticatedAdminId = null;
         authenticatedDeviceId = null;
         currentSessionId = null;
         sessions = List.of();
+        devices = List.of();
         clearReconfirmation();
         stateVersion = null;
         observedAt = null;
+        recoveryCustodyState = null;
+        recoveryCustodyAttestedAt = null;
         securityState = AdminSecurityState.SIGNED_OUT;
     }
 
@@ -512,15 +613,64 @@ public final class AdminSecurityController implements AutoCloseable {
         AdminSecurityState next = state.securityState();
         requireAuthenticatedState(next, "invalid_remote_security_state");
         if (expectedState != null && expectedState != next) throw new IOException("inconsistent remote security state");
-        List<AdminSecurityApi.SessionInfo> updatedSessions = api.getSessions(token);
+        AdminSecurityApi.DeviceInventory inventory = api.getDeviceInventory(token);
+        List<AdminSecurityApi.SessionInfo> updatedSessions = inventory.sessions();
+        List<AdminSecurityApi.DeviceInfo> updatedDevices = inventory.devices();
+        for (AdminSecurityApi.SessionInfo item : updatedSessions) {
+            requiredAwareRfc3339(item.lastSeenAt(), "invalid_session_last_seen_at");
+        }
         long currentMatches = updatedSessions.stream()
             .filter(item -> item.isCurrent() && !item.isRevoked() && item.sessionId().equals(currentSessionId))
             .count();
         if (currentMatches != 1L) throw new IOException("current administrator session binding is invalid");
+        Set<String> deviceIds = new HashSet<>();
+        int currentDeviceCount = 0;
+        for (AdminSecurityApi.DeviceInfo item : updatedDevices) {
+            String deviceId = item.deviceId();
+            if (deviceId == null
+                || !deviceId.matches("[A-Za-z0-9][A-Za-z0-9._:-]{7,127}")
+                || !deviceIds.add(deviceId)) {
+                throw new IOException("invalid administrator device inventory");
+            }
+            if (item.isCurrent()) {
+                currentDeviceCount += 1;
+                if (!deviceId.equals(authenticatedDeviceId)) {
+                    throw new IOException("current administrator device binding is invalid");
+                }
+            }
+        }
+        if (currentDeviceCount != 1) throw new IOException("current administrator device binding is invalid");
+        applyRemoteState(state, expectedState);
+        sessions = List.copyOf(updatedSessions);
+        devices = List.copyOf(updatedDevices);
+    }
+
+    private void applyRemoteState(
+        AdminSecurityApi.StateSnapshot state,
+        AdminSecurityState expectedState
+    ) throws IOException {
+        if (state == null) throw new IOException("missing remote security state");
+        AdminSecurityState next = state.securityState();
+        requireAuthenticatedState(next, "invalid_remote_security_state");
+        if (expectedState != null && expectedState != next) {
+            throw new IOException("inconsistent remote security state");
+        }
+        AdminRecoveryCustodyState custodyState = state.recoveryCustodyState();
+        String custodyAttestedAt = state.recoveryCustodyAttestedAt();
+        if (custodyState == null
+            || (custodyState == AdminRecoveryCustodyState.ATTESTED) != (custodyAttestedAt != null)) {
+            throw new IOException("invalid recovery custody state");
+        }
         securityState = next;
         stateVersion = requiredMetadata(state.stateVersion(), "invalid_state_version");
-        observedAt = requiredMetadata(state.observedAt(), "invalid_state_observed_at");
-        sessions = List.copyOf(updatedSessions);
+        observedAt = requiredAwareRfc3339(state.observedAt(), "invalid_state_observed_at");
+        recoveryCustodyState = custodyState;
+        recoveryCustodyAttestedAt = custodyAttestedAt == null
+            ? null
+            : requiredAwareRfc3339(
+                custodyAttestedAt,
+                "invalid_recovery_custody_attested_at"
+            );
     }
 
     private static void requireAuthenticatedState(AdminSecurityState state, String reason) throws IOException {
@@ -551,6 +701,22 @@ public final class AdminSecurityController implements AutoCloseable {
         return value;
     }
 
+    private static String requiredAwareRfc3339(String value, String reason) throws IOException {
+        String checked = requiredMetadata(value, reason);
+        if (!checked.matches(
+            "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+                + "(?:\\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})"
+        )) {
+            throw new IOException(reason);
+        }
+        try {
+            OffsetDateTime.parse(checked, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            return checked;
+        } catch (DateTimeParseException error) {
+            throw new IOException(reason, error);
+        }
+    }
+
     private void clearReconfirmation() {
         reauthenticatedUntilEpochMs = 0L;
         pendingReconfirmation = null;
@@ -578,6 +744,12 @@ public final class AdminSecurityController implements AutoCloseable {
 
     private static String newNonce() {
         byte[] value = new byte[16];
+        SECURE_RANDOM.nextBytes(value);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
+    }
+
+    private static String newCustodyReference() {
+        byte[] value = new byte[32];
         SECURE_RANDOM.nextBytes(value);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }

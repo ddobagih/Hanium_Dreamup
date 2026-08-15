@@ -1,0 +1,218 @@
+{
+  "authority_bindings": {
+    "contract": {
+      "byte_length": 4561,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r002.json",
+      "role": "FP022_START_GATE_CONTRACT_R002",
+      "sha256": "8e7f55dffcc0725fcb831118ed553b79ed09a41c0d323d00da343fa26ab01b42"
+    },
+    "goal": {
+      "byte_length": 5970,
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
+      "role": "FP022_GOAL",
+      "sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b"
+    },
+    "start_gate": {
+      "byte_length": 8653,
+      "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001",
+      "event_sequence": 69,
+      "path": "docs/control/execution/goal-gates/WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001/implementation-start-gate-receipt.json",
+      "role": "FP022_EXACT7_START_GATE",
+      "sha256": "6b29a7476aa4b88a40bf67922d4e0f8c1c7e3614fb46c9358859d8631e338a3d"
+    }
+  },
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_independence_claimed": false,
+    "external_review_status": "NOT_RUN",
+    "external_tmap_status": "NOT_RUN",
+    "field_gps_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_ids": [
+      "TC-FP-022-01",
+      "TC-FP-022-02",
+      "TC-FP-022-03",
+      "TC-FP-022-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "credit_scope": "REPOSITORY_INTERNAL_ONLY",
+  "document_id": "WS-FP022-NAVIGATION-IMPLEMENTATION-20260814-001",
+  "executor": {
+    "id": "codex-fp022-navigation-implementer-20260814",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "task": "/root"
+  },
+  "final_content_manifest": {
+    "content_set_sha256": "4ef7df96c5edf35864b81b637fcf8406009ab32f61cb97cae1e88763166c24f3",
+    "exact_path_count": 22,
+    "files": [
+      {
+        "byte_length": 929714,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+        "sha256": "7cf49ad23b268ebd52809055879b734d81e7cf7215c44c94f9196b20d5b4e865"
+      },
+      {
+        "byte_length": 13382,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommand.kt",
+        "sha256": "ec0515df166022d12d0d9eadede69da38c61a52271e344666ba9e21df0f0e2d5"
+      },
+      {
+        "byte_length": 25243,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClient.kt",
+        "sha256": "a44c232b7db2f07907261115b76d80145072abefe57a812679a40021e691faf3"
+      },
+      {
+        "byte_length": 4350,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicy.kt",
+        "sha256": "dfdb11f452c15af7046ccc10c6df0146cc880fee7bb107a56842130e88f22f43"
+      },
+      {
+        "byte_length": 24555,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigator.kt",
+        "sha256": "f0a38922b7c7664c93f7194362d1938795ca05964d06ed016f1fe7000a373cb6"
+      },
+      {
+        "byte_length": 1507,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimator.kt",
+        "sha256": "ec69d3e873b2ec408b50ad08a1216af590f34e9c3efd4886a3bc66c0ad4e38fd"
+      },
+      {
+        "byte_length": 6458,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicy.kt",
+        "sha256": "086ba1f5272b4e040c7080961093ee45e88722fbba05ef8900d2b87ceeaecb2b"
+      },
+      {
+        "byte_length": 1604,
+        "group_id": "ANDROID_RUNTIME",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/WalkingRouteModels.kt",
+        "sha256": "efeb5b394b7a15da0e9ede5edcc1e3eecab613149c684c41471f5d400d58e282"
+      },
+      {
+        "byte_length": 10769,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/MainActivityNavigationCompositionTest.kt",
+        "sha256": "b6b54774a3d21d0b17d782129c11d7ebdfc3620ed5765db4f83b9c7d5917df2f"
+      },
+      {
+        "byte_length": 12120,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/AndroidVoiceCommandTest.kt",
+        "sha256": "3f429044435a7d3dd94ae14c588013f9bebcb5b0a5f75cd9ffc8d931a29f07c9"
+      },
+      {
+        "byte_length": 12489,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientTest.kt",
+        "sha256": "511812bfc4ad42b70a11b432fe78dcea42c1e0d85d8c26fe476c0ffb44961739"
+      },
+      {
+        "byte_length": 7811,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/BackendWalkingRouteClientNetworkTest.kt",
+        "sha256": "045c5519f3293dde83471c251de7705e0689cd46a3890367980cfb401fb364f8"
+      },
+      {
+        "byte_length": 2647,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/LocationPolicyTest.kt",
+        "sha256": "39a7b33552203aeba6ec25adad9cffdb05d5326f23d8e7752c3f7e69d6551f31"
+      },
+      {
+        "byte_length": 25014,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/RouteNavigatorTest.kt",
+        "sha256": "9aef6ff711a7d64e08b15c1b700309844b75e8a562437c34ab798b875006a5ac"
+      },
+      {
+        "byte_length": 986,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/StepLengthEstimatorTest.kt",
+        "sha256": "315dc879c8d5c780125e75f36997b89ef9a78125f1b97a81bb7f742a8d873a35"
+      },
+      {
+        "byte_length": 9314,
+        "group_id": "ANDROID_INTERNAL_TESTS",
+        "path": "apps/android/app/src/test/java/kr/co/hanium/dreamup/walksafe/navigation/TactileRoutePolicyTest.kt",
+        "sha256": "c6a3914a5dec1bdc58de5322a5ee20b46dbad6872cfa3bee5eeb5cc2d7a0a3f7"
+      },
+      {
+        "byte_length": 4885,
+        "group_id": "BACKEND_ROUTE_AUTHORITY",
+        "path": "backend/app/api/navigation.py",
+        "sha256": "c2e30b526a9aefa2aefd8ef0589b790ac6b9dae0d8446a4a82549a5c40e36383"
+      },
+      {
+        "byte_length": 39732,
+        "group_id": "BACKEND_ROUTE_AUTHORITY",
+        "path": "backend/app/services/tmap_pedestrian.py",
+        "sha256": "369eaee6d42be77965e77734a5eb94572bbdd8d71836d90f6091cc402347cd06"
+      },
+      {
+        "byte_length": 2946,
+        "group_id": "BACKEND_ROUTE_AUTHORITY",
+        "path": "backend/app/services/walking_route_sanity.py",
+        "sha256": "7b136a395e71f2b1a1e7342f9ce311481047c9aad41256f25bafaf02096f880e"
+      },
+      {
+        "byte_length": 33227,
+        "group_id": "BACKEND_ROUTE_AUTHORITY",
+        "path": "backend/tests/test_navigation_routes.py",
+        "sha256": "a55ed9b49221351c14c7dda71d08ac84e16b689f6589b645ffd4361eb4b83895"
+      },
+      {
+        "byte_length": 1973,
+        "group_id": "POLICY_DOCS",
+        "path": "apps/android/app/src/main/java/kr/co/hanium/dreamup/walksafe/navigation/README.md",
+        "sha256": "f8bd355c58e63b3d8e8b9a0fdb7757ed069c9b3550a4b31285bfb1e45a6fecbf"
+      },
+      {
+        "byte_length": 22045,
+        "group_id": "POLICY_DOCS",
+        "path": "docs/walksafe-v2/navigation_integration_policy.md",
+        "sha256": "2fdcc61b3dc0a94d05d8bba17f3945fee7540bc2280a3907b875c0c4b38c7c27"
+      }
+    ],
+    "group_order": [
+      "ANDROID_RUNTIME",
+      "ANDROID_INTERNAL_TESTS",
+      "BACKEND_ROUTE_AUTHORITY",
+      "POLICY_DOCS"
+    ],
+    "manifest_content_sha256": "cd2b236d065e1d5db1cfc74cf37a69b20b5891e7356f7880dbec90b43814e790",
+    "path_set_sha256": "465a39302de0666dcf8c5ef6acd22c5a2c240bcef730ce1aca8d4458c84fc0f3",
+    "schema_version": "walksafe.fp022-final-content-manifest.v1",
+    "scope_kind": "EXACT_ORDERED_FP022_FINAL_CONTENT_MANIFEST"
+  },
+  "gap_id": "GAP-031",
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "implementation_content_set_sha256": "4ef7df96c5edf35864b81b637fcf8406009ab32f61cb97cae1e88763166c24f3",
+  "implementation_record_content_sha256": "845591a742185e7d6b461bdbc915a4b5faba6f87fd1d278872fe57ace06bb6cd",
+  "implemented_controls": [
+    "voice destination candidates are announced in explicit pages of three and require explicit selection",
+    "stair avoidance and pedestrian accessibility take precedence over a shorter inaccessible route",
+    "trusted GPS and the stored TMAP route remain authoritative for remaining distance and route projection",
+    "stride progress remains auxiliary and never substitutes for location direction or arrival authority",
+    "untrusted location permission or TMAP state pauses directional guidance fail closed",
+    "reroute and arrival require fresh explicit user decisions before network request or route termination"
+  ],
+  "kind": "IMPLEMENTATION_RECORD",
+  "observed_at": "2026-08-14T14:46:19.617604+09:00",
+  "policy_id": "FP-022",
+  "schema_version": "walksafe.fp022-navigation-implementation-record.v1",
+  "scope_kind": "EXACT_ORDERED_FP022_FINAL_CONTENT_MANIFEST",
+  "status": "PASS"
+}

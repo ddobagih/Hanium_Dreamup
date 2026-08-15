@@ -208,24 +208,61 @@ def test_layer_runner_migrates_the_verified_test_database_before_tests() -> None
     assert web_lock < backup < snapshot < restore_trap < web_build
 
 
+def test_current_runner_omits_unpreserved_v25_candidate_test() -> None:
+    candidate_test = "tests/test_walksafe_v2_5_control_candidate_20260730.py"
+    ignored_paths = Path(".gitignore").read_text(encoding="utf-8").splitlines()
+    current_runner = Path("scripts/run_walksafe_test_layers_current.sh").read_text(
+        encoding="utf-8"
+    )
+    frozen_runner = Path("scripts/run_walksafe_test_layers_20260711.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert f"/{candidate_test}" in ignored_paths
+    assert candidate_test not in current_runner
+    assert candidate_test in frozen_runner
+
+
 def test_quality_workflow_uses_checksum_pinned_current_tree_secret_scan() -> None:
     workflow = Path(".github/workflows/quality.yml").read_text(encoding="utf-8")
 
     checkout = workflow.index("actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5")
+    fp046_fetch = workflow.index("Fetch FP046 successor source commit")
+    npc_fetch = workflow.index("Fetch NPC start-control ancestry")
     setup_python = workflow.index(
         "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
     )
     restore_modes = workflow.index("Restore private evidence modes")
     secret_scan = workflow.index("Verify current tree contains no new secrets")
     dependency_install = workflow.index("Install Node regression dependencies")
-    assert checkout < setup_python < restore_modes < secret_scan < dependency_install
+    assert (
+        checkout
+        < fp046_fetch
+        < npc_fetch
+        < setup_python
+        < restore_modes
+        < secret_scan
+        < dependency_install
+    )
     assert workflow.count("actions/setup-python@") == 2
     assert 'python-version: "3.14.6"' in workflow
     assert "update-environment: false" in workflow
     assert "steps.backup_python.outputs.python-path" in workflow
     assert "steps.general_base_python.outputs.python-path" in workflow
+    assert 'NPC_REANCHOR_BASE_COMMIT: "f0093863e82bfc80d9f11915cef33a51d44b8730"' in workflow
+    assert 'NPC_REANCHOR_HEAD_COMMIT: "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c"' in workflow
+    assert 'origin "${NPC_REANCHOR_HEAD_COMMIT:?}"' in workflow
+    assert '--depth=8' in workflow
+    ancestry_check = workflow.index("git merge-base --is-ancestor")
+    assert "${NPC_REANCHOR_BASE_COMMIT:?}" in workflow[ancestry_check : ancestry_check + 200]
+    assert "${NPC_REANCHOR_HEAD_COMMIT:?}" in workflow[ancestry_check : ancestry_check + 200]
     assert (
         '"${GENERAL_BASE_PYTHON}" -I -B scripts/restore_walksafe_private_evidence_modes.py'
+        in workflow
+    )
+    assert (
+        'PYTHONPATH=. "${WALKSAFE_GENERAL_PYTHON_BIN:?}" -B '
+        'scripts/check_walksafe_project_continuation_v2_4.py'
         in workflow
     )
     assert 'GITLEAKS_VERSION: "8.30.1"' in workflow
@@ -297,7 +334,45 @@ def test_layer_runner_assigns_model_runtime_pytest_to_unit(tmp_path: Path) -> No
                 "HISTORICAL_CONTROL_PYTHON_TESTS=("
             )
         ]
+    unit_start = runner.index("UNIT_PYTHON_TESTS=(")
+    functional_start = runner.index("FUNCTIONAL_PYTHON_TESTS=(")
+    historical_start = runner.index("HISTORICAL_CONTROL_PYTHON_TESTS=(")
+    active_start = runner.index("ACTIVE_SESSION_CONTROL_PYTHON_TESTS=(")
+    unit_layer = runner[unit_start:functional_start]
+    functional_layer = runner[functional_start:historical_start]
+    historical_layer = runner[historical_start:active_start]
+    completed_transition_tests = (
+        "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+        "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+        "tests/test_apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_trace_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+        "tests/test_build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+        "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+        "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+        "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+        "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+    )
+    for completed_test in completed_transition_tests:
+        assert completed_test not in unit_layer
+        assert completed_test in historical_layer
+    current_recovery_verifier = (
+        "tests/test_run_walksafe_npc_single_admin_recovery_verification_20260813.py"
+    )
+    assert current_recovery_verifier in unit_layer
+    assert current_recovery_verifier not in historical_layer
+    postgres_runtime_acl = "backend/tests/test_admin_runtime_acl_hardening.py"
+    assert postgres_runtime_acl not in unit_layer
+    assert postgres_runtime_acl in functional_layer
     assert "./gradlew testDebugUnitTest --no-daemon --rerun-tasks" in runner
+    run_unit_start = runner.index("run_unit() (")
+    run_unit_end = runner.index("\n)\n\nrun_active_session_control", run_unit_start)
+    run_unit = runner[run_unit_start:run_unit_end]
+    assert run_unit.index('"${PYTHON_BIN}" -m pytest') < run_unit.index(
+        "./gradlew testDebugUnitTest"
+    )
     assert (
         'WALKSAFE_ADMIN_API_ORIGIN="${WALKSAFE_RELEASE_TEST_ADMIN_API_ORIGIN:-'
         'https://admin.walksafe.invalid}"'

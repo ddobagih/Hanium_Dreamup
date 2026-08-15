@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timedelta
 import hashlib
 import json
 import os
@@ -846,6 +847,34 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         self.assertEqual(history[5]["materialized_goal_id"], "WS-ARBITRARY-NEXT")
         self.assertEqual(history[7]["subject_goal_id"], "WS-ARBITRARY-NEXT")
 
+    def test_generic_order_allows_ready_goal_completion_for_semantic_replay(self) -> None:
+        history = self._generic_history_fixture()[:7]
+        goal_id = "WS-ARBITRARY-NEXT"
+        history.append(
+            self._event(
+                len(history) + 1,
+                "GOAL_COMPLETED",
+                previous=history[-1]["event_sha256"],
+                from_status="READY",
+                to_status="COMPLETE_AT_TARGET",
+                status_changes={goal_id: "COMPLETE_AT_TARGET"},
+                subject_goal_id=goal_id,
+            )
+        )
+
+        self.assertEqual(continuation.validate_generic_event_order(history), [])
+
+    def test_ready_completion_is_semantically_limited_to_workstreams(self) -> None:
+        self.assertTrue(
+            continuation._completion_source_is_allowed("READY", "WORKSTREAM")
+        )
+        self.assertFalse(
+            continuation._completion_source_is_allowed("READY", "WORK_ITEM")
+        )
+        self.assertTrue(
+            continuation._completion_source_is_allowed("IN_PROGRESS", "WORK_ITEM")
+        )
+
     def test_generic_next_goal_out_of_order_transition_is_rejected(self) -> None:
         history = self._generic_history_fixture()
         history[3]["event_type"] = "GOAL_COMPLETED"
@@ -1352,7 +1381,111 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         self.assertEqual(artifact_bindings, {})
         self.assertEqual(transitions, {})
 
-    def test_known_standalone_goal_graph_failure_set_is_exact(self) -> None:
+    def test_current_security_database_successors_preserve_completion_sources(
+        self,
+    ) -> None:
+        amendments = (
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_AMENDMENTS
+        )
+        self.assertEqual(
+            goal_graph._current_security_database_compatibility_artifacts(ROOT),
+            {
+                relative: (
+                    amendment["predecessor_sha256"],
+                    amendment["successor_sha256"],
+                )
+                for relative, amendment in amendments.items()
+            },
+        )
+
+        record_path = (
+            ROOT / goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_PATH
+        )
+        self.assertEqual(
+            record_path.stat().st_size,
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_BYTE_COUNT,
+        )
+        self.assertEqual(
+            sha256_file(record_path),
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_SHA256,
+        )
+
+    def test_current_security_database_successor_rejects_third_digest(
+        self,
+    ) -> None:
+        target = ROOT / "backend/tests/test_admin_runtime_acl_hardening.py"
+        real_sha256_file = goal_graph.continuation.sha256_file
+
+        def changed_sha256(path: Path) -> str:
+            if path == target:
+                return "f" * 64
+            return real_sha256_file(path)
+
+        with mock.patch.object(
+            goal_graph.continuation,
+            "sha256_file",
+            side_effect=changed_sha256,
+        ):
+            self.assertIsNone(
+                goal_graph._current_security_database_compatibility_artifacts(
+                    ROOT
+                )
+            )
+
+    def test_current_security_database_added_source_rejects_third_digest(
+        self,
+    ) -> None:
+        real_sha256_file = goal_graph.continuation.sha256_file
+        for relative in (
+            goal_graph.CURRENT_SECURITY_DATABASE_COMPATIBILITY_ADDED_SOURCES
+        ):
+            with self.subTest(relative=relative):
+                target = ROOT / relative
+
+                def changed_sha256(path: Path) -> str:
+                    if path == target:
+                        return "f" * 64
+                    return real_sha256_file(path)
+
+                with mock.patch.object(
+                    goal_graph.continuation,
+                    "sha256_file",
+                    side_effect=changed_sha256,
+                ):
+                    self.assertIsNone(
+                        goal_graph._current_security_database_compatibility_artifacts(
+                            ROOT
+                        )
+                    )
+
+    def test_current_security_database_rejects_unsealed_predecessor(
+        self,
+    ) -> None:
+        real_strict_json_bytes = goal_graph.npc_recovery.strict_json_bytes
+
+        def changed_predecessor(raw: bytes, label: str) -> dict[str, object]:
+            document = real_strict_json_bytes(raw, label)
+            if label != goal_graph.npc_recovery.V2_IMPLEMENTATION_REL.as_posix():
+                return document
+            document = copy.deepcopy(document)
+            for row in document["execution_input_closure"]["files"]:
+                if row["path"] == "backend/tests/test_fp046_postgres_integration.py":
+                    row["sha256"] = "f" * 64
+                    break
+            return document
+
+        with mock.patch.object(
+            goal_graph.npc_recovery,
+            "strict_json_bytes",
+            side_effect=changed_predecessor,
+        ):
+            self.assertIsNone(
+                goal_graph._current_security_database_compatibility_artifacts(
+                    ROOT
+                )
+            )
+
+    def test_standalone_goal_graph_passes_with_historical_witness(self) -> None:
         completed = subprocess.run(
             [
                 sys.executable,
@@ -1366,13 +1499,9 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
             check=False,
         )
 
-        self.assertEqual(completed.returncode, 1)
-        self.assertEqual(completed.stdout, b"")
-        self.assertEqual(completed.stderr.count(b"\n"), 64)
-        self.assertEqual(
-            hashlib.sha256(completed.stderr).hexdigest(),
-            "bfab9a20b8ab621f94b45dc27d153a03d0c9062c398fb9ac51a96e13ee098417",
-        )
+        self.assertEqual(completed.returncode, 0)
+        self.assertIn(b"WalkSafe v2.4 Goal graph check: PASS", completed.stdout)
+        self.assertEqual(completed.stderr, b"")
 
     @staticmethod
     def _create_fp008_private_gate_fixture(
@@ -2038,13 +2167,12 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         checkpoint = continuation.load_json(CHECKPOINT)
         state = checkpoint["goal_execution"]
         history = state["transition_history"]
-        latest_index = max(
-            index
-            for index, event in enumerate(history)
-            if "canonical_binding_snapshot_after" in event
+        tail = history[-1]
+        occurred_at = datetime.fromisoformat(tail["occurred_at"]) + timedelta(
+            seconds=1
         )
-        latest = history[latest_index]
-        snapshot = latest["canonical_binding_snapshot_after"]
+        focus_status = state["status_by_goal"][tail["focus_goal_id"]]
+        snapshot = continuation.canonical_binding_snapshot(checkpoint)
         top_level_by_role = {
             binding["role"]: binding
             for binding in checkpoint["canonical_bindings"]
@@ -2053,15 +2181,38 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
             digest = sha256_file(ROOT / binding["path"])
             binding["file_sha256"] = digest
             top_level_by_role[role]["file_sha256"] = digest
-        for index in range(latest_index, len(history)):
-            if index:
-                history[index]["previous_event_sha256"] = history[index - 1][
-                    "event_sha256"
-                ]
-            history[index]["event_sha256"] = continuation.event_sha256(
-                history[index]
-            )
-        state["transition_history_anchor_sha256"] = history[-1]["event_sha256"]
+        update = {
+            "sequence": len(history) + 1,
+            "event_id": "WS-TEST-CANONICAL-BINDINGS-UPDATED-CURRENT-001",
+            "event_type": "CANONICAL_BINDINGS_UPDATED",
+            "occurred_on": occurred_at.date().isoformat(),
+            "occurred_at": occurred_at.isoformat(),
+            "previous_focus_goal_id": tail["focus_goal_id"],
+            "previous_focus_content_sha256": tail[
+                "focus_goal_content_sha256"
+            ],
+            "focus_goal_id": tail["focus_goal_id"],
+            "focus_goal_content_sha256": tail["focus_goal_content_sha256"],
+            "from_status": focus_status,
+            "to_status": focus_status,
+            "static_plan_manifest_sha256": tail[
+                "static_plan_manifest_sha256"
+            ],
+            "status_changes": {},
+            "runtime_after": copy.deepcopy(tail["runtime_after"]),
+            "blockers_after": copy.deepcopy(tail["blockers_after"]),
+            "blocker_resolution_ids_after": copy.deepcopy(
+                tail["blocker_resolution_ids_after"]
+            ),
+            "source_checkpoint_version": checkpoint["schema_version"],
+            "evidence_refs": [],
+            "previous_event_sha256": tail["event_sha256"],
+            "canonical_binding_snapshot_after": snapshot,
+        }
+        update["event_sha256"] = continuation.event_sha256(update)
+        history.append(update)
+        state["transition_history_anchor_sha256"] = update["event_sha256"]
+        state["validation_cutoff_at"] = update["occurred_at"]
         return checkpoint
 
     @staticmethod
@@ -2078,6 +2229,98 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
                 continuation.EXPECTED_PACKAGE_ACTIVATION_AUTHORIZATION_SHA256
             ),
         )
+
+
+class WalkSafeFp022CompletionSuffixTest(unittest.TestCase):
+    def test_seq68_replays_the_frozen_r031_review_binding(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        event = checkpoint["goal_execution"]["transition_history"][67]
+        self.assertEqual(
+            continuation._fp022_frozen_transition_review_binding(ROOT),
+            event["transition_control_review_binding"],
+        )
+
+    def test_seq68_canonical_snapshot_is_historical_after_completion_updates(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        history = checkpoint["goal_execution"]["transition_history"]
+        event = history[67]
+        gap = next(
+            row
+            for row in checkpoint["canonical_bindings"]
+            if row["role"] == "IMPLEMENTATION_GAP"
+        )
+        gap["file_sha256"] = "0" * 64
+        errors = continuation._validate_fp022_control_reanchor_seq68(
+            ROOT,
+            event=event,
+            checkpoint=checkpoint,
+            history=history,
+        )
+        self.assertNotIn("canonical snapshot", "\n".join(errors))
+
+    def test_completion_review_paths_follow_the_current_review_builder(self) -> None:
+        from scripts import (
+            build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+        )
+
+        self.assertEqual(
+            continuation._fp022_completion_review_paths(),
+            {
+                "assignment": review.ASSIGNMENT_REL.as_posix(),
+                "review_result": review.RESULT_REL.as_posix(),
+                "independent_review": review.INDEPENDENT_REL.as_posix(),
+            },
+        )
+
+    def test_seq69_source_does_not_claim_completion(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        self.assertEqual(
+            continuation.validate_fp022_completion_seq70_71(ROOT, checkpoint),
+            [],
+        )
+
+    def test_seq70_without_adjacent_seq71_fails_closed(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        if len(state["transition_history"]) >= 71:
+            del state["transition_history"][69:]
+        seq70 = copy.deepcopy(state["transition_history"][-1])
+        seq70.update(
+            {
+                "sequence": 70,
+                "event_id": continuation.FP022_COMPLETION_UPDATE_EVENT_ID,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "previous_event_sha256": state["transition_history"][-1]["event_sha256"],
+            }
+        )
+        seq70["event_sha256"] = continuation.event_sha256(seq70)
+        state["transition_history"].append(seq70)
+        errors = continuation.validate_fp022_completion_seq70_71(ROOT, checkpoint)
+        self.assertEqual(
+            errors,
+            ["FP022 seq70 producer transaction lacks adjacent seq71 completion"],
+        )
+
+    def test_resealed_wrong_seq70_71_ids_are_rejected(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        if len(state["transition_history"]) >= 71:
+            del state["transition_history"][69:]
+        for sequence, event_type in ((70, "CANONICAL_BINDINGS_UPDATED"), (71, "GOAL_COMPLETED")):
+            event = copy.deepcopy(state["transition_history"][-1])
+            event.update(
+                {
+                    "sequence": sequence,
+                    "event_id": f"WS-FORGED-FP022-{sequence}",
+                    "event_type": event_type,
+                    "previous_event_sha256": state["transition_history"][-1]["event_sha256"],
+                }
+            )
+            event["event_sha256"] = continuation.event_sha256(event)
+            state["transition_history"].append(event)
+        errors = continuation.validate_fp022_completion_seq70_71(ROOT, checkpoint)
+        self.assertIn("FP022 completion seq70 ID", "\n".join(errors))
+        self.assertIn("FP022 completion seq71 ID", "\n".join(errors))
 
 
 if __name__ == "__main__":

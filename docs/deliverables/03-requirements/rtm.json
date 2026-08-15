@@ -1318,7 +1318,7 @@
     "requirements_with_not_run_verification": 68,
     "verification_completion_claim_count": 0
   },
-  "document_content_sha256": "e5388b76f2bf4fde692027b6243d04db6d1aeb74d9e05519b72d8b10974d9ba3",
+  "document_content_sha256": "bef7048a9fa4defd6d589f0611eb016e9e3657f6c7bc51484e8216599ad009ba",
   "fp008_artifact_trace_successor": {
     "gap_id": "GAP-017",
     "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
@@ -1543,6 +1543,161 @@
     "title": "WalkSafe 요구사항 추적표 Draft",
     "verification_status": "NOT_RUN"
   },
+  "npc_single_admin_recovery_artifact_trace_correction_v2": {
+    "change_id": "CHG-DOC-0018",
+    "gap_id": "GAP-008",
+    "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+    "input_bindings": [
+      {
+        "byte_length": 342992,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-CORRECTION-20260813-002",
+        "name": "npc_single_admin_recovery_v2_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/implementation-record-v2.json",
+        "relation": "NPC_V2_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "eae0f5cd70574bb22551239bdb958370f1167524a3e823bceabd0a80d8b44fe5"
+      },
+      {
+        "byte_length": 3479,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-CORRECTION-20260813-002",
+        "name": "npc_single_admin_recovery_v2_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/verification-result-v2.json",
+        "relation": "NPC_V2_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "3ff147da580c7702d885d8508995e4aa1a4b77b913a900af30acf0706d4907f7"
+      },
+      {
+        "byte_length": 527521,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+        "name": "npc_gap008_r027_correction_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.json",
+        "relation": "GAP008_R027_V2_CORRECTION_RESULT",
+        "sha256": "ec04719873e80d7769e49c6b959fa3d712907272c3c968640147e26081b4c04f"
+      },
+      {
+        "byte_length": 513,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+        "name": "npc_gap008_r027_correction_successor_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.md",
+        "relation": "GAP008_R027_V2_CORRECTION_MARKDOWN",
+        "sha256": "5c9d154c8f0a906e5fa5d377db4d621f08ed8b3ee5f80e6ac1e3927a6bd83411"
+      },
+      {
+        "byte_length": 65457,
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+        "name": "npc_gap008_r027_backlog_successor",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.json",
+        "relation": "GAP008_R027_V2_CORRECTION_BACKLOG",
+        "sha256": "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45"
+      },
+      {
+        "byte_length": 420,
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+        "name": "npc_gap008_r027_backlog_successor_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.md",
+        "relation": "GAP008_R027_V2_CORRECTION_BACKLOG_MARKDOWN",
+        "sha256": "4285b7f1095ec340fc228855331039cd9e7064891f114f9e93a3f81846483a14"
+      },
+      {
+        "byte_length": 11802,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-REVIEW-REJECTED-20260813-001",
+        "name": "npc_rejected_internal_review_r001",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R001/review-result.json",
+        "relation": "REJECTED_PREDECESSOR_REVIEW_ADD_ONLY",
+        "sha256": "562d4a0bbf30c5c93bd5291fe046acd911d801f5798055a1e310da120e508a36"
+      }
+    ],
+    "physical_path": "docs/deliverables/03-requirements/rtm.json",
+    "policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+    "predecessor_sha256": "2bfb1420660e48fb9df1a0d8311da98fa95381a0ea932dc4fc942f84b3695cab",
+    "preserved_v1_marker_sha256": "dde0fec6258383427fcb5720053228fb16b83a89b84815bab215324f385ec910",
+    "preserved_v1_successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/00-control/artifact-register.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json"
+    ],
+    "semantic_change": "V2_CORRECTION_PROGRESS_BINDING_ONLY",
+    "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-CORRECTION-20260813-002",
+    "trace_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "actual_recovery_drill_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_evidence_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_V2_CORRECTION_TRACE_ONLY"
+    },
+    "v1_marker_remains_add_only": true
+  },
+  "npc_single_admin_recovery_artifact_trace_successor": {
+    "gap_id": "GAP-008",
+    "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+    "input_bindings": [
+      {
+        "byte_length": 16279,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-20260812-001",
+        "name": "npc_single_admin_recovery_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+        "relation": "NPC_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4"
+      },
+      {
+        "byte_length": 2542,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-20260812-001",
+        "name": "npc_single_admin_recovery_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+        "relation": "NPC_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+      },
+      {
+        "byte_length": 515757,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260812-026",
+        "name": "npc_gap008_r026_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+        "relation": "GAP008_R026_SUCCESSOR_RESULT",
+        "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1"
+      }
+    ],
+    "physical_path": "docs/deliverables/03-requirements/rtm.json",
+    "policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+    "predecessor_sha256": "4086aecbc86ceb2f3d726e7458a289eddb0d5cbe0ce50f7cf6495985b6d9f13e",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/00-control/artifact-register.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json"
+    ],
+    "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001",
+    "trace_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "actual_recovery_drill_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_evidence_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_ARTIFACT_TRACE_ONLY"
+    }
+  },
   "policy_baseline_binding": {
     "approval_record_path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.0-approval-20260721-r001.json",
     "approval_record_sha256": "10ce10b104da2f625ebba51a9bf37dced2eab8007d2dd0519a67c268d387bbd5",
@@ -1698,7 +1853,7 @@
       "waived": false
     }
   ],
-  "requirement_binding_sha256": "4e8d777f8533eb31286dced3022c6c7b04f024de0093acbdfafba9d1794c74dc",
+  "requirement_binding_sha256": "a6aab9f4f5196f669ecf48c7f91609173052742ad97d9e5b11be83030aa5dedc",
   "requirement_change_tracking": {
     "artifact_code": "REQ-18",
     "candidate_approval_status": "NOT_APPROVED",
@@ -4312,10 +4467,413 @@
         "CD-IBQ-107"
       ],
       "code_trace": {
-        "links": [],
-        "status": "NOT_APPLICABLE_AT_COMMON_POLICY_LEVEL"
+        "links": [
+          {
+            "byte_count": 6734,
+            "path": "apps/android/adminapp/README.md",
+            "sha256": "0e12b7517fef0ecabe5c781b6ccfd943a2a8da3e3bd1084db50131d1de72e78c",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 39659,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/AdminBoundaryActivity.java",
+            "sha256": "961aa14a6f9d502ee6d7edabf2f0e4674a9c866c54f5332ac81a817fc0ea3158",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 19129,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminDeviceProof.java",
+            "sha256": "8d2ac1479aa31a2b5dd9843ac822da9b8a0876a785a37ed869cb953663af76a2",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 5659,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGate.java",
+            "sha256": "dadf2d43f8848ce7e3750021e4879c70146d2f41f90de02ede0b7ee79b0f18e2",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 406,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryCustodyState.java",
+            "sha256": "060da24f7867db3c34314c249a09a7b995736fa48508689df74d83c9998ca81a",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 4316,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicy.java",
+            "sha256": "6f3f1746a9067a82704ebb65095506d3094b1f4aaf2355b0bd6682d114cbe79e",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8727,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApi.java",
+            "sha256": "11afbd635dd64d8a2e0f688b4009eba39198d85ef3617dcfd4fc4e6d629ba998",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 1890,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityApiException.java",
+            "sha256": "8b7321b1e4b0f87b1eafe2511e835baad7b3de74b3ccf413cd722c5f0b1e505f",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 30795,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityController.java",
+            "sha256": "cb5ea3474e989b387b3ae5d98ba736114859ff4398b832062ddd11c4231d9daf",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 36633,
+            "path": "apps/android/adminapp/src/main/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClient.java",
+            "sha256": "e392a6392cd8159cee55d0c6ff75525f5b009b26badc0dd438892aafd74a27c8",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 6889,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminHighRiskActionGateTest.java",
+            "sha256": "93757aa93e932646661f690e144e18a79f092e3eed3c4cde97d7730c25eb35af",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 6248,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminRecoveryMessagePolicyTest.java",
+            "sha256": "6f9344a793b46a62f898116a5a6a75159816a1c7fbf3ae21600f26b42ecf3b07",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8055,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityBoundaryStaticTest.java",
+            "sha256": "5d89dd18f3c0eeea6fd32e8b2214c3ae81d73f37d041e68efb6df292b154c350",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 30623,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityControllerTest.java",
+            "sha256": "db82bad5e857f5b43f197aa2455ee3d807fc0a7937d0a20697252d577c2cd352",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 45692,
+            "path": "apps/android/adminapp/src/test/java/kr/co/hanium/dreamup/walksafe/admin/security/AdminSecurityHttpClientTest.java",
+            "sha256": "23265c9ca62b71fc6329499fb00f40740536f53fa98eb8716cc0c64a1e271be4",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 5615,
+            "path": "backend/.env.example",
+            "sha256": "70b43d743418672fcc47de0e60bdf9237389b89eb736e8d50cf467b6006e6c19",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 22584,
+            "path": "backend/README.md",
+            "sha256": "3ea257b811c886a27570c65c934abcc517f87fce7cd8a771a3c572693147f602",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 867,
+            "path": "backend/alembic/README.md",
+            "sha256": "73be6aadb677870e9e70111ca79d8e960fe256b66fca1fdb51eab0d7a21487c4",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 134131,
+            "path": "backend/alembic/versions/202608120001_admin_recovery_custody.py",
+            "sha256": "40a6e86fe965cd3d08dc10450c9bde353a3d665707763cd777a49243e82da6eb",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 4818,
+            "path": "backend/app/api/README.md",
+            "sha256": "27a14443275c00e1f16307f15a35629ea1a8f188a9be050a0bc4581b20a9ca4c",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 23795,
+            "path": "backend/app/api/admin_security.py",
+            "sha256": "3b76b6f03d790bf1a9397f4dba17e14cf20ea2ee5e881a4852ad7dd8f39a13fe",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 18952,
+            "path": "backend/app/api/health.py",
+            "sha256": "ae18fa113fbad37b0d9a32a6d0f309375f4faa4b8f22c3647b2fd326c021f7a6",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 3117,
+            "path": "backend/app/api/uploads.py",
+            "sha256": "59ee8d2956ca20f096b1afa79d3c350501bc671d33acd667e048dec6ea1dbf23",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 44292,
+            "path": "backend/app/config.py",
+            "sha256": "0101b5b7d1ab9c06590a270b464bb6ac48831bfa3b5cc84ceab587caab91106d",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 1013,
+            "path": "backend/app/database.py",
+            "sha256": "df97c1dabf6a105ca9bcea78dfc46f5ce010e07bd3b8411d3267b6989b2f23b5",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 48282,
+            "path": "backend/app/field_test_security.py",
+            "sha256": "4f181ccc655ead15d3a58ff4b5cd88b299dbe39adb6572290ac9a7b562fd16e1",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 6269,
+            "path": "backend/app/main.py",
+            "sha256": "16799466412e8962c9df17c96fc8dc782d9a1b63e7208d219fb6baf3c29db77c",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 63396,
+            "path": "backend/app/models.py",
+            "sha256": "bfb6f78b00a1b3b94d394dc2790e8b780978e8478686994589380b51d4e44eaa",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 18280,
+            "path": "backend/app/openapi_contract.py",
+            "sha256": "c5cfd12e304d3cb3dc5c9847821f9dab35c14a7aa2f76a76e2aee71c6dc2000d",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 7495,
+            "path": "backend/app/services/README.md",
+            "sha256": "c96aca6bd998ab801d5747ae42dadea9ab4be3ac159078a6b756e38c882e09ea",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 7167,
+            "path": "backend/app/services/admin_credential_issuer_key.py",
+            "sha256": "f0d1673b7324bf85d9163aa17c38ac1ebaa679ae23f2627b3189a795666f3947",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 40950,
+            "path": "backend/app/services/admin_device_proof.py",
+            "sha256": "6c38ce0ab205799511820d529ab7e7b4bb14b4f2034b4443d6ddad09667ddbda",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 148255,
+            "path": "backend/app/services/admin_security.py",
+            "sha256": "1c8050101bc05ea9bec07b408977a9547418733703230491cf410efc18e7c164",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 31657,
+            "path": "backend/app/services/report_image_keys.py",
+            "sha256": "e48af3e3f1c2b81b05c5635fb0fa9b1d70d8a66f9365271e0f35f43da9e5e50d",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 22965,
+            "path": "backend/app/services/report_original_access.py",
+            "sha256": "2b054ae3fd26e0a01afa093d9b51fb09724adf3dc222b830d9bea3a7f362e52f",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 3533,
+            "path": "backend/tests/README.md",
+            "sha256": "e3f5047e5d27bf9eaa97372b71ee599a0f604a045b97c072020274dc5eb4b782",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 10636,
+            "path": "backend/tests/conftest.py",
+            "sha256": "d1796ac586dcd0080a425fb8b8cfd57371691a889c4b292427ddf23421441359",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 12723,
+            "path": "backend/tests/test_admin_credential_issuer_binding.py",
+            "sha256": "c9291221ff7471462cbba55b61a0f6b5f91e5dd8c549605660fb9d4b4fb62531",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8318,
+            "path": "backend/tests/test_admin_credential_issuer_key.py",
+            "sha256": "019b4934ef842f1cbeec88e92126787caddcf8da5a55f09d71d45406856226ed",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 73481,
+            "path": "backend/tests/test_admin_device_proof.py",
+            "sha256": "8c133048daaeede58b62d869502a5c5a9364a7da47c19c64e9266384984a2a61",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 182209,
+            "path": "backend/tests/test_admin_security.py",
+            "sha256": "43a4e8fe29072e8043c2dee5c3308a3ba7667d0c454ba3fb2fa3dbfe029da0da",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 48389,
+            "path": "backend/tests/test_field_test_security.py",
+            "sha256": "934f874f896430c4a76b9d4978e2fd39a1abdb177bf0df25c53f549d9f82a1b6",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 20624,
+            "path": "backend/tests/test_fp008_postgres_integration.py",
+            "sha256": "dcb8a0decf5efca4d3f9dddcac536984f4b4f1b9db28e0cdc8cdb5146f09a3e6",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 25338,
+            "path": "backend/tests/test_health_readiness.py",
+            "sha256": "510a28701666a25bc6ade6e2b2adbbdfa1360b7315f9724ebca5f310394db84a",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8361,
+            "path": "backend/tests/test_inference_process.py",
+            "sha256": "7bf1fe5c87da490cbcd95813bb7f4ee71b29593275d5b95759877c2117562616",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 10864,
+            "path": "backend/tests/test_openapi_contract.py",
+            "sha256": "a30a38ed868621154e7e2cd6b339027d22299705c5e84aad50ecd653af47fb24",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 18964,
+            "path": "backend/tests/test_report_image_keyring.py",
+            "sha256": "4cf17addd6a1f8bd1991107ec2f957f1fe7fa671df5c7cb331cb2811fd4a6cf4",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 28104,
+            "path": "backend/tests/test_report_original_access.py",
+            "sha256": "e1c1e73bd2c2c59f6750a5d93259c1060f164a5290fb7c6f81858563a122506a",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 22491,
+            "path": "backend/tests/test_report_storage_reconciliation.py",
+            "sha256": "8f2a4158bf15cb7c91fdbca9b0aef9c9e821f96d680d9f523c8f9e4645dd61cd",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 215129,
+            "path": "contracts/walksafe.openapi.json",
+            "sha256": "7b6618ed7805c8cc0d25de78b40e7b9ec15da4a7aa4c367133aa39a030aa606c",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 1053,
+            "path": "deploy/config/walksafe-backend-migration.env.example",
+            "sha256": "f474c221a8b9481fdf41a491705dd76c35fd90131ef88d34ab6fd27001f59a83",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 4470,
+            "path": "deploy/config/walksafe-backend.env.example",
+            "sha256": "bc9e34f91402b8b2e71d759294b0f56f54ce701e25402221ca3d61586bbb9618",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 1239,
+            "path": "deploy/systemd/walksafe-admin-issuer-bind.service",
+            "sha256": "8cf185bdacddb40c6b07bbf983494a44818fc166287276fc72192474ec63a1a0",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 806,
+            "path": "deploy/systemd/walksafe-backend-migrate.service",
+            "sha256": "0d0e847b81ccaf1d3e4b009c8bb1f1385b9ed71c64441c0b49198a2842b01dcb",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 1209,
+            "path": "deploy/systemd/walksafe-backend.service",
+            "sha256": "037a10e0a974505432116a8a26d91be187600e9bf0bb4cf684598900659b00ee",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 172,
+            "path": "deploy/sysusers.d/walksafe-backend.conf",
+            "sha256": "87c2db5321206457dbe0a941836e4b02c3997e00e1b254c9aa578dd464509c30",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 5043,
+            "path": "docs/guides/code/android-admin.md",
+            "sha256": "bc9e96497fb1acd5a6c6b71d669647c6ca9ceda60db49e7ab08762d2a3eb50b3",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 12091,
+            "path": "docs/guides/security-privacy-guide.md",
+            "sha256": "1313a6ba5b21bc5d969c3698010732780a65b452284ef1ba03ea5c81fbd91af3",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 12546,
+            "path": "docs/guides/testing-guide.md",
+            "sha256": "2f8fdc982be013ccb739b1283ee5456b92bda56e304700e93ba925c5b72a7bd5",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 5007,
+            "path": "scripts/bind_walksafe_admin_credential_issuer_key.py",
+            "sha256": "9109e43ea03b2137154ac387446e6e12a15638e3abaac6bf1627926d7da66dcd",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 83622,
+            "path": "scripts/build_walksafe_full_rc_20260713.py",
+            "sha256": "bb9dd6bb5128a33338f51467ecc19d756db2166280873648e40afe2da69de45c",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 5942,
+            "path": "scripts/provision_walksafe_admin_device_key.py",
+            "sha256": "3490783da848ccf1767096d03fa5deabceaeb86c1fc55d841d694ec5c7b4c5ac",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 149965,
+            "path": "scripts/validate_walksafe_full_rc_20260713.py",
+            "sha256": "5400d611881f6227cef9c28e0e4321199552695536f4c891de1b09e249ef47ec",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8588,
+            "path": "scripts/walksafe_admin_high_risk_gate.py",
+            "sha256": "e2435c3b216c27ad4dd7307fa37d6bf684578262a2646b00dbe1e88c61b744fd",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 8302,
+            "path": "tests/test_bind_walksafe_admin_credential_issuer_key.py",
+            "sha256": "ec69b94ce9e40aec7fc0a9ade3fc6fe54e89d6794e4556fdf50ce80927f8f51f",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 29781,
+            "path": "tests/test_walksafe_admin_high_risk_data_delete_gate.py",
+            "sha256": "fb80b04064ac59cb028da51cbf5d3ef4487554c07d84281cad1511f1ab2f4d90",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          },
+          {
+            "byte_count": 138044,
+            "path": "tests/test_walksafe_full_rc_tooling.py",
+            "sha256": "b2009d52a808aefb3fc200e19414d370415de1c66d1db6f285d01e0a5df7d4e2",
+            "trace_status": "INTERNAL_IMPLEMENTATION_SOURCE_ONLY"
+          }
+        ],
+        "status": "INTERNAL_EXACT_SOURCE_LINKED_FORMAL_NOT_RUN"
       },
-      "content_sha256": "cea3235775e71afde6916e15044c8879e43939db3063147c701040c961f91882",
+      "content_sha256": "011c7c40fef30e54d5392d1be53cc738d651b0125b19ed32519c27eb0a3c1f7f",
       "decision_refs": [
         "DEC-SUPPORT-HOURS",
         "DEC-IBQ-143",
@@ -4416,8 +4974,33 @@
         "DLV-REQ-13"
       ],
       "evidence_trace": {
-        "links": [],
-        "status": "NOT_LINKED"
+        "links": [
+          {
+            "byte_length": 16279,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-20260812-001",
+            "name": "npc_single_admin_recovery_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+            "relation": "NPC_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4"
+          },
+          {
+            "byte_length": 2542,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-20260812-001",
+            "name": "npc_single_admin_recovery_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+            "relation": "NPC_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+          },
+          {
+            "byte_length": 515757,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260812-026",
+            "name": "npc_gap008_r026_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+            "relation": "GAP008_R026_SUCCESSOR_RESULT",
+            "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1"
+          }
+        ],
+        "status": "INTERNAL_AUTOMATED_EVIDENCE_LINKED_FORMAL_NOT_RUN"
       },
       "gate_refs": [
         "GATE-SINGLE-ADMIN-RECOVERY-DRILL",
@@ -4425,8 +5008,26 @@
         "GATE-SERVER-CAPACITY-STATE-CONTRACT",
         "GATE-CLOUD-COST-MEASUREMENT"
       ],
-      "implementation_observation": "공통정책은 개별 기능·설계·시험에서 준수 여부를 다시 확인해야 한다.",
+      "implementation_observation": "추가 인증, 외부 복구 custody, 원격 세션 폐기·재사용 거부, 고위험 동결·재인증과 감사의 저장소 내부 증거를 결속했다. 정식 시험과 실제 복구훈련은 NOT_RUN이다.",
       "lifecycle_status": "DRAFT",
+      "npc_single_admin_recovery_internal_trace": {
+        "actual_device_status": "NOT_RUN",
+        "actual_recovery_drill_status": "NOT_RUN",
+        "approval_credit_count": 0,
+        "artifact_approval_claimed": false,
+        "external_evidence_credit_count": 0,
+        "external_evidence_status": "NOT_RUN",
+        "formal_test_credit_count": 0,
+        "formal_test_status": "NOT_RUN",
+        "internal_implementation_status": "PASS",
+        "internal_verification_status": "PASS",
+        "production_deployment_status": "NOT_RUN",
+        "release_credit_count": 0,
+        "release_status": "NOT_ELIGIBLE",
+        "review_or_completion_inputs_included": false,
+        "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_ARTIFACT_TRACE_ONLY",
+        "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001"
+      },
       "plain_requirement": "관리자와 최종 승인자는 한 명으로 유지하되 휴대전화 밖의 복구수단, 원격 세션 폐기와 고위험 작업 동결로 계정 분실에 대비한다.",
       "planned_test_ids": [
         "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
@@ -4495,7 +5096,7 @@
       "title": "한 명의 관리자와 계정 복구",
       "trace_status": "REQUIREMENT_DRAFTED",
       "verification_completion_claimed": false,
-      "verification_status": "NOT_RUN",
+      "verification_status": "INTERNAL_VERIFICATION_PASS_FORMAL_NOT_RUN",
       "waiver_refs": []
     },
     {

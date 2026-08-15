@@ -707,7 +707,6 @@ def synchronize_report_image_keyring(db: Session, keyring: ReportImageKeyring) -
         select(ReportImageKeyringEvent)
         .order_by(ReportImageKeyringEvent.generation.desc())
         .limit(1)
-        .with_for_update()
     ).scalar_one_or_none()
     _assert_normal_terminal_keys_unused(db, keyring)
     if latest is not None and latest.manifest_sha256 == keyring.manifest_sha256:

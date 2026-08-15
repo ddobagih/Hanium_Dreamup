@@ -17,18 +17,25 @@ import uuid
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from backend.app.models import AdminDeviceKey, AdminDeviceProofChallenge
+from backend.app.models import (
+    AdminDeviceKey,
+    AdminDeviceProofChallenge,
+    AdminSecurityControl,
+    AdminSecurityRecoveryTransaction,
+)
 from backend.app.services.admin_security import (
     ACTION_PATTERN,
     ADMIN_UNSAFE_METHODS,
+    AdminCredentialIssuerUnavailable,
     AdminSecurityError,
     AdminSecurityStoreUnavailable,
     AdminSessionIdentity,
     classify_admin_operation,
+    load_admin_credential_issuer_key_for_settings,
     normalize_admin_operation_path,
 )
 
@@ -68,10 +75,14 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ADMIN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 _DEVICE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _READ_PURPOSE_PATTERN = re.compile(r"^[a-z][a-z0-9_.:-]{2,63}$")
-_WORKFLOW_PATH_PATTERN = re.compile(
+_REPORT_WORKFLOW_PATH_PATTERN = re.compile(
     r"^/reports/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-"
     r"[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/"
     r"(?:review-decisions|deliveries)$"
+)
+_ADMIN_WRITE_WORKFLOW_PATH_PATTERN = re.compile(
+    r"^(?:/admin/security/recovery-custody/attest|"
+    r"/admin/security/devices/[A-Za-z0-9][A-Za-z0-9._:-]{7,127}/report-lost)$"
 )
 _CANONICAL_UUID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
@@ -277,11 +288,14 @@ def admin_device_key_marker(spki_der: bytes) -> str:
 
 
 def is_admin_device_proof_workflow_request(method: str, path: str) -> bool:
+    if not isinstance(method, str) or not isinstance(path, str):
+        return False
+    normalized_method = method.upper()
+    if _REPORT_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None:
+        return normalized_method in {"GET", "POST"}
     return (
-        isinstance(method, str)
-        and method.upper() in {"GET", "POST"}
-        and isinstance(path, str)
-        and _WORKFLOW_PATH_PATTERN.fullmatch(path) is not None
+        normalized_method == "POST"
+        and _ADMIN_WRITE_WORKFLOW_PATH_PATTERN.fullmatch(path) is not None
     )
 
 
@@ -380,6 +394,13 @@ def validate_device_proof_challenge_binding(
     return parsed_session_id
 
 
+def _database_device_proof_purpose(
+    purpose: str,
+    read_purpose: str | None,
+) -> str:
+    return "READ" if purpose == "ACTION" and read_purpose is not None else purpose
+
+
 def _signed_fields_from_challenge(challenge: AdminDeviceProofChallenge) -> dict[str, Any]:
     return {
         "action": challenge.action,
@@ -416,9 +437,184 @@ def _active_device_key_query(
     )
 
 
+def _lock_recovery_complete_context(
+    db: Session,
+    *,
+    admin_id: str,
+    device_id: str,
+    observed_at: datetime,
+) -> None:
+    """Lock and validate the recovery state bound to one recovery device."""
+
+    bind = db.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        digest = hashlib.sha256(f"recovery-state\0{admin_id}".encode()).hexdigest()
+        lock_key = int.from_bytes(
+            bytes.fromhex(digest[:16]),
+            byteorder="big",
+            signed=True,
+        )
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"),
+            {"key": lock_key},
+        )
+
+    controls = db.execute(
+        select(AdminSecurityControl).with_for_update()
+    ).scalars().all()
+    if (
+        len(controls) != 1
+        or controls[0].singleton_scope is not True
+        or controls[0].admin_id != admin_id
+        or controls[0].security_state != "RECOVERY_IN_PROGRESS"
+    ):
+        raise AdminSecurityError(
+            "admin_device_proof_invalid",
+            "The administrator device proof is invalid.",
+            status_code=403,
+        )
+
+    transactions = db.execute(
+        select(AdminSecurityRecoveryTransaction)
+        .where(
+            AdminSecurityRecoveryTransaction.admin_id == admin_id,
+            AdminSecurityRecoveryTransaction.completed_at.is_(None),
+        )
+        .with_for_update()
+    ).scalars().all()
+    active_transactions = [
+        transaction
+        for transaction in transactions
+        if transaction.admin_id == admin_id
+        and transaction.completed_at is None
+        and _as_utc(transaction.expires_at) > observed_at
+    ]
+    if not active_transactions and any(
+        transaction.admin_id == admin_id
+        and transaction.completed_at is None
+        and _as_utc(transaction.expires_at) <= observed_at
+        and secrets.compare_digest(transaction.device_id, device_id)
+        for transaction in transactions
+    ):
+        raise AdminSecurityError(
+            "admin_recovery_expired",
+            "The recovery transaction expired; start recovery again.",
+            status_code=410,
+        )
+    if (
+        len(active_transactions) != 1
+        or not secrets.compare_digest(
+            active_transactions[0].device_id, device_id
+        )
+    ):
+        raise AdminSecurityError(
+            "admin_device_proof_invalid",
+            "The administrator device proof is invalid.",
+            status_code=403,
+        )
+
+
+def _postgresql_session(db: Session) -> bool:
+    bind = db.get_bind()
+    return bind is not None and bind.dialect.name == "postgresql"
+
+
+def _lock_device_proof_key(
+    db: Session,
+    *,
+    admin_id: str,
+    device_id: str,
+    device_key_version: int,
+    device_key_marker: str,
+    observed_at: datetime,
+    purpose: str,
+    runtime_totp_secret: str | None,
+    credential_issuer_key: str | None,
+    inactive_code: str,
+    inactive_message: str,
+) -> bytes:
+    if _postgresql_session(db):
+        if not runtime_totp_secret or not credential_issuer_key:
+            raise AdminCredentialIssuerUnavailable()
+        rows = db.execute(
+            text(
+                "SELECT * FROM public.walksafe_lock_admin_device_proof_context("
+                "CAST(:admin_id AS text), CAST(:device_id AS text), "
+                "CAST(:device_key_version AS bigint), "
+                "CAST(:device_key_marker AS text), "
+                "CAST(:observed_at AS timestamptz), CAST(:purpose AS text), "
+                "CAST(:runtime_totp_secret AS text), "
+                "CAST(:credential_issuer_key AS text))"
+            ),
+            {
+                "admin_id": admin_id,
+                "device_id": device_id,
+                "device_key_version": device_key_version,
+                "device_key_marker": device_key_marker,
+                "observed_at": observed_at,
+                "purpose": purpose,
+                "runtime_totp_secret": runtime_totp_secret,
+                "credential_issuer_key": credential_issuer_key,
+            },
+        ).all()
+        if len(rows) != 1:
+            raise AdminSecurityStoreUnavailable()
+        status = rows[0].context_status
+        if status == "RECOVERY_EXPIRED":
+            if (
+                purpose == "RECOVERY_COMPLETE"
+                and rows[0].public_key_spki_der is not None
+            ):
+                return bytes(rows[0].public_key_spki_der)
+            raise AdminSecurityError(
+                "admin_recovery_expired",
+                "The recovery transaction expired; start recovery again.",
+                status_code=410,
+            )
+        if status == "INVALID":
+            raise AdminSecurityError(
+                "admin_device_proof_invalid",
+                "The administrator device proof is invalid.",
+                status_code=403,
+            )
+        if status == "KEY_INACTIVE":
+            raise AdminSecurityError(
+                inactive_code,
+                inactive_message,
+                status_code=403,
+            )
+        if status != "OK" or rows[0].public_key_spki_der is None:
+            raise AdminSecurityStoreUnavailable()
+        return bytes(rows[0].public_key_spki_der)
+
+    if purpose == "RECOVERY_COMPLETE":
+        _lock_recovery_complete_context(
+            db,
+            admin_id=admin_id,
+            device_id=device_id,
+            observed_at=observed_at,
+        )
+    device_key = db.execute(
+        _active_device_key_query(
+            admin_id=admin_id,
+            device_id=device_id,
+            key_version=device_key_version,
+            key_marker=device_key_marker,
+        ).with_for_update()
+    ).scalar_one_or_none()
+    if device_key is None:
+        raise AdminSecurityError(
+            inactive_code,
+            inactive_message,
+            status_code=403,
+        )
+    return bytes(device_key.public_key_spki_der)
+
+
 class AdminDeviceProofService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, settings: Any | None = None) -> None:
         self.db = db
+        self.settings = settings
 
     def issue_challenge(
         self,
@@ -475,27 +671,39 @@ class AdminDeviceProofService:
             milliseconds=ADMIN_DEVICE_PROOF_TTL_MILLISECONDS
         )
         try:
-            device_key = self.db.execute(
-                _active_device_key_query(
-                    admin_id=admin_id,
-                    device_id=device_id,
-                    key_version=device_key_version,
-                    key_marker=device_key_marker,
-                ).with_for_update()
-            ).scalar_one_or_none()
-            if device_key is None:
-                raise AdminSecurityError(
-                    "admin_device_key_not_registered",
-                    "The administrator device key is not registered and active.",
-                    status_code=403,
+            runtime_totp_secret = None
+            credential_issuer_key = None
+            if _postgresql_session(self.db):
+                if self.settings is None:
+                    raise AdminCredentialIssuerUnavailable()
+                runtime_totp_secret = getattr(
+                    self.settings,
+                    "admin_totp_secret",
+                    None,
                 )
+                credential_issuer_key = load_admin_credential_issuer_key_for_settings(
+                    self.settings
+                )
+            public_key_spki_der = _lock_device_proof_key(
+                self.db,
+                admin_id=admin_id,
+                device_id=device_id,
+                device_key_version=device_key_version,
+                device_key_marker=device_key_marker,
+                observed_at=issued_at,
+                purpose=_database_device_proof_purpose(purpose, read_purpose),
+                runtime_totp_secret=runtime_totp_secret,
+                credential_issuer_key=credential_issuer_key,
+                inactive_code="admin_device_key_not_registered",
+                inactive_message=(
+                    "The administrator device key is not registered and active."
+                ),
+            )
             try:
-                actual_marker = admin_device_key_marker(
-                    bytes(device_key.public_key_spki_der)
-                )
+                actual_marker = admin_device_key_marker(public_key_spki_der)
             except ValueError as exc:
                 raise AdminSecurityStoreUnavailable() from exc
-            if not secrets.compare_digest(actual_marker, device_key.key_marker):
+            if not secrets.compare_digest(actual_marker, device_key_marker):
                 raise AdminSecurityStoreUnavailable()
 
             outstanding_expiries = self.db.execute(
@@ -581,6 +789,8 @@ def verify_admin_device_proof(
     expected_read_purpose: str | None,
     raw_body: bytes,
     raw_query_string: bytes,
+    runtime_totp_secret: str | None = None,
+    credential_issuer_key: str | None = None,
     now: datetime | None = None,
 ) -> VerifiedAdminDeviceProof:
     """Verify and consume one exact request-bound challenge in the caller transaction."""
@@ -670,27 +880,27 @@ def verify_admin_device_proof(
         canonical_payload = canonical_device_proof_json(signed_fields)
         if not secrets.compare_digest(challenge.signing_payload, canonical_payload):
             raise AdminSecurityStoreUnavailable()
-        device_key = db.execute(
-            _active_device_key_query(
-                admin_id=challenge.admin_id,
-                device_id=challenge.device_id,
-                key_version=challenge.device_key_version,
-                key_marker=challenge.device_key_marker,
-            ).with_for_update()
-        ).scalar_one_or_none()
-        if device_key is None:
-            raise AdminSecurityError(
-                "admin_device_key_not_active",
-                "The administrator device key is not active.",
-                status_code=403,
-            )
+        public_key_spki_der = _lock_device_proof_key(
+            db,
+            admin_id=challenge.admin_id,
+            device_id=challenge.device_id,
+            device_key_version=challenge.device_key_version,
+            device_key_marker=challenge.device_key_marker,
+            observed_at=observed_at,
+            purpose=_database_device_proof_purpose(
+                expected_purpose,
+                expected_read_purpose,
+            ),
+            runtime_totp_secret=runtime_totp_secret,
+            credential_issuer_key=credential_issuer_key,
+            inactive_code="admin_device_key_not_active",
+            inactive_message="The administrator device key is not active.",
+        )
         try:
-            public_key = load_p256_spki_public_key(
-                bytes(device_key.public_key_spki_der)
-            )
+            public_key = load_p256_spki_public_key(public_key_spki_der)
         except ValueError as exc:
             raise AdminSecurityStoreUnavailable() from exc
-        actual_marker = hashlib.sha256(bytes(device_key.public_key_spki_der)).hexdigest()
+        actual_marker = hashlib.sha256(public_key_spki_der).hexdigest()
         if not secrets.compare_digest(actual_marker, challenge.device_key_marker):
             raise AdminSecurityStoreUnavailable()
         try:
@@ -749,6 +959,60 @@ def provision_admin_device_key(
     marker = admin_device_key_marker(public_key_spki_der)
     observed_at = _as_utc(now or datetime.now(timezone.utc))
     try:
+        bind = db.get_bind()
+        if bind is not None and bind.dialect.name == "postgresql":
+            digest = hashlib.sha256(
+                f"recovery-state\0{admin_id}".encode()
+            ).hexdigest()
+            lock_key = int.from_bytes(
+                bytes.fromhex(digest[:16]),
+                byteorder="big",
+                signed=True,
+            )
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_key},
+            )
+        controls = db.execute(
+            select(AdminSecurityControl).with_for_update()
+        ).scalars().all()
+        if (
+            len(controls) != 1
+            or controls[0].singleton_scope is not True
+            or controls[0].admin_id != admin_id
+        ):
+            raise AdminSecurityError(
+                "admin_device_key_provisioning_not_allowed",
+                "Administrator device key provisioning is not allowed.",
+                status_code=409,
+            )
+        if controls[0].security_state == "RECOVERY_IN_PROGRESS":
+            active_recoveries = db.execute(
+                select(AdminSecurityRecoveryTransaction)
+                .where(
+                    AdminSecurityRecoveryTransaction.admin_id == admin_id,
+                    AdminSecurityRecoveryTransaction.completed_at.is_(None),
+                    AdminSecurityRecoveryTransaction.expires_at > observed_at,
+                )
+                .with_for_update()
+            ).scalars().all()
+            if (
+                len(active_recoveries) != 1
+                or not secrets.compare_digest(
+                    active_recoveries[0].device_id, device_id
+                )
+            ):
+                raise AdminSecurityError(
+                    "admin_device_key_provisioning_not_allowed",
+                    "Administrator device key provisioning is not allowed.",
+                    status_code=409,
+                )
+        elif controls[0].security_state not in {"NORMAL", "RECOVERY_REQUIRED"}:
+            raise AdminSecurityError(
+                "admin_device_key_provisioning_not_allowed",
+                "Administrator device key provisioning is not allowed.",
+                status_code=409,
+            )
         existing = db.execute(
             select(AdminDeviceKey)
             .where(
@@ -807,7 +1071,7 @@ def provision_admin_device_key(
             status="ACTIVE",
             idempotent=False,
         )
-    except ValueError:
+    except (AdminSecurityError, ValueError):
         db.rollback()
         raise
     except SQLAlchemyError as exc:

@@ -1,0 +1,109 @@
+{
+  "completion_boundary": {
+    "actual_device_status": "NOT_RUN",
+    "deployment_credit_delta": 0,
+    "device_credit_delta": 0,
+    "external_credit_delta": 0,
+    "external_independence_claimed": false,
+    "external_review_status": "NOT_RUN",
+    "external_tmap_status": "NOT_RUN",
+    "field_gps_status": "NOT_RUN",
+    "formal_test_credit_delta": 0,
+    "formal_test_ids": [
+      "TC-FP-022-01",
+      "TC-FP-022-02",
+      "TC-FP-022-03",
+      "TC-FP-022-04"
+    ],
+    "formal_test_status": "NOT_RUN",
+    "production_deployment_status": "NOT_RUN",
+    "release_credit_delta": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "document_id": "WS-FP022-GAP031-R028-SUCCESSOR-20260814-001",
+  "evidence_bindings": [
+    {
+      "byte_length": 531,
+      "kind": "BACKEND_NAVIGATION_INTERNAL_LOG",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/backend-navigation-internal.log",
+      "sha256": "249031160869dc49edbec23a88808d17dadda9e174a1d5e97a0568361123d951"
+    },
+    {
+      "byte_length": 3701,
+      "kind": "ANDROID_USER_INTERNAL_LOG",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/android-user-internal.log",
+      "sha256": "cdf1a98a74eb416ed30689d71e509f44155596ceb8d05a3df9c211014c904838"
+    },
+    {
+      "byte_length": 421,
+      "kind": "TEST_LAYER_REGISTRY_VALIDATE_LOG",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/test-layer-registry-validate.log",
+      "sha256": "e6502409d2de507ce23ef8dff787545a5b835d3862f3f1f362a326df71190e02"
+    },
+    {
+      "byte_length": 9860,
+      "kind": "IMPLEMENTATION_RECORD",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/implementation-record.json",
+      "sha256": "62821b96edd5a5b8f671c70707082f2151682041cc46b304bf400a2cc6adf10b"
+    },
+    {
+      "byte_length": 4825,
+      "kind": "VERIFICATION_OBSERVATIONS",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/verification-observations.json",
+      "sha256": "ae32c95d6034ec234d8a0c9c9e94039d16bb22f62c641565dbe668d9c516c93d"
+    },
+    {
+      "byte_length": 2439,
+      "kind": "VERIFICATION_RESULT",
+      "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/verification-result.json",
+      "sha256": "130777d1051e1414f37e07cb95da7695e9f6780c21311a9860d5c2034c775823"
+    }
+  ],
+  "executor": {
+    "id": "codex-fp022-navigation-implementer-20260814",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+    "task": "/root"
+  },
+  "formal_test_status": "NOT_RUN",
+  "gap031_status": "PARTIAL",
+  "gap_id": "GAP-031",
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "kind": "SUCCESSOR_TRACE",
+  "next_goal": {
+    "goal_id": "WS-GOAL-EPIC-04-FP-023-R001",
+    "policy_id": "FP-023",
+    "priority_rank": 25
+  },
+  "next_single_action": "SEPARATE_INTERNAL_REVIEW",
+  "observed_at": "2026-08-14T14:46:19.617604+09:00",
+  "policy_id": "FP-022",
+  "r028_bindings": [
+    {
+      "byte_length": 532549,
+      "kind": "GAP_R028_JSON",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json",
+      "sha256": "f7be788ed4bcde8440d2539dceed9105421019f38ec1a4106648a5fab7120bab"
+    },
+    {
+      "byte_length": 547,
+      "kind": "GAP_R028_MARKDOWN",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.md",
+      "sha256": "dbec9a7564c76cf28e559dcb3309834a7410dfb002fe0bf4782373788f8dd173"
+    },
+    {
+      "byte_length": 66305,
+      "kind": "BACKLOG_R028_JSON",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json",
+      "sha256": "acf975cffcdec26906099236567f825a616226bfb030ef70d20bb7a21bcfbe55"
+    },
+    {
+      "byte_length": 332,
+      "kind": "BACKLOG_R028_MARKDOWN",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.md",
+      "sha256": "3ae60a068ceaf2ec69a600b122f662a1e69dfd00cdfb5dd05fb773e58a773914"
+    }
+  ],
+  "schema_version": "walksafe.fp022-gap031-successor-trace.v1",
+  "status": "GAP031_REASSESSED_INTERNAL_REVIEW_PENDING",
+  "successor_trace_content_sha256": "ea58fcbd771cfbdf3f18c5c4e097689157609edf4a65b0905e24eac51b648baa"
+}

@@ -120,6 +120,92 @@ def test_checked_openapi_is_canonical_sorted_runtime_schema() -> None:
     assert "WalkSafeAdminBearer" in schema["components"]["securitySchemes"]
     assert "WalkSafeAdminToken" not in schema["components"]["securitySchemes"]
     assert "WalkSafeOriginalAccessGrant" in schema["components"]["securitySchemes"]
+    state_response = schema["components"]["schemas"]["StateResponse"]
+    assert set(state_response["required"]) == {
+        "security_state",
+        "state_version",
+        "observed_at",
+        "recovery_custody_state",
+        "recovery_custody_attested_at",
+    }
+    assert state_response["additionalProperties"] is False
+    sessions_response = schema["components"]["schemas"]["SessionsResponse"]
+    assert set(sessions_response["required"]) == {"sessions", "devices"}
+    assert sessions_response["additionalProperties"] is False
+    assert sessions_response["properties"]["sessions"]["maxItems"] == 100
+    assert sessions_response["properties"]["devices"]["maxItems"] == 100
+    device_item = schema["components"]["schemas"]["DeviceItem"]
+    assert set(device_item["required"]) == {"device_id", "current"}
+    assert device_item["additionalProperties"] is False
+    recovery_complete_responses = schema["paths"][
+        "/admin/security/recovery/complete"
+    ]["post"]["responses"]
+    assert recovery_complete_responses["410"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/AdminRecoveryExpiredErrorResponse"}
+    expired_detail = schema["components"]["schemas"][
+        "AdminRecoveryExpiredErrorDetail"
+    ]
+    assert set(expired_detail["required"]) == {"code", "message"}
+    assert expired_detail["additionalProperties"] is False
+    assert expired_detail["properties"]["code"]["const"] == (
+        "admin_recovery_expired"
+    )
+    challenge_expired = schema["paths"][
+        "/admin/security/device-proof/challenges"
+    ]["post"]["responses"]["410"]
+    assert challenge_expired["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/AdminRecoveryExpiredErrorResponse"
+    }
+    assert challenge_expired["x-walksafe-when-purpose"] == "RECOVERY_COMPLETE"
+    assert "RECOVERY_COMPLETE" in challenge_expired["description"]
+    custody_request = schema["components"]["schemas"][
+        "RecoveryCustodyAttestRequest"
+    ]
+    assert set(custody_request["required"]) == {
+        "custody_reference",
+        "material_kind",
+        "storage_location",
+        "separate_encrypted_backup_confirmed",
+    }
+    assert custody_request["additionalProperties"] is False
+    assert custody_request["properties"]["custody_reference"] == {
+        "description": (
+            "Canonical unpadded Base64url encoding of an opaque 32-byte "
+            "recovery custody reference."
+        ),
+        "maxLength": 43,
+        "minLength": 43,
+        "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+        "title": "Custody Reference",
+        "type": "string",
+    }
+    empty_request = schema["components"]["schemas"]["EmptyRequest"]
+    assert empty_request["properties"] == {}
+    assert empty_request["additionalProperties"] is False
+    proof_schemes = {
+        "WalkSafeAdminDeviceChallengeId",
+        "WalkSafeAdminDeviceSignature",
+        "WalkSafeCorrelationId",
+    }
+    for path, action in (
+        (
+            "/admin/security/recovery-custody/attest",
+            "recovery.custody.attest",
+        ),
+        (
+            "/admin/security/devices/{device_id}/report-lost",
+            "device.report_lost",
+        ),
+    ):
+        operation = schema["paths"][path]["post"]
+        assert proof_schemes <= set(operation["security"][0])
+        assert operation["x-walksafe-admin-device-proof"] == {
+            "purpose": "ACTION",
+            "action": action,
+            "read_purpose": None,
+            "session_id": "authenticated-admin-session",
+        }
     upload_security = schema["paths"]["/uploads/{filename}"]["get"]["security"]
     assert upload_security == [
         {

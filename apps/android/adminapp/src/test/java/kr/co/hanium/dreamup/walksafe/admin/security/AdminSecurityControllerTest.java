@@ -22,10 +22,91 @@ public final class AdminSecurityControllerTest {
         assertEquals(AdminSecurityState.NORMAL, snapshot.securityState());
         assertEquals("state-v1", snapshot.stateVersion());
         assertEquals("2026-07-22T00:00:00Z", snapshot.observedAt());
+        assertEquals(AdminRecoveryCustodyState.ATTESTED, snapshot.recoveryCustodyState());
+        assertEquals("2026-07-21T23:00:00Z", snapshot.recoveryCustodyAttestedAt());
         assertEquals(CURRENT_SESSION_ID, snapshot.currentSessionId());
         assertEquals(2, snapshot.sessions().size());
+        assertEquals(3, snapshot.devices().size());
         assertTrue(snapshot.isAccessSessionActive());
         assertFalse(snapshot.isRecoveryActive());
+    }
+
+    @Test
+    public void unconfirmedCustodyLocksHighRiskAndOperationsUntilExplicitAttestation() throws Exception {
+        FakeApi api = new FakeApi();
+        api.custodyState = AdminRecoveryCustodyState.UNATTESTED;
+        api.custodyAttestedAt = null;
+        FakeOperations operations = new FakeOperations();
+        AdminSecurityController controller = new AdminSecurityController(api, operations);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        var denied = controller.highRiskDecision(
+            AdminHighRiskActionGate.Action.DATA_DELETE,
+            1L,
+            true
+        );
+        assertFalse(denied.isAllowed());
+        assertEquals("recovery_custody_not_attested", denied.reason());
+        assertThrows(IllegalStateException.class, () -> controller.reauthenticate(
+            PASSWORD, "123456", AdminHighRiskActionGate.Action.DATA_DELETE, 1L
+        ));
+        assertEquals(0, api.reauthenticateCount);
+        assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
+            "11111111-1111-4111-8111-111111111111",
+            new AdminReportDecision(
+                AdminReportDecision.Decision.APPROVED, "reviewed", null, true, true, true
+            ),
+            true
+        ));
+
+        controller.attestRecoveryCustody(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE);
+
+        assertEquals(AdminRecoveryCustodyState.ATTESTED, controller.snapshot().recoveryCustodyState());
+        assertEquals("2026-07-22T00:02:00Z", controller.snapshot().recoveryCustodyAttestedAt());
+        assertEquals(AdminSecurityApi.RecoveryMaterialKind.RECOVERY_CODE, api.attestedMaterialKind);
+        assertEquals(AdminSecurityApi.RecoveryStorageLocation.OFF_PHONE, api.attestedStorageLocation);
+        assertTrue(api.separateEncryptedBackupConfirmed);
+        assertTrue(api.custodyReference.matches("[A-Za-z0-9_-]{43}"));
+    }
+
+    @Test
+    public void anotherAuthenticatedDeviceCanReportLostRemoteDeviceButNeverItself() throws Exception {
+        FakeApi api = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertThrows(IllegalArgumentException.class, () -> controller.reportLostDevice(DEVICE_ID));
+        assertEquals(0, api.reportLostDeviceCount);
+
+        controller.reportLostDevice(OTHER_DEVICE_ID);
+
+        assertEquals(1, api.reportLostDeviceCount);
+        assertEquals(OTHER_DEVICE_ID, api.reportedLostDeviceId);
+        assertEquals(1, controller.snapshot().sessions().size());
+        assertEquals(DEVICE_ID, controller.snapshot().sessions().get(0).deviceId());
+        assertTrue(controller.snapshot().sessions().get(0).isCurrent());
+        assertEquals("state-v3", controller.snapshot().stateVersion());
+    }
+
+    @Test
+    public void activeKeyOnlyRemoteDeviceCanBeReportedLostWithoutAnActiveSession() throws Exception {
+        FakeApi api = new FakeApi();
+        AdminSecurityController controller = new AdminSecurityController(api);
+        controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
+
+        assertFalse(controller.snapshot().sessions().stream().anyMatch(session ->
+            KEY_ONLY_DEVICE_ID.equals(session.deviceId())
+        ));
+        assertTrue(controller.snapshot().devices().stream().anyMatch(device ->
+            KEY_ONLY_DEVICE_ID.equals(device.deviceId()) && !device.isCurrent()
+        ));
+
+        controller.reportLostDevice(KEY_ONLY_DEVICE_ID);
+
+        assertEquals(KEY_ONLY_DEVICE_ID, api.reportedLostDeviceId);
+        assertFalse(controller.snapshot().devices().stream().anyMatch(device ->
+            KEY_ONLY_DEVICE_ID.equals(device.deviceId())
+        ));
     }
 
     @Test
@@ -43,6 +124,33 @@ public final class AdminSecurityControllerTest {
             1L,
             true
         ).isAllowed());
+    }
+
+    @Test
+    public void malformedRemoteSecurityTimestampsFailClosedAtTheControllerBoundary() {
+        FakeApi observedAt = new FakeApi();
+        observedAt.observedAt = "2026-07-22T00:00:00";
+        AdminSecurityController observedController = new AdminSecurityController(observedAt);
+        assertThrows(IOException.class, () -> observedController.login(
+            "admin-01", PASSWORD, "123456", DEVICE_ID, "test phone"
+        ));
+        assertEquals(AdminSecurityState.FAIL_CLOSED, observedController.snapshot().securityState());
+
+        FakeApi attestedAt = new FakeApi();
+        attestedAt.custodyAttestedAt = "not-a-timestamp";
+        AdminSecurityController attestedController = new AdminSecurityController(attestedAt);
+        assertThrows(IOException.class, () -> attestedController.login(
+            "admin-01", PASSWORD, "123456", DEVICE_ID, "test phone"
+        ));
+        assertEquals(AdminSecurityState.FAIL_CLOSED, attestedController.snapshot().securityState());
+
+        FakeApi lastSeenAt = new FakeApi();
+        lastSeenAt.sessionLastSeenAt = "2026-07-22T00:00:00";
+        AdminSecurityController sessionController = new AdminSecurityController(lastSeenAt);
+        assertThrows(IOException.class, () -> sessionController.login(
+            "admin-01", PASSWORD, "123456", DEVICE_ID, "test phone"
+        ));
+        assertEquals(AdminSecurityState.FAIL_CLOSED, sessionController.snapshot().securityState());
     }
 
     @Test
@@ -186,30 +294,29 @@ public final class AdminSecurityControllerTest {
         controller.reauthenticate(
             PASSWORD,
             "123456",
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             10_000L
         );
 
         assertTrue(api.reconfirmationNonce.matches("[A-Za-z0-9_-]{22}"));
+        assertEquals("data.delete", api.reconfirmationAction);
+        assertEquals("POST", api.reconfirmationMethod);
+        assertEquals("/admin/operations/data-deletions", api.reconfirmationPath);
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.export", "PATCH", "/reports/report-1/status", 10_001L, true
+            AdminHighRiskActionGate.Action.PRIVILEGE_CHANGE, 10_001L, true
         ).isAllowed());
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 10_001L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 10_001L, true
         ).isAllowed());
 
         controller.reauthenticate(
             PASSWORD,
             "123456",
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             10_000L
         );
         var allowed = controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 10_001L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 10_001L, true
         );
         assertTrue(allowed.isAllowed());
         assertEquals(
@@ -217,7 +324,7 @@ public final class AdminSecurityControllerTest {
             allowed.requestHeaders().get(AdminHighRiskActionGate.RECONFIRMATION_NONCE_HEADER)
         );
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 10_002L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 10_002L, true
         ).isAllowed());
     }
 
@@ -229,37 +336,34 @@ public final class AdminSecurityControllerTest {
         controller.reauthenticate(
             PASSWORD,
             "123456",
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             10_000L
         );
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 20_000L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 20_000L, true
         ).isAllowed());
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 10_001L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 10_001L, true
         ).isAllowed());
 
         api.echoPath = "/reports/report-2/status";
         assertThrows(IOException.class, () -> controller.reauthenticate(
             PASSWORD,
             "123456",
-            "report.status.update",
-            "PATCH",
-            "/reports/report-1/status",
+            AdminHighRiskActionGate.Action.DATA_DELETE,
             10_000L
         ));
         assertEquals(0L, controller.snapshot().reauthenticatedUntilEpochMs());
         assertFalse(controller.consumeHighRiskAuthorization(
-            "report.status.update", "PATCH", "/reports/report-1/status", 10_001L, true
+            AdminHighRiskActionGate.Action.DATA_DELETE, 10_001L, true
         ).isAllowed());
     }
 
     @Test
     public void operationsStayFlagLockedAndUseOnlyTheNormalBoundAdminSession() throws Exception {
+        FakeApi api = new FakeApi();
         FakeOperations operations = new FakeOperations();
-        AdminSecurityController controller = new AdminSecurityController(new FakeApi(), operations);
+        AdminSecurityController controller = new AdminSecurityController(api, operations);
         controller.login("admin-01", PASSWORD, "123456", DEVICE_ID, "test phone");
         AdminReportDecision review = new AdminReportDecision(
             AdminReportDecision.Decision.APPROVED, "reviewed", null, true, true, true
@@ -280,6 +384,7 @@ public final class AdminSecurityControllerTest {
         assertEquals(DEVICE_ID, operations.session.deviceId());
         assertEquals(ACCESS_TOKEN, operations.session.accessToken());
         controller.signOutLocal();
+        assertEquals(1, api.clearLocalBindingCount);
         assertThrows(IllegalStateException.class, () -> controller.recordReviewDecision(
             "11111111-1111-4111-8111-111111111111", review, true
         ));
@@ -382,9 +487,29 @@ public final class AdminSecurityControllerTest {
         String activeRecoveryToken;
         String completedRecoveryToken;
         String reconfirmationNonce;
+        String reconfirmationAction;
+        String reconfirmationMethod;
+        String reconfirmationPath;
         String echoPath;
         String stateFailureMessage = "state unavailable";
         AdminSecurityApiException completeRecoveryError;
+        AdminRecoveryCustodyState custodyState = AdminRecoveryCustodyState.ATTESTED;
+        String custodyAttestedAt = "2026-07-21T23:00:00Z";
+        String observedAt = "2026-07-22T00:00:00Z";
+        String sessionLastSeenAt = "2026-07-22T00:00:00Z";
+        int reauthenticateCount;
+        int reportLostDeviceCount;
+        String reportedLostDeviceId;
+        String custodyReference;
+        RecoveryMaterialKind attestedMaterialKind;
+        RecoveryStorageLocation attestedStorageLocation;
+        boolean separateEncryptedBackupConfirmed;
+        int clearLocalBindingCount;
+
+        @Override
+        public void clearLocalBinding() {
+            clearLocalBindingCount += 1;
+        }
 
         @Override
         public LoginResult login(String adminId, String password, String totpCode, String deviceId, String deviceLabel) {
@@ -394,21 +519,49 @@ public final class AdminSecurityControllerTest {
         @Override
         public StateSnapshot getState(String accessToken) throws IOException {
             if (failState) throw new IOException(stateFailureMessage);
-            return new StateSnapshot(AdminSecurityState.NORMAL, "state-v1", "2026-07-22T00:00:00Z");
+            return state("state-v1", observedAt);
         }
 
         @Override
-        public List<SessionInfo> getSessions(String accessToken) {
-            return List.of(
-                session(CURRENT_SESSION_ID, true),
-                session(OTHER_SESSION_ID, false)
+        public DeviceInventory getDeviceInventory(String accessToken) {
+            return new DeviceInventory(
+                List.of(
+                    session(CURRENT_SESSION_ID, DEVICE_ID, true, sessionLastSeenAt),
+                    session(OTHER_SESSION_ID, OTHER_DEVICE_ID, false, sessionLastSeenAt)
+                ),
+                List.of(
+                    new DeviceInfo(DEVICE_ID, true),
+                    new DeviceInfo(OTHER_DEVICE_ID, false),
+                    new DeviceInfo(KEY_ONLY_DEVICE_ID, false)
+                )
             );
         }
 
         @Override
         public StateSnapshot revokeSession(String accessToken, String sessionId) throws IOException {
             if (failRevoke) throw new IOException("revoke unavailable");
-            return new StateSnapshot(AdminSecurityState.NORMAL, "state-v2", "2026-07-22T00:01:00Z");
+            return state("state-v2", "2026-07-22T00:01:00Z");
+        }
+
+        @Override
+        public StateSnapshot attestRecoveryCustody(
+            String accessToken,
+            RecoveryCustodyAttestation attestation
+        ) {
+            custodyReference = attestation.custodyReference();
+            attestedMaterialKind = attestation.materialKind();
+            attestedStorageLocation = attestation.storageLocation();
+            separateEncryptedBackupConfirmed = attestation.isSeparateEncryptedBackupConfirmed();
+            custodyState = AdminRecoveryCustodyState.ATTESTED;
+            custodyAttestedAt = "2026-07-22T00:02:00Z";
+            return state("state-v2", custodyAttestedAt);
+        }
+
+        @Override
+        public StateSnapshot reportLostDevice(String accessToken, String deviceId) {
+            reportLostDeviceCount += 1;
+            reportedLostDeviceId = deviceId;
+            return state("state-v3", "2026-07-22T00:03:00Z");
         }
 
         @Override
@@ -421,7 +574,11 @@ public final class AdminSecurityControllerTest {
             String path,
             String nonce
         ) {
+            reauthenticateCount += 1;
             reconfirmationNonce = nonce;
+            reconfirmationAction = action;
+            reconfirmationMethod = method;
+            reconfirmationPath = path;
             return new ReauthenticationResult(20_000L, action, method, echoPath == null ? path : echoPath);
         }
 
@@ -468,8 +625,23 @@ public final class AdminSecurityControllerTest {
             return new LoginResult(NEW_ACCESS_TOKEN, AdminSecurityState.NORMAL, CURRENT_SESSION_ID);
         }
 
-        private static SessionInfo session(String id, boolean current) {
-            return new SessionInfo(id, DEVICE_ID, "test phone", current, false, "2026-07-22T00:00:00Z");
+        private StateSnapshot state(String version, String observedAt) {
+            return new StateSnapshot(
+                AdminSecurityState.NORMAL,
+                version,
+                observedAt,
+                custodyState,
+                custodyAttestedAt
+            );
+        }
+
+        private static SessionInfo session(
+            String id,
+            String deviceId,
+            boolean current,
+            String lastSeenAt
+        ) {
+            return new SessionInfo(id, deviceId, "test phone", current, false, lastSeenAt);
         }
     }
 
@@ -503,6 +675,8 @@ public final class AdminSecurityControllerTest {
     private static final String DEVICE_ID = "admin-device-12345678-1234-1234-1234-123456789abc";
     private static final String CURRENT_SESSION_ID = "11111111-1111-4111-8111-111111111111";
     private static final String OTHER_SESSION_ID = "22222222-2222-4222-8222-222222222222";
+    private static final String OTHER_DEVICE_ID = "admin-device-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    private static final String KEY_ONLY_DEVICE_ID = "admin-device-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     private static final String PASSWORD = "correct horse battery staple";
     private static final String NEW_PASSWORD = "new correct horse battery staple";
     private static final String RECOVERY_CODE = "recovery-code-for-tests-123456";

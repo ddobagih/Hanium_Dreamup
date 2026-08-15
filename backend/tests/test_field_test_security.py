@@ -687,6 +687,7 @@ def test_deployment_alembic_requires_a_distinct_migration_role(
     )
     monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
     monkeypatch.setenv("DATABASE_URL", runtime_url)
+    monkeypatch.setenv("WALKSAFE_RUNTIME_DATABASE_ROLE", "walksafe_backend_app")
     monkeypatch.delenv("WALKSAFE_MIGRATION_DATABASE_URL", raising=False)
     with pytest.raises(ValueError, match="WALKSAFE_MIGRATION_DATABASE_URL"):
         migration_database_url()
@@ -697,6 +698,103 @@ def test_deployment_alembic_requires_a_distinct_migration_role(
 
     monkeypatch.setenv("WALKSAFE_MIGRATION_DATABASE_URL", migration_url)
     assert migration_database_url() == migration_url
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("WALKSAFE_RUNTIME_DATABASE_ROLE", "walksafe_backend_app")
+    assert migration_database_url() == migration_url
+
+    monkeypatch.delenv("WALKSAFE_RUNTIME_DATABASE_ROLE", raising=False)
+    with pytest.raises(ValueError, match="WALKSAFE_RUNTIME_DATABASE_ROLE"):
+        migration_database_url()
+
+
+def test_deployment_alembic_rejects_ambiguous_runtime_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime_url = (
+        "postgresql+psycopg://walksafe_backend_app:runtime@db.example.invalid/walksafe"
+        "?sslmode=verify-full&gssencmode=disable"
+    )
+    migration_url = (
+        "postgresql+psycopg://walksafe_migrator:migrate@db.example.invalid/walksafe"
+        "?sslmode=verify-full&gssencmode=disable"
+    )
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+    monkeypatch.setenv("DATABASE_URL", runtime_url)
+    monkeypatch.setenv("WALKSAFE_MIGRATION_DATABASE_URL", migration_url)
+    monkeypatch.setenv("WALKSAFE_RUNTIME_DATABASE_ROLE", "another_runtime")
+
+    with pytest.raises(ValueError, match="must match the DATABASE_URL role"):
+        migration_database_url()
+
+    monkeypatch.setenv("WALKSAFE_RUNTIME_DATABASE_ROLE", "role with spaces")
+    with pytest.raises(ValueError, match="canonical database role"):
+        migration_database_url()
+
+
+def test_deployment_settings_reject_migration_database_credential(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+    monkeypatch.setenv("WALKSAFE_FIELD_TEST_SECURITY_ENABLED", "true")
+    monkeypatch.setenv("WALKSAFE_FIELD_TEST_TOKEN", FIELD_TOKEN)
+    monkeypatch.setenv("WALKSAFE_ADMIN_TOKEN", ADMIN_TOKEN)
+    monkeypatch.setenv(
+        "WALKSAFE_MIGRATION_DATABASE_URL",
+        (
+            "postgresql+psycopg://walksafe_migrator:migrate@db.example.invalid/walksafe"
+            "?sslmode=verify-full&gssencmode=disable"
+        ),
+    )
+
+    with pytest.raises(ValueError, match="must not expose"):
+        Settings()
+
+
+def test_deployment_config_does_not_load_repository_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loaded: list[Path] = []
+    monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+    monkeypatch.setattr(
+        config_module,
+        "load_dotenv",
+        lambda path: loaded.append(Path(path)),
+    )
+
+    with pytest.raises(ValueError):
+        Settings()
+    assert loaded == []
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("WALKSAFE_RUNTIME_DATABASE_ROLE", "walksafe_backend_app")
+    monkeypatch.setenv(
+        "WALKSAFE_MIGRATION_DATABASE_URL",
+        (
+            "postgresql+psycopg://walksafe_migrator:migrate@db.example.invalid/walksafe"
+            "?sslmode=verify-full&gssencmode=disable"
+        ),
+    )
+    assert "walksafe_migrator" in migration_database_url()
+    assert loaded == []
+
+
+def test_repository_dotenv_cannot_select_a_deployment_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("WALKSAFE_ENVIRONMENT", raising=False)
+
+    def inject_production(_path: Path) -> None:
+        monkeypatch.setenv("WALKSAFE_ENVIRONMENT", "production")
+
+    monkeypatch.setattr(config_module, "load_dotenv", inject_production)
+
+    with pytest.raises(ValueError, match="must not be selected"):
+        Settings()
+
+    monkeypatch.delenv("WALKSAFE_ENVIRONMENT", raising=False)
+    with pytest.raises(ValueError, match="must not be selected"):
+        migration_database_url()
 
 
 def test_settings_require_distinct_long_tokens_when_security_enabled(

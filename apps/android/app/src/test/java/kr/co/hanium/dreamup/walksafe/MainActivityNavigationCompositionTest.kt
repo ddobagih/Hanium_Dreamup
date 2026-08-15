@@ -1,5 +1,6 @@
 package kr.co.hanium.dreamup.walksafe
 
+import java.io.File
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import java.util.concurrent.atomic.AtomicBoolean
@@ -16,6 +17,75 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MainActivityNavigationCompositionTest {
+    private val source = File(
+        "src/main/java/kr/co/hanium/dreamup/walksafe/MainActivity.kt",
+    ).readText()
+
+    @Test
+    fun offRouteAndArrivalCandidatesNeverTriggerAutomaticNetworkOrShutdown() {
+        val guidance = functionBlock("private fun updateRouteGuidance(")
+
+        assertFalse(guidance.contains("requestRoute("))
+        assertFalse(
+            Regex("""if\s*\(update\.arrived\)\s*\{[^}]*isRouteActive\s*=\s*false""")
+                .containsMatchIn(guidance),
+        )
+    }
+
+    @Test
+    fun trustedGpsRecoveryDoesNotAutomaticallyRequestANewRoute() {
+        val locationUpdate = functionBlock("private fun handleLocationUpdate(")
+
+        assertFalse(locationUpdate.contains("requestRoute("))
+    }
+
+    @Test
+    fun routeGuidanceUsesStrideOnlyAsAuxiliaryProgressEvidence() {
+        val guidance = functionBlock("private fun updateRouteGuidance(")
+
+        assertTrue(guidance.contains("stepProgressM = routeStepProgressMOrNull()"))
+        assertFalse(guidance.contains("latitude = step"))
+        assertFalse(guidance.contains("longitude = step"))
+    }
+
+    @Test
+    fun voicePagingIsThreeAtATimeAndOnlySelectsFromTheCurrentPage() {
+        val hearMore = functionBlock("private fun hearMoreVoiceDestinationCandidates(")
+        val selection = functionBlock("private fun selectVoiceDestinationCandidate(")
+
+        assertTrue(source.contains("const val DESTINATION_SEARCH_PAGE_SIZE = 3"))
+        assertTrue(hearMore.contains("DestinationSearchVoiceCommand.HearMore"))
+        assertTrue(hearMore.contains("performDestinationSearch(reset = false)"))
+        assertTrue(selection.contains("DestinationSearchVoiceCommand.SelectCandidate(oneBasedIndex)"))
+    }
+
+    @Test
+    fun voiceDecisionCommandsAreBoundToTheRouteRevisionAtRecognitionStart() {
+        val recognitionStart = functionBlock("private fun startVoiceCommandRecognition(")
+        val commandHandler = functionBlock("private fun handleVoiceCommandPhrases(")
+
+        assertTrue(recognitionStart.contains("expectedNavigationDecisionToken"))
+        assertTrue(commandHandler.contains("routeNavigator.pendingDecisionToken()"))
+        assertTrue(commandHandler.contains("voice=navigation_decision_stale"))
+    }
+
+    @Test
+    fun rejectingArrivalDoesNotRestoreTmapTrustWithoutFreshGpsEvidence() {
+        val rejection = functionBlock("private fun rejectArrivalFromVoice(")
+
+        assertFalse(rejection.contains("latestTmapOnRoute = true"))
+    }
+
+    @Test
+    fun androidSourceDoesNotContainATmapProviderKey() {
+        val androidMain = File("src/main").walkTopDown()
+            .filter(File::isFile)
+            .filter { it.extension in setOf("kt", "java", "xml") }
+            .joinToString("\n") { it.readText() }
+
+        assertFalse(Regex("(?i)tmap[_-]?app[_-]?key|\\\"appKey\\\"").containsMatchIn(androidMain))
+    }
+
     @Test
     fun destinationSearchPreservesRequestsUntilActualCandidateSelectionCancelsBoth() {
         val activity = MainActivity()
@@ -169,5 +239,23 @@ class MainActivityNavigationCompositionTest {
                 .bindTo(activity)
                 .invokeWithArguments(arguments.toList())
         }.exceptionOrNull()
+    }
+
+    private fun functionBlock(marker: String): String {
+        val markerIndex = source.indexOf(marker)
+        require(markerIndex >= 0) { "missing function marker: $marker" }
+        val openingBrace = source.indexOf('{', markerIndex)
+        require(openingBrace >= 0) { "missing opening brace: $marker" }
+        var depth = 0
+        for (index in openingBrace until source.length) {
+            when (source[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return source.substring(markerIndex, index + 1)
+                }
+            }
+        }
+        error("missing closing brace: $marker")
     }
 }

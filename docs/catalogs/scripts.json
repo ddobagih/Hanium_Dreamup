@@ -103,6 +103,42 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/apply_walksafe_fp046_goal_completed_seq54_55_20260810.py",
@@ -159,7 +195,61 @@
       "language": "PYTHON",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
       "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_seq56_57_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:apply"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "HISTORICAL",
+      "lifecycle_rule": "documented-historical-exact",
+      "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq60_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:apply"
     },
@@ -196,6 +286,15 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
       "path": "scripts/backup_walksafe_data_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/bind_walksafe_admin_credential_issuer_key.py",
       "strongest_side_effect": "DB_DEVICE",
       "strongest_side_effect_rule": "database-or-device-capability-exact"
     },
@@ -679,6 +778,51 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp022_completion_seq70_71_review_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp022_gap_backlog_r028_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/build_walksafe_fp035_correction_candidate_20260722.py",
@@ -798,6 +942,15 @@
       "language": "PYTHON",
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_historical_git_witness_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
       "path": "scripts/build_walksafe_implementation_gap_analysis_20260722.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:build"
@@ -817,6 +970,132 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
       "path": "scripts/build_walksafe_npc_permission_session_trace_20260724.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_gap_backlog_r027_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r004_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r005_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r006_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r007_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r008_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r009_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r010_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_r011_followup_review_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_strict_review_gate_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_npc_single_admin_recovery_trace_20260812.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:build"
     },
@@ -853,6 +1132,24 @@
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/build_walksafe_phase1_exact257_successor_r014_20260810.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r015_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_phase1_exact257_successor_r016_20260813.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:build"
     },
@@ -916,6 +1213,15 @@
       "lifecycle": "BLOCKED",
       "lifecycle_rule": "intentional-fail-closed-exact",
       "path": "scripts/build_walksafe_web_release_20260711.sh",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_workstream_aggregate_review_20260813.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:build"
     },
@@ -1768,6 +2074,15 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/run_walksafe_fp046_goal_start_gate_20260809.py",
@@ -1798,6 +2113,24 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-maintained-script",
       "path": "scripts/run_walksafe_log_retention_20260711.sh",
+      "strongest_side_effect": "DB_DEVICE",
+      "strongest_side_effect_rule": "database-or-device-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_npc_single_admin_recovery_goal_start_gate_20260812.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/run_walksafe_npc_single_admin_recovery_verification_20260813.py",
       "strongest_side_effect": "DB_DEVICE",
       "strongest_side_effect_rule": "database-or-device-capability-exact"
     },
@@ -2155,10 +2488,10 @@
   ],
   "lifecycle_counts": {
     "BLOCKED": 3,
-    "CURRENT": 123,
-    "HISTORICAL": 113
+    "CURRENT": 159,
+    "HISTORICAL": 114
   },
-  "path_count": 239,
+  "path_count": 276,
   "roots": [
     "data_sources/scripts/",
     "scripts/"
@@ -2174,12 +2507,12 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "1d62c3b6db29ab4f9f5c6e496832de8afcc0a91f36a3233c0e826d77e7a13ff7",
+  "source_set_sha256": "223a73229c8d8041d6ae544ebe0e2c4f9dc81990beaa6a65a05b59ceb01b7bb8",
   "strongest_side_effect_counts": {
-    "DB_DEVICE": 19,
+    "DB_DEVICE": 21,
     "EXTERNAL": 8,
     "LOCAL_BUILD": 42,
     "READ_ONLY": 39,
-    "REPOSITORY_WRITE": 131
+    "REPOSITORY_WRITE": 166
   }
 }

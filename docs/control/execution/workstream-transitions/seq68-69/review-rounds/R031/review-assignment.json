@@ -1,0 +1,444 @@
+{
+  "assigned_at": "2026-08-14T03:21:10+00:00",
+  "assigner": {
+    "agent_instance_id": "codex-root-fp022-seq68-69-r031-assigner-20260814",
+    "canonical_task": "/root",
+    "role": "INTERNAL_REVIEW_ASSIGNER"
+  },
+  "evidence_type": "FP022_SEQ68_69_REVIEW_ASSIGNMENT",
+  "executor": {
+    "agent_instance_id": "codex-root-fp022-seq68-69-r031-executor-20260814",
+    "canonical_task": "/root",
+    "role": "INTERNAL_IMPLEMENTATION_EXECUTOR"
+  },
+  "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "approval_credit_added": 0,
+    "artifact_completion_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "product_implementation_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "atomic_checkpoint_publication_is_fail_closed": true,
+      "no_product_artifact_formal_device_external_deployment_approval_or_release_credit_is_added": true,
+      "private_seven_check_gate_runs_only_after_seq68": true,
+      "projected_seq68_and_seq69_pass_continuation_and_goal_graph": true,
+      "r002_contract_exactly_supersedes_r001": true,
+      "seq66_67_r002_predecessor_review_is_exact": true,
+      "seq68_is_add_only_ready_to_ready_control_reanchor": true,
+      "seq68_status_changes_are_empty": true,
+      "seq69_changes_only_fp022_ready_to_in_progress": true,
+      "seq69_started_requires_the_exact_pass_receipt": true,
+      "source_checkpoint_is_exact_seq67": true
+    },
+    "predecessor_review_bindings": [
+      {
+        "byte_length": 7889,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/review-assignment.json",
+        "sha256": "106f22a96ee9cf976b74e2b33cf92b9f14fd9009e38e5463e8fc462bd3b0e523"
+      },
+      {
+        "byte_length": 7951,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/review-result.json",
+        "sha256": "734801f30e1d977806e5ec19751117b4d3c13a2467f8b3d5caea21a42e40246b"
+      },
+      {
+        "byte_length": 8228,
+        "path": "docs/control/execution/workstream-transitions/seq66-67/review-rounds/R002/independent-review.json",
+        "sha256": "0a882fb03cb9918cdb153d9df5ce1c148bfbb9fd4442325d82226b9bf4b4f101"
+      }
+    ],
+    "projected_transition": {
+      "control_reanchor": {
+        "contract_id": "WS-FP022-INTERNAL-START-GATE-R002",
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-START-CONTROL-REANCHORED-FP022-20260814-001",
+        "event_type": "GOAL_START_CONTROL_REANCHORED",
+        "from_status": "READY",
+        "occurred_at": "2026-08-14T01:54:30+09:00",
+        "sequence": 68,
+        "status_changes": {},
+        "to_status": "READY"
+      },
+      "final_focus_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+      "final_status": "IN_PROGRESS",
+      "goal_started": {
+        "catalog_publication_required": true,
+        "catalog_transition_paths": [
+          "docs/catalogs/repository-paths.json",
+          "docs/catalogs/scripts.json",
+          "docs/catalogs/tests.json"
+        ],
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP022-20260814-001",
+        "event_type": "GOAL_STARTED",
+        "from_status": "READY",
+        "sequence": 69,
+        "start_gate_required_status": "PASS",
+        "to_status": "IN_PROGRESS"
+      }
+    },
+    "required_finding_ids": [],
+    "reviewed_control_code_cohort": [
+      {
+        "byte_length": 276723,
+        "path": "scripts/check_walksafe_project_continuation_v2_4.py",
+        "sha256": "1406095e3ebd68282032a47c6e9f1893191c5397bac97359516c5d040749c1ce"
+      },
+      {
+        "byte_length": 79216,
+        "path": "tests/test_walksafe_project_continuation_v2_4.py",
+        "sha256": "9b31f233b8011a363f5747e91b33e98420965645b478d28db18ff551007e1ef7"
+      },
+      {
+        "byte_length": 534353,
+        "path": "scripts/check_walksafe_goal_graph_v2_4.py",
+        "sha256": "dd6d80982b93ef12b567728ac39f9fff4735e71b95948364966f55599e615a95"
+      },
+      {
+        "byte_length": 282839,
+        "path": "tests/test_walksafe_goal_graph_v2_4.py",
+        "sha256": "dd4b4954933b3cb0fd238c0bff21514a14ffeac055b9e72715abddb2f345723b"
+      },
+      {
+        "byte_length": 65466,
+        "path": "scripts/generate_repository_catalogs.py",
+        "sha256": "1966c7719ca92ecd6e6ad8b09b62c3d31e58f301d7b2d8af453eab16f5cebaef"
+      },
+      {
+        "byte_length": 36837,
+        "path": "tests/test_repository_catalogs.py",
+        "sha256": "d02798e42003a2cbd5eeba20a307f5d314b0f4346b62aee46b413a358b42f065"
+      },
+      {
+        "byte_length": 24304,
+        "path": "scripts/run_walksafe_test_layers_current.sh",
+        "sha256": "eb074f51cebb41d071e6533385b9b73c622e521c82ecf7700d5ee695b4e69fe9"
+      },
+      {
+        "byte_length": 15389,
+        "path": "tests/test_apply_walksafe_workstream_aggregate_seq63_65_20260813.py",
+        "sha256": "e0991490e771630bc2c7728b39030fc993dd5867f5567b83dbb758005b89f6d3"
+      },
+      {
+        "byte_length": 47604,
+        "path": "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "d38dd3930b61dfc6a7d0bf485d420f428930777b5984cb7f46c13a38323fed2f"
+      },
+      {
+        "byte_length": 14335,
+        "path": "tests/test_walksafe_fp022_goal_seq66_67_20260813.py",
+        "sha256": "dd20a5442b40a3c40d0a813bc678529d894c3dfd2b1f57cbec5d24407aee7171"
+      },
+      {
+        "byte_length": 26312,
+        "path": "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "423f10fd49479256ba2cdc9ab05265b3e6d3b30679a6e8063e7d7d7c92a46447"
+      },
+      {
+        "byte_length": 7127,
+        "path": "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py",
+        "sha256": "f57978ae59db20a46c63bd2bdf8ae25eabd329c7036ad2d408af7b7778025fce"
+      },
+      {
+        "byte_length": 25824,
+        "path": "scripts/run_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "7c0e391b528bb5cea184e291085961aa7c98071caf20aa7f6fde1c1f4a6c5ce8"
+      },
+      {
+        "byte_length": 15887,
+        "path": "tests/test_walksafe_fp022_goal_start_gate_20260813.py",
+        "sha256": "7ec3f1013f205fe1d949f58d284901e04a3e0df9aef99a11d4f2fda04f4142c0"
+      },
+      {
+        "byte_length": 43883,
+        "path": "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "sha256": "a2931d4cec50116770838843819567dac8d6bf7b2399b0b8f645647740569e8f"
+      },
+      {
+        "byte_length": 18763,
+        "path": "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
+        "sha256": "6cd6a12bcbe1f11d6471a8b23d344c560c393f426d16a4de713e15e666654870"
+      },
+      {
+        "byte_length": 58244,
+        "path": "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        "sha256": "5703d15fd15292709cf538c14b36448013c3f2bf6a88abae5623813fb2eb9f9f"
+      },
+      {
+        "byte_length": 52031,
+        "path": "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+        "sha256": "c787ac0b47e6269588448bca7841e9056507d5b9d512b9f11912616723db4051"
+      },
+      {
+        "byte_length": 44586,
+        "path": "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+        "sha256": "c20d81c2cdb88da959b8204413e7f3802c9132c44422d2c6e8b6e8d39f0dec3a"
+      },
+      {
+        "byte_length": 13968,
+        "path": "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py",
+        "sha256": "0615677f3d85cade563926f0115ec354c5231e0ca7a40c266d2232c7b79ac8ef"
+      }
+    ],
+    "reviewed_control_code_cohort_sha256": "a8ffbccdbbf8d0734d810baa7bbd879d8c3e1d42242b86da77f10cea2f1e3f40",
+    "source_checkpoint": {
+      "byte_length": 1994168,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sequence": 67,
+      "sha256": "87990596835e0ed3dad48c4a974fb2521a28d9dfdfe076a1ec10596306179354",
+      "tail_event_sha256": "37207b4393dd5820de6b71c7e167885f8592875f8b54d9d75d650aef230a87a2"
+    },
+    "successor_start_gate_contract_evidence": {
+      "byte_length": 4561,
+      "canonical_contract_sha256": "bc382fc5095cfa0eef246447f961d268ff3953274ba1df84360a1a5bb4663e7c",
+      "contract_id": "WS-FP022-INTERNAL-START-GATE-R002",
+      "contract_version": "2026-08-14.1",
+      "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260814-002",
+      "file_sha256": "8e7f55dffcc0725fcb831118ed553b79ed09a41c0d323d00da343fa26ab01b42",
+      "ordered_check_ids": [
+        "CONTINUATION",
+        "V24_ARTIFACT_WORK_QUEUE",
+        "TEST_LAYER_REGISTRY_VALIDATE",
+        "BACKEND_NAVIGATION_INTERNAL",
+        "ANDROID_USER_INTERNAL",
+        "ROOT_FP022_CONTROL_REGRESSION",
+        "REPOSITORY_STATE"
+      ],
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r002.json",
+      "successor_reason_code": "SEQ67_READY_TRUST_ANCHOR_AND_CURRENT_CONTROL_COHORT_REQUIRED"
+    },
+    "superseded_review_assignments": [
+      {
+        "byte_length": 9610,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R001/review-assignment.json",
+        "reason": "SEQ69_FULL_CHECKERS_WERE_NOT_REVALIDATED_AT_PUBLICATION",
+        "sha256": "99b3c11342a7b0fc4f2ec191f07e1182071ff425bbcdc6b7381be4506ee35fb5",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 10052,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R002/review-assignment.json",
+        "reason": "SEQ66_67_PREDECESSOR_REVIEW_WAS_REVALIDATED_AGAINST_LIVE_CONTROLS",
+        "sha256": "18fc4e5453d0a53f0a21aa5ecf15f87edd8448fe7bd7620f4b716ae8a19b7364",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 10440,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R003/review-assignment.json",
+        "reason": "SEQ66_67_POSTPUBLICATION_TEST_EXPECTED_ONLY_THE_SYNTHETIC_REVIEW_BINDING",
+        "sha256": "06813200f1b0de4cba73a10aac9954a9ae1e61dadf274a2ed3664e7f0490767c",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 10835,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R004/review-assignment.json",
+        "reason": "SEQ62_AGGREGATE_FIXTURE_DID_NOT_REVERSE_FP022_SEQ66_67_STATE",
+        "sha256": "f4c66d94964471aa1a6172c953f727ff9f7298f30fdca7b637ffba366c0b23e8",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 11218,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R005/review-assignment.json",
+        "reason": "SEQ68_MANAGED_CLOSURE_DID_NOT_IMPORT_THE_START_REVIEW_AUTHORITY",
+        "sha256": "ee5dcd2740a344d0ebb05402a53b140daaa4769dd7009ce160ba894a5205951a",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 11604,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R006/review-assignment.json",
+        "reason": "SEQ66_67_PREDECESSOR_BINDING_WAS_REPLAYED_AGAINST_LIVE_CONTROLS",
+        "sha256": "9ad8b1476fab7572fa2d8d6b83362988ca4257ef4590a0b7165a356621c81271",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 11990,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R007/review-assignment.json",
+        "reason": "FP022_READY_CURRENT_FOCUS_OMITTED_THE_POLICY_ID_HYPHEN",
+        "sha256": "913483230b4860c2b04ff4ecbc4aa05f83dcf85adf41a4957764dc84104f0d3a",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 12367,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R008/review-assignment.json",
+        "reason": "FP022_GATE_DIRECT_CHECKER_COMMANDS_DID_NOT_SET_PYTHONPATH",
+        "sha256": "929100cdce179b016bfd4739d19cceeddb5f3b49fa5816c713df71ad4d1b0f52",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 12747,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R009/review-assignment.json",
+        "reason": "FP022_OFFLINE_ANDROID_GATE_DID_NOT_BIND_A_GRADLE_CACHE",
+        "sha256": "5c3a5c7e79d965711e60a8da5435f9dde1c3dbd0dd4bc771356636018a1dd9a8",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 13124,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R010/review-assignment.json",
+        "reason": "SEQ69_EVENT_ID_WAS_FORMAT_VALIDATED_BUT_NOT_EXACTLY_SEALED",
+        "sha256": "89768ab21323c22fda19c43e990c8d6cbe9b137f94dd896e6476473f65132b1c",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 13506,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R011/review-assignment.json",
+        "reason": "START_GATE_CONTROL_TESTS_REQUIRED_PHYSICAL_SEQ67_AFTER_SEQ68_PUBLICATION",
+        "sha256": "680b1e8a8f42511560c2f91784fd060a1bb24653306248a333f699aefca84043",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 13901,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R012/review-assignment.json",
+        "reason": "CATALOG_FIXED_POINT_TEST_BYPASSED_THE_SEQ68_REVERSE_PROJECTED_SOURCE",
+        "sha256": "733046bd5e51993e5d8a26edbd5f2fb3075c2534c0321d8603e6bb5f3f4a37f7",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 14292,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R013/review-assignment.json",
+        "reason": "SEQ69_RECAPTURE_DID_NOT_EXCLUDE_THE_VERIFIED_ATOMIC_STAGING_FILE",
+        "sha256": "b7f85c026a423cd76f6064f25a7846e54c8b74563a9581309e3cfb44b7419893",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 14679,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R014/review-assignment.json",
+        "reason": "SEQ69_POSTPUBLICATION_REGRESSION_AND_CATALOGS_WERE_STALE",
+        "sha256": "f3a7db43bb7858bbf16848ed8ca43d2cbdd04ddbc0307f9db2191a38f5f5e053",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 15279,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R015/review-assignment.json",
+        "reason": "CATALOG_ATOMIC_STAGING_FILE_CHANGED_THE_SOURCE_UNIVERSE",
+        "sha256": "36769daf922fc4fc1212a4c8ddb6af3459e1cb4697299d1014271ca700734ee4",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 15657,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R016/review-assignment.json",
+        "reason": "CATALOG_STAGING_SYMLINK_WAS_READ_BEFORE_TYPE_VALIDATION",
+        "sha256": "72488b7e03343ba01cadcf9865e75479d272420b3ca397288d913fcf21a25852",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 16035,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R017/review-assignment.json",
+        "reason": "CATALOG_DISCOVERY_CORRECTLY_OMITTED_THE_DOT_PREFIXED_STAGING_FILE",
+        "sha256": "603da771a2081ba79db3444d2241a095df4ec73c883ef64eb2b7914d20fd2920",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 16423,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R018/review-assignment.json",
+        "reason": "CATALOG_STAGING_WAS_REOPENED_BY_PATH_DURING_STABLE_READ",
+        "sha256": "737c48158fc73e726efa06f1c16a6fe749983137c06c39753eb304b0044e4d0d",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 16801,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R019/review-assignment.json",
+        "reason": "SEQ69_CATALOG_TRANSITION_RECAPTURE_REJECTED_EXACT_CANDIDATE_BYTES",
+        "sha256": "9a000485985e8cd96b715150b8c4aa7738fe8dd54a9cc8f88dd0ea41c8ad9d8a",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 17189,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R020/review-assignment.json",
+        "reason": "R020_ASSIGNMENT_ACTOR_IDENTITIES_REFERENCED_R019",
+        "sha256": "3c74084e2fc31e084b7efa86c8c8b308bbbf3ff0085daff3e3c796a15ed52f0f",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 17560,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R021/review-assignment.json",
+        "reason": "CATALOG_TRANSITION_PHASE_AND_STABLE_LIVE_IDENTITY_WERE_NOT_BOUND",
+        "sha256": "a877aa5b491efa9aa6a3626c3388e87482584d7277ac3fe20edf06fdd5821270",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 17947,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R022/review-assignment.json",
+        "reason": "FRESH_CLI_COULD_NOT_RESUME_A_VALID_PARTIAL_CATALOG_PHASE",
+        "sha256": "b48f5ebf238920f54dcc4c0348817a1a8e198017024f270b390aef8e7ebdd141",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 18326,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R023/review-assignment.json",
+        "reason": "SUPERSEDED_REVIEW_OUTPUT_ABSENCE_WAS_NOT_ENFORCED_AFTER_R018",
+        "sha256": "e059c7eb8f4d9f36aafd3c1f3b3d615f59a0890d0667f265b29e492358d19f0f",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 18709,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R024/review-assignment.json",
+        "reason": "FRESH_PARTIAL_CATALOG_CLI_WAS_REJECTED_BY_SEQ68_LIVE_SNAPSHOT_CHECK",
+        "sha256": "17c440b95b2c9e90adb8f529043449fa7104585f69e2986584d6b9ce5676a595",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 19099,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R025/review-assignment.json",
+        "reason": "GATE_CONTEXT_RELOADED_THE_SEQ68_LIVE_SNAPSHOT_DURING_PARTIAL_CATALOG_RESUME",
+        "sha256": "1b1430eb1c102a2ba5ca9c6abe88cd9162a4daf3c8db45351ffb180a6c81551f",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 19497,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R026/review-assignment.json",
+        "reason": "SEQ69_VALIDATION_COMPARED_THE_HISTORICAL_SEQ68_REANCHOR_TO_THE_CURRENT_SNAPSHOT",
+        "sha256": "c5c2815a72eba3b52e9baf2d412f7f6575d36f7366b78e973c95c165f7f117c2",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 19899,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R027/review-assignment.json",
+        "reason": "GENERIC_CANONICAL_SUFFIX_WAS_MISCLASSIFIED_AS_FP022_GOAL_STARTED",
+        "sha256": "d94df20da66fba9bfbbac979add0bfb3ebfd3e9957032590c7ff7f60e31ca30c",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 20286,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R028/review-assignment.json",
+        "reason": "SEQ69_TRANSACTION_RECHECK_REQUIRED_THE_HISTORICAL_CATALOG_SNAPSHOT",
+        "sha256": "c4ff27da7ed14d9f304219d7c35a7017ac2cc26e82a1049bbc268084f15e26c7",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 20675,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R029/review-assignment.json",
+        "reason": "CHECKPOINT_STAGING_CHANGED_THE_CANDIDATE_CATALOG_SOURCE_UNIVERSE",
+        "sha256": "b4cd104575bff3842507bfc85efac01e8ccbbf42cbc688fba769e1e0b23135d9",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      },
+      {
+        "byte_length": 21062,
+        "path": "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R030/review-assignment.json",
+        "reason": "POST_EXCHANGE_RECAPTURE_NORMALIZED_CATALOGS_TO_THE_SEQ68_PREDECESSOR",
+        "sha256": "b1bcc31570c1a852e126f4e4b83686af10a6d5dbbcf1322200d460157aca6f8d",
+        "status": "SUPERSEDED_BEFORE_REVIEW_RESULT"
+      }
+    ],
+    "superseded_start_gate_contract_evidence": {
+      "byte_length": 2912,
+      "canonical_contract_sha256": "a5d39ea4a1c7f919e4d3d08f3a429f7de0bdadec9d03756df7f32f4bbef074ab",
+      "contract_id": "WS-FP022-INTERNAL-START-GATE-R001",
+      "contract_version": "2026-08-13.1",
+      "document_id": "WS-FP022-INITIAL-START-GATE-CONTRACT-20260813-001",
+      "file_sha256": "14ad8eee8a6c972c1e9091c2065b0779acdde427d0176b84fb83b18840865c25",
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json"
+    }
+  },
+  "reviewer": {
+    "agent_instance_id": "codex-fp022-seq68-69-r031-reviewer-20260814",
+    "canonical_task": "/root/fp022_seq68_69_r031_reviewer",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP022-SEQ68-69-REVIEW-20260814-R031",
+  "schema_version": "1.0"
+}

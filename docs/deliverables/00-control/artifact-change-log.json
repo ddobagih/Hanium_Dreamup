@@ -1985,9 +1985,201 @@
       "rollback_or_supersedes": null,
       "source_baseline_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
       "title": "FP-046 동의·철회·개인정보 삭제 구현을 현재 추적 산출물에 결속"
+    },
+    {
+      "affected_artifact_codes": [
+        "DOC-05",
+        "DOC-01",
+        "REQ-16",
+        "DES-06",
+        "DEV-01",
+        "DEV-18"
+      ],
+      "affected_paths": [
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/03-requirements/rtm.json",
+        "docs/deliverables/04-design/design-traceability-register.json",
+        "docs/deliverables/05-implementation/implementation-manifest.json",
+        "docs/deliverables/05-implementation/module-register.json"
+      ],
+      "affected_requirement_ids": [
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001"
+      ],
+      "affected_test_ids": [
+        "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+      ],
+      "after_summary": "여섯 현재 산출물이 NPC 복구 내부 구현·검증과 GAP-008 R026에 결속되며 외부 credit은 0이다.",
+      "application": {
+        "acceptance_credit_count": 0,
+        "actual_device_credit_count": 0,
+        "approval_credit_count": 0,
+        "execution_credit_count": 0,
+        "external_evidence_credit_count": 0,
+        "formal_evidence_credit_count": 0,
+        "input_bindings": [
+          {
+            "byte_length": 16279,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-20260812-001",
+            "name": "npc_single_admin_recovery_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+            "relation": "NPC_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4"
+          },
+          {
+            "byte_length": 2542,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-20260812-001",
+            "name": "npc_single_admin_recovery_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+            "relation": "NPC_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+          },
+          {
+            "byte_length": 515757,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260812-026",
+            "name": "npc_gap008_r026_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+            "relation": "GAP008_R026_SUCCESSOR_RESULT",
+            "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1"
+          }
+        ],
+        "publication_order": [
+          "docs/deliverables/00-control/artifact-change-log.json",
+          "docs/deliverables/00-control/artifact-register.json",
+          "docs/deliverables/03-requirements/rtm.json",
+          "docs/deliverables/04-design/design-traceability-register.json",
+          "docs/deliverables/05-implementation/implementation-manifest.json",
+          "docs/deliverables/05-implementation/module-register.json"
+        ],
+        "release_credit_count": 0,
+        "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001"
+      },
+      "approved_at": null,
+      "before_summary": "GAP-008의 현행 코드·내부 증거 결속이 비어 있다.",
+      "change_id": "CHG-DOC-0017",
+      "change_type": "NPC_SINGLE_ADMIN_RECOVERY_INTERNAL_ARTIFACT_TRACE_SUCCESSOR",
+      "date": "2026-08-12",
+      "lifecycle_status": "DRAFT",
+      "reason": "GAP-008 R026 내부 증거를 추적하되 실제 복구훈련·정식·외부·출시 credit을 만들지 않기 위함",
+      "review": {
+        "approval_record": null,
+        "approval_status": "NOT_APPROVED",
+        "review_status": "PENDING",
+        "reviewer": null
+      },
+      "reviewer": null,
+      "rollback_or_supersedes": null,
+      "title": "한 명 관리자 복구 내부 구현을 현재 추적 산출물에 결속"
+    },
+    {
+      "affected_artifact_codes": [
+        "DOC-05",
+        "DOC-01",
+        "REQ-16",
+        "DES-06",
+        "DEV-01",
+        "DEV-18"
+      ],
+      "affected_paths": [
+        "docs/deliverables/00-control/artifact-change-log.json",
+        "docs/deliverables/00-control/artifact-register.json",
+        "docs/deliverables/03-requirements/rtm.json",
+        "docs/deliverables/04-design/design-traceability-register.json",
+        "docs/deliverables/05-implementation/implementation-manifest.json",
+        "docs/deliverables/05-implementation/module-register.json"
+      ],
+      "affected_requirement_ids": [
+        "RQ-NPC-SINGLE-ADMIN-RECOVERY-001"
+      ],
+      "affected_test_ids": [
+        "TC-NPC-SINGLE-ADMIN-RECOVERY-01"
+      ],
+      "after_summary": "v1 표지를 보존하고 v2 내부 증거·R027·R001 거부 결과를 교정 진척으로 결속한다.",
+      "application": {
+        "actual_device_credit_count": 0,
+        "external_evidence_credit_count": 0,
+        "formal_evidence_credit_count": 0,
+        "input_bindings": [
+          {
+            "byte_length": 342992,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-CORRECTION-20260813-002",
+            "name": "npc_single_admin_recovery_v2_implementation_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/implementation-record-v2.json",
+            "relation": "NPC_V2_INTERNAL_IMPLEMENTATION_RESULT",
+            "sha256": "eae0f5cd70574bb22551239bdb958370f1167524a3e823bceabd0a80d8b44fe5"
+          },
+          {
+            "byte_length": 3479,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-CORRECTION-20260813-002",
+            "name": "npc_single_admin_recovery_v2_verification_result",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/verification-result-v2.json",
+            "relation": "NPC_V2_INTERNAL_VERIFICATION_RESULT",
+            "sha256": "3ff147da580c7702d885d8508995e4aa1a4b77b913a900af30acf0706d4907f7"
+          },
+          {
+            "byte_length": 527521,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+            "name": "npc_gap008_r027_correction_successor",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.json",
+            "relation": "GAP008_R027_V2_CORRECTION_RESULT",
+            "sha256": "ec04719873e80d7769e49c6b959fa3d712907272c3c968640147e26081b4c04f"
+          },
+          {
+            "byte_length": 513,
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+            "name": "npc_gap008_r027_correction_successor_markdown",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.md",
+            "relation": "GAP008_R027_V2_CORRECTION_MARKDOWN",
+            "sha256": "5c9d154c8f0a906e5fa5d377db4d621f08ed8b3ee5f80e6ac1e3927a6bd83411"
+          },
+          {
+            "byte_length": 65457,
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+            "name": "npc_gap008_r027_backlog_successor",
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.json",
+            "relation": "GAP008_R027_V2_CORRECTION_BACKLOG",
+            "sha256": "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45"
+          },
+          {
+            "byte_length": 420,
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+            "name": "npc_gap008_r027_backlog_successor_markdown",
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.md",
+            "relation": "GAP008_R027_V2_CORRECTION_BACKLOG_MARKDOWN",
+            "sha256": "4285b7f1095ec340fc228855331039cd9e7064891f114f9e93a3f81846483a14"
+          },
+          {
+            "byte_length": 11802,
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-REVIEW-REJECTED-20260813-001",
+            "name": "npc_rejected_internal_review_r001",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R001/review-result.json",
+            "relation": "REJECTED_PREDECESSOR_REVIEW_ADD_ONLY",
+            "sha256": "562d4a0bbf30c5c93bd5291fe046acd911d801f5798055a1e310da120e508a36"
+          }
+        ],
+        "preserved_v1_successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001",
+        "release_credit_count": 0,
+        "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-CORRECTION-20260813-002"
+      },
+      "approved_at": null,
+      "before_summary": "여섯 산출물은 거부된 R001의 v1 증거 계보까지만 결속한다.",
+      "change_id": "CHG-DOC-0018",
+      "change_type": "NPC_SINGLE_ADMIN_RECOVERY_V2_ARTIFACT_TRACE_CORRECTION",
+      "date": "2026-08-13",
+      "lifecycle_status": "DRAFT",
+      "reason": "R001 거부 검토를 보존하면서 v2 구현·검증과 R027 교정만 add-only로 추적하기 위함",
+      "review": {
+        "approval_record": null,
+        "approval_status": "NOT_APPROVED",
+        "review_status": "PENDING",
+        "reviewer": null
+      },
+      "reviewer": null,
+      "rollback_or_supersedes": null,
+      "title": "NPC 단일 관리자 복구 v2 교정 증거를 현재 추적 산출물에 결속"
     }
   ],
-  "content_sha256": "4752a81131123ae7a49aca73e16d4cebc7e0284d469088fa223213c35049f96f",
+  "content_sha256": "d0b92934e7bdb5ed010dddb44030541f99c6a4fdeb652f608d5479328878a733",
   "draft_discovery": {
     "file_bindings": [
       {
@@ -3571,6 +3763,161 @@
     "title": "WalkSafe 산출물 변경 이력",
     "updated_at": "2026-08-02"
   },
+  "npc_single_admin_recovery_artifact_trace_correction_v2": {
+    "change_id": "CHG-DOC-0018",
+    "gap_id": "GAP-008",
+    "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+    "input_bindings": [
+      {
+        "byte_length": 342992,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-CORRECTION-20260813-002",
+        "name": "npc_single_admin_recovery_v2_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/implementation-record-v2.json",
+        "relation": "NPC_V2_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "eae0f5cd70574bb22551239bdb958370f1167524a3e823bceabd0a80d8b44fe5"
+      },
+      {
+        "byte_length": 3479,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-CORRECTION-20260813-002",
+        "name": "npc_single_admin_recovery_v2_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/verification-result-v2.json",
+        "relation": "NPC_V2_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "3ff147da580c7702d885d8508995e4aa1a4b77b913a900af30acf0706d4907f7"
+      },
+      {
+        "byte_length": 527521,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+        "name": "npc_gap008_r027_correction_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.json",
+        "relation": "GAP008_R027_V2_CORRECTION_RESULT",
+        "sha256": "ec04719873e80d7769e49c6b959fa3d712907272c3c968640147e26081b4c04f"
+      },
+      {
+        "byte_length": 513,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260813-027",
+        "name": "npc_gap008_r027_correction_successor_markdown",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.md",
+        "relation": "GAP008_R027_V2_CORRECTION_MARKDOWN",
+        "sha256": "5c9d154c8f0a906e5fa5d377db4d621f08ed8b3ee5f80e6ac1e3927a6bd83411"
+      },
+      {
+        "byte_length": 65457,
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+        "name": "npc_gap008_r027_backlog_successor",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.json",
+        "relation": "GAP008_R027_V2_CORRECTION_BACKLOG",
+        "sha256": "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45"
+      },
+      {
+        "byte_length": 420,
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+        "name": "npc_gap008_r027_backlog_successor_markdown",
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.md",
+        "relation": "GAP008_R027_V2_CORRECTION_BACKLOG_MARKDOWN",
+        "sha256": "4285b7f1095ec340fc228855331039cd9e7064891f114f9e93a3f81846483a14"
+      },
+      {
+        "byte_length": 11802,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-INTERNAL-REVIEW-REJECTED-20260813-001",
+        "name": "npc_rejected_internal_review_r001",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/review-rounds/R001/review-result.json",
+        "relation": "REJECTED_PREDECESSOR_REVIEW_ADD_ONLY",
+        "sha256": "562d4a0bbf30c5c93bd5291fe046acd911d801f5798055a1e310da120e508a36"
+      }
+    ],
+    "physical_path": "docs/deliverables/00-control/artifact-change-log.json",
+    "policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+    "predecessor_sha256": "09c5fdb8eee426a7d60cf10639bf7d6ec9fc41ef2862bec8912282635a5ba96c",
+    "preserved_v1_marker_sha256": "ac0785211a415ec111e6e294ab1e046fc4259385cc20eed3e6ce0ee14d71dcba",
+    "preserved_v1_successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/00-control/artifact-register.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json"
+    ],
+    "semantic_change": "V2_CORRECTION_PROGRESS_BINDING_ONLY",
+    "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-CORRECTION-20260813-002",
+    "trace_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "actual_recovery_drill_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_evidence_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_V2_CORRECTION_TRACE_ONLY"
+    },
+    "v1_marker_remains_add_only": true
+  },
+  "npc_single_admin_recovery_artifact_trace_successor": {
+    "gap_id": "GAP-008",
+    "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+    "input_bindings": [
+      {
+        "byte_length": 16279,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-IMPLEMENTATION-20260812-001",
+        "name": "npc_single_admin_recovery_implementation_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/implementation-record.json",
+        "relation": "NPC_INTERNAL_IMPLEMENTATION_RESULT",
+        "sha256": "708cd80bd2a22fd8d6ab511fbd480c0f24fdfe11612396bb15840764f85b27f4"
+      },
+      {
+        "byte_length": 2542,
+        "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-VERIFICATION-20260812-001",
+        "name": "npc_single_admin_recovery_verification_result",
+        "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-result.json",
+        "relation": "NPC_INTERNAL_VERIFICATION_RESULT",
+        "sha256": "c6b17db7e47b70d6c75cb1f3c422512262fc21c97f6fcf1258d584d90b5a80e2"
+      },
+      {
+        "byte_length": 515757,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260812-026",
+        "name": "npc_gap008_r026_successor",
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260812-r026.json",
+        "relation": "GAP008_R026_SUCCESSOR_RESULT",
+        "sha256": "eb97ed79d544591bf577702521acdec8c87378405397b7270b24f645b81ea8e1"
+      }
+    ],
+    "physical_path": "docs/deliverables/00-control/artifact-change-log.json",
+    "policy_id": "NPC-SINGLE-ADMIN-RECOVERY",
+    "predecessor_sha256": "e25bc981af11837741161b55367253246e4e416816af9d2ba8a27ca8cee27437",
+    "publication_order": [
+      "docs/deliverables/00-control/artifact-change-log.json",
+      "docs/deliverables/00-control/artifact-register.json",
+      "docs/deliverables/03-requirements/rtm.json",
+      "docs/deliverables/04-design/design-traceability-register.json",
+      "docs/deliverables/05-implementation/implementation-manifest.json",
+      "docs/deliverables/05-implementation/module-register.json"
+    ],
+    "successor_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-ARTIFACT-TRACE-SUCCESSOR-20260812-001",
+    "trace_boundary": {
+      "actual_device_status": "NOT_RUN",
+      "actual_recovery_drill_status": "NOT_RUN",
+      "approval_credit_count": 0,
+      "artifact_approval_claimed": false,
+      "external_evidence_credit_count": 0,
+      "external_evidence_status": "NOT_RUN",
+      "formal_test_credit_count": 0,
+      "formal_test_status": "NOT_RUN",
+      "internal_implementation_status": "PASS",
+      "internal_verification_status": "PASS",
+      "production_deployment_status": "NOT_RUN",
+      "release_credit_count": 0,
+      "release_status": "NOT_ELIGIBLE",
+      "review_or_completion_inputs_included": false,
+      "scope": "REPOSITORY_INTERNAL_NPC_SINGLE_ADMIN_RECOVERY_ARTIFACT_TRACE_ONLY"
+    }
+  },
   "opening_snapshot": {
     "approved_snapshot_version": "1.0.0",
     "pretransition_file_sha256": "b25cbb5143e25fa0cb3c3a8ff2edf078099d3d98811c89b26b84f31607a4fbe1",
@@ -3787,7 +4134,7 @@
   ],
   "summary": {
     "approved_change_count": 1,
-    "change_count": 16,
-    "last_change_id": "CHG-DOC-0016"
+    "change_count": 18,
+    "last_change_id": "CHG-DOC-0018"
   }
 }
