@@ -257,6 +257,30 @@ class MainActivityNavigationCompositionTest {
         assertFalse(stop.contains("requestRoute("))
     }
 
+    @Test
+    fun distrustedGpsStopsDirectionGuidanceInsteadOfSubstitutingStepLength() {
+        val handler = functionBlock("private fun handleLocationUpdate(")
+        val untrusted = handler.substringAfter("gps_untrusted").substringBefore("latestTrustedLocation = freshTrusted")
+
+        assertTrue(handler.contains("reason = \"gps_untrusted\""))
+        assertTrue(handler.contains("pauseDirectionGuidance("))
+        assertFalse(untrusted.contains("stepLengthEstimator"))
+        assertFalse(untrusted.contains("latestStepCount"))
+        assertFalse(untrusted.contains("routeStepProgressMOrNull"))
+    }
+
+    @Test
+    fun actualTravelDirectionIsDerivedFromLocationOnly() {
+        assertTrue(source.contains("latestHeadingDeg = updateHeadingFromLocation("))
+        assertFalse(source.contains("latestHeadingDeg = earthOrientationTracker"))
+        assertFalse(source.contains("latestHeadingDeg = routeNavigator"))
+
+        val heading = functionBlock("private fun updateHeadingFromLocation(")
+        assertFalse(heading.contains("earthOrientationTracker"))
+        assertFalse(heading.contains("stepLengthEstimator"))
+        assertFalse(heading.contains("routeNavigator"))
+    }
+
     private fun functionBlock(marker: String): String {
         val markerIndex = source.indexOf(marker)
         require(markerIndex >= 0) { "missing function marker: $marker" }
