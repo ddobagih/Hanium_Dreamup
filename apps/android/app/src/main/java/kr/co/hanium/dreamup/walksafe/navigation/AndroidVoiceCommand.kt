@@ -10,6 +10,7 @@ sealed interface AndroidVoiceCommand {
     data object CancelDestination : AndroidVoiceCommand
     data object NextNavigationInstruction : AndroidVoiceCommand
     data object RequestReroute : AndroidVoiceCommand
+    data object RecheckLocation : AndroidVoiceCommand
     data object ConfirmArrival : AndroidVoiceCommand
     data object RejectArrival : AndroidVoiceCommand
     data object StopNavigation : AndroidVoiceCommand
@@ -23,6 +24,7 @@ sealed interface AndroidVoiceAction {
     data object CancelDestination : AndroidVoiceAction
     data object SpeakNextNavigationInstruction : AndroidVoiceAction
     data object RequestReroute : AndroidVoiceAction
+    data object RecheckLocation : AndroidVoiceAction
     data object ConfirmArrival : AndroidVoiceAction
     data object RejectArrival : AndroidVoiceAction
     data object StopNavigation : AndroidVoiceAction
@@ -118,6 +120,7 @@ fun AndroidVoiceCommand.toAction(): AndroidVoiceAction {
         AndroidVoiceCommand.CancelDestination -> AndroidVoiceAction.CancelDestination
         AndroidVoiceCommand.NextNavigationInstruction -> AndroidVoiceAction.SpeakNextNavigationInstruction
         AndroidVoiceCommand.RequestReroute -> AndroidVoiceAction.RequestReroute
+        AndroidVoiceCommand.RecheckLocation -> AndroidVoiceAction.RecheckLocation
         AndroidVoiceCommand.ConfirmArrival -> AndroidVoiceAction.ConfirmArrival
         AndroidVoiceCommand.RejectArrival -> AndroidVoiceAction.RejectArrival
         AndroidVoiceCommand.StopNavigation -> AndroidVoiceAction.StopNavigation
@@ -171,6 +174,7 @@ fun parseAndroidVoiceCommand(text: String): AndroidVoiceCommand? {
     if (compact == "더듣기") return AndroidVoiceCommand.HearMoreDestinationCandidates
     if (compact in NEXT_NAVIGATION_COMMANDS) return AndroidVoiceCommand.NextNavigationInstruction
     if (compact in REROUTE_COMMANDS) return AndroidVoiceCommand.RequestReroute
+    if (compact in LOCATION_RECHECK_COMMANDS) return AndroidVoiceCommand.RecheckLocation
     if (compact in ARRIVAL_CONFIRM_COMMANDS) return AndroidVoiceCommand.ConfirmArrival
     if (compact in ARRIVAL_REJECT_COMMANDS) return AndroidVoiceCommand.RejectArrival
     if (compact in STOP_NAVIGATION_COMMANDS) return AndroidVoiceCommand.StopNavigation
@@ -288,6 +292,11 @@ private val REROUTE_COMMANDS = setOf(
     "새경로찾아줘",
     "경로다시찾아줘",
     "재탐색해줘",
+)
+private val LOCATION_RECHECK_COMMANDS = setOf(
+    "위치다시확인",
+    "위치확인해줘",
+    "위치다시확인해줘",
 )
 private val ARRIVAL_CONFIRM_COMMANDS = setOf(
     "도착확인",

@@ -10,13 +10,14 @@ data class RouteNavigatorConfig(
     val arrivalConfirmSamples: Int = 2,
     val offRouteDistanceM: Double = 35.0,
     val offRouteConfirmSamples: Int = 2,
+    val locationRecheckMaxAccuracyM: Float = 10f,
     val guidanceIntervalMs: Long = 6_000L,
     val maximumProgressBacktrackM: Double = 8.0,
     val maximumProgressAdvanceM: Double = 80.0,
 )
 
 enum class RouteNavigatorUserDecision {
-    REROUTE,
+    OFF_ROUTE_CHOICE,
     ARRIVAL_CONFIRMATION,
 }
 
@@ -72,6 +73,7 @@ class RouteNavigator(
     private var arrivalSampleCount = 0
     private var pendingDecision: RouteNavigatorUserDecision? = null
     private var offRouteGuidanceSuspended = false
+    private var locationRecheckPending = false
     private var rerouteApprovedForCurrentDeviation = false
     private var progressDistanceM: Double? = null
     private var latestRouteBearingDeg: Float? = null
@@ -93,6 +95,7 @@ class RouteNavigator(
         arrivalSampleCount = 0
         updatePendingDecision(null)
         offRouteGuidanceSuspended = false
+        locationRecheckPending = false
         rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
         latestRouteBearingDeg = null
@@ -112,6 +115,7 @@ class RouteNavigator(
         arrivalSampleCount = 0
         updatePendingDecision(null)
         offRouteGuidanceSuspended = false
+        locationRecheckPending = false
         rerouteApprovedForCurrentDeviation = false
         progressDistanceM = null
         latestRouteBearingDeg = null
@@ -194,7 +198,7 @@ class RouteNavigator(
 
     @Synchronized
     fun approveReroute(): RouteNavigatorUpdate {
-        if (route == null || pendingDecision != RouteNavigatorUserDecision.REROUTE) {
+        if (route == null || pendingDecision != RouteNavigatorUserDecision.OFF_ROUTE_CHOICE) {
             return RouteNavigatorUpdate(null, false, false, false, "reroute_decision_missing")
         }
         updatePendingDecision(null)
@@ -209,10 +213,44 @@ class RouteNavigator(
     }
 
     @Synchronized
+    fun recheckLocation(): RouteNavigatorUpdate {
+        if (route == null || pendingDecision != RouteNavigatorUserDecision.OFF_ROUTE_CHOICE) {
+            return RouteNavigatorUpdate(null, false, false, false, "location_recheck_missing")
+        }
+        updatePendingDecision(null)
+        offRouteSampleCount = 0
+        offRouteGuidanceSuspended = true
+        rerouteApprovedForCurrentDeviation = false
+        locationRecheckPending = true
+        return RouteNavigatorUpdate(
+            instruction = "위치를 다시 확인하는 동안 방향 안내를 중지합니다.",
+            arrived = false,
+            offRoute = true,
+            shouldReroute = false,
+            reason = "off_route_location_recheck_started",
+        )
+    }
+
+    @Synchronized
+    fun endNavigationByUser(): RouteNavigatorUpdate {
+        if (route == null) {
+            return RouteNavigatorUpdate(null, false, false, false, "navigation_end_missing")
+        }
+        clear()
+        return RouteNavigatorUpdate(
+            instruction = "사용자 선택으로 길안내를 종료했습니다.",
+            arrived = false,
+            offRoute = false,
+            shouldReroute = false,
+            reason = "navigation_ended_by_user",
+        )
+    }
+
+    @Synchronized
     fun rerouteRequestFailed() {
         if (route == null || !offRouteGuidanceSuspended) return
         rerouteApprovedForCurrentDeviation = false
-        updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+        updatePendingDecision(RouteNavigatorUserDecision.OFF_ROUTE_CHOICE)
     }
 
     @Synchronized
@@ -307,13 +345,25 @@ class RouteNavigator(
             updatePendingDecision(RouteNavigatorUserDecision.ARRIVAL_CONFIRMATION)
             return arrivalConfirmationRequiredUpdate(stepProgressConsistent)
         }
+        if (locationRecheckPending) {
+            if (location.accuracyM > config.locationRecheckMaxAccuracyM) {
+                return RouteNavigatorUpdate(
+                    instruction = null,
+                    arrived = false,
+                    offRoute = true,
+                    shouldReroute = false,
+                    reason = "off_route_location_untrusted",
+                )
+            }
+            locationRecheckPending = false
+        }
         val offRouteCandidate = distanceToRouteM - location.accuracyM > config.offRouteDistanceM
         offRouteSampleCount = if (offRouteCandidate) offRouteSampleCount + 1 else 0
         val offRoute = offRouteSampleCount >= config.offRouteConfirmSamples.coerceAtLeast(1)
         if (!offRouteCandidate) {
             offRouteGuidanceSuspended = false
             rerouteApprovedForCurrentDeviation = false
-            if (pendingDecision == RouteNavigatorUserDecision.REROUTE) updatePendingDecision(null)
+            if (pendingDecision == RouteNavigatorUserDecision.OFF_ROUTE_CHOICE) updatePendingDecision(null)
         }
         if (offRouteCandidate && !offRoute) {
             return RouteNavigatorUpdate(null, arrived = false, offRoute = false, shouldReroute = false, reason = "off_route_pending")
@@ -334,14 +384,15 @@ class RouteNavigator(
                     },
                 )
             }
-            updatePendingDecision(RouteNavigatorUserDecision.REROUTE)
+            updatePendingDecision(RouteNavigatorUserDecision.OFF_ROUTE_CHOICE)
             return RouteNavigatorUpdate(
-                "경로를 벗어나 현재 방향 안내를 중지했습니다. 새 경로를 찾을지 사용자 선택이 필요합니다.",
+                "경로를 벗어나 방향 안내를 중지했습니다. " +
+                    "새 경로 요청, 위치 다시 확인, 길안내 종료 중에서 사용자 선택이 필요합니다.",
                 arrived = false,
                 offRoute = true,
                 shouldReroute = false,
                 reason = "off_route_user_decision_required",
-                pendingUserDecision = RouteNavigatorUserDecision.REROUTE,
+                pendingUserDecision = RouteNavigatorUserDecision.OFF_ROUTE_CHOICE,
             )
         }
 

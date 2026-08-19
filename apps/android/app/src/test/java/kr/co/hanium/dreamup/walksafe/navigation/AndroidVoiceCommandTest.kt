@@ -256,6 +256,16 @@ class AndroidVoiceCommandTest {
         )
     }
 
+    @Test
+    fun recognizesLocationRecheckAsItsOwnOffRouteChoice() {
+        assertEquals(AndroidVoiceCommand.RecheckLocation, parseAndroidVoiceCommand("위치 다시 확인"))
+        assertEquals(AndroidVoiceCommand.RecheckLocation, parseAndroidVoiceCommand("위치 확인해줘"))
+        assertEquals(
+            AndroidVoiceAction.RecheckLocation,
+            AndroidVoiceCommand.RecheckLocation.toAction(),
+        )
+    }
+
     private fun destinationResult(
         name: String,
         roadAddress: String? = null,

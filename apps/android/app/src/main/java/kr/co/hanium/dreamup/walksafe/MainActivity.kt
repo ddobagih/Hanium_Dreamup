@@ -17566,6 +17566,7 @@ generation != cameraFallbackGeneration
             AndroidVoiceAction.CancelDestination -> cancelDestinationFromVoice()
             AndroidVoiceAction.SpeakNextNavigationInstruction -> speakNextNavigationInstruction()
             AndroidVoiceAction.RequestReroute -> requestRerouteFromVoice()
+            AndroidVoiceAction.RecheckLocation -> recheckLocationFromVoice()
             AndroidVoiceAction.ConfirmArrival -> confirmArrivalFromVoice()
             AndroidVoiceAction.RejectArrival -> rejectArrivalFromVoice()
             AndroidVoiceAction.StopNavigation -> stopNavigationFromVoice()
@@ -17671,7 +17672,7 @@ generation != cameraFallbackGeneration
         if (
             destination == null ||
             !isRouteActive ||
-            routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE
+            routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.OFF_ROUTE_CHOICE
         ) {
             speakInteraction("지금은 새 경로를 요청할 이탈 상태가 아닙니다.")
             return
@@ -17683,6 +17684,19 @@ generation != cameraFallbackGeneration
         if (!routeRequestInFlight.get() && routeNavigator.hasRoute()) {
             retainRouteAfterRerouteFailure("TMAP 새 경로 요청을 시작할 수 없어 방향 안내를 중지했습니다.")
         }
+    }
+
+    private fun recheckLocationFromVoice() {
+        if (
+            !isRouteActive ||
+            routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.OFF_ROUTE_CHOICE
+        ) {
+            speakInteraction("지금은 위치를 다시 확인할 이탈 상태가 아닙니다.")
+            return
+        }
+        val decision = routeNavigator.recheckLocation()
+        updateNavigationStatus("navigation=off_route_location_recheck_user_confirmed")
+        speakInteraction(requireNotNull(decision.instruction))
     }
 
     private fun confirmArrivalFromVoice() {
@@ -17738,13 +17752,25 @@ generation != cameraFallbackGeneration
 
     private fun stopNavigationFromVoice() {
         val hadActiveNavigation = isRouteActive || routeRequestInFlight.get()
+        val offRouteChoicePending =
+            routeNavigator.pendingUserDecision() == RouteNavigatorUserDecision.OFF_ROUTE_CHOICE
         if (routeRequestInFlight.get()) {
             cancelActiveRouteRequest()
         } else if (isRouteActive) {
+            if (offRouteChoicePending) {
+                routeNavigator.endNavigationByUser()
+            }
             resetRouteState()
         }
-        val message = if (hadActiveNavigation) "길안내를 중지했습니다." else "진행 중인 길안내가 없습니다."
-        updateNavigationStatus("voice=navigation_stopped hadActive=$hadActiveNavigation")
+        val message = when {
+            offRouteChoicePending -> "사용자 선택으로 길안내를 종료했습니다."
+            hadActiveNavigation -> "길안내를 중지했습니다."
+            else -> "진행 중인 길안내가 없습니다."
+        }
+        updateNavigationStatus(
+            "voice=navigation_stopped hadActive=$hadActiveNavigation " +
+                "offRouteChoice=$offRouteChoicePending",
+        )
         speakInteraction(message)
     }
 

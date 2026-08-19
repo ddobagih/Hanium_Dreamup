@@ -142,7 +142,7 @@ class TactileRoutePolicyTest {
             .substringBefore("private fun hasActivityRecognitionPermission")
         assertTrue(locationPermission.contains("Manifest.permission.ACCESS_FINE_LOCATION"))
         assertFalse(locationPermission.contains("Manifest.permission.ACCESS_COARSE_LOCATION"))
-        assertTrue(source.contains("routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.REROUTE"))
+        assertTrue(source.contains("routeNavigator.pendingUserDecision() != RouteNavigatorUserDecision.OFF_ROUTE_CHOICE"))
         assertTrue(source.contains("routeNavigator.rerouteRequestFailed()"))
         assertTrue(source.contains("existing_route_retained"))
         assertTrue(source.contains("!routeRequestInFlight.get() &&"))

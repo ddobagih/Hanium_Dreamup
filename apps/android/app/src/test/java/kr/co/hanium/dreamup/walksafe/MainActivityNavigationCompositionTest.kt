@@ -241,6 +241,22 @@ class MainActivityNavigationCompositionTest {
         }.exceptionOrNull()
     }
 
+    @Test
+    fun offRouteLocationRecheckNeverRequestsANewRouteByItself() {
+        val recheck = functionBlock("private fun recheckLocationFromVoice(")
+
+        assertFalse(recheck.contains("requestRoute("))
+        assertTrue(recheck.contains("routeNavigator.recheckLocation()"))
+    }
+
+    @Test
+    fun userEndingNavigationResolvesThePendingOffRouteChoice() {
+        val stop = functionBlock("private fun stopNavigationFromVoice(")
+
+        assertTrue(stop.contains("endNavigationByUser()"))
+        assertFalse(stop.contains("requestRoute("))
+    }
+
     private fun functionBlock(marker: String): String {
         val markerIndex = source.indexOf(marker)
         require(markerIndex >= 0) { "missing function marker: $marker" }

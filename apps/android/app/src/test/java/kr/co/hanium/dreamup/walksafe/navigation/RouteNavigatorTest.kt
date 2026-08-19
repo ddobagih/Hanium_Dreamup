@@ -136,13 +136,13 @@ class RouteNavigatorTest {
             assertTrue(update.offRoute)
             assertFalse(update.shouldReroute)
             assertTrue(update.userDecisionRequired)
-            assertEquals(RouteNavigatorUserDecision.REROUTE, update.pendingUserDecision)
+            assertEquals(RouteNavigatorUserDecision.OFF_ROUTE_CHOICE, update.pendingUserDecision)
             assertEquals("off_route_user_decision_required", update.reason)
             assertTrue(update.instruction?.contains("사용자 선택이 필요") == true)
             assertFalse(update.instruction?.contains("직진하세요") == true)
             assertFalse(update.instruction?.contains("다시 찾습니다") == true)
         }
-        assertEquals(RouteNavigatorUserDecision.REROUTE, navigator.pendingUserDecision())
+        assertEquals(RouteNavigatorUserDecision.OFF_ROUTE_CHOICE, navigator.pendingUserDecision())
     }
 
     @Test
@@ -174,7 +174,7 @@ class RouteNavigatorTest {
 
         navigator.rerouteRequestFailed()
 
-        assertEquals(RouteNavigatorUserDecision.REROUTE, navigator.pendingUserDecision())
+        assertEquals(RouteNavigatorUserDecision.OFF_ROUTE_CHOICE, navigator.pendingUserDecision())
         assertTrue(navigator.approveReroute().shouldReroute)
         assertTrue(navigator.hasRoute())
     }
@@ -570,6 +570,72 @@ class RouteNavigatorTest {
         assertFalse(first.arrived)
         assertFalse(second.arrived)
         assertTrue(second.instruction?.contains("최종 접근") == true)
+    }
+
+    @Test
+    fun locationRecheckClearsTheChoiceAndKeepsGuidanceSuspendedWithoutReroute() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        val confirmed = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val recheck = navigator.recheckLocation()
+
+        assertTrue(confirmed.userDecisionRequired)
+        assertFalse(recheck.shouldReroute)
+        assertEquals("off_route_location_recheck_started", recheck.reason)
+        assertEquals(null, navigator.pendingUserDecision())
+        assertTrue(navigator.hasRoute())
+        assertEquals(null, navigator.currentInstruction(offRouteLocation()))
+    }
+
+    @Test
+    fun locationRecheckDoesNotResumeGuidanceOnAnUntrustedFix() {
+        val navigator = RouteNavigator(
+            RouteNavigatorConfig(offRouteConfirmSamples = 1, guidanceIntervalMs = 0),
+        )
+        navigator.setRoute(route())
+        navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+        navigator.recheckLocation()
+
+        val untrusted = navigator.update(
+            slightlyOffRouteLocation(accuracyM = 40f),
+            nowMs = 2_000L,
+            requestInFlight = false,
+        )
+
+        assertEquals(null, untrusted.instruction)
+        assertFalse(untrusted.shouldReroute)
+        assertEquals("off_route_location_untrusted", untrusted.reason)
+        assertEquals(null, navigator.currentInstruction(locationNearStart()))
+    }
+
+    @Test
+    fun userEndingNavigationClearsTheRouteAndTheChoice() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+        val confirmed = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val ended = navigator.endNavigationByUser()
+
+        assertTrue(confirmed.userDecisionRequired)
+        assertFalse(ended.shouldReroute)
+        assertFalse(ended.arrived)
+        assertEquals("navigation_ended_by_user", ended.reason)
+        assertEquals(null, navigator.pendingUserDecision())
+        assertFalse(navigator.hasRoute())
+    }
+
+    @Test
+    fun confirmedOffRouteInstructionOffersAllThreeApprovedChoices() {
+        val navigator = RouteNavigator(RouteNavigatorConfig(offRouteConfirmSamples = 1))
+        navigator.setRoute(route())
+
+        val update = navigator.update(offRouteLocation(), nowMs = 1_000L, requestInFlight = false)
+
+        val instruction = update.instruction ?: ""
+        assertTrue(instruction.contains("새 경로"))
+        assertTrue(instruction.contains("위치 다시 확인"))
+        assertTrue(instruction.contains("길안내 종료"))
     }
 
     private fun route(guideInstruction: String? = "직진하세요.", bearingDeg: Float? = null): WalkingRoute {
