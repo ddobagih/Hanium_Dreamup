@@ -448,4 +448,12 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(source.contains("navigationPermissionsRequestedForRoute || fieldSessionActive"))
         assertTrue(source.contains("ensureNavigationPermissions(requireActivityRecognition = true)"))
     }
+    @Test
+    fun onboardingOverlayBottomPaddingScalesWithScreenDensity() {
+        // 하드코딩된 32px 는 density 420 기기에서 12dp 에 불과하고, 밀도가 다른
+        // 기기에서는 여백이 제각각이 된다. 마지막 컨트롤 아래 24dp 를 보장한다.
+        assertTrue(source.contains("OVERLAY_BOTTOM_PADDING_DP"))
+        assertTrue(source.contains("resources.displayMetrics.density"))
+        assertFalse(source.contains("setPadding(32, 48, 32, 32)"))
+    }
 }
