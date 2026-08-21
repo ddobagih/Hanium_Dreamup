@@ -456,4 +456,17 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(source.contains("resources.displayMetrics.density"))
         assertFalse(source.contains("setPadding(32, 48, 32, 32)"))
     }
+    @Test
+    fun settingsSectionStaysHiddenUntilFirstRunOnboardingCompletes() {
+        // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
+        // 컨트롤이 낭독 순서를 채우고, 안전 고지를 읽기 전에 동의 초안이 기록되는 것을 막는다.
+        // 계정 삭제 복구 로그인 화면은 온보딩 완료 전에도 필요하므로 예외로 둔다.
+        val update = source.substringAfter("private fun updateFirstRunOnboardingUi")
+            .substringBefore("private fun linkFirstRunAccessibilityTraversal")
+
+        assertTrue(update.contains("privacyControls.visibility"))
+        assertTrue(update.contains("firstRunOnboardingComplete()"))
+        assertTrue(update.contains("accountDeletionRecoveryLoginRequired()"))
+        assertTrue(update.contains("View.GONE"))
+    }
 }

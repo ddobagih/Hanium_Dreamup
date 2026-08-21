@@ -9610,6 +9610,17 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::runtimeControls.isInitialized && !mayUseWalk) {
             runtimeControls.visibility = View.GONE
         }
+        if (::privacyControls.isInitialized) {
+            // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
+            // 컨트롤이 낭독 순서를 채우고, 안전 고지를 읽기 전에 동의 초안이 기록되는 것을 막는다.
+            // 계정 삭제 복구 로그인은 온보딩 완료 전에도 필요하므로 예외로 둔다.
+            privacyControls.visibility =
+                if (firstRunOnboardingComplete() || accountDeletionRecoveryLoginRequired()) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
     }
 
     private fun linkPriorityUserAccessibilityTraversal() {
