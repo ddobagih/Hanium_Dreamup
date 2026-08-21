@@ -469,4 +469,21 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(update.contains("accountDeletionRecoveryLoginRequired()"))
         assertTrue(update.contains("View.GONE"))
     }
+    @Test
+    fun controlsCarryTheMeasuredDesignTokensInsteadOfPlatformDefaults() {
+        // 측정된 대비값을 코드 상수로 고정한다. 흰 글자/회색 면 6.97:1, 테두리 4.08:1.
+        assertTrue(source.contains("WS_COLOR_BUTTON_FILL"))
+        assertTrue(source.contains("WS_COLOR_BUTTON_TEXT"))
+        assertTrue(source.contains("WS_COLOR_LINE"))
+        assertTrue(source.contains("WS_CORNER_RADIUS_DP"))
+        assertTrue(source.contains("WS_CONTROL_GAP_DP"))
+
+        val factory = source.substringAfter("fun accessiblePriorityUserButton(")
+            .substringBefore("productPurposeText =")
+        assertTrue(factory.contains("GradientDrawable()"))
+        assertTrue(factory.contains("bottomMargin"))
+        // 기존 접근성 계약은 그대로 유지한다.
+        assertTrue(factory.contains("setSingleLine(false)"))
+        assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
+    }
 }
