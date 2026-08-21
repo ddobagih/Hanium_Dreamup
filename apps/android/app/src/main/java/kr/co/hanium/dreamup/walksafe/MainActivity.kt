@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.graphics.drawable.GradientDrawable
 import android.hardware.GeomagneticField
 import android.location.Location
 import android.net.ConnectivityManager
@@ -8795,10 +8796,27 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ellipsize = null
             minimumHeight = (48f * resources.displayMetrics.density).roundToInt()
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            val density = resources.displayMetrics.density
+            textSize = 17f
+            setTextColor(WS_COLOR_BUTTON_TEXT)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = WS_CORNER_RADIUS_DP * density
+                setColor(WS_COLOR_BUTTON_FILL)
+                setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+            }
+            setPadding(
+                (20f * density).roundToInt(),
+                (12f * density).roundToInt(),
+                (20f * density).roundToInt(),
+                (12f * density).roundToInt(),
+            )
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
+            ).apply {
+                bottomMargin = (WS_CONTROL_GAP_DP * density).roundToInt()
+            }
             setOnClickListener { onClick() }
         }
 
@@ -8806,6 +8824,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n앱 버전: ${BuildConfig.VERSION_NAME}"
             textSize = 18f
             setTextColor(0xffffffff.toInt())
+            setLineSpacing(0f, 1.45f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = (WS_SECTION_GAP_DP * resources.displayMetrics.density).roundToInt()
+            }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
@@ -8815,6 +8840,15 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = "첫 실행 등록 상태를 확인하는 중입니다."
             textSize = 18f
             setTextColor(0xffffe8bd.toInt())
+            letterSpacing = 0.02f
+            setLineSpacing(0f, 1.35f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = (WS_SECTION_GAP_DP * resources.displayMetrics.density).roundToInt()
+                bottomMargin = (WS_CONTROL_GAP_DP * resources.displayMetrics.density).roundToInt()
+            }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -8845,6 +8879,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             text = INTEGRATED_CONSENT_DISCLOSURE_KO
             textSize = 16f
             setTextColor(0xffffffff.toInt())
+            setLineSpacing(0f, 1.45f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = (WS_CONTROL_GAP_DP * resources.displayMetrics.density).roundToInt()
+            }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
@@ -20664,6 +20705,14 @@ generation != cameraFallbackGeneration
 
     private companion object {
         /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
+        /** 실측 대비 기준 디자인 토큰. 흰 글자/회색 면 6.97:1, 테두리 4.08:1. */
+        const val WS_COLOR_BUTTON_FILL = 0xff5a595b.toInt()
+        const val WS_COLOR_BUTTON_TEXT = 0xffffffff.toInt()
+        const val WS_COLOR_LINE = 0xff6e6d70.toInt()
+        const val WS_CORNER_RADIUS_DP = 10f
+        const val WS_SECTION_GAP_DP = 24f
+        const val WS_CONTROL_GAP_DP = 12f
+
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
 
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
