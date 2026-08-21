@@ -9387,10 +9387,12 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             addView(progressBeepToggleButton)
             addView(progressBeepVolumeButton)
         }
+        val overlayBottomPaddingPx =
+            (OVERLAY_BOTTOM_PADDING_DP * resources.displayMetrics.density).toInt()
         val overlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
-            setPadding(32, 48, 32, 32)
+            setPadding(32, 48, 32, overlayBottomPaddingPx)
             setBackgroundColor(0x66000000)
             addView(productPurposeText)
             addView(permissionDenialPanel)
@@ -9413,7 +9415,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         walkSafetyOverlay = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
-            setPadding(32, 48, 32, 32)
+            setPadding(32, 48, 32, overlayBottomPaddingPx)
             setBackgroundColor(0x66000000)
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -20650,6 +20652,9 @@ generation != cameraFallbackGeneration
             ).stoppedFeatures
 
     private companion object {
+        /** 마지막 컨트롤 아래 확보할 여백. 화면 밀도에 맞춰 px 로 환산한다. */
+        const val OVERLAY_BOTTOM_PADDING_DP = 24f
+
         val PRIVACY_STARTUP_PROCESS_LOCK = Any()
         var accountDeletionStartupResetHandoffPending = false
         const val PERMISSION_REQUEST_CODE_MIN = 3_201
