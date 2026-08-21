@@ -340,6 +340,17 @@ class MainActivityLongLivedLoginStaticTest {
         return text.substring(start, end)
     }
 
+    @Test
+    fun gatewayLoginConnectionFailureIsHandledInsteadOfKillingTheProcess() {
+        val clicked = functionBlock("private fun onGatewaySessionButtonClicked")
+
+        // login()/logout() 은 IOException 을 감싸지 않는다. RuntimeException 만 잡으면
+        // Gateway 가 닿지 않을 때 실행자 스레드에서 빠져나가 프로세스가 종료된다.
+        assertTrue(clicked.contains("gatewaySessionClient.login("))
+        assertFalse(clicked.contains("catch (_: RuntimeException)"))
+        assertTrue(clicked.contains("catch (_: Exception)"))
+    }
+
     private fun functionBlock(marker: String): String = functionBlock(source, marker)
 
     private fun functionBlock(text: String, marker: String): String =

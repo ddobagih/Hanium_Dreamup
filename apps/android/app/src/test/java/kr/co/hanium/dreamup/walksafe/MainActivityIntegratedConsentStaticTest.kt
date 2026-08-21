@@ -1,6 +1,7 @@
 package kr.co.hanium.dreamup.walksafe
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -92,5 +93,18 @@ class MainActivityIntegratedConsentStaticTest {
             source.substring(markerIndex, returnIndex)
                 .contains("reportAttemptStore.release(lease)"),
         )
+    }
+    @Test
+    fun gatewayConnectionFailureIsHandledInsteadOfKillingTheProcess() {
+        val request = ReportStaticSourceInspector.functionBlock(
+            source,
+            "private fun startIntegratedConsentRequest",
+        )
+
+        // ConnectException 은 IOException 계열이라 RuntimeException 으로 잡히지 않는다.
+        // Gateway 가 닿지 않을 때 실행자 스레드에서 빠져나가면 프로세스가 종료된다.
+        assertFalse(request.contains("catch (_: RuntimeException)"))
+        assertTrue(request.contains("catch (_: Exception)"))
+        assertTrue(request.contains("integratedConsent=blocked:server_confirmation_failed"))
     }
 }
