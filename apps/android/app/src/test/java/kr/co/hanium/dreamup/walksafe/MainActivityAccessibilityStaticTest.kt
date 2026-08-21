@@ -486,4 +486,21 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(factory.contains("setSingleLine(false)"))
         assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
     }
+    @Test
+    fun onboardingShowsStepProgressAsDecorationAndStatusTextAsTitle() {
+        // 진행 표시줄은 시각 정보만 제공한다. 같은 내용을 heading 문장이 이미 낭독하므로
+        // 접근성 트리에서 제외해 중복 낭독을 막는다.
+        assertTrue(source.contains("firstRunProgressBar"))
+        assertTrue(source.contains("firstRunProgressSegments"))
+
+        val bar = source.substringAfter("firstRunProgressBar = LinearLayout(this)")
+            .substringBefore("firstRunOnboardingStatusText = TextView(this)")
+        assertTrue(bar.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
+
+        // 단계 문장은 본문 크기가 아니라 제목으로 보인다.
+        val title = source.substringAfter("firstRunOnboardingStatusText = TextView(this).apply")
+            .substringBefore("ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText")
+        assertTrue(title.contains("Typeface.BOLD"))
+        assertTrue(title.contains("textSize = 22f"))
+    }
 }

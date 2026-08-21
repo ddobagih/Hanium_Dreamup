@@ -11,6 +11,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.GeomagneticField
 import android.location.Location
@@ -437,6 +438,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountLogoutButton: Button
     private lateinit var reportPrivacyDisclosureText: TextView
     private lateinit var privacyConsentStatusText: TextView
+    private lateinit var firstRunProgressBar: LinearLayout
+    private val firstRunProgressSegments = mutableListOf<View>()
     private lateinit var privacyControls: LinearLayout
     private lateinit var reportPrivacyConsentButton: Button
     private lateinit var automaticReportConsentButton: Button
@@ -8665,12 +8668,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
         }
+        firstRunProgressSegments.clear()
+        firstRunProgressBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            // 같은 정보를 아래 heading 문장이 낭독하므로 접근성 트리에서 제외한다.
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            val density = resources.displayMetrics.density
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = (WS_SECTION_GAP_DP * density).roundToInt() }
+            repeat(FIRST_RUN_VISIBLE_STAGE_COUNT) { index ->
+                val segment = View(this@MainActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        (3f * density).roundToInt(),
+                        1f,
+                    ).apply {
+                        if (index > 0) marginStart = (6f * density).roundToInt()
+                    }
+                    setBackgroundColor(WS_COLOR_LINE)
+                }
+                firstRunProgressSegments += segment
+                addView(segment)
+            }
+        }
         firstRunOnboardingStatusText = TextView(this).apply {
             id = View.generateViewId()
             text = "첫 실행 등록 상태를 확인하는 중입니다."
-            textSize = 18f
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
             setTextColor(0xffffe8bd.toInt())
-            letterSpacing = 0.02f
+            letterSpacing = 0.0f
             setLineSpacing(0f, 1.35f)
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -8738,6 +8767,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingControls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            addView(firstRunProgressBar)
             addView(firstRunOnboardingStatusText)
             addView(firstRunPurposeButton)
             listOf(
@@ -9650,6 +9680,21 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         if (::runtimeControls.isInitialized && !mayUseWalk) {
             runtimeControls.visibility = View.GONE
+        }
+        if (::firstRunProgressBar.isInitialized) {
+            val completedStages = when (snapshot.stage) {
+                FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1
+                FirstRunOnboardingStage.AGE_AND_GUARDIAN_NEED -> 2
+                FirstRunOnboardingStage.INTEGRATED_CONSENT -> 3
+                else -> FIRST_RUN_VISIBLE_STAGE_COUNT
+            }
+            firstRunProgressSegments.forEachIndexed { index, segment ->
+                segment.setBackgroundColor(
+                    if (index < completedStages) 0xffffe8bd.toInt() else WS_COLOR_LINE,
+                )
+            }
+            firstRunProgressBar.visibility =
+                if (firstRunOnboardingComplete()) View.GONE else View.VISIBLE
         }
         if (::privacyControls.isInitialized) {
             // 온보딩 중에는 설정·동의·계정 섹션을 접근성 트리에서 제거한다. 단계와 무관한
@@ -20148,6 +20193,7 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_BUTTON_TEXT = 0xffffffff.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
         const val WS_CORNER_RADIUS_DP = 10f
+        const val FIRST_RUN_VISIBLE_STAGE_COUNT = 3
         const val WS_SECTION_GAP_DP = 24f
         const val WS_CONTROL_GAP_DP = 12f
 
