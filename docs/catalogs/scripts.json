@@ -2507,7 +2507,7 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "223a73229c8d8041d6ae544ebe0e2c4f9dc81990beaa6a65a05b59ceb01b7bb8",
+  "source_set_sha256": "8f0ebca05a26e194f404d47170a952cdd06e5661438093b3e9129f3806ef5a97",
   "strongest_side_effect_counts": {
     "DB_DEVICE": 21,
     "EXTERNAL": 8,

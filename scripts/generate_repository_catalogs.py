@@ -51,6 +51,8 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/apply_walksafe_fp046_goal_completed_seq54_55_20260810.py',
         'scripts/apply_walksafe_fp046_goal_seq51_52_20260809.py',
         'scripts/apply_walksafe_fp046_goal_started_seq53_20260809.py',
+        'scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py',
+        'scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py',
         'scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py',
         'scripts/apply_walksafe_fp048_goal_started_seq42_20260802.py',
         'scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py',
@@ -131,6 +133,8 @@ KNOWN_SCRIPT_PATHS = frozenset(
         'scripts/build_walksafe_fp046_artifact_trace_successor_20260810.py',
         'scripts/build_walksafe_fp046_consent_withdrawal_deletion_trace_20260810.py',
         'scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py',
+        'scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py',
+        'scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py',
         'scripts/build_walksafe_fp046_strict_review_gate_20260810.py',
         'scripts/build_walksafe_fp047_user_admin_login_authorization_separation_trace_20260726.py',
         'scripts/build_walksafe_fp048_artifact_trace_successor_20260802.py',
@@ -578,6 +582,9 @@ REPOSITORY_WRITE_SCRIPT_EXACT = frozenset(
         "scripts/generate_repository_catalogs.py",
         "scripts/generate_walksafe_openapi.py",
         "scripts/build_walksafe_historical_git_witness_20260812.py",
+        "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+        "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+        "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
         "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
         "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
         "scripts/apply_walksafe_npc_single_admin_recovery_goal_started_seq59_20260812.py",
@@ -617,6 +624,7 @@ LOCAL_BUILD_SCRIPT_EXACT = frozenset(
 )
 READ_ONLY_SCRIPT_EXACT = frozenset(
     {
+        "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
         "scripts/validate_submission_forms_20260710.py",
         "scripts/validate_submission_materials_20260710.py",
         "scripts/validate_walksafe_formal_deliverables_0_6.py",

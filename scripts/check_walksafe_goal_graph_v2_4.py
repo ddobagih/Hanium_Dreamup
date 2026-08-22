@@ -2649,6 +2649,77 @@ NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_ID = (
 NPC_SINGLE_ADMIN_RECOVERY_COMPLETION_EVENT_SHA256 = (
     "24f586dda8e19d9c1315bee80e546906359869c49e5fa776bb891ec76beb13c1"
 )
+R002_REOPEN_PARENT_GOAL_ID = "WS-GOAL-EPIC-03"
+R002_REOPEN_FIRST_SEQUENCE = 72
+R002_REOPEN_EVENT_IDS = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP046-R002-20260815-001",
+    "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-FP046-R002-20260815-001",
+    (
+        "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-"
+        "NPC-SINGLE-ADMIN-RECOVERY-R002-20260815-001"
+    ),
+    "WS-GOAL-GRAPH-V2-4-GOAL-READY-EPIC03-REOPEN-20260815-001",
+    "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001",
+)
+R002_REOPEN_EVENT_TYPES = (
+    "CANONICAL_BINDINGS_UPDATED",
+    "GOAL_SUPERSEDED",
+    "GOAL_SUPERSEDED",
+    "GOAL_READY",
+    "GOAL_READY",
+)
+R002_REOPEN_CANONICAL_BINDING_UPDATES = {
+    "IMPLEMENTATION_GAP": {
+        "role": "IMPLEMENTATION_GAP",
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+        "path": (
+            "docs/control/audits/"
+            "walksafe-implementation-gap-analysis-20260815-r029.json"
+        ),
+        "file_sha256": (
+            "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922"
+        ),
+    },
+    "IMPLEMENTATION_BACKLOG": {
+        "role": "IMPLEMENTATION_BACKLOG",
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "path": (
+            "docs/control/audits/"
+            "walksafe-implementation-remediation-backlog-20260815-r029.json"
+        ),
+        "file_sha256": (
+            "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
+        ),
+    },
+}
+R002_REOPEN_SUCCESSORS = (
+    {
+        "predecessor_goal_id": FP046_GOAL_ID,
+        "predecessor_goal_path": (
+            "docs/control/goals/walksafe-completion-graph-v2-4/"
+            "work-items/epic-03/"
+            "epic-03-fp046-consent-withdrawal-deletion-r001.md"
+        ),
+        "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "goal_path": (
+            "docs/control/goals/walksafe-completion-graph-v2-4/"
+            "work-items/epic-03/"
+            "epic-03-fp046-consent-withdrawal-deletion-r002.md"
+        ),
+        "requires": ["WS-GOAL-EPIC-03-FP-008-R001"],
+    },
+    {
+        "predecessor_goal_id": NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+        "predecessor_goal_path": NPC_SINGLE_ADMIN_RECOVERY_GOAL_PATH,
+        "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002",
+        "goal_path": (
+            "docs/control/goals/walksafe-completion-graph-v2-4/"
+            "work-items/epic-03/"
+            "epic-03-npc-single-admin-recovery-r002.md"
+        ),
+        "requires": ["WS-GOAL-EPIC-03-FP-046-R002"],
+    },
+)
 NPC_SINGLE_ADMIN_RECOVERY_R027_BACKLOG_DOCUMENT_ID = (
     "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027"
 )
@@ -6376,7 +6447,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             else None
         )
         fp022_control_successor_context = (
-            fp022_completion_review.validated_control_successor_r004_context(
+            fp022_completion_review.validated_control_successor_r008_context(
                 root
             )
             if fp022_completion_suffix
@@ -6664,7 +6735,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
 
         if fp022_control_successor_context is not None:
             r002_reviewed_sources = (
-                fp022_control_successor_context.predecessor
+                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor.predecessor
                 .predecessor_managed_closure_source_successors
             )
             overlaid_mandatory = (
@@ -6677,11 +6748,12 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             if overlaid_mandatory is None:
                 return False
             r003_reviewed_sources = (
-                fp022_control_successor_context
-                .predecessor.managed_closure_source_successors
+                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor.predecessor
+                .managed_closure_source_successors
             )
             r004_reviewed_sources = (
-                fp022_control_successor_context.managed_closure_source_successors
+                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor
+                .managed_closure_source_successors
             )
             overlaid_mandatory = (
                 _overlay_reviewed_managed_closure_source_successors_r003(
@@ -6777,6 +6849,11 @@ def _npc_single_admin_recovery_completion_package(
     checkpoint: dict[str, Any],
 ) -> dict[str, Any] | None:
     """Validate the add-only NPC result/review package bound by seq61/62."""
+
+    proof_checkpoint = _r002_legacy_completion_overlay(root, checkpoint)
+    if proof_checkpoint is None:
+        return None
+    checkpoint = proof_checkpoint
 
     state = checkpoint.get("goal_execution")
     statuses = state.get("status_by_goal") if isinstance(state, dict) else None
@@ -7876,6 +7953,9 @@ def validate_fp046_r014_successor_authority(
     """Consume sealed R014 exact6 authority without granting completion credit."""
     if not _fp046_completion_is_present(checkpoint):
         return [], {}, {}
+    proof_checkpoint = _r002_legacy_completion_overlay(root, checkpoint)
+    if proof_checkpoint is None:
+        return ["FP046 R014 archived completion successor differs"], {}, {}
     if successor_artifacts is None or (
         not successor_artifacts
         and not _npc_single_admin_recovery_successor_is_declared(checkpoint)
@@ -7888,7 +7968,7 @@ def validate_fp046_r014_successor_authority(
         )
         if successor_artifacts is None:
             return ["NPC successor authority differs"], {}, {}
-    if not _fp046_completion_is_declared(root, checkpoint):
+    if not _fp046_completion_is_declared(root, proof_checkpoint):
         return ["FP046 R014 successor declaration differs"], {}, {}
     compatibility_errors = _validate_fp046_final_source_compatibility_binding(root)
     if compatibility_errors:
@@ -15515,6 +15595,575 @@ def validate_fp022_completion_seq70_71(
     return errors
 
 
+def _r002_reopen_suffix(
+    checkpoint: dict[str, Any],
+) -> list[dict[str, Any]] | None:
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list):
+        return None
+    if len(history) < R002_REOPEN_FIRST_SEQUENCE:
+        return []
+    suffix = history[
+        R002_REOPEN_FIRST_SEQUENCE - 1 : R002_REOPEN_FIRST_SEQUENCE + 4
+    ]
+    return suffix if len(suffix) == 5 and all(
+        isinstance(event, dict) for event in suffix
+    ) else None
+
+
+def _r002_completion_events(
+    history: list[dict[str, Any]],
+    goal_ids: set[str],
+) -> dict[str, dict[str, Any]] | None:
+    result: dict[str, dict[str, Any]] = {}
+    for event in history:
+        if (
+            event.get("event_type") == "GOAL_COMPLETED"
+            and isinstance(event.get("subject_goal_id"), str)
+            and event["subject_goal_id"] in goal_ids
+        ):
+            goal_id = event["subject_goal_id"]
+            if goal_id in result:
+                return None
+            result[goal_id] = event
+    return result if set(result) == goal_ids else None
+
+
+def _r002_evidence_before_suffix(
+    history: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    active: dict[str, Any] | None = None
+    archived: dict[str, Any] | None = None
+    for event in history:
+        if "completion_evidence_by_goal_after" in event:
+            value = event.get("completion_evidence_by_goal_after")
+            if not isinstance(value, dict):
+                return None
+            active = copy.deepcopy(value)
+        if "archived_completion_evidence_by_goal_after" in event:
+            value = event.get("archived_completion_evidence_by_goal_after")
+            if not isinstance(value, dict):
+                return None
+            archived = copy.deepcopy(value)
+    if active is None:
+        return None
+    return active, archived if archived is not None else {}
+
+
+def _r002_archive_projection(
+    active: dict[str, Any],
+    archived: dict[str, Any],
+    goal_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    if goal_id not in active or goal_id in archived:
+        return None
+    return (
+        {key: value for key, value in active.items() if key != goal_id},
+        {**archived, goal_id: active[goal_id]},
+    )
+
+
+def _r002_goal_document(
+    root: Path,
+    relative: str,
+) -> tuple[dict[str, Any], str] | None:
+    path = _exact_repo_file(root, relative)
+    if path is None:
+        return None
+    try:
+        goal, _ = frozen_goal.parse_goal(path)
+    except (OSError, ValueError):
+        return None
+    return goal, continuation.sha256_file(path)
+
+
+def _r002_inventory_record(
+    root: Path,
+    specification: dict[str, Any],
+    event: dict[str, Any],
+) -> dict[str, Any] | None:
+    document = _r002_goal_document(root, specification["goal_path"])
+    if document is None:
+        return None
+    goal, digest = document
+    return {
+        "goal_id": specification["goal_id"],
+        "goal_kind": goal.get("goal_kind"),
+        "initial_status": goal.get("initial_status"),
+        "parent_goal_id": goal.get("parent_goal_id"),
+        "path": specification["goal_path"],
+        "sha256": digest,
+        "work_item_type": goal.get("work_item_type"),
+        "materialized_from_role": goal.get("materialized_from_role"),
+        "materialized_from_path": goal.get("materialized_from_path"),
+        "materialized_from_document_id": goal.get(
+            "materialized_from_document_id"
+        ),
+        "materialized_from_sha256": goal.get("materialized_from_sha256"),
+        "predecessor_goal_id": goal.get("predecessor_goal_id"),
+        "predecessor_goal_content_sha256": goal.get(
+            "predecessor_goal_content_sha256"
+        ),
+        "supersedes_goal_id": goal.get("supersedes_goal_id"),
+        "supersedes_goal_content_sha256": goal.get(
+            "supersedes_goal_content_sha256"
+        ),
+        "artifact_work_reason": goal.get("artifact_work_reason"),
+        "artifact_trigger_evidence_refs": goal.get(
+            "artifact_trigger_evidence_refs"
+        ),
+        "materialized_event_sha256": event.get("event_sha256"),
+    }
+
+
+def _r002_successor_errors(
+    root: Path,
+    *,
+    label: str,
+    event: dict[str, Any],
+    source_event: dict[str, Any],
+    canonical_update: dict[str, Any],
+    completion_event: dict[str, Any],
+    specification: dict[str, Any],
+    backlog_binding: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    predecessor_goal_id = specification["predecessor_goal_id"]
+    successor_goal_id = specification["goal_id"]
+    predecessor = _r002_goal_document(
+        root, specification["predecessor_goal_path"]
+    )
+    successor = _r002_goal_document(root, specification["goal_path"])
+    if predecessor is None or successor is None:
+        return [f"{label} R002 Goal document is missing or malformed"]
+    predecessor_goal, predecessor_sha256 = predecessor
+    successor_goal, successor_sha256 = successor
+    source = frozen_goal.materialization_source_snapshot(successor_goal)
+    expected_trigger = {
+        "canonical_update_event_sha256": canonical_update.get("event_sha256"),
+        "target_completion_event_sha256": completion_event.get("event_sha256"),
+        "target_completion_occurred_at": completion_event.get("occurred_at"),
+        "decided_at": canonical_update.get("occurred_at"),
+    }
+    expected_event = {
+        "subject_goal_id": predecessor_goal_id,
+        "materialized_goal_id": successor_goal_id,
+        "materialized_goal_path": specification["goal_path"],
+        "materialized_goal_content_sha256": successor_sha256,
+        "materialized_from_role": source.get("role"),
+        "materialized_from_path": source.get("path"),
+        "materialized_from_document_id": source.get("document_id"),
+        "materialized_from_sha256": source.get("file_sha256"),
+        "predecessor_goal_id": continuation.FP022_GOAL_ID,
+        "predecessor_goal_content_sha256": continuation.FP022_GOAL_SHA256,
+        "supersedes_goal_id": predecessor_goal_id,
+        "supersedes_goal_content_sha256": predecessor_sha256,
+        "from_status": "COMPLETE_AT_TARGET",
+        "to_status": "SUPERSEDED",
+        "status_changes": {
+            predecessor_goal_id: "SUPERSEDED",
+            successor_goal_id: "PLANNED",
+        },
+        "evidence_refs": [],
+        "reopen_trigger": expected_trigger,
+    }
+    if any(event.get(field) != expected for field, expected in expected_event.items()):
+        errors.append(f"{label} R002 supersession event differs")
+    if (
+        event.get("canonical_binding_snapshot_after")
+        != canonical_update.get("canonical_binding_snapshot_after")
+        or "dynamic_goal_inventory_after" in event
+        or "materialized_child_goal_ids_by_parent_after" in event
+    ):
+        errors.append(f"{label} R002 supersession projection differs")
+    if (
+        successor_goal.get("goal_id") != successor_goal_id
+        or successor_goal.get("goal_kind") != "WORK_ITEM"
+        or successor_goal.get("initial_status") != "PLANNED"
+        or successor_goal.get("parent_goal_id") != R002_REOPEN_PARENT_GOAL_ID
+        or successor_goal.get("start_requires") != specification["requires"]
+        or successor_goal.get("completion_requires") != specification["requires"]
+        or successor_goal.get("predecessor_goal_id")
+        != continuation.FP022_GOAL_ID
+        or successor_goal.get("predecessor_goal_content_sha256")
+        != continuation.FP022_GOAL_SHA256
+        or successor_goal.get("supersedes_goal_id") != predecessor_goal_id
+        or successor_goal.get("supersedes_goal_content_sha256")
+        != predecessor_sha256
+        or successor_goal.get("reopen_reason") != "CANONICAL_INPUT_CHANGED"
+        or successor_goal.get("reopen_evidence_refs") != []
+        or source != backlog_binding
+        or not frozen_goal.successor_semantic_scope_matches(
+            predecessor_goal, successor_goal
+        )
+    ):
+        errors.append(f"{label} R002 Goal lineage differs")
+    if (
+        event.get("previous_focus_goal_id")
+        != source_event.get("focus_goal_id")
+        or event.get("focus_goal_id") != source_event.get("focus_goal_id")
+        or event.get("previous_focus_content_sha256")
+        != source_event.get("focus_goal_content_sha256")
+        or event.get("focus_goal_content_sha256")
+        != source_event.get("focus_goal_content_sha256")
+    ):
+        errors.append(f"{label} R002 supersession focus differs")
+    return errors
+
+
+def validate_fp046_npc_r002_reopen_seq72_76(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Bind the one approved archive-and-successor transaction at seq72-76."""
+    suffix = _r002_reopen_suffix(checkpoint)
+    if suffix == []:
+        return []
+    if suffix is None:
+        return ["FP046/NPC R002 reopen suffix is incomplete or malformed"]
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(state, dict) or not isinstance(history, list):
+        return ["FP046/NPC R002 reopen state is malformed"]
+    errors: list[str] = []
+    source_history = history[: R002_REOPEN_FIRST_SEQUENCE - 1]
+    source_event = source_history[-1] if source_history else None
+    if not isinstance(source_event, dict) or (
+        source_event.get("sequence") != 71
+        or source_event.get("event_id")
+        != continuation.FP022_COMPLETION_EVENT_ID
+        or source_event.get("event_type") != "GOAL_COMPLETED"
+        or source_event.get("subject_goal_id") != continuation.FP022_GOAL_ID
+    ):
+        return ["FP046/NPC R002 reopen source seq71 differs"]
+    if (
+        [event.get("sequence") for event in suffix]
+        != list(range(R002_REOPEN_FIRST_SEQUENCE, R002_REOPEN_FIRST_SEQUENCE + 5))
+        or [event.get("event_id") for event in suffix]
+        != list(R002_REOPEN_EVENT_IDS)
+        or [event.get("event_type") for event in suffix]
+        != list(R002_REOPEN_EVENT_TYPES)
+    ):
+        errors.append("FP046/NPC R002 reopen event identity differs")
+    previous = source_event
+    for event in suffix:
+        if (
+            event.get("previous_event_sha256") != previous.get("event_sha256")
+            or event.get("event_sha256") != continuation.event_sha256(event)
+        ):
+            errors.append("FP046/NPC R002 reopen event chain or seal differs")
+        previous = event
+
+    tracked_ids = {
+        R002_REOPEN_PARENT_GOAL_ID,
+        FP046_GOAL_ID,
+        NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+        FP008_ADMIN_REVIEW_GOAL_ID,
+    }
+    completion_events = _r002_completion_events(source_history, tracked_ids)
+    evidence = _r002_evidence_before_suffix(source_history)
+    if completion_events is None or evidence is None:
+        return errors + ["FP046/NPC R002 reopen source completion lineage differs"]
+    source_active, source_archived = evidence
+    cbu, fp046, npc, parent_ready, fp046_ready = suffix
+    parent_completion = completion_events[R002_REOPEN_PARENT_GOAL_ID]
+    fp046_completion = completion_events[FP046_GOAL_ID]
+    npc_completion = completion_events[NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID]
+    fp008_completion = completion_events[FP008_ADMIN_REVIEW_GOAL_ID]
+    source_canonical = source_event.get("canonical_binding_snapshot_after")
+    expected_canonical = copy.deepcopy(source_canonical)
+    if not isinstance(expected_canonical, dict):
+        errors.append("FP046/NPC R002 reopen source canonical snapshot differs")
+        expected_canonical = {}
+    else:
+        expected_canonical.update(R002_REOPEN_CANONICAL_BINDING_UPDATES)
+    canonical = cbu.get("canonical_binding_snapshot_after")
+    if canonical != expected_canonical:
+        errors.append("FP046/NPC R002 reopen canonical snapshot differs")
+    backlog_binding = (
+        canonical.get("IMPLEMENTATION_BACKLOG")
+        if isinstance(canonical, dict)
+        else None
+    )
+    backlog_path = _exact_repo_file(
+        root,
+        backlog_binding.get("path") if isinstance(backlog_binding, dict) else None,
+    )
+    backlog_document = _load_exact_json(
+        root,
+        R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"][
+            "path"
+        ],
+    )
+    backlog_metadata = (
+        backlog_document.get("metadata")
+        if isinstance(backlog_document, dict)
+        else None
+    )
+    if (
+        not isinstance(backlog_binding, dict)
+        or backlog_binding
+        != R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"]
+        or backlog_path is None
+        or backlog_binding.get("file_sha256")
+        != continuation.sha256_file(backlog_path)
+        or not isinstance(backlog_metadata, dict)
+        or backlog_metadata.get("backlog_id")
+        != R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"][
+            "document_id"
+        ]
+    ):
+        errors.append("FP046/NPC R002 reopen Backlog binding differs")
+        backlog_binding = {}
+
+    expected_cbu = {
+        "subject_goal_id": R002_REOPEN_PARENT_GOAL_ID,
+        "from_status": "COMPLETE_AT_TARGET",
+        "to_status": "PLANNED",
+        "status_changes": {R002_REOPEN_PARENT_GOAL_ID: "PLANNED"},
+        "changed_binding_roles": ["IMPLEMENTATION_BACKLOG", "IMPLEMENTATION_GAP"],
+        "changed_subject_ids_by_role": {
+            "IMPLEMENTATION_BACKLOG": ["FP-046"],
+            "IMPLEMENTATION_GAP": ["FP-046", "GAP-055"],
+        },
+        "impact_closure_goal_ids": [
+            R002_REOPEN_PARENT_GOAL_ID,
+            FP046_GOAL_ID,
+            NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+        ],
+        "impact_disposition_by_goal": {
+            FP046_GOAL_ID: {"result": "REOPEN_REQUIRED"},
+            NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID: {"result": "REOPEN_REQUIRED"},
+            R002_REOPEN_PARENT_GOAL_ID: {
+                "result": "REOPEN_CONTAINER",
+                "target_status": "PLANNED",
+            },
+        },
+        "reopened_completion_event_sha256_by_goal": {
+            R002_REOPEN_PARENT_GOAL_ID: parent_completion.get("event_sha256")
+        },
+        "evidence_refs": [],
+    }
+    if any(cbu.get(field) != expected for field, expected in expected_cbu.items()):
+        errors.append("FP046/NPC R002 reopen canonical closure differs")
+    projection = _r002_archive_projection(
+        source_active, source_archived, R002_REOPEN_PARENT_GOAL_ID
+    )
+    if projection is None:
+        errors.append("FP046/NPC R002 reopen parent completion archive differs")
+        active_after_parent, archived_after_parent = {}, {}
+    else:
+        active_after_parent, archived_after_parent = projection
+        if (
+            cbu.get("completion_evidence_by_goal_after") != active_after_parent
+            or cbu.get("archived_completion_evidence_by_goal_after")
+            != archived_after_parent
+        ):
+            errors.append("FP046/NPC R002 reopen parent evidence archive differs")
+    projection = _r002_archive_projection(
+        active_after_parent, archived_after_parent, FP046_GOAL_ID
+    )
+    if projection is None:
+        errors.append("FP046 R002 source completion archive differs")
+        active_after_fp046, archived_after_fp046 = {}, {}
+    else:
+        active_after_fp046, archived_after_fp046 = projection
+        if (
+            fp046.get("completion_evidence_by_goal_after") != active_after_fp046
+            or fp046.get("archived_completion_evidence_by_goal_after")
+            != archived_after_fp046
+        ):
+            errors.append("FP046 R002 source evidence archive differs")
+    projection = _r002_archive_projection(
+        active_after_fp046,
+        archived_after_fp046,
+        NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+    )
+    if projection is None:
+        errors.append("NPC R002 source completion archive differs")
+        active_after_npc, archived_after_npc = {}, {}
+    else:
+        active_after_npc, archived_after_npc = projection
+        if (
+            npc.get("completion_evidence_by_goal_after") != active_after_npc
+            or npc.get("archived_completion_evidence_by_goal_after")
+            != archived_after_npc
+        ):
+            errors.append("NPC R002 source evidence archive differs")
+
+    if isinstance(backlog_binding, dict):
+        errors.extend(
+            _r002_successor_errors(
+                root,
+                label="FP046",
+                event=fp046,
+                source_event=source_event,
+                canonical_update=cbu,
+                completion_event=fp046_completion,
+                specification=R002_REOPEN_SUCCESSORS[0],
+                backlog_binding=backlog_binding,
+            )
+        )
+        errors.extend(
+            _r002_successor_errors(
+                root,
+                label="NPC",
+                event=npc,
+                source_event=source_event,
+                canonical_update=cbu,
+                completion_event=npc_completion,
+                specification=R002_REOPEN_SUCCESSORS[1],
+                backlog_binding=backlog_binding,
+            )
+        )
+
+    expected_parent_basis = {
+        "mode": "CANONICAL_DEPENDENCY_CLOSURE_REOPEN",
+        "canonical_update_event_sha256": cbu.get("event_sha256"),
+        "successor_event_sha256_by_goal": {
+            R002_REOPEN_SUCCESSORS[0]["goal_id"]: fp046.get("event_sha256"),
+            R002_REOPEN_SUCCESSORS[1]["goal_id"]: npc.get("event_sha256"),
+        },
+        "archived_completion_event_sha256": parent_completion.get("event_sha256"),
+    }
+    if (
+        parent_ready.get("subject_goal_id") != R002_REOPEN_PARENT_GOAL_ID
+        or parent_ready.get("from_status") != "PLANNED"
+        or parent_ready.get("to_status") != "READY"
+        or parent_ready.get("status_changes")
+        != {R002_REOPEN_PARENT_GOAL_ID: "READY"}
+        or parent_ready.get("evidence_refs") != []
+        or parent_ready.get("readiness_basis") != expected_parent_basis
+    ):
+        errors.append("FP046/NPC R002 reopen parent readiness differs")
+    inventory = parent_ready.get("dynamic_goal_inventory_after")
+    children = parent_ready.get("materialized_child_goal_ids_by_parent_after")
+    if not isinstance(inventory, dict) or not isinstance(children, dict):
+        errors.append("FP046/NPC R002 reopen successor inventory is missing")
+    else:
+        for event, specification in zip(
+            (fp046, npc), R002_REOPEN_SUCCESSORS, strict=True
+        ):
+            record = inventory.get(specification["goal_id"])
+            expected_record = _r002_inventory_record(root, specification, event)
+            if record != expected_record:
+                errors.append("FP046/NPC R002 reopen successor inventory differs")
+        members = children.get(R002_REOPEN_PARENT_GOAL_ID)
+        expected_successors = [
+            specification["goal_id"] for specification in R002_REOPEN_SUCCESSORS
+        ]
+        if (
+            not isinstance(members, list)
+            or members != sorted(set(members))
+            or not set(expected_successors).issubset(members)
+        ):
+            errors.append("FP046/NPC R002 reopen successor child map differs")
+
+    expected_ready_basis = {
+        "dependency_completion_events": [
+            {
+                "goal_id": FP008_ADMIN_REVIEW_GOAL_ID,
+                "event_sha256": fp008_completion.get("event_sha256"),
+            }
+        ]
+    }
+    if (
+        fp046_ready.get("subject_goal_id") != R002_REOPEN_SUCCESSORS[0]["goal_id"]
+        or fp046_ready.get("from_status") != "PLANNED"
+        or fp046_ready.get("to_status") != "READY"
+        or fp046_ready.get("status_changes")
+        != {R002_REOPEN_SUCCESSORS[0]["goal_id"]: "READY"}
+        or fp046_ready.get("evidence_refs") != []
+        or fp046_ready.get("reopened_container_ready_event_sha256")
+        != parent_ready.get("event_sha256")
+        or fp046_ready.get("readiness_basis") != expected_ready_basis
+    ):
+        errors.append("FP046 R002 readiness differs")
+
+    statuses = state.get("status_by_goal")
+    active = state.get("completion_evidence_by_goal")
+    archived = state.get("archived_completion_evidence_by_goal")
+    state_inventory = state.get("dynamic_goal_inventory")
+    if (
+        not isinstance(statuses, dict)
+        or not isinstance(active, dict)
+        or not isinstance(archived, dict)
+        or not isinstance(state_inventory, dict)
+    ):
+        errors.append("FP046/NPC R002 reopen final state is malformed")
+        return errors
+    expected_archived_statuses = {
+        FP046_GOAL_ID: "SUPERSEDED",
+        NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID: "SUPERSEDED",
+    }
+    if any(
+        statuses.get(goal_id) != status
+        for goal_id, status in expected_archived_statuses.items()
+    ):
+        errors.append("FP046/NPC R002 reopen final statuses differ")
+    for goal_id, expected_roles in archived_after_npc.items():
+        if archived.get(goal_id) != expected_roles:
+            errors.append("FP046/NPC R002 reopen final archive differs")
+            break
+    if any(goal_id in active for goal_id in (
+        R002_REOPEN_PARENT_GOAL_ID,
+        FP046_GOAL_ID,
+        NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+    )):
+        errors.append("FP046/NPC R002 reopen active completion evidence differs")
+    for event, specification in zip(
+        (fp046, npc), R002_REOPEN_SUCCESSORS, strict=True
+    ):
+        if state_inventory.get(specification["goal_id"]) != _r002_inventory_record(
+            root, specification, event
+        ):
+            errors.append("FP046/NPC R002 reopen final successor inventory differs")
+    if len(history) == R002_REOPEN_FIRST_SEQUENCE + 4:
+        if (
+            statuses.get(R002_REOPEN_PARENT_GOAL_ID) != "READY"
+            or statuses.get(R002_REOPEN_SUCCESSORS[0]["goal_id"]) != "READY"
+            or statuses.get(R002_REOPEN_SUCCESSORS[1]["goal_id"]) != "PLANNED"
+            or active != active_after_npc
+            or archived != archived_after_npc
+            or state.get("dynamic_goal_inventory") != inventory
+            or state.get("materialized_child_goal_ids_by_parent") != children
+            or continuation.canonical_binding_snapshot(checkpoint) != canonical
+        ):
+            errors.append("FP046/NPC R002 reopen final projection differs")
+    return errors
+
+
+def _r002_legacy_completion_overlay(
+    root: Path,
+    checkpoint: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Restore only archived R001 completion roles for frozen proof replay."""
+    suffix = _r002_reopen_suffix(checkpoint)
+    if suffix == []:
+        return checkpoint
+    if suffix is None or validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint):
+        return None
+    projection = copy.deepcopy(checkpoint)
+    state = projection.get("goal_execution")
+    if not isinstance(state, dict):
+        return None
+    statuses = state.get("status_by_goal")
+    active = state.get("completion_evidence_by_goal")
+    archived = state.get("archived_completion_evidence_by_goal")
+    if not isinstance(statuses, dict) or not isinstance(active, dict) or not isinstance(
+        archived, dict
+    ):
+        return None
+    for goal_id in (FP046_GOAL_ID, NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID):
+        roles = archived.get(goal_id)
+        if not isinstance(roles, list):
+            return None
+        statuses[goal_id] = "COMPLETE_AT_TARGET"
+        active[goal_id] = roles
+    return projection
+
+
 def validate(
     root: Path = ROOT,
     checkpoint_path: Path = V24_CHECKPOINT_RELATIVE,
@@ -15553,6 +16202,7 @@ def validate(
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return errors + [f"v2.4 input cannot be loaded: {exc}"]
     errors.extend(validate_fp022_completion_seq70_71(root, checkpoint))
+    errors.extend(validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint))
     preimage_errors, canonical_preimages = (
         validate_canonical_preimage_archive(root)
     )

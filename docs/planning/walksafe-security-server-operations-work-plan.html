@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WalkSafe 보안·서버 운영 실행 계획</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5b6578;
+      --line: #d9dfeb;
+      --surface: #ffffff;
+      --soft: #f4f7fb;
+      --navy: #173b68;
+      --blue: #1f67a8;
+      --teal: #087f74;
+      --amber: #9a5b00;
+      --red: #a32929;
+      --green-soft: #e8f7f2;
+      --amber-soft: #fff4d8;
+      --blue-soft: #eaf2fb;
+      --red-soft: #fdecec;
+      --shadow: 0 12px 30px rgba(30, 55, 90, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: var(--blue); text-underline-offset: 0.18em; }
+    a:hover { color: var(--navy); }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 72px;
+    }
+
+    header {
+      overflow: hidden;
+      position: relative;
+      padding: 42px;
+      border-radius: 22px;
+      color: #fff;
+      background: linear-gradient(135deg, #102b4b 0%, #164f7a 58%, #087f74 100%);
+      box-shadow: var(--shadow);
+    }
+
+    header::after {
+      content: "";
+      position: absolute;
+      right: -90px;
+      bottom: -130px;
+      width: 330px;
+      height: 330px;
+      border: 54px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.84;
+    }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.35rem);
+      line-height: 1.18;
+      letter-spacing: -0.045em;
+    }
+
+    header .lead {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 18px 0 0;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.04rem;
+    }
+
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 24px;
+      font-size: 0.88rem;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    nav {
+      position: sticky;
+      z-index: 5;
+      top: 10px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      margin: 18px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 8px 24px rgba(30, 55, 90, 0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    nav a {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      border-radius: 9px;
+      color: var(--navy);
+      font-size: 0.88rem;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    nav a:hover,
+    nav a:focus-visible { background: var(--blue-soft); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      min-width: 0;
+      gap: 18px;
+    }
+
+    section,
+    .notice {
+      min-width: 0;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    section[id] { scroll-margin-top: 88px; }
+
+    .notice {
+      border-left: 5px solid var(--amber);
+      background: var(--amber-soft);
+      box-shadow: none;
+    }
+
+    .notice strong { color: #744300; }
+
+    h2 {
+      margin: 0 0 16px;
+      color: var(--navy);
+      font-size: clamp(1.45rem, 3vw, 2rem);
+      line-height: 1.3;
+      letter-spacing: -0.025em;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      color: var(--navy);
+      font-size: 1.15rem;
+    }
+
+    p { margin: 0.65em 0; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: 0.36rem; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--soft);
+    }
+
+    .card .value {
+      display: block;
+      color: var(--navy);
+      font-size: 1.55rem;
+      font-weight: 850;
+      letter-spacing: -0.035em;
+    }
+
+    .card .label { color: var(--muted); font-size: 0.87rem; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 850;
+      letter-spacing: 0.015em;
+      white-space: nowrap;
+    }
+
+    .badge.ready { color: #096250; background: var(--green-soft); }
+    .badge.planned { color: #785000; background: var(--amber-soft); }
+    .badge.blocked { color: var(--red); background: var(--red-soft); }
+    .badge.info { color: var(--navy); background: var(--blue-soft); }
+
+    .table-wrap {
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.91rem;
+    }
+
+    th,
+    td {
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--navy);
+      background: #edf3fa;
+      font-size: 0.81rem;
+      letter-spacing: 0.015em;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    code {
+      padding: 0.12em 0.34em;
+      border-radius: 5px;
+      background: #edf1f6;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 12px 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: #edf1f6;
+    }
+
+    pre code { padding: 0; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, auto);
+      align-items: center;
+      justify-content: start;
+      gap: 9px;
+      margin: 18px 0;
+    }
+
+    .flow .node {
+      min-width: 116px;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--blue-soft);
+      color: var(--navy);
+      text-align: center;
+      font-weight: 850;
+    }
+
+    .flow .arrow { color: var(--blue); font-size: 1.3rem; font-weight: 900; }
+
+    .callout {
+      margin: 16px 0;
+      padding: 14px 16px;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 10px 10px 0;
+      background: var(--blue-soft);
+    }
+
+    .epic-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 6px;
+    }
+
+    .epic-head h2 { margin: 0; }
+
+    .epic-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .epic-meta div {
+      padding: 12px 14px;
+      border-radius: 11px;
+      background: var(--soft);
+    }
+
+    .epic-meta dt {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+
+    .epic-meta dd { margin: 3px 0 0; font-weight: 750; }
+
+    .steps {
+      counter-reset: plan-step;
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .steps li {
+      counter-increment: plan-step;
+      position: relative;
+      min-height: 50px;
+      margin: 0;
+      padding: 10px 12px 10px 54px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .steps li::before {
+      content: counter(plan-step);
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 9px;
+      color: #fff;
+      background: var(--navy);
+      font-weight: 850;
+    }
+
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { position: relative; padding-left: 1.55rem; }
+    .checklist li::before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      color: var(--teal);
+      font-weight: 900;
+    }
+
+    .small { color: var(--muted); font-size: 0.85rem; }
+    .nowrap { white-space: nowrap; }
+
+    footer {
+      padding: 24px 6px 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .epic-meta { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .flow .arrow { transform: rotate(90deg); text-align: center; }
+    }
+
+    @media (max-width: 620px) {
+      .page { width: min(calc(100% - 18px), 1180px); padding-top: 10px; }
+      header, section, .notice { padding: 21px; border-radius: 14px; }
+      nav { top: 4px; }
+      .cards { grid-template-columns: 1fr; }
+      th, td { padding: 10px; }
+    }
+
+    @media print {
+      @page { margin: 13mm; }
+      body { background: #fff; font-size: 10pt; }
+      .page { width: 100%; padding: 0; }
+      header { color: #000; background: #fff; border: 2px solid #173b68; box-shadow: none; }
+      header .lead, .meta { color: #26364d; }
+      nav { display: none; }
+      main { display: block; }
+      section, .notice { break-inside: avoid; margin-top: 12px; box-shadow: none; }
+      a { color: inherit; text-decoration: none; }
+      .table-wrap { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <p class="eyebrow">Hanium Dreamup · WalkSafe</p>
+      <h1>보안·서버 운영 실행 계획</h1>
+      <p class="lead">
+        팀 합의상 담당 범위인 EPIC-03·07·09·11을 구현 단위, 협업 경계,
+        선행조건과 검증 순서로 재분류한 작업 문서입니다.
+      </p>
+      <div class="meta">
+        <span>기준일: 2026-08-15 (KST)</span>
+        <span>기준 브랜치: current</span>
+        <span>기준 커밋: c0ba5a792b1c</span>
+        <span>문서 성격: 비정본 실행 계획</span>
+      </div>
+    </header>
+
+    <nav aria-label="문서 바로가기">
+      <a href="#summary">담당 요약</a>
+      <a href="#dependency">진행 순서</a>
+      <a href="#roles">역할 경계</a>
+      <a href="#epic03">EPIC-03</a>
+      <a href="#epic07">EPIC-07</a>
+      <a href="#epic09">EPIC-09</a>
+      <a href="#epic11">EPIC-11</a>
+      <a href="#roadmap">실행 로드맵</a>
+      <a href="#sources">근거</a>
+    </nav>
+
+    <main>
+      <aside class="notice" aria-label="문서 사용 주의">
+        <strong>먼저 구분할 것:</strong>
+        기존 기능 카탈로그의 <code>SV-03</code>, <code>SV-07</code>, <code>SV-09</code>,
+        <code>SV-11</code>은 개별 기능 ID이고, 이 문서의 <code>WS-GOAL-EPIC-03/07/09/11</code>과
+        같은 번호 체계가 아닙니다. Epic 상태·의존성·완료 기준은 checkpoint와 r028 backlog가 정본이며,
+        카탈로그 행 연결은 의미 기반 참고 매핑입니다.
+      </aside>
+
+      <section id="summary">
+        <h2>1. 담당 범위 요약</h2>
+        <div class="cards" aria-label="현황 요약">
+          <div class="card"><span class="value">4개</span><span class="label">담당 Epic</span></div>
+          <div class="card"><span class="value">1개</span><span class="label">내부 구현 목표 도달</span></div>
+          <div class="card"><span class="value">3개</span><span class="label">PLANNED 상태</span></div>
+          <div class="card"><span class="value">미승인</span><span class="label">현재 release eligibility</span></div>
+        </div>
+
+        <p class="callout">
+          이 계획에서는 팀 합의에 따라 사용자를 네 Epic의 실무 담당자로 둡니다. 다만 정본 문서의 역할명은
+          EPIC-03·07이 <strong>보안·개인정보책임자</strong>, EPIC-09·11이
+          <strong>백엔드·운영 기술책임자</strong>로 나뉘며, 기능 카탈로그에는 사람 이름의 실제 배정값이
+          포함돼 있지 않습니다.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Epic</th><th>현재 상태</th><th>담당 핵심</th><th>반드시 함께할 역할</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>03</strong><br>계정·관리자 앱·보안</td>
+                <td><span class="badge ready">COMPLETE_AT_TARGET</span><br><span class="small">내부 목표: IMPLEMENTATION_READY</span></td>
+                <td>권한·세션·관리자 보안·삭제·암호화의 운영 검증 마감</td>
+                <td>Android 관리자 앱, 개인정보, QA, 외부 검토자</td>
+              </tr>
+              <tr>
+                <td><strong>07</strong><br>원본 수집·보존·삭제</td>
+                <td><span class="badge planned">PLANNED</span></td>
+                <td>원본 schema, 암호화 저장, retention/deletion scheduler와 영수증</td>
+                <td>Android 수집, AI·데이터, 개인정보, QA</td>
+              </tr>
+              <tr>
+                <td><strong>09</strong><br>서버 저장·용량·장애대응</td>
+                <td><span class="badge planned">PLANNED</span></td>
+                <td>Gateway·DB·object store·KMS 경계, 용량 상태, 장애·비용 제어</td>
+                <td>Android, DBA, 인프라, 개인정보, QA</td>
+              </tr>
+              <tr>
+                <td><strong>11</strong><br>릴리스·운영·복구 준비</td>
+                <td><span class="badge planned">PLANNED</span></td>
+                <td>배포·rollback, 관측·경보, backup/restore, 안전 종료 runbook</td>
+                <td>Android release, AI, DBA, 개인정보, QA·승인자</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="dependency">
+        <h2>2. 진행 순서와 시작 조건</h2>
+        <div class="flow" role="img" aria-label="EPIC-03에서 EPIC-07, EPIC-09, EPIC-11로 이어지는 의존 순서">
+          <div class="node">EPIC-03<br><span class="small">운영 검증 병행</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">EPIC-07<br><span class="small">먼저 구현</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">EPIC-09<br><span class="small">용량·복원력</span></div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">EPIC-11<br><span class="small">운영 준비</span></div>
+        </div>
+        <ul>
+          <li>EPIC-07은 EPIC-02와 EPIC-03을 선행조건으로 둡니다.</li>
+          <li>EPIC-09는 EPIC-03·07·08이 완료·결속돼야 합니다.</li>
+          <li>EPIC-11은 EPIC-09·10 결과를 받아야 합니다.</li>
+          <li>현재 저장소의 전역 focus는 EPIC-04이며, ready frontier는 EPIC-04·12입니다. 따라서 EPIC-07·09·11의 <em>제품 코드 시작</em>은 Goal 상태와 팀 우선순위를 먼저 전환한 뒤 진행합니다.</li>
+        </ul>
+        <h3>모든 기능에 적용할 작업 루프</h3>
+        <ol class="steps">
+          <li><strong>실패 조건부터 고정</strong> — 권한 우회, 부분 저장, 재시도, 용량 초과, 복원 같은 부정 경로 테스트를 먼저 작성합니다.</li>
+          <li><strong>계약과 경계 확정</strong> — API/schema/state/TTL/idempotency/감사 필드를 문서와 테스트에 결속합니다.</li>
+          <li><strong>최소 구현</strong> — 해당 계약을 만족하는 서버·저장·운영 코드만 구현합니다.</li>
+          <li><strong>구성요소·통합 검증</strong> — 정상/실패/재시작/중복/부분장애를 재현하고 기존 안전 기능 회귀를 확인합니다.</li>
+          <li><strong>증거와 인계 갱신</strong> — RTM, test result, runbook, receipt를 남기고 실제 기기·운영·외부 검증은 승인된 gate로 넘깁니다.</li>
+        </ol>
+      </section>
+
+      <section id="roles">
+        <h2>3. 내가 직접 맡을 것과 협업할 것</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>구분</th><th>내가 주도</th><th>협업팀 산출물</th></tr></thead>
+            <tbody>
+              <tr><td>Backend·Gateway</td><td>인증/권한, idempotency, 오류 계약, 안전 API 자원격리</td><td>Android 요청·재시도 계약, QA 부하·실패 시나리오</td></tr>
+              <tr><td>Data·Storage</td><td>DB/object store/KMS 경계, manifest·receipt·tombstone, 보존·삭제 job</td><td>수집 metadata, AI dataset 삭제, DBA 운영 정책</td></tr>
+              <tr><td>Security·Privacy</td><td>세션 폐기, step-up, 키 분리·회전 경계, 접근감사, fail-closed 정책</td><td>동의 UX, 실제 권리요청, 개인정보·법률 독립검토</td></tr>
+              <tr><td>Operations</td><td>capacity state, health/alert, backup/restore, rollout/rollback·종료 runbook</td><td>앱 update/중단 UX, 모델 배포, 운영 승인·훈련·비용 측정</td></tr>
+              <tr><td>Evidence</td><td>서버 테스트, migration 검증, 로그·receipt·runbook 초안</td><td>실기기 원자료, 외부 검토서, 정식시험·release gate 승인</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">
+          실제 운영 계정·비밀·KMS·유료 저장소 생성, production 배포, 개인정보 독립검토와 승인 면제는
+          저장소 구현 권한만으로 수행하지 않습니다. 팀 또는 승인권자가 자원과 실행 권한을 제공한 뒤 별도 증거로 남깁니다.
+        </p>
+      </section>
+
+      <section id="epic03">
+        <div class="epic-head">
+          <h2>4. EPIC-03 — 계정·관리자 앱·보안</h2>
+          <span class="badge ready">내부 목표 도달</span>
+        </div>
+        <dl class="epic-meta">
+          <div><dt>선행조건</dt><dd>EPIC-01</dd></div>
+          <div><dt>정본 책임 역할</dt><dd>보안·개인정보책임자</dd></div>
+          <div><dt>현재 할 일</dt><dd>새 기능보다 회귀·실환경 검증 인계</dd></div>
+        </dl>
+        <p>
+          코드·인터페이스·내부 인수조건은 준비됐습니다. 회귀 실패나 정책 변경이 없다면 이 Epic을 새 구현으로
+          다시 열지 않고, 아래 운영 증거를 모아 EPIC-12 검증으로 넘기는 것이 맞습니다.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>작업 묶음</th><th>확인할 실패 조건</th><th>남길 산출물</th></tr></thead>
+            <tbody>
+              <tr><td><strong>FP-047</strong><br>사용자/관리자 권한·세션</td><td>사용자 토큰의 관리자 API 접근, 폐기 token replay, step-up 없는 고위험 작업을 거부하고 감사</td><td>권한 matrix, 실제 역할 검증 결과, 폐기·동결 audit</td></tr>
+              <tr><td><strong>FP-008</strong><br>분리 관리자 앱</td><td>미등록 기기·추가인증 누락·잘못된 역할의 검수/전달을 거부하고 보행 기능과 격리</td><td>등록기기/추가인증 결과, 관리자 workflow 증거</td></tr>
+              <tr><td><strong>FP-046</strong><br>동의·철회·삭제</td><td>일부 저장소 장애, 중복 retry, backup restore에서도 상태 역행·원본 부활이 없음</td><td>저장소별 deletion receipt, tombstone/재시도 기록</td></tr>
+              <tr><td><strong>NPC 복구</strong><br>단일 관리자 분실 대응</td><td>불충분한 custody, 폐기 session replay, 재인증 전 고위험 작업을 거부</td><td>복구훈련 결과, 원격 session 폐기 증거</td></tr>
+              <tr><td><strong>FP-048</strong><br>암호화·키·사고대응</td><td>평문·누락 키·TLS/KMS 실패·감사 누락 때 fail-closed</td><td>실환경 TLS/KMS 확인, key rotation·복원·사고 runbook</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>완료 판단</h3>
+        <ul class="checklist">
+          <li>내부 구현 완료 상태를 유지하고 관련 회귀 검사를 통과한다.</li>
+          <li>실제 사용자/관리자·등록 기기·운영 DB/TLS/KMS 결과를 확보한다.</li>
+          <li>실제 삭제·복구훈련·독립 보안/개인정보 검토를 EPIC-12 gate에 결속한다.</li>
+        </ul>
+        <p class="small">카탈로그 참고 매핑(비정본): UA-05/06/07, AD-01~09, PV-01/03~14, SV-02/03/05/12, QA-18/21.</p>
+      </section>
+
+      <section id="epic07">
+        <div class="epic-head">
+          <h2>5. EPIC-07 — 원본 수집·보존·삭제</h2>
+          <span class="badge planned">PLANNED</span>
+        </div>
+        <dl class="epic-meta">
+          <div><dt>선행조건</dt><dd>EPIC-02 + EPIC-03</dd></div>
+          <div><dt>정본 책임 역할</dt><dd>보안·개인정보책임자</dd></div>
+          <div><dt>현재 gap</dt><dd>원본 수집 MISSING, lifecycle PARTIAL</dd></div>
+        </dl>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>구현 패키지</th><th>내가 구현할 핵심</th><th>fail-first 검증</th><th>협업</th></tr></thead>
+            <tbody>
+              <tr><td><strong>07-A Schema</strong></td><td>영상·음성·정확위치·센서·경로·탐지·신고·성능 원본의 versioned schema와 session/segment/consent-version/purpose metadata</td><td>필수 목적·동의·구간 정보가 없거나 schema version이 틀리면 수신 거부</td><td>Android, AI</td></tr>
+              <tr><td><strong>07-B Encrypted ingest</strong></td><td>암호화 chunk, hash, manifest, 수신 receipt와 부분 업로드 정리</td><td>hash 불일치·중복·부분 저장·키 실패 때 commit 금지 및 고아 객체 정리</td><td>Android, DBA</td></tr>
+              <tr><td><strong>07-C Retention</strong></td><td>저장소/목적별 retention state와 scheduler</td><td>만료 경계, 재시작, 중복 job에서도 조기삭제·기한초과가 없음</td><td>개인정보, AI</td></tr>
+              <tr><td><strong>07-D Rights deletion</strong></td><td>철회·전체삭제·용량보류 중단, tombstone, 저장소별 재시도·영수증</td><td>일부 저장소 장애와 backup restore 뒤에도 원본이 되살아나지 않음</td><td>Android, 개인정보, QA</td></tr>
+              <tr><td><strong>07-E Audit</strong></td><td>누가·무엇을·어떤 근거/기한으로 보존·삭제했는지 비민감 감사자료</td><td>receipt만으로 원본 복원이 불가능하고 이력 위변조를 탐지</td><td>보안 검토, QA</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>정책 상수</h3>
+        <ul>
+          <li>단말 receipt 사본 24시간, 미전송 원본 30일, 검역 14일.</li>
+          <li>일반 활동/자동신고 원본 180일, 학습·라벨·고정 검증셋 3년, backup 35일.</li>
+          <li>전체삭제 목표: 단말 24시간, 서버 7일, dataset 30일, backup 35일.</li>
+          <li>삭제 receipt 3년 보존, restore 전에 tombstone을 먼저 재적용.</li>
+        </ul>
+        <h3>완료 판단</h3>
+        <ul class="checklist">
+          <li>schema·암호화 ingest·retention/deletion scheduler와 감사 계약의 내부 테스트가 통과한다.</li>
+          <li>release의 현재 Noop 원본 수집을 실제 구현으로 바꾸기 전 개인정보·기기 수집 경계를 승인받는다.</li>
+          <li>실제 원본 수집·독립검토·실환경 삭제는 EPIC-12 증거로 이관한다.</li>
+        </ul>
+        <p class="small">카탈로그 참고 매핑(비정본): PV-02/03/05/06/07/08/09, RP-03/04/08, SV-05, ML-10.</p>
+      </section>
+
+      <section id="epic09">
+        <div class="epic-head">
+          <h2>6. EPIC-09 — 서버 저장·용량·장애대응</h2>
+          <span class="badge planned">PLANNED</span>
+        </div>
+        <dl class="epic-meta">
+          <div><dt>선행조건</dt><dd>EPIC-03 + EPIC-07 + EPIC-08</dd></div>
+          <div><dt>정본 책임 역할</dt><dd>백엔드·운영 기술책임자</dd></div>
+          <div><dt>우선순위</dt><dd>P0 · 8개 정책 묶음</dd></div>
+        </dl>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>정책</th><th>현재</th><th>구현할 것</th><th>핵심 검증</th></tr></thead>
+            <tbody>
+              <tr><td><strong>FP-043</strong><br>중앙 안전상태</td><td><span class="badge blocked">CONFLICTING</span></td><td>신뢰 상실 시 전체 안전정지, 연속 정상검사와 사용자 확인 뒤 재개</td><td>camera stale, 지도+위치 동시 실패, 자동 재개 금지</td></tr>
+              <tr><td><strong>FP-044</strong><br>영속 queue</td><td><span class="badge blocked">CONFLICTING</span></td><td>30일 암호화 queue, 보행 중 전송 금지, consent/idempotency/TTL/byte limit</td><td>offline→재연결, 응답 유실, 중복 신고 방지</td></tr>
+              <tr><td><strong>FP-045</strong><br>단말 자원감시</td><td><span class="badge planned">MISSING</span></td><td>저장공간·배터리·발열·영상 age·추론지연과 단계 축소/정지</td><td>장시간 부하, crash/recovery, 안전 기능 우선</td></tr>
+              <tr><td><strong>Capacity sync</strong></td><td><span class="badge planned">MISSING</span></td><td>server capacity version·checked-at·TTL과 단말 상태 동기화</td><td>stale/offline 상태에서 보수적 제한</td></tr>
+              <tr><td><strong>Storage capacity</strong></td><td><span class="badge planned">MISSING</span></td><td>원본 store/DB 분리, 70/85/95/100 전이, backup·restore·비용 측정</td><td>각 임계점 신규 수집 제한과 기존 안전기능 유지</td></tr>
+              <tr><td><strong>FP-040</strong><br>Gateway</td><td><span class="badge info">PARTIAL</span></td><td>운영 role 검사, 단일 Gateway, idempotency·rate limit·오류 계약</td><td>invalid role/token, bulk 부하 중 안전 API</td></tr>
+              <tr><td><strong>FP-041</strong><br>DB·KMS·store</td><td><span class="badge info">PARTIAL</span></td><td>경계 분리, manifest·receipt·migration·deletion mark</td><td>부분저장/고아파일, 동일시점 restore, KMS 교체</td></tr>
+              <tr><td><strong>FP-042</strong><br>자원·비용</td><td><span class="badge info">PARTIAL</span></td><td>안전/대용량 자원격리, quota/timeout, 일 사용량·월 비용 한도</td><td>queue 포화·비밀 누출·비용 상한에서 안전 대체 안내</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>용량 기준선</h3>
+        <p>
+          서울 주 원본 <strong>300 GiB</strong>와 backup <strong>300 GiB</strong>를 기준으로
+          70/85/95/100%를 각각 210/255/285/300 GiB에 대응시킵니다. 용량이 회복돼도 데이터 수집만
+          정책에 따라 자동 재개할 수 있고, 보행 안전 세션은 사용자 확인 없이 자동 재개하지 않습니다.
+        </p>
+        <h3>완료 판단</h3>
+        <ul class="checklist">
+          <li>8개 정책의 API/state/schema와 단위·구성요소 부정 경로 테스트가 통과한다.</li>
+          <li>대용량·장애·재시도 중에도 안전 API와 미만료 원본이 보호된다.</li>
+          <li>실제 비용·용량·장애훈련은 측정 자원 승인 후 EPIC-12에서 검증한다.</li>
+        </ul>
+        <p class="small">카탈로그 참고 매핑(비정본): WS-08/09/11, RP-02/03/04/08, PV-01/05/08, SV-01/06/09/10/11, QA-15/17.</p>
+      </section>
+
+      <section id="epic11">
+        <div class="epic-head">
+          <h2>7. EPIC-11 — 릴리스·운영·복구 준비</h2>
+          <span class="badge planned">PLANNED</span>
+        </div>
+        <dl class="epic-meta">
+          <div><dt>선행조건</dt><dd>EPIC-09 + EPIC-10</dd></div>
+          <div><dt>정본 책임 역할</dt><dd>백엔드·운영 기술책임자</dd></div>
+          <div><dt>현재 gap</dt><dd>4개 정책 모두 PARTIAL</dd></div>
+        </dl>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>작업 패키지</th><th>구현·문서화</th><th>내부 dry-run 완료 조건</th><th>운영 승인 후</th></tr></thead>
+            <tbody>
+              <tr><td><strong>FP-051</strong><br>Release/Rollback</td><td>앱·서버·모델·설정·DB를 묶는 서명된 불변 manifest, 단계 배포, 보행 중 update 연기, 긴급 신규 보행 차단, 호환 rollback</td><td>변경 조합 검증, 이전 version rollback, 데이터 무손실·활성 보행 보호</td><td>실제 staged deploy와 rollback drill</td></tr>
+              <tr><td><strong>FP-053</strong><br>Backup/Restore/Cost</td><td>storage/backup 사용량·비용 job, 35일 순환, 암호화·서명 backup, 격리 restore</td><td>검증용 격리 환경에서 checksum·삭제표식·복구시점 검증</td><td>실제 restore, 실제 비용 측정</td></tr>
+              <tr><td><strong>FP-052</strong><br>Health/Alert</td><td>통합 dashboard, 단계 alert, 자동차단, on-call, 긴급 runbook</td><td>의도적 장애 주입으로 alert→차단→담당자 인계 확인</td><td>실 on-call과 서비스 경보 연동</td></tr>
+              <tr><td><strong>FP-054</strong><br>Maintenance/Shutdown</td><td>안전 종료, 신규 session 차단, migration/rollback, 서비스 종료, 데이터 이관·삭제 절차</td><td>활성 보행 보호, 신규 보행 차단, 재시작/실패 복구 rehearsal</td><td>실제 maintenance·종료·이관 실행</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>완료 판단</h3>
+        <ul class="checklist">
+          <li>코드·job·manifest·runbook과 내부 dry-run 결과가 서로 같은 version으로 결속된다.</li>
+          <li>rollback/restore/alert/종료가 활성 보행과 개인정보 삭제상태를 훼손하지 않는다.</li>
+          <li>production deploy·실제 restore·비용·on-call·shutdown은 명시적 운영 승인 뒤 수행한다.</li>
+        </ul>
+        <p class="small">카탈로그 참고 매핑(비정본): ML-09, PV-08/09, SV-07/10/11/12, QA-11/12/13/15/17/19/20/21/22/23.</p>
+      </section>
+
+      <section id="roadmap">
+        <h2>8. 실제 작업 로드맵</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>단계</th><th>목표</th><th>실행</th><th>검증·종료 조건</th></tr></thead>
+            <tbody>
+              <tr><td class="nowrap"><strong>M0 배정·gate 정렬</strong></td><td>문서와 실제 팀 운영을 일치</td><td>실제 담당자 export 기록, EPIC-07 시작 승인, EPIC-02/03 선행상태 확인</td><td>owner·reviewer·승인권자와 첫 work item이 명시됨</td></tr>
+              <tr><td><strong>M1 EPIC-03 병행 마감</strong></td><td>기존 내부 구현의 운영 검증 준비</td><td>회귀, 실계정/기기/TLS/KMS/복구훈련용 test packet 준비</td><td>코드 재개 필요 여부 판정, EPIC-12 인계 목록 확정</td></tr>
+              <tr><td><strong>M2 EPIC-07</strong></td><td>원본 lifecycle 내부 구현 준비 완료</td><td>Schema → encrypted ingest → retention → deletion → audit 순서</td><td>부정 경로 테스트와 저장소별 receipt/tombstone 통과</td></tr>
+              <tr><td><strong>M3 EPIC-09</strong></td><td>저장·용량·장애정책 구현</td><td>안전상태/queue → 자원감시 → capacity → Gateway/DB/KMS/비용</td><td>70/85/95/100 및 부분장애·중복·복원 테스트 통과</td></tr>
+              <tr><td><strong>M4 EPIC-11</strong></td><td>릴리스·운영·복구 dry-run 준비</td><td>manifest/rollout → backup/restore → health/alert → shutdown</td><td>version 결속된 runbook과 내부 rehearsal 결과 확보</td></tr>
+              <tr><td><strong>M5 EPIC-12 이관</strong></td><td>정식·실기기·외부·운영 검증</td><td>승인된 자원으로 test/gate 실행</td><td>279개 정식시험과 관련 gate가 실제 PASS 또는 승인된 waiver</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>바로 다음 작업</h3>
+        <ol>
+          <li><strong>팀 배정 확정본 저장:</strong> 기능 카탈로그 export에 이 문서의 Epic 담당자와 reviewer를 기록합니다.</li>
+          <li><strong>Goal 우선순위 조정:</strong> 현재 EPIC-04 focus를 유지할지, EPIC-07을 다음 승인 work item으로 올릴지 팀에서 결정합니다.</li>
+          <li><strong>EPIC-07 fail-first 초안:</strong> raw manifest 필수 필드, 부분 ingest, retention 경계, restore 후 tombstone 테스트부터 작성합니다.</li>
+          <li><strong>EPIC-03 운영 packet 병행:</strong> 실제 역할·기기·TLS/KMS·삭제·복구훈련에 필요한 계정/환경/승인 목록을 준비합니다.</li>
+        </ol>
+
+        <h3>내부 검증 명령</h3>
+        <pre><code>PYTHONPATH=. python3 -B scripts/check_walksafe_project_continuation_v2_4.py
+PYTHONPATH=. python3 -B scripts/check_walksafe_goal_graph_v2_4.py
+python3 -B scripts/generate_repository_catalogs.py --check
+scripts/run_walksafe_test_layers_current.sh validate</code></pre>
+        <p class="small">
+          위 명령은 저장소 내부 상태 확인용입니다. 정식시험·실기기·외부 검토·production 자원 검증을 대체하지 않습니다.
+        </p>
+      </section>
+
+      <section id="sources">
+        <h2>9. 판정 근거와 문서 우선순위</h2>
+        <ol>
+          <li><a href="../control/walksafe-project-continuation-checkpoint.json">현재 continuation checkpoint</a> — 현재 Goal 상태·focus·검증 경계.</li>
+          <li><a href="../control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json">r028 remediation backlog</a> — Epic owner role, 의존성, gap, 순서와 완료 기준.</li>
+          <li>
+            Epic workstream:
+            <a href="../control/goals/walksafe-completion-graph-v2-2/workstreams/epic-03-account-admin-security.md">03</a>,
+            <a href="../control/goals/walksafe-completion-graph-v2-2/workstreams/epic-07-raw-data-lifecycle.md">07</a>,
+            <a href="../control/goals/walksafe-completion-graph-v2-2/workstreams/epic-09-server-capacity-resilience.md">09</a>,
+            <a href="../control/goals/walksafe-completion-graph-v2-2/workstreams/epic-11-release-operations-recovery-readiness.md">11</a>.
+          </li>
+          <li><a href="walksafe_feature_implementation_catalog.html">저장소 기능 구현 카탈로그</a> — 세부 feature 상태 참고. Epic 연결은 이 계획서의 의미 기반 추론이며 정본 관계가 아님.</li>
+        </ol>
+        <p class="callout">
+          Downloads의 2026-08-10 사본보다 저장소 카탈로그가 최신입니다. 상태가 충돌하면 checkpoint → r028 backlog → Epic workstream → 기능 카탈로그 순서로 판정합니다.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      WalkSafe 보안·서버 운영 실행 계획 · 2026-08-15 · 정본 상태가 바뀌면 이 문서도 함께 재검토
+    </footer>
+  </div>
+</body>
+</html>

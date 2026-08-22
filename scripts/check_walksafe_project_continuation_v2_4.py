@@ -31,6 +31,8 @@ from typing import Any, Mapping, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 V23_PACKAGE_ID = "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-3"
@@ -115,16 +117,21 @@ V24_NATIVE_PATHS = (
 )
 
 
-def _load_frozen_v23_utility(root: Path = ROOT):
-    path = root / "scripts/check_walksafe_project_continuation_v2_3.py"
-    expected = V23_FROZEN_FILE_SHA256[path.relative_to(root).as_posix()]
+def _load_frozen_v23_utility(
+    root: Path = ROOT,
+    *,
+    relative: str = "scripts/check_walksafe_project_continuation_v2_3.py",
+    module_name: str = "_walksafe_v23_continuation_utility_for_v24",
+):
+    path = root / relative
+    expected = V23_FROZEN_FILE_SHA256[relative]
     if (
         not path.is_file()
         or hashlib.sha256(path.read_bytes()).hexdigest() != expected
     ):
         raise RuntimeError("frozen v2.3 continuation utility SHA-256 differs")
     spec = importlib.util.spec_from_file_location(
-        "_walksafe_v23_continuation_utility_for_v24",
+        module_name,
         path,
     )
     if spec is None or spec.loader is None:
@@ -579,6 +586,25 @@ ALLOWED_EVENT_TYPES = {
     "BLOCKER_RESOLVED",
     "PACKAGE_COMPLETED",
 }
+GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE = 72
+GENERIC_DEPENDENCY_CLOSURE_DIRECT_FIELDS = (
+    "canonical_binding_snapshot_after",
+    "changed_binding_roles",
+    "changed_subject_ids_by_role",
+    "impact_closure_goal_ids",
+    "impact_disposition_by_goal",
+    "reopened_completion_event_sha256_by_goal",
+    "status_changes",
+)
+
+
+def _is_dependency_closure_event(event_type: object, event: Mapping[str, Any]) -> bool:
+    return (
+        event_type == "CANONICAL_BINDINGS_UPDATED"
+        and isinstance(event.get("sequence"), int)
+        and event["sequence"] >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+        and event.get("produced_by_goal_id") in (None, "")
+    )
 GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS = {
     "sequence",
     "event_id",
@@ -813,6 +839,49 @@ FP022_R028_BACKLOG_PATH = (
     "docs/control/audits/"
     "walksafe-implementation-remediation-backlog-20260814-r028.json"
 )
+R008_R028_BACKLOG_BINDING = {
+    "role": "IMPLEMENTATION_BACKLOG",
+    "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
+    "path": FP022_R028_BACKLOG_PATH,
+    "file_sha256": (
+        "acf975cffcdec26906099236567f825a616226bfb030ef70d20bb7a21bcfbe55"
+    ),
+}
+R008_R029_CANONICAL_BACKLOG_BINDING = {
+    "role": "IMPLEMENTATION_BACKLOG",
+    "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+    "path": (
+        "docs/control/audits/"
+        "walksafe-implementation-remediation-backlog-20260815-r029.json"
+    ),
+    "file_sha256": (
+        "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
+    ),
+}
+R008_R028_LEGACY_BACKLOG_SOURCE_PREDECESSOR = {
+    "path": (
+        "docs/control/audits/"
+        "walksafe-implementation-remediation-backlog-20260813-r027.json"
+    ),
+    "file_sha256": (
+        "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45"
+    ),
+    "byte_length": 65457,
+    "markdown_path": (
+        "docs/control/audits/"
+        "walksafe-implementation-remediation-backlog-20260813-r027.md"
+    ),
+    "markdown_file_sha256": (
+        "4285b7f1095ec340fc228855331039cd9e7064891f114f9e93a3f81846483a14"
+    ),
+    "markdown_byte_length": 420,
+    "preserved_unchanged": True,
+}
+R008_R029_NORMALIZED_BACKLOG_SOURCE_PREDECESSOR = {
+    "path": FP022_R028_BACKLOG_PATH,
+    "file_sha256": R008_R028_BACKLOG_BINDING["file_sha256"],
+    "preserved_unchanged": True,
+}
 FP022_PARENT_GOAL_ID = "WS-GOAL-EPIC-04"
 FP022_PARENT_GOAL_PATH = (
     "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/"
@@ -6016,9 +6085,12 @@ def _expected_status_change(
 ) -> tuple[dict[str, str] | None, str | None]:
     subject = event.get("subject_goal_id")
     materialized = event.get("materialized_goal_id")
+    if event_type == "CANONICAL_BINDINGS_UPDATED":
+        if _is_dependency_closure_event(event_type, event):
+            return _dependency_closure_status_changes(event), None
+        return {}, None
     if event_type in {
         "PACKAGE_ACTIVATED",
-        "CANONICAL_BINDINGS_UPDATED",
         "GOAL_START_CONTROL_REANCHORED",
         "WORK_SESSION_RESUMED",
         "GOAL_FOCUS_CHANGED",
@@ -6072,6 +6144,28 @@ def _expected_status_change(
     return None, f"unsupported event type: {event_type}"
 
 
+def _dependency_closure_status_changes(
+    event: Mapping[str, Any],
+) -> dict[str, str] | None:
+    """Return the only legal generic status shape before replay semantics."""
+
+    subject = event.get("subject_goal_id")
+    changes = event.get("status_changes")
+    disposition = event.get("impact_disposition_by_goal")
+    if (
+        not all(field in event for field in GENERIC_DEPENDENCY_CLOSURE_DIRECT_FIELDS)
+        or not isinstance(subject, str)
+        or not isinstance(changes, dict)
+        or set(changes) != {subject}
+        or not isinstance(changes.get(subject), str)
+        or not isinstance(disposition, dict)
+        or disposition.get(subject)
+        != {"result": "REOPEN_CONTAINER", "target_status": changes[subject]}
+    ):
+        return None
+    return dict(changes)
+
+
 def _expected_from_to(
     event_type: str,
     event: dict[str, Any],
@@ -6112,6 +6206,10 @@ def _expected_from_to(
     if event_type == "CANONICAL_BINDINGS_UPDATED":
         producer = event.get("produced_by_goal_id")
         focus = event.get("focus_goal_id")
+        if _is_dependency_closure_event(event_type, event):
+            if not isinstance(subject, str):
+                return None
+            return statuses.get(subject, ""), changes.get(subject, "")
         goal_id = producer if isinstance(producer, str) else focus
         status = statuses.get(str(goal_id), "")
         return status, status
@@ -6136,6 +6234,494 @@ def _completion_source_is_allowed(
     return before_status == "IN_PROGRESS" or (
         before_status == "READY" and goal_kind == "WORKSTREAM"
     )
+
+
+def _legacy_backlog_upgrade_subjects(
+    root: Path,
+    graph: Any,
+    before: Mapping[str, Mapping[str, Any]],
+    after: Mapping[str, Mapping[str, Any]],
+    subjects: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """Ignore only R028's exact legacy Backlog-provenance schema upgrade."""
+
+    role = "IMPLEMENTATION_BACKLOG"
+    ids = subjects.get(role)
+    before_binding, after_binding = before.get(role), after.get(role)
+    if (
+        not isinstance(ids, list)
+        or "*" not in ids
+        or not isinstance(before_binding, dict)
+        or not isinstance(after_binding, dict)
+    ):
+        return subjects
+    if (
+        before_binding != R008_R028_BACKLOG_BINDING
+        or after_binding != R008_R029_CANONICAL_BACKLOG_BINDING
+    ):
+        return subjects
+    paths = [
+        resolve_repo_file(root, binding.get("path"))
+        for binding in (before_binding, after_binding)
+    ]
+    if any(path is None for path in paths):
+        return subjects
+    try:
+        if (
+            sha256_file(paths[0]) != R008_R028_BACKLOG_BINDING["file_sha256"]
+            or sha256_file(paths[1])
+            != R008_R029_CANONICAL_BACKLOG_BINDING["file_sha256"]
+        ):
+            return subjects
+        before_payload, after_payload = (load_json(path) for path in paths)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return subjects
+    if not isinstance(before_payload, dict) or not isinstance(after_payload, dict):
+        return subjects
+    try:
+        scoped = graph.SCOPED_CONTENT_KEYS_BY_ROLE[role]
+        global_keys = graph.GLOBAL_CONTENT_KEYS_BY_ROLE[role]
+        normalize_residual = graph.normalized_role_residual_value
+        normalize_payload = graph.normalized_normative_payload
+    except (AttributeError, KeyError, TypeError):
+        return subjects
+    residual_keys = (
+        set(before_payload)
+        | set(after_payload)
+    ) - set(scoped) - set(global_keys) - {"source_predecessor"}
+    normalized_residual = lambda payload: normalize_payload(
+        {
+            key: normalize_residual(role, key, payload.get(key))
+            for key in residual_keys
+        }
+    )
+    if (
+        before_payload.get("source_predecessor")
+        != R008_R028_LEGACY_BACKLOG_SOURCE_PREDECESSOR
+        or after_payload.get("source_predecessor")
+        != R008_R029_NORMALIZED_BACKLOG_SOURCE_PREDECESSOR
+        or normalized_residual(before_payload) != normalized_residual(after_payload)
+        or normalize_payload(
+            {key: before_payload.get(key) for key in global_keys}
+        )
+        != normalize_payload(
+            {key: after_payload.get(key) for key in global_keys}
+        )
+    ):
+        return subjects
+    return {**subjects, role: [subject for subject in ids if subject != "*"]}
+
+
+def _completion_archive_projection(
+    active: Any,
+    archived: Any,
+    goal_id: str,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    if (
+        not isinstance(active, dict)
+        or not isinstance(archived, dict)
+        or goal_id in archived
+        or not isinstance(active.get(goal_id), list)
+    ):
+        return None
+    return (
+        {key: value for key, value in active.items() if key != goal_id},
+        {**archived, goal_id: active[goal_id]},
+    )
+
+
+def _validate_dependency_closure_update(
+    root: Path,
+    *,
+    label: str,
+    graph: Any,
+    event: Mapping[str, Any],
+    bindings_before: Mapping[str, Mapping[str, Any]],
+    nodes: Mapping[str, Mapping[str, Any]],
+    statuses: Mapping[str, str],
+    completion_bindings_by_goal: Mapping[str, Any],
+    latest_start_event_by_goal: Mapping[str, Mapping[str, Any]],
+    completion_hashes: Mapping[str, str],
+    completion_times: Mapping[str, str],
+    latest_completion: Any,
+    latest_archived_completion: Any,
+) -> tuple[list[str], dict[str, str], dict[str, dict[str, str]], dict[str, str]]:
+    """Replay the direct-field seq72+ canonical dependency closure."""
+
+    errors: list[str] = []
+    if not all(field in event for field in GENERIC_DEPENDENCY_CLOSURE_DIRECT_FIELDS):
+        errors.append(f"{label} canonical dependency closure fields are missing")
+    after = event.get("canonical_binding_snapshot_after")
+    if not isinstance(after, dict):
+        return errors + [f"{label} canonical binding snapshot is malformed"], {}, {}, {}
+    try:
+        snapshot_errors, normalized_after = (
+            graph.validate_canonical_binding_snapshot(
+                root,
+                after,
+                label=f"{label} canonical binding snapshot",
+            )
+        )
+        errors.extend(snapshot_errors)
+        if normalized_after != after:
+            errors.append(f"{label} canonical binding snapshot differs")
+        changed_roles = sorted(
+            role
+            for role in set(bindings_before) | set(normalized_after)
+            if bindings_before.get(role) != normalized_after.get(role)
+        )
+        if not changed_roles:
+            errors.append(f"{label} canonical binding update is a no-op")
+        if event.get("changed_binding_roles") != changed_roles:
+            errors.append(f"{label} changed canonical binding roles differ")
+
+        replay_nodes = {
+            goal_id: node
+            for goal_id, node in nodes.items()
+            if goal_id in statuses
+        }
+        subject_errors, subjects = graph.canonical_changed_subject_ids_by_role(
+            root,
+            changed_roles=changed_roles,
+            bindings_before=bindings_before,
+            bindings_after=normalized_after,
+        )
+        if not subject_errors:
+            subjects = _legacy_backlog_upgrade_subjects(
+                root, graph, bindings_before, normalized_after, subjects
+            )
+        direct = graph.changed_binding_affected_goals(
+            changed_roles=set(changed_roles),
+            changed_subject_ids_by_role=subjects,
+            nodes=replay_nodes,
+            statuses=statuses,
+            completion_bindings_by_goal=completion_bindings_by_goal,
+            latest_start_event_by_goal=latest_start_event_by_goal,
+        )
+        impacted = graph.expand_affected_goal_dependency_closure(
+            nodes=replay_nodes,
+            statuses=statuses,
+            directly_affected_goal_roles=direct,
+        )
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        return errors + [
+            f"{label} canonical dependency closure cannot be derived: {exc}"
+        ], {}, {}, {}
+    errors.extend(f"{label}: {error}" for error in subject_errors)
+    if event.get("changed_subject_ids_by_role") != subjects:
+        errors.append(f"{label} canonical changed subject IDs differ")
+    expected_dispositions: dict[str, dict[str, str]] = {}
+    expected_changes: dict[str, str] = {}
+    expected_reopened: dict[str, str] = {}
+    pending: dict[str, dict[str, str]] = {}
+    event_hash = event.get("event_sha256")
+    for goal_id in sorted(impacted):
+        node = replay_nodes.get(goal_id, {})
+        status = statuses.get(goal_id)
+        roles = impacted[goal_id]
+        kind = node.get("goal_kind")
+        if kind == "WORK_ITEM" and status == "COMPLETE_AT_TARGET":
+            expected_dispositions[goal_id] = {"result": "REOPEN_REQUIRED"}
+            trigger = {
+                "canonical_update_event_sha256": event_hash,
+                "target_completion_event_sha256": completion_hashes.get(goal_id),
+                "target_completion_occurred_at": completion_times.get(
+                    completion_hashes.get(goal_id)
+                ),
+                "decided_at": event.get("occurred_at"),
+            }
+            if all(isinstance(value, str) for value in trigger.values()) and SHA256_RE.fullmatch(str(event_hash)):
+                pending[goal_id] = {key: str(value) for key, value in trigger.items()}
+            else:
+                errors.append(f"{label} canonical dependency closure seal is invalid")
+        elif kind == "WORKSTREAM" and status == "COMPLETE_AT_TARGET":
+            target = graph.workstream_reopen_target_status(roles)
+            expected_dispositions[goal_id] = {
+                "result": "REOPEN_CONTAINER",
+                "target_status": target,
+            }
+            expected_changes[goal_id] = target
+            completion_hash = completion_hashes.get(goal_id)
+            if isinstance(completion_hash, str) and SHA256_RE.fullmatch(completion_hash):
+                expected_reopened[goal_id] = completion_hash
+            else:
+                errors.append(f"{label} reopened Workstream completion binding is missing")
+        else:
+            errors.append(f"{label} closure target is not completed/reopenable: {goal_id}")
+    if event.get("impact_closure_goal_ids") != sorted(impacted):
+        errors.append(f"{label} canonical impact dependency closure differs")
+    if event.get("impact_disposition_by_goal") != expected_dispositions:
+        errors.append(f"{label} canonical change impact disposition set differs")
+    if event.get("reopened_completion_event_sha256_by_goal") != expected_reopened:
+        errors.append(f"{label} reopened Workstream completion binding differs")
+    if event.get("status_changes") != expected_changes:
+        errors.append(f"{label} canonical update Workstream reopen set differs")
+    reopened_ids = [
+        goal_id
+        for goal_id, disposition in expected_dispositions.items()
+        if disposition.get("result") == "REOPEN_CONTAINER"
+    ]
+    if (
+        len(reopened_ids) != 1
+        or event.get("subject_goal_id") != reopened_ids[0]
+        or set(expected_changes) != {reopened_ids[0]}
+    ):
+        errors.append(f"{label} canonical update reopen subject differs")
+    else:
+        projection = _completion_archive_projection(
+            latest_completion, latest_archived_completion, reopened_ids[0]
+        )
+        if projection is None:
+            errors.append(f"{label} reopened Workstream evidence is missing")
+        else:
+            active, archived = projection
+            if (
+                event.get("completion_evidence_by_goal_after") != active
+                or event.get("archived_completion_evidence_by_goal_after")
+                != archived
+            ):
+                errors.append(f"{label} reopened Workstream archive differs")
+    subject = event.get("subject_goal_id")
+    completion_hash = expected_reopened.get(subject) if isinstance(subject, str) else None
+    reopened = (
+        {
+            "subject_goal_id": subject,
+            "canonical_update_event_sha256": event_hash,
+            "archived_completion_event_sha256": completion_hash,
+        }
+        if isinstance(subject, str)
+        and isinstance(event_hash, str)
+        and isinstance(completion_hash, str)
+        else {}
+    )
+    return errors, expected_changes, pending, reopened
+
+
+def _validate_dependency_closure_successor(
+    root: Path,
+    *,
+    label: str,
+    graph: Any,
+    event: Mapping[str, Any],
+    before: Mapping[str, str],
+    nodes: Mapping[str, Mapping[str, Any]],
+    goal_paths: Mapping[str, str],
+    bindings: Mapping[str, Mapping[str, Any]],
+    pending: Mapping[str, Mapping[str, str]],
+    rewritten_successors: Mapping[str, str],
+    latest_completion: Any,
+    latest_archived_completion: Any,
+) -> list[str]:
+    """Validate the one event that may clear a REOPEN_REQUIRED Work Item."""
+
+    errors: list[str] = []
+    subject = event.get("subject_goal_id")
+    successor = event.get("materialized_goal_id")
+    if not isinstance(subject, str) or not isinstance(successor, str):
+        return [f"{label} canonical-change successor boundary differs"]
+    expected_trigger = pending.get(subject)
+    predecessor = nodes.get(subject, {})
+    replacement = nodes.get(successor, {})
+    if (
+        not isinstance(expected_trigger, dict)
+        or predecessor.get("goal_kind") != "WORK_ITEM"
+        or replacement.get("goal_kind") != "WORK_ITEM"
+    ):
+        errors.append(f"{label} canonical-change successor boundary differs")
+    if (
+        not isinstance(expected_trigger, dict)
+        or bool(set(expected_trigger) & set(event))
+        or event.get("reopen_trigger") != expected_trigger
+    ):
+        errors.append(f"{label} canonical-change successor binding differs")
+    if event.get("canonical_binding_snapshot_after") != bindings:
+        errors.append(f"{label} successor canonical binding snapshot differs")
+    try:
+        source = graph.materialization_source_snapshot(dict(replacement))
+        dependencies = set(graph.string_list(predecessor.get("start_requires"))) | set(
+            graph.string_list(predecessor.get("completion_requires"))
+        )
+        expected_start = [
+            rewritten_successors.get(goal_id, goal_id)
+            for goal_id in graph.string_list(predecessor.get("start_requires"))
+        ]
+        expected_completion = [
+            rewritten_successors.get(goal_id, goal_id)
+            for goal_id in graph.string_list(predecessor.get("completion_requires"))
+        ]
+        parent_id = replacement.get("parent_goal_id")
+        if (
+            not graph.successor_semantic_scope_matches(
+                dict(predecessor), dict(replacement)
+            )
+            or dependencies & set(pending)
+            or replacement.get("start_requires") != expected_start
+            or replacement.get("completion_requires") != expected_completion
+            or not graph.successor_parent_accepts_revision(
+                before.get(str(parent_id)), canonical_change_successor=True
+            )
+        ):
+            errors.append(f"{label} successor semantic/dependency contract differs")
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        return errors + [f"{label} successor contract cannot be derived: {exc}"]
+    subject_path = resolve_repo_file(root, goal_paths.get(subject))
+    successor_path = resolve_repo_file(root, goal_paths.get(successor))
+    subject_sha = sha256_file(subject_path) if subject_path is not None else None
+    successor_sha = sha256_file(successor_path) if successor_path is not None else None
+    materialization = {
+        "artifact_trigger_evidence_refs": replacement.get(
+            "artifact_trigger_evidence_refs"
+        ),
+        "artifact_work_reason": replacement.get("artifact_work_reason"),
+        "materialized_goal_id": successor,
+        "materialized_goal_path": goal_paths.get(successor),
+        "materialized_goal_content_sha256": successor_sha,
+        "predecessor_goal_id": replacement.get("predecessor_goal_id"),
+        "predecessor_goal_content_sha256": replacement.get("predecessor_goal_content_sha256"),
+        "supersedes_goal_id": subject,
+        "supersedes_goal_content_sha256": subject_sha,
+    }
+    if (
+        any(event.get(field) != value for field, value in materialization.items())
+        or replacement.get("supersedes_goal_id") != subject
+        or replacement.get("supersedes_goal_content_sha256") != subject_sha
+        or source != graph.materialization_source_snapshot(dict(event))
+        or bindings.get(str(source.get("role"))) != source
+        or replacement.get("reopen_reason") != "CANONICAL_INPUT_CHANGED"
+        or event.get("evidence_refs") != []
+    ):
+        errors.append(f"{label} successor source/lineage differs")
+    projection = _completion_archive_projection(
+        latest_completion, latest_archived_completion, subject
+    )
+    if projection is None:
+        errors.append(f"{label} superseded completion evidence is missing")
+    elif event.get("completion_evidence_by_goal_after") != projection[0] or event.get(
+        "archived_completion_evidence_by_goal_after"
+    ) != projection[1]:
+        errors.append(f"{label} successor completion evidence archive differs")
+    if (
+        "dynamic_goal_inventory_after" in event
+        or "materialized_child_goal_ids_by_parent_after" in event
+    ):
+        errors.append(f"{label} successor inventory projection is self-referential")
+    return errors
+
+
+def _validate_dependency_closure_inventory_projection(
+    root: Path,
+    *,
+    label: str,
+    event: Mapping[str, Any],
+    nodes: Mapping[str, Mapping[str, Any]],
+    goal_paths: Mapping[str, str],
+    latest_inventory: Any,
+    latest_children: Any,
+    successors: Mapping[str, str],
+    reopened_closure: Mapping[str, str],
+) -> list[str]:
+    """Bind deferred successor inventory after its event hashes exist."""
+
+    errors: list[str] = []
+    parents = {
+        parent
+        for successor in successors
+        if isinstance((node := nodes.get(successor)), Mapping)
+        and isinstance((parent := node.get("parent_goal_id")), str)
+    }
+    parent = next(iter(parents)) if len(parents) == 1 else None
+    if (
+        not isinstance(parent, str)
+        or event.get("subject_goal_id") != parent
+        or reopened_closure.get("subject_goal_id") != parent
+    ):
+        errors.append(f"{label} successor inventory projection subject differs")
+    if not isinstance(latest_inventory, dict) or not isinstance(latest_children, dict):
+        return errors + [f"{label} successor inventory projection state is malformed"]
+    expected_basis = {
+        "mode": "CANONICAL_DEPENDENCY_CLOSURE_REOPEN",
+        "canonical_update_event_sha256": reopened_closure.get(
+            "canonical_update_event_sha256"
+        ),
+        "successor_event_sha256_by_goal": dict(sorted(successors.items())),
+        "archived_completion_event_sha256": reopened_closure.get(
+            "archived_completion_event_sha256"
+        ),
+    }
+    if event.get("readiness_basis") != expected_basis:
+        errors.append(f"{label} reopened Workstream readiness basis differs")
+    inventory = copy.deepcopy(latest_inventory)
+    children = copy.deepcopy(latest_children)
+    for successor, event_hash in successors.items():
+        node = nodes.get(successor, {})
+        path = goal_paths.get(successor)
+        resolved = resolve_repo_file(root, path)
+        if (
+            node.get("goal_kind") != "WORK_ITEM"
+            or not isinstance(path, str)
+            or resolved is None
+            or successor in inventory
+        ):
+            errors.append(f"{label} successor dynamic Goal inventory binding differs")
+            continue
+        record = {
+            **{
+                field: node.get(field)
+                for field in (
+                    "artifact_trigger_evidence_refs", "artifact_work_reason", "initial_status",
+                    "work_item_type", "parent_goal_id", "materialized_from_role",
+                    "materialized_from_path", "materialized_from_document_id",
+                    "materialized_from_sha256", "predecessor_goal_id",
+                    "predecessor_goal_content_sha256", "supersedes_goal_id",
+                    "supersedes_goal_content_sha256",
+                )
+            },
+            "goal_id": successor, "path": path, "sha256": sha256_file(resolved),
+            "goal_kind": "WORK_ITEM", "materialized_event_sha256": event_hash,
+        }
+        parent = node.get("parent_goal_id")
+        members = children.get(parent) if isinstance(parent, str) else None
+        valid_members = (
+            isinstance(members, list)
+            and all(isinstance(member, str) for member in members)
+            and len(members) == len(set(members))
+        )
+        if (
+            not isinstance(parent, str)
+            or not valid_members
+            or successor in members
+        ):
+            errors.append(f"{label} successor materialized child map differs")
+        else:
+            inventory[successor] = record
+            children[parent] = sorted(set(members) | {successor})
+    if event.get("dynamic_goal_inventory_after") != inventory:
+        errors.append(f"{label} successor dynamic Goal inventory differs")
+    if event.get("materialized_child_goal_ids_by_parent_after") != children:
+        errors.append(f"{label} successor materialized child map differs")
+    return errors
+
+
+def _validate_reopened_successor_ready(
+    *,
+    label: str,
+    event: Mapping[str, Any],
+    before: Mapping[str, str],
+    nodes: Mapping[str, Mapping[str, Any]],
+    container_ready_events: Mapping[str, str],
+) -> list[str]:
+    subject = event.get("subject_goal_id")
+    if not isinstance(subject, str) or subject not in container_ready_events:
+        return []
+    parent = nodes.get(subject, {}).get("parent_goal_id")
+    if (
+        not isinstance(parent, str)
+        or before.get(parent) != "READY"
+        or event.get("reopened_container_ready_event_sha256")
+        != container_ready_events[subject]
+    ):
+        return [f"{label} reopened Work Item container readiness differs"]
+    return []
 
 
 def validate_generic_event_order(
@@ -6260,10 +6846,7 @@ def validate_generic_event_order(
 
         before = dict(statuses)
         expected_boundary = _expected_from_to(
-            str(event_type),
-            event,
-            before,
-            changes,
+            str(event_type), event, before, changes
         )
         if expected_boundary is None:
             errors.append(f"{label} from/to boundary cannot be derived")
@@ -6292,7 +6875,7 @@ def validate_generic_event_order(
                 errors.append(f"{label} does not resume IN_PROGRESS work")
         elif event_type == "CANONICAL_BINDINGS_UPDATED":
             producer = event.get("produced_by_goal_id")
-            if producer not in {None, ""}:
+            if producer not in (None, ""):
                 if (
                     not isinstance(producer, str)
                     or before.get(producer) != "IN_PROGRESS"
@@ -6460,10 +7043,41 @@ def validate_transition_replay(
             if isinstance(goal_id, str) and isinstance(record, dict):
                 goal_kind_by_id[goal_id] = record.get("goal_kind")
 
+    closure_graph: Any = None
+    closure_nodes: dict[str, dict[str, Any]] = {}
+    latest_start_event_by_goal: dict[str, dict[str, Any]] = {}
+    if len(history) >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE:
+        try:
+            closure_graph = _load_frozen_v23_utility(
+                root,
+                relative="scripts/check_walksafe_goal_graph_v2_3.py",
+                module_name="_walksafe_v23_goal_graph_utility_for_v24",
+            )
+            node_errors, closure_nodes = closure_graph.current_goal_nodes(root, state)
+            errors.extend(f"v2.4 dependency closure: {error}" for error in node_errors)
+            for goal_id, node in closure_nodes.items():
+                goal_kind_by_id[goal_id] = node.get("goal_kind")
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            errors.append(f"v2.4 dependency closure Goal nodes cannot be loaded: {exc}")
+
     previous_hash = ""
     statuses: dict[str, str] = {}
     completion_hashes = _completion_hash_seed(archive)
+    completion_time_by_hash = {
+        event.get("event_sha256"): event.get("occurred_at")
+        for source_history in (archived_state.get("transition_history"), history)
+        if isinstance(source_history, list)
+        for event in source_history
+        if isinstance(event, dict)
+        and isinstance(event.get("event_sha256"), str)
+        and isinstance(event.get("occurred_at"), str)
+    }
     pending_producer: str | None = None
+    pending_reopen_source_event_by_goal: dict[str, dict[str, str]] = {}
+    successor_goal_id_by_superseded: dict[str, str] = {}
+    pending_successor_inventory_event_by_goal: dict[str, str] = {}
+    pending_reopened_closure: dict[str, str] = {}
+    reopened_container_ready_by_successor: dict[str, str] = {}
     activation_hash: str | None = None
     activation_occurred_at: datetime | None = None
     goal_paths = _goal_path_by_id(archive, checkpoint)
@@ -6753,12 +7367,59 @@ def validate_transition_replay(
                 errors.append(
                     f"{label} violates canonical producer completion order"
                 )
-
-            expected_changes, transition_error = _expected_status_change(
-                str(event_type),
-                event,
-                statuses,
-            )
+            if pending_reopen_source_event_by_goal and not (
+                event_type == "GOAL_SUPERSEDED"
+                and isinstance(subject, str)
+                and subject in pending_reopen_source_event_by_goal
+            ):
+                errors.append(f"{label} unresolved canonical-change Goals must be superseded before another event")
+            elif pending_successor_inventory_event_by_goal and not (
+                event_type == "GOAL_READY"
+                or (event_type == "GOAL_SUPERSEDED" and pending_reopen_source_event_by_goal)
+            ):
+                errors.append(f"{label} successor inventory projection must be the next ready event")
+            closure_event = _is_dependency_closure_event(event_type, event)
+            if closure_event:
+                if not closure_nodes or closure_graph is None:
+                    errors.append(f"{label} canonical dependency closure Goal nodes are missing")
+                    expected_changes = {}
+                    pending_reopen = {}
+                else:
+                    (
+                        closure_errors,
+                        expected_changes,
+                        pending_reopen,
+                        pending_reopened_closure,
+                    ) = (
+                        _validate_dependency_closure_update(
+                            root,
+                            label=label,
+                            graph=closure_graph,
+                            event=event,
+                            bindings_before=latest_canonical_bindings,
+                            nodes=closure_nodes,
+                            statuses=statuses,
+                            completion_bindings_by_goal=latest_completion_evidence,
+                            latest_start_event_by_goal=(
+                                latest_start_event_by_goal
+                            ),
+                            completion_hashes=completion_hashes,
+                            completion_times=completion_time_by_hash,
+                            latest_completion=latest_completion_evidence,
+                            latest_archived_completion=(
+                                latest_archived_completion_evidence
+                            ),
+                        )
+                    )
+                    errors.extend(closure_errors)
+                pending_reopen_source_event_by_goal.update(pending_reopen)
+                transition_error = None
+            else:
+                expected_changes, transition_error = _expected_status_change(
+                    str(event_type),
+                    event,
+                    statuses,
+                )
             if transition_error:
                 errors.append(f"{label} {transition_error}")
             elif expected_changes is None:
@@ -6768,10 +7429,7 @@ def validate_transition_replay(
 
             before = dict(statuses)
             expected_boundary = _expected_from_to(
-                str(event_type),
-                event,
-                before,
-                changes,
+                str(event_type), event, before, changes
             )
             if expected_boundary is None:
                 errors.append(f"{label} from/to boundary cannot be derived")
@@ -6832,7 +7490,7 @@ def validate_transition_replay(
                     )
             elif event_type == "CANONICAL_BINDINGS_UPDATED":
                 producer = event.get("produced_by_goal_id")
-                if producer not in {None, ""}:
+                if not closure_event and producer not in (None, ""):
                     if (
                         not isinstance(producer, str)
                         or before.get(producer) != "IN_PROGRESS"
@@ -6896,34 +7554,74 @@ def validate_transition_replay(
                     or before.get(subject) != "PLANNED"
                 ):
                     errors.append(f"{label} does not ready a PLANNED Goal")
-                basis = event.get("readiness_basis")
-                dependencies = (
-                    basis.get("dependency_completion_events")
-                    if isinstance(basis, dict)
-                    else None
-                )
-                if not isinstance(dependencies, list):
-                    errors.append(f"{label} readiness basis is missing")
+                if pending_successor_inventory_event_by_goal:
+                    errors.extend(
+                        _validate_dependency_closure_inventory_projection(
+                            root,
+                            label=label,
+                            event=event,
+                            nodes=closure_nodes,
+                            goal_paths=goal_paths,
+                            latest_inventory=latest_inventory,
+                            latest_children=latest_children,
+                            successors=(
+                                pending_successor_inventory_event_by_goal
+                            ),
+                            reopened_closure=pending_reopened_closure,
+                        )
+                    )
+                    event_hash = event.get("event_sha256")
+                    if isinstance(event_hash, str):
+                        reopened_container_ready_by_successor.update(
+                            {
+                                goal_id: event_hash
+                                for goal_id in (
+                                    pending_successor_inventory_event_by_goal
+                                )
+                            }
+                        )
+                    pending_successor_inventory_event_by_goal.clear()
+                    pending_reopened_closure = {}
                 else:
-                    for dependency in dependencies:
-                        goal_id = (
-                            dependency.get("goal_id")
-                            if isinstance(dependency, dict)
-                            else None
-                        )
-                        digest = (
-                            dependency.get("event_sha256")
-                            if isinstance(dependency, dict)
-                            else None
-                        )
-                        if (
-                            not isinstance(goal_id, str)
-                            or before.get(goal_id) != "COMPLETE_AT_TARGET"
-                            or completion_hashes.get(goal_id) != digest
-                        ):
-                            errors.append(
-                                f"{label} readiness dependency differs"
+                    basis = event.get("readiness_basis")
+                    dependencies = (
+                        basis.get("dependency_completion_events")
+                        if isinstance(basis, dict)
+                        else None
+                    )
+                    if not isinstance(dependencies, list):
+                        errors.append(f"{label} readiness basis is missing")
+                    else:
+                        for dependency in dependencies:
+                            goal_id = (
+                                dependency.get("goal_id")
+                                if isinstance(dependency, dict)
+                                else None
                             )
+                            digest = (
+                                dependency.get("event_sha256")
+                                if isinstance(dependency, dict)
+                                else None
+                            )
+                            if (
+                                not isinstance(goal_id, str)
+                                or before.get(goal_id) != "COMPLETE_AT_TARGET"
+                                or completion_hashes.get(goal_id) != digest
+                            ):
+                                errors.append(
+                                    f"{label} readiness dependency differs"
+                                )
+                errors.extend(
+                    _validate_reopened_successor_ready(
+                        label=label,
+                        event=event,
+                        before=before,
+                        nodes=closure_nodes,
+                        container_ready_events=(
+                            reopened_container_ready_by_successor
+                        ),
+                    )
+                )
             elif event_type == "GOAL_SUPERSEDED":
                 if (
                     not isinstance(subject, str)
@@ -6933,6 +7631,33 @@ def validate_transition_replay(
                     or materialized in before
                 ):
                     errors.append(f"{label} supersession boundary differs")
+                if isinstance(subject, str) and subject in pending_reopen_source_event_by_goal:
+                    errors.extend(
+                        _validate_dependency_closure_successor(
+                            root,
+                            label=label,
+                            graph=closure_graph,
+                            event=event,
+                            before=before,
+                            nodes=closure_nodes,
+                            goal_paths=goal_paths,
+                            bindings=latest_canonical_bindings,
+                            pending=pending_reopen_source_event_by_goal,
+                            rewritten_successors=successor_goal_id_by_superseded,
+                            latest_completion=latest_completion_evidence,
+                            latest_archived_completion=(
+                                latest_archived_completion_evidence
+                            ),
+                        )
+                    )
+                    pending_reopen_source_event_by_goal.pop(subject, None)
+                    if isinstance(materialized, str):
+                        successor_goal_id_by_superseded[subject] = materialized
+                        event_hash = event.get("event_sha256")
+                        if isinstance(event_hash, str) and SHA256_RE.fullmatch(event_hash):
+                            pending_successor_inventory_event_by_goal[materialized] = event_hash
+                        else:
+                            errors.append(f"{label} successor event seal is invalid")
             elif event_type == "BLOCKER_RECORDED":
                 if (
                     not isinstance(subject, str)
@@ -7038,6 +7763,8 @@ def validate_transition_replay(
                 latest_blockers = value
             else:
                 latest_resolution_ids = value
+        if event_type in {"GOAL_STARTED", "WORK_SESSION_RESUMED"} and isinstance(subject, str):
+            latest_start_event_by_goal[subject] = dict(event)
         previous_hash = str(event.get("event_sha256", ""))
         previous_occurred_at = occurred_at
 
@@ -7059,6 +7786,10 @@ def validate_transition_replay(
                 f"canonical binding differs: {role}"
             )
 
+    if pending_reopen_source_event_by_goal:
+        errors.append("v2.4 history ends with unresolved canonical-change Goals")
+    if pending_successor_inventory_event_by_goal:
+        errors.append("v2.4 history ends before successor inventory projection")
     if package_completed:
         expected_lifecycle = ("COMPLETED", "COMPLETED")
     elif len(history) == 1:

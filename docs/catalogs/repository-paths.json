@@ -11,9 +11,9 @@
   },
   "classification_counts": {
     "CURRENT_PRODUCT": 285,
-    "EVIDENCE": 2368,
+    "EVIDENCE": 2374,
     "GENERATED": 4,
-    "GOVERNANCE": 253,
+    "GOVERNANCE": 254,
     "LEGACY_REFERENCE": 214,
     "SUPPORT": 692
   },
@@ -72140,6 +72140,162 @@
       "checkpoint": {
         "canonical_bindings": [],
         "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R005/assignment.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R005/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R005/review-result.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R006/assignment.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R006/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R006/review-result.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
         "managed": true,
         "path_bound": true,
         "static_protected": false
@@ -82669,6 +82825,32 @@
       "path": "docs/planning/repository-modernization-20260811/preservation-record.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "GOVERNANCE",
+      "classification_rule": "docs-planning",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP",
+      "movement_basis": "docs-planning",
+      "path": "docs/planning/walksafe-security-server-operations-work-plan.html",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-planning"
     },
     {
       "canonical": {
@@ -99495,11 +99677,11 @@
   ],
   "movement_counts": {
     "ARCHIVE_AFTER_DECOUPLING": 196,
-    "KEEP": 692,
+    "KEEP": 693,
     "KEEP_AS_STUB": 2,
-    "KEEP_AT_PATH": 2926
+    "KEEP_AT_PATH": 2932
   },
-  "path_count": 3816,
+  "path_count": 3823,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -99511,5 +99693,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "223a73229c8d8041d6ae544ebe0e2c4f9dc81990beaa6a65a05b59ceb01b7bb8"
+  "source_set_sha256": "8f0ebca05a26e194f404d47170a952cdd06e5661438093b3e9129f3806ef5a97"
 }

@@ -79,6 +79,38 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
             self.assertNotIn('"timestamp"', text)
         self.assertEqual(len(hashes), 1)
 
+    def test_r008_control_scripts_have_exact_current_policy(self) -> None:
+        expected = {
+            "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py": (
+                "READ_ONLY",
+                "read-only-code-review-exact",
+            ),
+            "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+            "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py": (
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
+            ),
+        }
+        for path, (side_effect, effect_rule) in expected.items():
+            self.assertIn(path, catalogs.KNOWN_SCRIPT_PATHS)
+            self.assertEqual(
+                catalogs.script_lifecycle(path),
+                ("CURRENT", "current-maintained-script"),
+                path,
+            )
+            self.assertEqual(
+                catalogs.script_side_effect(path),
+                (side_effect, effect_rule),
+                path,
+            )
+
     def test_candidate_checkpoint_override_drives_repository_catalog(self) -> None:
         checkpoint = json.loads(
             (ROOT / catalogs.CHECKPOINT_PATH).read_text(encoding="utf-8")

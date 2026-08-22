@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from datetime import datetime, timedelta
 import hashlib
 import json
 import os
@@ -14,6 +13,11 @@ import tempfile
 import unittest
 from unittest import mock
 
+from scripts import (
+    build_walksafe_fp046_gap_backlog_r029_20260815 as r029_bridge,
+    build_walksafe_fp046_gap_backlog_r029_candidate_20260815 as r029_candidate,
+)
+from scripts import check_walksafe_goal_graph_v2_3 as frozen_goal_graph
 from scripts import check_walksafe_goal_graph_v2_4 as goal_graph
 from scripts import check_walksafe_project_continuation_v2_4 as continuation
 from scripts import materialize_walksafe_fp048_goal_20260802 as fp048_goal
@@ -1503,6 +1507,29 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         self.assertIn(b"WalkSafe v2.4 Goal graph check: PASS", completed.stdout)
         self.assertEqual(completed.stderr, b"")
 
+    def test_standalone_continuation_passes_without_pythonpath(self) -> None:
+        environment = os.environ.copy()
+        environment.pop("PYTHONPATH", None)
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                str(ROOT / "scripts/check_walksafe_project_continuation_v2_4.py"),
+            ],
+            cwd=ROOT,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0)
+        self.assertIn(
+            b"WalkSafe v2.4 continuation check: PASS",
+            completed.stdout,
+        )
+        self.assertEqual(completed.stderr, b"")
+
     @staticmethod
     def _create_fp008_private_gate_fixture(
         root: Path,
@@ -2168,10 +2195,6 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
         state = checkpoint["goal_execution"]
         history = state["transition_history"]
         tail = history[-1]
-        occurred_at = datetime.fromisoformat(tail["occurred_at"]) + timedelta(
-            seconds=1
-        )
-        focus_status = state["status_by_goal"][tail["focus_goal_id"]]
         snapshot = continuation.canonical_binding_snapshot(checkpoint)
         top_level_by_role = {
             binding["role"]: binding
@@ -2181,38 +2204,9 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
             digest = sha256_file(ROOT / binding["path"])
             binding["file_sha256"] = digest
             top_level_by_role[role]["file_sha256"] = digest
-        update = {
-            "sequence": len(history) + 1,
-            "event_id": "WS-TEST-CANONICAL-BINDINGS-UPDATED-CURRENT-001",
-            "event_type": "CANONICAL_BINDINGS_UPDATED",
-            "occurred_on": occurred_at.date().isoformat(),
-            "occurred_at": occurred_at.isoformat(),
-            "previous_focus_goal_id": tail["focus_goal_id"],
-            "previous_focus_content_sha256": tail[
-                "focus_goal_content_sha256"
-            ],
-            "focus_goal_id": tail["focus_goal_id"],
-            "focus_goal_content_sha256": tail["focus_goal_content_sha256"],
-            "from_status": focus_status,
-            "to_status": focus_status,
-            "static_plan_manifest_sha256": tail[
-                "static_plan_manifest_sha256"
-            ],
-            "status_changes": {},
-            "runtime_after": copy.deepcopy(tail["runtime_after"]),
-            "blockers_after": copy.deepcopy(tail["blockers_after"]),
-            "blocker_resolution_ids_after": copy.deepcopy(
-                tail["blocker_resolution_ids_after"]
-            ),
-            "source_checkpoint_version": checkpoint["schema_version"],
-            "evidence_refs": [],
-            "previous_event_sha256": tail["event_sha256"],
-            "canonical_binding_snapshot_after": snapshot,
-        }
-        update["event_sha256"] = continuation.event_sha256(update)
-        history.append(update)
-        state["transition_history_anchor_sha256"] = update["event_sha256"]
-        state["validation_cutoff_at"] = update["occurred_at"]
+        tail["canonical_binding_snapshot_after"] = snapshot
+        tail["event_sha256"] = continuation.event_sha256(tail)
+        state["transition_history_anchor_sha256"] = tail["event_sha256"]
         return checkpoint
 
     @staticmethod
@@ -2229,6 +2223,654 @@ class WalkSafeProjectContinuationV24Test(unittest.TestCase):
                 continuation.EXPECTED_PACKAGE_ACTIVATION_AUTHORIZATION_SHA256
             ),
         )
+
+
+class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
+    @staticmethod
+    def _fixture() -> dict[str, object]:
+        epic, focus = "WS-GOAL-EPIC-03", "WS-GOAL-EPIC-04"
+        fp, fp_next = "WS-GOAL-EPIC-03-FP-046-R001", "WS-GOAL-EPIC-03-FP-046-R002"
+        npc, npc_next = "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001", "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002"
+        paths = {
+            fp: "synthetic/fp-r001.md",
+            fp_next: "synthetic/fp-r002.md",
+            npc: "synthetic/npc-r001.md", npc_next: "synthetic/npc-r002.md",
+        }
+        hashes = {
+            path: marker * 64
+            for path, marker in zip(paths.values(), ("1", "2", "3", "4"))
+        }
+        source = {
+            "role": "IMPLEMENTATION_GAP", "document_id": "WS-GAP-055-R029",
+            "path": "synthetic/gap-r029.json", "file_sha256": "b" * 64,
+        }
+        common = {
+            "goal_kind": "WORK_ITEM", "initial_status": "PLANNED",
+            "parent_goal_id": epic, "work_item_type": "POLICY_GAP_WORK",
+            "priority_rank": 1, "target_completion_level": "TARGET",
+            "source_policy_ids": ["FP-046"], "gap_ids": ["GAP-055"],
+            "canonical_input_roles": ["IMPLEMENTATION_GAP"], "output_subject_ids_by_role": {},
+            "artifact_trigger_evidence_refs": [], "artifact_work_reason": "",
+            "source_blocker_ids": [], "stop_policy": "NONE", "question_policy": "NONE",
+        }
+
+        def work_item(work_item_id: str, requires: list[str]) -> dict[str, object]:
+            return {**common, "work_item_id": work_item_id, "start_requires": requires, "completion_requires": requires}
+
+        nodes: dict[str, dict[str, object]] = {
+            epic: {"goal_kind": "WORKSTREAM", "parent_goal_id": "WS-GOAL-MASTER"},
+            fp: work_item("FP-046", []),
+            npc: work_item("NPC-SINGLE-ADMIN-RECOVERY", [fp]),
+        }
+        for old, new, requires in ((fp, fp_next, []), (npc, npc_next, [fp_next])):
+            nodes[new] = {
+                **nodes[old], "start_requires": requires, "completion_requires": requires,
+                "predecessor_goal_id": old, "predecessor_goal_content_sha256": hashes[paths[old]],
+                "supersedes_goal_id": old, "supersedes_goal_content_sha256": hashes[paths[old]],
+                "reopen_reason": "CANONICAL_INPUT_CHANGED",
+                "materialized_from_role": source["role"],
+                "materialized_from_document_id": source["document_id"],
+                "materialized_from_path": source["path"],
+                "materialized_from_sha256": source["file_sha256"],
+            }
+        before = {
+            "IMPLEMENTATION_GAP": {
+                **source, "path": "synthetic/gap-r028.json", "file_sha256": "a" * 64,
+            }
+        }
+        after = {"IMPLEMENTATION_GAP": source}
+        impacts = {
+            fp: {"IMPLEMENTATION_GAP"},
+            npc: {"DEPENDENCY_CLOSURE", "WORK_ITEM_DEPENDENCY_REVISION_REQUIRED"},
+            epic: {"CHILD_AGGREGATE_INVALIDATED", "START_DEPENDENCY_INVALIDATED"},
+        }
+        completion_hashes = {epic: "e" * 64, fp: "6" * 64, npc: "7" * 64}
+        active = {epic: ["EPIC03_COMPLETION"], fp: ["FP046_COMPLETION"], npc: ["NPC_COMPLETION"]}
+        update = {
+            "event_sha256": "c" * 64, "occurred_at": "2026-08-15T00:00:03+09:00",
+            "subject_goal_id": epic, "focus_goal_id": focus,
+            "canonical_binding_snapshot_after": after, "changed_binding_roles": ["IMPLEMENTATION_GAP"],
+            "changed_subject_ids_by_role": {"IMPLEMENTATION_GAP": ["GAP-055"]},
+            "impact_closure_goal_ids": sorted(impacts),
+            "impact_disposition_by_goal": {
+                fp: {"result": "REOPEN_REQUIRED"}, npc: {"result": "REOPEN_REQUIRED"},
+                epic: {"result": "REOPEN_CONTAINER", "target_status": "PLANNED"},
+            },
+            "reopened_completion_event_sha256_by_goal": {epic: completion_hashes[epic]},
+            "status_changes": {epic: "PLANNED"},
+            "completion_evidence_by_goal_after": {fp: active[fp], npc: active[npc]},
+            "archived_completion_evidence_by_goal_after": {epic: active[epic]},
+        }
+        return {
+            "epic": epic, "focus": focus, "fp": fp, "fp_next": fp_next,
+            "npc": npc, "npc_next": npc_next, "paths": paths, "hashes": hashes,
+            "nodes": nodes, "before": before, "after": after, "impacts": impacts,
+            "statuses": {fp: "COMPLETE_AT_TARGET", npc: "COMPLETE_AT_TARGET", epic: "COMPLETE_AT_TARGET"},
+            "completion_hashes": completion_hashes,
+            "completion_times": {completion_hashes[fp]: "2026-08-15T00:00:01+09:00",
+                                 completion_hashes[npc]: "2026-08-15T00:00:02+09:00"},
+            "active": active, "children": {epic: [fp, npc]}, "update": update,
+        }
+
+    @staticmethod
+    def _update(fixture: dict[str, object], event: dict[str, object]):
+        with (
+            mock.patch.object(frozen_goal_graph, "validate_canonical_binding_snapshot", side_effect=lambda _root, value, **_kwargs: ([], value)),
+            mock.patch.object(frozen_goal_graph, "canonical_changed_subject_ids_by_role", return_value=([], fixture["update"]["changed_subject_ids_by_role"])),
+            mock.patch.object(frozen_goal_graph, "changed_binding_affected_goals", return_value={fixture["fp"]: {"IMPLEMENTATION_GAP"}}),
+            mock.patch.object(frozen_goal_graph, "expand_affected_goal_dependency_closure", return_value=fixture["impacts"]),
+        ):
+            return continuation._validate_dependency_closure_update(
+                ROOT, label="synthetic closure", graph=frozen_goal_graph, event=event,
+                bindings_before=fixture["before"], nodes=fixture["nodes"], statuses=fixture["statuses"],
+                completion_bindings_by_goal={}, latest_start_event_by_goal={}, completion_hashes=fixture["completion_hashes"],
+                completion_times=fixture["completion_times"], latest_completion=fixture["active"], latest_archived_completion={},
+            )
+
+    @staticmethod
+    def _successor(fixture: dict[str, object], old: str, new: str, active: dict[str, list[str]],
+                   archived: dict[str, list[str]], pending: dict[str, dict[str, str]], seal: str) -> dict[str, object]:
+        node = fixture["nodes"][new]
+        active_after, archived_after = copy.deepcopy(active), copy.deepcopy(archived)
+        archived_after[old] = active_after.pop(old)
+        return {
+            "event_sha256": seal, "subject_goal_id": old, "materialized_goal_id": new,
+            "reopen_trigger": pending[old], "canonical_binding_snapshot_after": fixture["after"],
+            **{field: node[field] for field in (
+                "artifact_trigger_evidence_refs", "artifact_work_reason", "materialized_from_role",
+                "materialized_from_document_id", "materialized_from_path",
+            )},
+            "materialized_from_sha256": node["materialized_from_sha256"],
+            "materialized_goal_path": fixture["paths"][new],
+            "materialized_goal_content_sha256": fixture["hashes"][fixture["paths"][new]],
+            "predecessor_goal_id": node["predecessor_goal_id"],
+            "predecessor_goal_content_sha256": node["predecessor_goal_content_sha256"],
+            "supersedes_goal_id": old,
+            "supersedes_goal_content_sha256": fixture["hashes"][fixture["paths"][old]],
+            "evidence_refs": [], "completion_evidence_by_goal_after": active_after,
+            "archived_completion_evidence_by_goal_after": archived_after,
+        }
+
+    @staticmethod
+    def _successor_errors(fixture: dict[str, object], event: dict[str, object], before: dict[str, str],
+                          pending: dict[str, dict[str, str]], rewritten: dict[str, str], active: object,
+                          archived: object, label: str) -> list[str]:
+        return continuation._validate_dependency_closure_successor(
+            ROOT, label=label, graph=frozen_goal_graph, event=event, before=before,
+            nodes=fixture["nodes"], goal_paths=fixture["paths"], bindings=fixture["after"],
+            pending=pending, rewritten_successors=rewritten, latest_completion=active,
+            latest_archived_completion=archived,
+        )
+
+    def test_replays_generic_closure_then_deferred_parent_projection(self) -> None:
+        checkpoint = continuation.load_json(CHECKPOINT)
+        self.assertEqual(continuation.validate_transition_replay(
+            ROOT, checkpoint, continuation.load_json(V23_ARCHIVE), V24_MANIFEST,
+            expected_prepared_sha256=continuation.EXPECTED_V24_PREPARED_EVENT_SHA256,
+            expected_authorization_sha256=continuation.EXPECTED_PACKAGE_ACTIVATION_AUTHORIZATION_SHA256,
+        ), [])
+        history = checkpoint["goal_execution"]["transition_history"]
+        dispatch = copy.deepcopy(history[-1])
+        dispatch.update(
+            sequence=72, event_id="WS-SYNTHETIC-CLOSURE-072", event_type="CANONICAL_BINDINGS_UPDATED",
+            previous_event_sha256=history[-1]["event_sha256"], subject_goal_id="WS-GOAL-EPIC-03",
+            produced_by_goal_id=None, canonical_binding_snapshot_after=continuation.canonical_binding_snapshot(checkpoint),
+            changed_binding_roles=[], changed_subject_ids_by_role={}, impact_closure_goal_ids=[],
+            impact_disposition_by_goal={"WS-GOAL-EPIC-03": {"result": "REOPEN_CONTAINER", "target_status": "PLANNED"}},
+            reopened_completion_event_sha256_by_goal={"WS-GOAL-EPIC-03": "e" * 64}, status_changes={"WS-GOAL-EPIC-03": "PLANNED"},
+            from_status="COMPLETE_AT_TARGET", to_status="PLANNED",
+        )
+        dispatch["event_sha256"] = continuation.event_sha256(dispatch)
+        history.append(dispatch)
+        errors = continuation.validate_transition_replay(
+            ROOT, checkpoint, continuation.load_json(V23_ARCHIVE), V24_MANIFEST
+        )
+        self.assertIn("canonical binding update is a no-op", "\n".join(errors))
+        self.assertFalse([error for error in errors if error.startswith("generic order:")])
+        fixture = self._fixture()
+        errors, changes, pending, reopened = self._update(fixture, copy.deepcopy(fixture["update"]))
+        self.assertEqual((errors, changes, set(pending)), ([], {fixture["epic"]: "PLANNED"}, {fixture["fp"], fixture["npc"]}))
+        active = copy.deepcopy(fixture["update"]["completion_evidence_by_goal_after"])
+        archived = copy.deepcopy(fixture["update"]["archived_completion_evidence_by_goal_after"])
+
+        first = self._successor(fixture, fixture["fp"], fixture["fp_next"], active, archived, pending, "f" * 64)
+        with (
+            mock.patch.object(continuation, "resolve_repo_file", side_effect=lambda _root, path: Path("/synthetic") / path if path else None),
+            mock.patch.object(continuation, "sha256_file", side_effect=lambda path: fixture["hashes"][path.as_posix().removeprefix("/synthetic/")]),
+        ):
+            self.assertEqual(self._successor_errors(
+                fixture, first, {**fixture["statuses"], fixture["epic"]: "PLANNED"},
+                pending, {}, active, archived, "first",
+            ), [])
+            active, archived = first["completion_evidence_by_goal_after"], first["archived_completion_evidence_by_goal_after"]
+            pending.pop(fixture["fp"])
+            second = self._successor(fixture, fixture["npc"], fixture["npc_next"], active, archived, pending, "d" * 64)
+            self.assertEqual(self._successor_errors(
+                fixture, second, {**fixture["statuses"], fixture["epic"]: "PLANNED", fixture["fp"]: "SUPERSEDED", fixture["fp_next"]: "PLANNED"},
+                pending, {fixture["fp"]: fixture["fp_next"]}, active, archived, "second",
+            ), [])
+            successors = {fixture["fp_next"]: first["event_sha256"], fixture["npc_next"]: second["event_sha256"]}
+            def record(goal_id: str, seal: str) -> dict[str, object]:
+                node = fixture["nodes"][goal_id]
+                return {
+                    **{field: node[field] for field in (
+                        "artifact_trigger_evidence_refs", "artifact_work_reason", "initial_status",
+                        "work_item_type", "parent_goal_id", "materialized_from_role",
+                        "materialized_from_path", "materialized_from_document_id",
+                        "materialized_from_sha256", "predecessor_goal_id",
+                        "predecessor_goal_content_sha256", "supersedes_goal_id",
+                        "supersedes_goal_content_sha256",
+                    )},
+                    "goal_id": goal_id, "path": fixture["paths"][goal_id], "sha256": fixture["hashes"][fixture["paths"][goal_id]],
+                    "goal_kind": "WORK_ITEM", "materialized_event_sha256": seal,
+                }
+            projection = {
+                "subject_goal_id": fixture["epic"],
+                "readiness_basis": {
+                    "mode": "CANONICAL_DEPENDENCY_CLOSURE_REOPEN",
+                    "canonical_update_event_sha256": fixture["update"]["event_sha256"],
+                    "successor_event_sha256_by_goal": successors,
+                    "archived_completion_event_sha256": fixture["completion_hashes"][fixture["epic"]],
+                },
+                "dynamic_goal_inventory_after": {goal: record(goal, seal) for goal, seal in successors.items()},
+                "materialized_child_goal_ids_by_parent_after": {
+                    fixture["epic"]: sorted(fixture["children"][fixture["epic"]] + list(successors))
+                },
+            }
+            def validate_projection() -> list[str]:
+                return continuation._validate_dependency_closure_inventory_projection(
+                    ROOT, label="projection", event=projection, nodes=fixture["nodes"],
+                    goal_paths=fixture["paths"], latest_inventory={}, latest_children=fixture["children"],
+                    successors=successors, reopened_closure=reopened,
+                )
+            self.assertEqual(validate_projection(), [])
+            projection["materialized_child_goal_ids_by_parent_after"][fixture["epic"]].remove(fixture["fp_next"])
+            self.assertTrue(validate_projection())
+            fixture["children"][fixture["epic"]].append(fixture["fp_next"])
+            self.assertTrue(validate_projection())
+            fixture["children"][fixture["epic"]] = [[]]
+            self.assertTrue(validate_projection())
+            fixture["nodes"][fixture["fp_next"]]["parent_goal_id"] = []
+            self.assertTrue(validate_projection())
+
+    def test_seq75_accepts_legacy_seq71_child_order_and_sorts_successors(self) -> None:
+        fixture = self._fixture()
+        _, _, _pending, reopened = self._update(
+            fixture, copy.deepcopy(fixture["update"])
+        )
+        checkpoint = continuation.load_json(CHECKPOINT)
+        state = checkpoint["goal_execution"]
+        latest_inventory = copy.deepcopy(state["dynamic_goal_inventory"])
+        latest_children = copy.deepcopy(
+            state["materialized_child_goal_ids_by_parent"]
+        )
+        legacy_members = latest_children[fixture["epic"]]
+        self.assertNotEqual(legacy_members, sorted(legacy_members))
+        successors = {
+            fixture["fp_next"]: "f" * 64,
+            fixture["npc_next"]: "d" * 64,
+        }
+
+        def record(goal_id: str, seal: str) -> dict[str, object]:
+            node = fixture["nodes"][goal_id]
+            return {
+                **{
+                    field: node[field]
+                    for field in (
+                        "artifact_trigger_evidence_refs",
+                        "artifact_work_reason",
+                        "initial_status",
+                        "work_item_type",
+                        "parent_goal_id",
+                        "materialized_from_role",
+                        "materialized_from_path",
+                        "materialized_from_document_id",
+                        "materialized_from_sha256",
+                        "predecessor_goal_id",
+                        "predecessor_goal_content_sha256",
+                        "supersedes_goal_id",
+                        "supersedes_goal_content_sha256",
+                    )
+                },
+                "goal_id": goal_id,
+                "path": fixture["paths"][goal_id],
+                "sha256": fixture["hashes"][fixture["paths"][goal_id]],
+                "goal_kind": "WORK_ITEM",
+                "materialized_event_sha256": seal,
+            }
+
+        projected_inventory = {
+            **latest_inventory,
+            **{
+                goal_id: record(goal_id, seal)
+                for goal_id, seal in successors.items()
+            },
+        }
+        projected_children = copy.deepcopy(latest_children)
+        projected_children[fixture["epic"]] = sorted(
+            set(legacy_members) | set(successors)
+        )
+        projection = {
+            "subject_goal_id": fixture["epic"],
+            "readiness_basis": {
+                "mode": "CANONICAL_DEPENDENCY_CLOSURE_REOPEN",
+                "canonical_update_event_sha256": fixture["update"]["event_sha256"],
+                "successor_event_sha256_by_goal": dict(sorted(successors.items())),
+                "archived_completion_event_sha256": fixture["completion_hashes"][fixture["epic"]],
+            },
+            "dynamic_goal_inventory_after": projected_inventory,
+            "materialized_child_goal_ids_by_parent_after": projected_children,
+        }
+
+        def validate_projection(
+            children: dict[str, object], event: dict[str, object] = projection
+        ) -> list[str]:
+            return continuation._validate_dependency_closure_inventory_projection(
+                ROOT,
+                label="seq75 projection",
+                event=event,
+                nodes=fixture["nodes"],
+                goal_paths=fixture["paths"],
+                latest_inventory=latest_inventory,
+                latest_children=children,
+                successors=successors,
+                reopened_closure=reopened,
+            )
+
+        with (
+            mock.patch.object(
+                continuation,
+                "resolve_repo_file",
+                side_effect=lambda _root, path: (
+                    Path("/synthetic") / path if path else None
+                ),
+            ),
+            mock.patch.object(
+                continuation,
+                "sha256_file",
+                side_effect=lambda path: fixture["hashes"][
+                    path.as_posix().removeprefix("/synthetic/")
+                ],
+            ),
+        ):
+            self.assertEqual(validate_projection(latest_children), [])
+            unsorted_projection = copy.deepcopy(projection)
+            unsorted_projection[
+                "materialized_child_goal_ids_by_parent_after"
+            ][fixture["epic"]] = legacy_members + list(successors)
+            self.assertTrue(
+                validate_projection(latest_children, unsorted_projection)
+            )
+            for members in (
+                legacy_members + [legacy_members[0]],
+                legacy_members + [42],
+            ):
+                malformed_children = copy.deepcopy(latest_children)
+                malformed_children[fixture["epic"]] = members
+                self.assertTrue(validate_projection(malformed_children))
+
+    def test_rejects_scope_order_trigger_archive_and_inventory_drift(self) -> None:
+        fixture = self._fixture()
+        update = fixture["update"]
+        for mutate in (
+            lambda event: event.pop("changed_subject_ids_by_role"),
+            lambda event: event.update({"subject_goal_id": fixture["focus"]}),
+            lambda event: event.update({"subject_goal_id": []}),
+            lambda event: event.update({"status_changes": {fixture["epic"]: "READY"}}),
+            lambda event: event.update({"status_changes": {fixture["fp"]: "PLANNED"}}),
+        ):
+            event = copy.deepcopy(update)
+            mutate(event)
+            self.assertTrue(self._update(fixture, event)[0])
+        _, _, pending, _ = self._update(fixture, copy.deepcopy(update))
+        active = copy.deepcopy(update["completion_evidence_by_goal_after"])
+        archived = copy.deepcopy(update["archived_completion_evidence_by_goal_after"])
+        reverse = self._successor(fixture, fixture["npc"], fixture["npc_next"], active, archived, pending, "d" * 64)
+        source = self._successor(fixture, fixture["fp"], fixture["fp_next"], active, archived, pending, "f" * 64)
+        source["materialized_from_path"] = "docs/control/audits/r028.json"
+        source["archived_completion_evidence_by_goal_after"] = {}
+        source["dynamic_goal_inventory_after"] = {}
+        top_level_trigger = self._successor(
+            fixture, fixture["fp"], fixture["fp_next"], active, archived, pending, "f" * 64
+        )
+        top_level_trigger["target_completion_event_sha256"] = "0" * 64
+        malformed_archive = self._successor(
+            fixture, fixture["fp"], fixture["fp_next"], active, archived, pending, "f" * 64
+        )
+        with (
+            mock.patch.object(continuation, "resolve_repo_file", side_effect=lambda _root, path: Path("/synthetic") / path if path else None),
+            mock.patch.object(continuation, "sha256_file", side_effect=lambda path: fixture["hashes"][path.as_posix().removeprefix("/synthetic/")]),
+        ):
+            for event, prior_archive in (
+                (reverse, archived), (source, archived),
+                (top_level_trigger, archived), (malformed_archive, []),
+                (malformed_archive, {fixture["fp"]: []}),
+            ):
+                self.assertTrue(self._successor_errors(
+                    fixture, event, {**fixture["statuses"], fixture["epic"]: "PLANNED"},
+                    pending, {}, active, prior_archive, "tamper",
+                ))
+        ready = {
+            "subject_goal_id": fixture["fp_next"],
+            "reopened_container_ready_event_sha256": "9" * 64,
+        }
+        self.assertEqual(
+            continuation._validate_reopened_successor_ready(
+                label="ready", event=ready, before={fixture["epic"]: "READY"},
+                nodes=fixture["nodes"], container_ready_events={fixture["fp_next"]: "9" * 64},
+            ),
+            [],
+        )
+        for before, event in (({fixture["epic"]: "PLANNED"}, ready), ({fixture["epic"]: "READY"}, {**ready, "reopened_container_ready_event_sha256": "0" * 64})):
+            self.assertTrue(continuation._validate_reopened_successor_ready(
+                label="ready", event=event, before=before, nodes=fixture["nodes"],
+                container_ready_events={fixture["fp_next"]: "9" * 64},
+            ))
+        history = WalkSafeProjectContinuationV24Test._generic_history_fixture()
+        history[3]["produced_by_goal_id"] = []
+        WalkSafeProjectContinuationV24Test._reseal_history(history)
+        self.assertTrue(continuation.validate_generic_event_order(history))
+
+    def test_r028_to_canonical_r029_only_removes_exact_provenance_star(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                *r029_candidate.R028_INPUT_PATHS,
+                *r029_candidate.CURRENT_SOURCE_PATHS,
+            ):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / relative).read_bytes())
+            outputs = r029_bridge.build_outputs(root)
+            for relative, text in outputs.items():
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+
+            before_path = root / r029_candidate.R028_BACKLOG_JSON_REL
+            after_path = root / r029_bridge.CANONICAL_BACKLOG_JSON_REL
+            before_raw = before_path.read_bytes()
+            after_raw = after_path.read_bytes()
+            before_payload = json.loads(before_raw)
+            after_payload = json.loads(after_raw)
+
+            def binding(
+                role: str, document_id: str, relative: Path
+            ) -> dict[str, str]:
+                return {
+                    "role": role,
+                    "document_id": document_id,
+                    "path": relative.as_posix(),
+                    "file_sha256": continuation.sha256_file(root / relative),
+                }
+
+            def upgraded(
+                before_binding: dict[str, str],
+                after_binding: dict[str, str],
+                subjects: dict[str, list[str]],
+            ) -> list[str]:
+                return continuation._legacy_backlog_upgrade_subjects(
+                    root,
+                    frozen_goal_graph,
+                    {"IMPLEMENTATION_BACKLOG": before_binding},
+                    {"IMPLEMENTATION_BACKLOG": after_binding},
+                    subjects,
+                )["IMPLEMENTATION_BACKLOG"]
+
+            base_before = binding(
+                "IMPLEMENTATION_BACKLOG",
+                "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
+                r029_candidate.R028_BACKLOG_JSON_REL,
+            )
+            base_after = binding(
+                "IMPLEMENTATION_BACKLOG",
+                "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+                r029_bridge.CANONICAL_BACKLOG_JSON_REL,
+            )
+            generic_errors, raw_subjects = (
+                frozen_goal_graph.canonical_changed_subject_ids_by_role(
+                    root,
+                    changed_roles=[
+                        "IMPLEMENTATION_GAP",
+                        "IMPLEMENTATION_BACKLOG",
+                    ],
+                    bindings_before={
+                        "IMPLEMENTATION_GAP": binding(
+                            "IMPLEMENTATION_GAP",
+                            "WS-IMPLEMENTATION-GAP-ANALYSIS-20260814-028",
+                            r029_candidate.R028_GAP_JSON_REL,
+                        ),
+                        "IMPLEMENTATION_BACKLOG": base_before,
+                    },
+                    bindings_after={
+                        "IMPLEMENTATION_GAP": binding(
+                            "IMPLEMENTATION_GAP",
+                            "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+                            r029_bridge.CANONICAL_GAP_JSON_REL,
+                        ),
+                        "IMPLEMENTATION_BACKLOG": base_after,
+                    },
+                )
+            )
+            self.assertEqual(generic_errors, [])
+            self.assertEqual(
+                raw_subjects["IMPLEMENTATION_BACKLOG"], ["*", "FP-046"]
+            )
+            self.assertEqual(base_before, continuation.R008_R028_BACKLOG_BINDING)
+            self.assertEqual(
+                base_after,
+                continuation.R008_R029_CANONICAL_BACKLOG_BINDING,
+            )
+            self.assertEqual(
+                upgraded(base_before, base_after, raw_subjects), ["FP-046"]
+            )
+
+            candidate_outputs = r029_candidate.build_outputs(root)
+            candidate_path = root / r029_candidate.R029_BACKLOG_JSON_REL
+            candidate_path.parent.mkdir(parents=True, exist_ok=True)
+            candidate_path.write_text(
+                candidate_outputs[r029_candidate.R029_BACKLOG_JSON_REL],
+                encoding="utf-8",
+            )
+            candidate_after = binding(
+                "IMPLEMENTATION_BACKLOG",
+                "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+                r029_candidate.R029_BACKLOG_JSON_REL,
+            )
+            self.assertEqual(candidate_path.read_bytes(), after_raw)
+            self.assertIn(
+                "*",
+                upgraded(base_before, candidate_after, raw_subjects),
+            )
+
+            def write_case(
+                changed_before: dict[str, object], changed_after: dict[str, object]
+            ) -> tuple[dict[str, str], dict[str, str]]:
+                if changed_before == before_payload:
+                    before_path.write_bytes(before_raw)
+                else:
+                    before_path.write_text(
+                        json.dumps(
+                            changed_before,
+                            ensure_ascii=False,
+                            indent=2,
+                            sort_keys=True,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                if changed_after == after_payload:
+                    after_path.write_bytes(after_raw)
+                else:
+                    after_path.write_text(
+                        json.dumps(
+                            changed_after,
+                            ensure_ascii=False,
+                            indent=2,
+                            sort_keys=True,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                return (
+                    binding(
+                        "IMPLEMENTATION_BACKLOG",
+                        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
+                        r029_candidate.R028_BACKLOG_JSON_REL,
+                    ),
+                    binding(
+                        "IMPLEMENTATION_BACKLOG",
+                        "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+                        r029_bridge.CANONICAL_BACKLOG_JSON_REL,
+                    ),
+                )
+
+            tamper_cases = (
+                (
+                    "before canonical path",
+                    lambda before, _after, before_binding, _after_binding: (
+                        before_binding.update(path="docs/control/audits/other.json")
+                    ),
+                ),
+                (
+                    "before canonical hash",
+                    lambda before, _after, before_binding, _after_binding: (
+                        before_binding.update(file_sha256="0" * 64)
+                    ),
+                ),
+                (
+                    "candidate path",
+                    lambda _before, _after, _before_binding, after_binding: (
+                        after_binding.update(
+                            path=r029_candidate.R029_BACKLOG_JSON_REL.as_posix(),
+                            file_sha256=continuation.sha256_file(candidate_path),
+                        )
+                    ),
+                ),
+                (
+                    "legacy provenance byte length",
+                    lambda before, _after, _before_binding, _after_binding: (
+                        before["source_predecessor"].update(byte_length=1)
+                    ),
+                ),
+                (
+                    "normalized provenance path",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after["source_predecessor"].update(path="docs/control/audits/other.json")
+                    ),
+                ),
+                (
+                    "normalized provenance hash",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after["source_predecessor"].update(file_sha256="0" * 64)
+                    ),
+                ),
+                (
+                    "normalized provenance flag",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after["source_predecessor"].update(preserved_unchanged=False)
+                    ),
+                ),
+                (
+                    "global value",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after.update(current_status_model="tampered")
+                    ),
+                ),
+                (
+                    "metadata residual",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after["metadata"].update(status="tampered")
+                    ),
+                ),
+                (
+                    "unknown residual",
+                    lambda _before, after, _before_binding, _after_binding: (
+                        after.update(unexpected_residual=True)
+                    ),
+                ),
+            )
+            for label, mutate in tamper_cases:
+                changed_before = copy.deepcopy(before_payload)
+                changed_after = copy.deepcopy(after_payload)
+                before_binding, after_binding = write_case(
+                    changed_before, changed_after
+                )
+                mutate(
+                    changed_before,
+                    changed_after,
+                    before_binding,
+                    after_binding,
+                )
+                if changed_before != before_payload or changed_after != after_payload:
+                    before_binding, after_binding = write_case(
+                        changed_before, changed_after
+                    )
+                self.assertIn(
+                    "*",
+                    upgraded(before_binding, after_binding, raw_subjects),
+                    label,
+                )
 
 
 class WalkSafeFp022CompletionSuffixTest(unittest.TestCase):
