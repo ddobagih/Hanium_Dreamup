@@ -15618,6 +15618,8 @@ def _r002_completion_events(
 ) -> dict[str, dict[str, Any]] | None:
     result: dict[str, dict[str, Any]] = {}
     for event in history:
+        if not isinstance(event, dict):
+            return None
         if (
             event.get("event_type") == "GOAL_COMPLETED"
             and isinstance(event.get("subject_goal_id"), str)
@@ -15636,6 +15638,8 @@ def _r002_evidence_before_suffix(
     active: dict[str, Any] | None = None
     archived: dict[str, Any] | None = None
     for event in history:
+        if not isinstance(event, dict):
+            return None
         if "completion_evidence_by_goal_after" in event:
             value = event.get("completion_evidence_by_goal_after")
             if not isinstance(value, dict):
@@ -15649,6 +15653,148 @@ def _r002_evidence_before_suffix(
     if active is None:
         return None
     return active, archived if archived is not None else {}
+
+
+def _r002_materialization_before_suffix(
+    history: list[dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, list[str]]] | None:
+    latest: tuple[dict[str, Any], dict[str, list[str]]] | None = None
+    for event in history:
+        if not isinstance(event, dict):
+            return None
+        has_inventory = "dynamic_goal_inventory_after" in event
+        has_children = "materialized_child_goal_ids_by_parent_after" in event
+        if has_inventory != has_children:
+            return None
+        if not has_inventory:
+            continue
+        inventory = event.get("dynamic_goal_inventory_after")
+        children = event.get("materialized_child_goal_ids_by_parent_after")
+        if (
+            not isinstance(inventory, dict)
+            or not isinstance(children, dict)
+            or any(
+                not isinstance(parent_id, str)
+                or not isinstance(child_ids, list)
+                or any(not isinstance(child_id, str) for child_id in child_ids)
+                for parent_id, child_ids in children.items()
+            )
+        ):
+            return None
+        latest = copy.deepcopy(inventory), copy.deepcopy(children)
+    return latest
+
+
+def _r002_transition_review_errors(
+    root: Path,
+    canonical_update: dict[str, Any],
+    suffix: list[dict[str, Any]],
+) -> list[str]:
+    """Validate the actual approved seq72 review triad and its byte binding."""
+    try:
+        from scripts import (  # noqa: E402
+            apply_walksafe_fp046_npc_r002_reopen_20260815 as review,
+        )
+        review_paths = {
+            "assignment": review.TRANSITION_ASSIGNMENT_REL,
+            "review_result": review.TRANSITION_RESULT_REL,
+            "independent_review": review.TRANSITION_INDEPENDENT_REL,
+        }
+        raw_by_path = {
+            relative: review._safe_regular_bytes(
+                root, relative, "transition review"
+            )
+            for relative in review_paths.values()
+        }
+        expected_binding = {
+            key: review._binding(relative, raw_by_path[relative])
+            for key, relative in review_paths.items()
+        }
+        errors = []
+        if canonical_update.get("transition_review_binding") != expected_binding:
+            errors.append("FP046/NPC R002 transition review byte binding differs")
+
+        def actual_binding(relative: Path) -> dict[str, Any]:
+            raw = review._safe_regular_bytes(root, relative, "review subject")
+            return review._binding(relative, raw)
+
+        assignment_raw = raw_by_path[review.TRANSITION_ASSIGNMENT_REL]
+        result_raw = raw_by_path[review.TRANSITION_RESULT_REL]
+        independent_raw = raw_by_path[review.TRANSITION_INDEPENDENT_REL]
+        assignment = review.strict_json_bytes(
+            assignment_raw, "transition assignment"
+        )
+        result = review.strict_json_bytes(result_raw, "transition review result")
+        source_bindings = canonical_update.get("source_bindings")
+        source_checkpoint = (
+            source_bindings.get("checkpoint")
+            if isinstance(source_bindings, dict)
+            else None
+        )
+        if (
+            not isinstance(source_checkpoint, dict)
+            or set(source_checkpoint) != {"path", "sha256", "byte_length"}
+            or source_checkpoint.get("path")
+            != review.CHECKPOINT_REL.as_posix()
+            or not re.fullmatch(
+                r"[0-9a-f]{64}", str(source_checkpoint.get("sha256", ""))
+            )
+            or not isinstance(source_checkpoint.get("byte_length"), int)
+            or source_checkpoint["byte_length"] <= 0
+        ):
+            raise ValueError("transition source checkpoint binding differs")
+        for relative, (digest, byte_length) in review.R007_REVIEW_PINS.items():
+            binding = actual_binding(relative)
+            if (
+                binding["sha256"] != digest
+                or binding["byte_length"] != byte_length
+            ):
+                raise ValueError(f"R007 review binding differs: {relative}")
+        subject_paths = sorted(
+            {
+                *review.r029_bridge.CANONICAL_OUTPUT_PATHS,
+                review.FP046_R002_REL,
+                review.NPC_R002_REL,
+                review.AUTHORIZATION_REL,
+                review.INITIAL_START_GATE_CONTRACT_REL,
+            }
+        )
+        review_package = {
+            "source_checkpoint": copy.deepcopy(source_checkpoint),
+            "r007_control_successor_review_bindings": [
+                actual_binding(relative) for relative in review.R007_REVIEW_PINS
+            ],
+            "authorization": actual_binding(review.AUTHORIZATION_REL),
+            "initial_start_gate_contract": actual_binding(
+                review.INITIAL_START_GATE_CONTRACT_REL
+            ),
+            "staged_subject_bindings": [
+                actual_binding(relative) for relative in subject_paths
+            ],
+            "preflight": {"events": suffix},
+        }
+        review.validate_transition_assignment_document(
+            assignment,
+            assignment_raw,
+            review_package,
+        )
+        review._validate_transition_result_document(
+            result,
+            result_raw,
+            assignment,
+            assignment_raw,
+        )
+        expected_independent = review.build_transition_independent_review(
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        ).encode("utf-8")
+        if independent_raw != expected_independent:
+            raise ValueError("transition independent review differs")
+    except Exception as exc:
+        return [f"FP046/NPC R002 transition review differs: {exc}"]
+    return errors
 
 
 def _r002_archive_projection(
@@ -15828,6 +15974,8 @@ def validate_fp046_npc_r002_reopen_seq72_76(
         return ["FP046/NPC R002 reopen state is malformed"]
     errors: list[str] = []
     source_history = history[: R002_REOPEN_FIRST_SEQUENCE - 1]
+    if any(not isinstance(event, dict) for event in source_history):
+        return ["FP046/NPC R002 reopen source prefix is malformed"]
     source_event = source_history[-1] if source_history else None
     if not isinstance(source_event, dict) or (
         source_event.get("sequence") != 71
@@ -15848,9 +15996,13 @@ def validate_fp046_npc_r002_reopen_seq72_76(
         errors.append("FP046/NPC R002 reopen event identity differs")
     previous = source_event
     for event in suffix:
+        try:
+            expected_event_sha256 = continuation.event_sha256(event)
+        except (TypeError, ValueError):
+            expected_event_sha256 = None
         if (
             event.get("previous_event_sha256") != previous.get("event_sha256")
-            or event.get("event_sha256") != continuation.event_sha256(event)
+            or event.get("event_sha256") != expected_event_sha256
         ):
             errors.append("FP046/NPC R002 reopen event chain or seal differs")
         previous = event
@@ -15867,6 +16019,7 @@ def validate_fp046_npc_r002_reopen_seq72_76(
         return errors + ["FP046/NPC R002 reopen source completion lineage differs"]
     source_active, source_archived = evidence
     cbu, fp046, npc, parent_ready, fp046_ready = suffix
+    errors.extend(_r002_transition_review_errors(root, cbu, suffix))
     parent_completion = completion_events[R002_REOPEN_PARENT_GOAL_ID]
     fp046_completion = completion_events[FP046_GOAL_ID]
     npc_completion = completion_events[NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID]
@@ -15881,41 +16034,34 @@ def validate_fp046_npc_r002_reopen_seq72_76(
     canonical = cbu.get("canonical_binding_snapshot_after")
     if canonical != expected_canonical:
         errors.append("FP046/NPC R002 reopen canonical snapshot differs")
-    backlog_binding = (
-        canonical.get("IMPLEMENTATION_BACKLOG")
-        if isinstance(canonical, dict)
-        else None
-    )
-    backlog_path = _exact_repo_file(
-        root,
-        backlog_binding.get("path") if isinstance(backlog_binding, dict) else None,
-    )
-    backlog_document = _load_exact_json(
-        root,
-        R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"][
-            "path"
-        ],
-    )
-    backlog_metadata = (
-        backlog_document.get("metadata")
-        if isinstance(backlog_document, dict)
-        else None
-    )
-    if (
-        not isinstance(backlog_binding, dict)
-        or backlog_binding
-        != R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"]
-        or backlog_path is None
-        or backlog_binding.get("file_sha256")
-        != continuation.sha256_file(backlog_path)
-        or not isinstance(backlog_metadata, dict)
-        or backlog_metadata.get("backlog_id")
-        != R002_REOPEN_CANONICAL_BINDING_UPDATES["IMPLEMENTATION_BACKLOG"][
-            "document_id"
-        ]
+    validated_bindings: dict[str, dict[str, Any]] = {}
+    for role, label, document_id_field in (
+        ("IMPLEMENTATION_GAP", "Gap", "report_id"),
+        ("IMPLEMENTATION_BACKLOG", "Backlog", "backlog_id"),
     ):
-        errors.append("FP046/NPC R002 reopen Backlog binding differs")
-        backlog_binding = {}
+        expected_binding = R002_REOPEN_CANONICAL_BINDING_UPDATES[role]
+        binding = canonical.get(role) if isinstance(canonical, dict) else None
+        path = _exact_repo_file(
+            root,
+            binding.get("path") if isinstance(binding, dict) else None,
+        )
+        document = _load_exact_json(root, expected_binding["path"])
+        metadata = (
+            document.get("metadata") if isinstance(document, dict) else None
+        )
+        if (
+            not isinstance(binding, dict)
+            or binding != expected_binding
+            or path is None
+            or binding.get("file_sha256")
+            != continuation.sha256_file(path)
+            or not isinstance(metadata, dict)
+            or metadata.get(document_id_field) != expected_binding["document_id"]
+        ):
+            errors.append(f"FP046/NPC R002 reopen {label} binding differs")
+        else:
+            validated_bindings[role] = binding
+    backlog_binding = validated_bindings.get("IMPLEMENTATION_BACKLOG")
 
     expected_cbu = {
         "subject_goal_id": R002_REOPEN_PARENT_GOAL_ID,
@@ -16039,25 +16185,44 @@ def validate_fp046_npc_r002_reopen_seq72_76(
         errors.append("FP046/NPC R002 reopen parent readiness differs")
     inventory = parent_ready.get("dynamic_goal_inventory_after")
     children = parent_ready.get("materialized_child_goal_ids_by_parent_after")
-    if not isinstance(inventory, dict) or not isinstance(children, dict):
+    source_materialization = _r002_materialization_before_suffix(source_history)
+    if (
+        not isinstance(inventory, dict)
+        or not isinstance(children, dict)
+        or source_materialization is None
+    ):
         errors.append("FP046/NPC R002 reopen successor inventory is missing")
     else:
+        source_inventory, source_children = source_materialization
+        expected_inventory = copy.deepcopy(source_inventory)
         for event, specification in zip(
             (fp046, npc), R002_REOPEN_SUCCESSORS, strict=True
         ):
-            record = inventory.get(specification["goal_id"])
             expected_record = _r002_inventory_record(root, specification, event)
-            if record != expected_record:
+            if (
+                expected_record is None
+                or specification["goal_id"] in expected_inventory
+            ):
                 errors.append("FP046/NPC R002 reopen successor inventory differs")
-        members = children.get(R002_REOPEN_PARENT_GOAL_ID)
+                continue
+            expected_inventory[specification["goal_id"]] = expected_record
         expected_successors = [
             specification["goal_id"] for specification in R002_REOPEN_SUCCESSORS
         ]
-        if (
-            not isinstance(members, list)
-            or members != sorted(set(members))
-            or not set(expected_successors).issubset(members)
+        source_members = source_children.get(R002_REOPEN_PARENT_GOAL_ID)
+        expected_children = copy.deepcopy(source_children)
+        if not isinstance(source_members, list) or any(
+            goal_id in source_inventory or goal_id in source_members
+            for goal_id in expected_successors
         ):
+            errors.append("FP046/NPC R002 reopen successor inventory differs")
+        else:
+            expected_children[R002_REOPEN_PARENT_GOAL_ID] = sorted(
+                set(source_members) | set(expected_successors)
+            )
+        if inventory != expected_inventory:
+            errors.append("FP046/NPC R002 reopen successor inventory differs")
+        if children != expected_children:
             errors.append("FP046/NPC R002 reopen successor child map differs")
 
     expected_ready_basis = {

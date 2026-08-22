@@ -8306,7 +8306,48 @@ class WalkSafeFp022CompletionGraphSuffixTest(unittest.TestCase):
 
 
 class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
-    def _checkpoint(self) -> tuple[Path, dict]:
+    @staticmethod
+    def _write_transition_review(root: Path) -> dict[Path, bytes]:
+        r002_preflight.write_transition_assignment(
+            root, assigned_at="2026-08-15T12:00:00+09:00"
+        )
+        assignment_raw = (
+            root / r002_preflight.TRANSITION_ASSIGNMENT_REL
+        ).read_bytes()
+        assignment = json.loads(assignment_raw)
+        result = {
+            "schema_version": "1.0",
+            "evidence_type": (
+                "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
+            ),
+            "goal_id": r002_preflight.TRANSITION_GOAL_ID,
+            "round_id": r002_preflight.TRANSITION_ROUND_ID,
+            "assignment_binding": r002_preflight._binding(
+                r002_preflight.TRANSITION_ASSIGNMENT_REL,
+                assignment_raw,
+            ),
+            "decision": "APPROVED",
+            "findings": {"blocking": [], "major_open": [], "minor_open": []},
+            "finding_dispositions": [],
+            "review_scope": assignment["review_scope"],
+            "review_boundary": assignment["review_boundary"],
+        }
+        result_path = root / r002_preflight.TRANSITION_RESULT_REL
+        result_path.parent.mkdir(parents=True, exist_ok=True)
+        result_path.write_bytes(
+            r002_preflight.json_text(result).encode("utf-8")
+        )
+        r002_preflight.write_transition_independent_review(root)
+        return {
+            relative: (root / relative).read_bytes()
+            for relative in (
+                r002_preflight.TRANSITION_ASSIGNMENT_REL,
+                r002_preflight.TRANSITION_RESULT_REL,
+                r002_preflight.TRANSITION_INDEPENDENT_REL,
+            )
+        }
+
+    def _checkpoint(self, *, approved: bool = True) -> tuple[Path, dict]:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -8319,6 +8360,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             r002_preflight.FP022_R001_REL,
             r002_preflight.EPIC03_REL,
             *r002_preflight.r029_candidate.CURRENT_SOURCE_PATHS,
+            *r002_preflight.R007_REVIEW_PINS,
             *completion_review.CONTROL_SUCCESSOR_R008_COHORT_PATHS,
             *r002_transaction.CATALOG_RELATIVES,
             *(
@@ -8359,17 +8401,15 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         (root / r002_preflight.CHECKPOINT_REL).write_text(
             r002_preflight.json_text(checkpoint), encoding="utf-8"
         )
-        # Pure projection does not inspect this future triad, but it commits
-        # its paths into the projected working-tree hash.
-        for relative in (
-            r002_preflight.TRANSITION_ASSIGNMENT_REL,
-            r002_preflight.TRANSITION_RESULT_REL,
-            r002_preflight.TRANSITION_INDEPENDENT_REL,
-        ):
-            target = root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(b"{}")
+        review_overlay = (
+            self._write_transition_review(root) if approved else None
+        )
         plan = r002_preflight.build_canonical_preflight(root)
+        if review_overlay is not None:
+            plan = r002_transaction._bind_review_to_preflight(
+                plan,
+                r002_transaction._transition_review_binding(review_overlay),
+            )
         projection = r002_transaction.project_transaction(
             root,
             preflight=plan,
@@ -8379,6 +8419,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 path: (ROOT / path).read_bytes()
                 for path in r002_transaction.CATALOG_RELATIVES
             },
+            transition_review_overlay=review_overlay,
             r008_control_cohort_paths=(
                 completion_review.CONTROL_SUCCESSOR_R008_COHORT_PATHS
             ),
@@ -8445,7 +8486,14 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             [],
         )
 
-    def test_exact_seq72_76_archives_and_reopens_without_repository_outputs(self) -> None:
+    def test_seq72_76_projection_without_actual_review_fails_closed(self) -> None:
+        root, checkpoint = self._checkpoint(approved=False)
+
+        self.assertTrue(
+            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint)
+        )
+
+    def test_exact_approved_seq72_76_archives_and_reopens(self) -> None:
         root, checkpoint = self._checkpoint()
 
         self.assertEqual(
@@ -8608,6 +8656,79 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                     field
                 ] = value
                 self._reseal_suffix(checkpoint)
+                self.assertTrue(
+                    graph.validate_fp046_npc_r002_reopen_seq72_76(
+                        root, checkpoint
+                    )
+                )
+
+    def test_transition_review_binding_and_actual_bytes_fail_closed(self) -> None:
+        root, checkpoint = self._checkpoint()
+        checkpoint["goal_execution"]["transition_history"][71].pop(
+            "transition_review_binding"
+        )
+        self._reseal_suffix(checkpoint)
+        self.assertTrue(
+            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint)
+        )
+
+        root, checkpoint = self._checkpoint()
+        (root / r002_preflight.TRANSITION_RESULT_REL).write_bytes(b"{}\n")
+        self.assertTrue(
+            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint)
+        )
+
+    def test_r029_gap_actual_bytes_fail_closed(self) -> None:
+        root, checkpoint = self._checkpoint()
+        gap_path = root / graph.R002_REOPEN_CANONICAL_BINDING_UPDATES[
+            "IMPLEMENTATION_GAP"
+        ]["path"]
+        gap_path.write_bytes(b"{}\n")
+
+        self.assertTrue(
+            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint)
+        )
+
+    def test_malformed_source_prefix_returns_error(self) -> None:
+        root, checkpoint = self._checkpoint()
+        checkpoint["goal_execution"]["transition_history"][0] = None
+
+        errors = graph.validate_fp046_npc_r002_reopen_seq72_76(
+            root, checkpoint
+        )
+
+        self.assertTrue(errors)
+
+    def test_extra_successor_inventory_and_child_delta_fail_closed(self) -> None:
+        def extra_inventory(events: list[dict], state: dict) -> None:
+            events[3]["dynamic_goal_inventory_after"]["WS-GOAL-FORGED"] = {}
+            state["dynamic_goal_inventory"] = copy.deepcopy(
+                events[3]["dynamic_goal_inventory_after"]
+            )
+
+        def extra_child(events: list[dict], state: dict) -> None:
+            children = events[3][
+                "materialized_child_goal_ids_by_parent_after"
+            ]
+            children[graph.R002_REOPEN_PARENT_GOAL_ID].append(
+                "WS-GOAL-FORGED"
+            )
+            children[graph.R002_REOPEN_PARENT_GOAL_ID].sort()
+            state["materialized_child_goal_ids_by_parent"] = copy.deepcopy(
+                children
+            )
+
+        for label, mutate in (
+            ("inventory", extra_inventory),
+            ("child", extra_child),
+        ):
+            with self.subTest(label=label):
+                root, checkpoint = self._checkpoint()
+                state = checkpoint["goal_execution"]
+                events = state["transition_history"][71:76]
+                mutate(events, state)
+                self._reseal_suffix(checkpoint)
+
                 self.assertTrue(
                     graph.validate_fp046_npc_r002_reopen_seq72_76(
                         root, checkpoint
