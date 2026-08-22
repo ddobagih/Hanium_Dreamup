@@ -583,4 +583,28 @@ class MainActivityAccessibilityStaticTest {
             source.contains("label = \"네 가지 선택을 서버에 저장하고 확인\",\n            emphasis = true,"),
         )
     }
+    @Test
+    fun buttonLabelsStayShortOnScreenWhileTalkBackKeepsTheContext() {
+        // 화면에는 "만 18세 이상", TalkBack 에는 "가입 연령: 만 18세 이상".
+        // 눈으로 보는 라벨은 짧게, 낭독 맥락은 유지한다.
+        val factory = source.substringAfter("fun accessiblePriorityUserButton(")
+            .substringBefore("firstRunNoticeToggleButton =")
+        assertTrue(factory.contains("spokenLabel"))
+
+        val ageBlock = source.substringAfter("firstRunAgeButtons.clear()")
+            .substringBefore("firstRunIntegratedConsentDisclosureText =")
+        assertTrue(ageBlock.contains("spokenLabel = \"가입 연령: "))
+        assertFalse(ageBlock.contains("label = \"가입 연령: "))
+    }
+
+    @Test
+    fun spacingSeparatesGroupsInsteadOfBeingUniform() {
+        // 24dp 일괄이 아니라, 섹션 경계는 넓게 같은 그룹의 버튼 사이는 좁게 둔다.
+        assertTrue(source.contains("WS_GROUP_GAP_DP"))
+        assertTrue(source.contains("WS_TITLE_GAP_DP"))
+        val factory = source.substringAfter("fun accessiblePriorityUserButton(")
+            .substringBefore("firstRunNoticeToggleButton =")
+        assertTrue(factory.contains("WS_GROUP_GAP_DP"))
+        assertFalse(factory.contains("bottomMargin = (WS_CONTROL_GAP_DP"))
+    }
 }
