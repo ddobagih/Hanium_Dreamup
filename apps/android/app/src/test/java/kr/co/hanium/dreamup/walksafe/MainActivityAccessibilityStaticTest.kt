@@ -619,4 +619,20 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(build.contains("WS_COLOR_LINE"))
         assertTrue(build.contains("firstRunConsentCards[item]"))
     }
+    @Test
+    fun onboardingCardsCarryTheirOwnHeadingAndCount() {
+        // 고지 카드 머리글은 Spannable 로 넣는다. addView(productPurposeText) 가 오버레이에
+        // 직접 있어야 하는 계약 때문에 별도 컨테이너로 감쌀 수 없다.
+        assertTrue(source.contains("SAFETY_NOTICE_HEADING"))
+        val notice = functionBlock("private fun applyNoticeHeadingStyle")
+        assertTrue(notice.contains("SpannableString"))
+        assertTrue(notice.contains("RelativeSizeSpan"))
+
+        // 항목 설명은 승인된 전문에서 그대로 잘라 쓴다. 새 문구를 만들지 않는다.
+        assertTrue(source.contains("consentClauseOrNull"))
+        val clause = functionBlock("private fun consentClauseOrNull")
+        assertTrue(clause.contains("INTEGRATED_CONSENT_DISCLOSURE_KO"))
+
+        assertTrue(source.contains("firstRunConsentCountText"))
+    }
 }

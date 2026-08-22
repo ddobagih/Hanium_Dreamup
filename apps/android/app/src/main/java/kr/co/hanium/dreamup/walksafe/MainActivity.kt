@@ -459,6 +459,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var reportPrivacyDisclosureText: TextView
     private lateinit var privacyConsentStatusText: TextView
     private val firstRunConsentCards = mutableMapOf<IntegratedConsentItem, LinearLayout>()
+    private lateinit var firstRunConsentCountText: TextView
+    private lateinit var firstRunDisclosureToggleButton: Button
+    private var firstRunDisclosureExpanded = false
     private lateinit var firstRunNoticeToggleButton: Button
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
@@ -8960,6 +8963,25 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
+        firstRunDisclosureToggleButton = accessiblePriorityUserButton(
+            label = "통합 동의 전문 보기",
+            onClick = {
+                firstRunDisclosureExpanded = !firstRunDisclosureExpanded
+                updateFirstRunOnboardingUi()
+            },
+        )
+        firstRunConsentCountText = TextView(this).apply {
+            id = View.generateViewId()
+            textSize = 16f
+            setTextColor(WS_COLOR_NOTICE_TEXT)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                bottomMargin = (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
+            }
+        }
         firstRunIntegratedConsentButtons.clear()
         firstRunConsentCards.clear()
         IntegratedConsentItem.entries.forEach { item ->
@@ -8994,6 +9016,33 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ).apply {
                     bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
                 }
+                val clause = consentClauseOrNull(
+                    when (item) {
+                        IntegratedConsentItem.RAW_SOURCE_COLLECTION -> "원본 수집"
+                        IntegratedConsentItem.AUTOMATIC_REPORTING -> "자동신고"
+                        IntegratedConsentItem.MOBILE_NETWORK_TRANSFER -> "이동통신 전송"
+                        IntegratedConsentItem.TRAINING_REUSE -> "학습 재사용"
+                    },
+                )
+                if (clause != null) {
+                    addView(
+                        TextView(this@MainActivity).apply {
+                            text = clause
+                            textSize = 16f
+                            setTextColor(WS_COLOR_NOTICE_TEXT)
+                            setLineSpacing(0f, 1.45f)
+                            // 아래 버튼이 항목명과 상태를 모두 낭독하므로 중복을 피한다.
+                            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ).apply {
+                                bottomMargin =
+                                    (WS_GROUP_GAP_DP * resources.displayMetrics.density).roundToInt()
+                            }
+                        },
+                    )
+                }
                 addView(button)
             }
         }
@@ -9014,6 +9063,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 FirstRunAgeBand.UNDER_14,
             ).forEach { ageBand -> addView(firstRunAgeButtons.getValue(ageBand)) }
             addView(firstRunIntegratedConsentDisclosureText)
+            addView(firstRunDisclosureToggleButton)
+            addView(firstRunConsentCountText)
             IntegratedConsentItem.entries.forEach { item ->
                 addView(firstRunConsentCards.getValue(item))
             }
@@ -9631,18 +9682,51 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         firstRunOnboardingStatusText.text = styled
     }
 
+    /**
+     * 고지 카드 머리글. addView(productPurposeText) 가 오버레이에 직접 있어야 하는 계약
+     * 때문에 별도 컨테이너로 감쌀 수 없어 같은 TextView 안에서 Spannable 로 처리한다.
+     */
+    private fun applyNoticeHeadingStyle(body: String) {
+        if (!::productPurposeText.isInitialized) return
+        val display = "$SAFETY_NOTICE_HEADING\n$body"
+        val styled = SpannableString(display)
+        val end = SAFETY_NOTICE_HEADING.length
+        styled.setSpan(RelativeSizeSpan(0.78f), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        styled.setSpan(StyleSpan(Typeface.BOLD), 0, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        styled.setSpan(
+            ForegroundColorSpan(WS_COLOR_EMPHASIS),
+            0,
+            end,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        productPurposeText.text = styled
+        productPurposeText.contentDescription = display
+    }
+
+    /** 승인된 통합 동의 전문에서 해당 항목의 조항만 잘라낸다. 새 문구를 만들지 않는다. */
+    private fun consentClauseOrNull(label: String): String? {
+        val source = INTEGRATED_CONSENT_DISCLOSURE_KO
+        val start = source.indexOf("$label: ")
+        if (start < 0) return null
+        val rest = source.substring(start)
+        val next = Regex("""\s\d\. """).find(rest, 1)?.range?.first
+            ?: rest.indexOf(" 각 항목은")
+        return if (next > 0) rest.substring(0, next).trim() else rest.trim()
+    }
+
     private fun refreshFirstRunNoticeUi() {
         if (!::productPurposeText.isInitialized || !::firstRunNoticeToggleButton.isInitialized) return
         val acknowledged = !::firstRunOnboardingSnapshot.isInitialized ||
             firstRunOnboardingSnapshot.stage != FirstRunOnboardingStage.PURPOSE_AND_SAFETY
         val expanded = !acknowledged || firstRunNoticeExpandedByUser
         val version = "앱 버전: ${BuildConfig.VERSION_NAME}"
-        productPurposeText.text = if (expanded) {
-            "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n$version"
-        } else {
-            "안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"
-        }
-        productPurposeText.contentDescription = productPurposeText.text
+        applyNoticeHeadingStyle(
+            if (expanded) {
+                "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n$version"
+            } else {
+                "안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"
+            },
+        )
         firstRunNoticeToggleButton.visibility = if (acknowledged) View.VISIBLE else View.GONE
         firstRunNoticeToggleButton.text =
             if (expanded) "안전 고지 접기" else "안전 고지 다시 보기"
@@ -9949,12 +10033,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         val integratedConsentVisible =
             snapshot.stage == FirstRunOnboardingStage.INTEGRATED_CONSENT
         if (::firstRunIntegratedConsentDisclosureText.isInitialized) {
+            // 항목마다 승인 전문의 해당 조항을 이미 담고 있으므로, 문서 전체는 요청할 때만 편다.
             firstRunIntegratedConsentDisclosureText.visibility =
+                if (integratedConsentVisible && firstRunDisclosureExpanded) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+        if (::firstRunDisclosureToggleButton.isInitialized) {
+            firstRunDisclosureToggleButton.visibility =
                 if (integratedConsentVisible) View.VISIBLE else View.GONE
+            firstRunDisclosureToggleButton.text =
+                if (firstRunDisclosureExpanded) "통합 동의 전문 접기" else "통합 동의 전문 보기"
+            firstRunDisclosureToggleButton.contentDescription =
+                firstRunDisclosureToggleButton.text
         }
         firstRunIntegratedConsentButtons.values.forEach { button ->
             button.visibility =
                 if (integratedConsentVisible) View.VISIBLE else View.GONE
+        }
+        firstRunConsentCards.values.forEach { card ->
+            card.visibility = if (integratedConsentVisible) View.VISIBLE else View.GONE
+        }
+        if (::firstRunConsentCountText.isInitialized) {
+            firstRunConsentCountText.visibility =
+                if (integratedConsentVisible) View.VISIBLE else View.GONE
+            val granted = IntegratedConsentItem.entries.count {
+                integratedConsentDraft.isGranted(it)
+            }
+            firstRunConsentCountText.text =
+                "${IntegratedConsentItem.entries.size}개 중 ${granted}개 허용"
+            firstRunConsentCountText.contentDescription = firstRunConsentCountText.text
         }
         if (::firstRunIntegratedConsentSaveButton.isInitialized) {
             firstRunIntegratedConsentSaveButton.visibility =
@@ -20889,6 +20999,7 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
         const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
+        const val SAFETY_NOTICE_HEADING = "안전 고지 · FP-001/FP-009 1.0.1"
         const val WS_COLOR_EMPHASIS = 0xffffe8bd.toInt()
         const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
