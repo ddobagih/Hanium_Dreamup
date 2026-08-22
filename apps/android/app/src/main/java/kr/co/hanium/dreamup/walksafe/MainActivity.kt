@@ -11,6 +11,11 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.GeomagneticField
@@ -9548,6 +9553,44 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
      * 게이트이므로 스크롤 위치 같은 시각 전용 조건은 걸지 않는다. 사용자가 확인한 뒤에는
      * 접히되 삭제되지 않고, 접힌 줄은 정책 상수를 그대로 발췌한다.
      */
+    /**
+     * 단계 문장 앞머리("첫 실행 N단계.")는 eyebrow 로 작고 흐리게, 나머지는 제목으로
+     * 크고 굵게 보인다. 한 TextView 안에서 처리하므로 text 와 contentDescription 은
+     * 전체 문장 그대로 남고 접근성 heading 계약이 유지된다.
+     */
+    private fun applyStageHeadingStyle(message: String) {
+        if (!::firstRunOnboardingStatusText.isInitialized) return
+        val separator = message.indexOf('.')
+        if (separator <= 0 || separator + 1 >= message.length) {
+            firstRunOnboardingStatusText.text = message
+            return
+        }
+        val eyebrowEnd = separator + 1
+        // 표시용으로만 줄을 나눈다. contentDescription 은 원문 그대로이므로 낭독은 변하지 않는다.
+        val display = message.substring(0, eyebrowEnd) + "\n" +
+            message.substring(eyebrowEnd).trimStart()
+        val styled = SpannableString(display)
+        styled.setSpan(
+            RelativeSizeSpan(0.62f),
+            0,
+            eyebrowEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        styled.setSpan(
+            ForegroundColorSpan(WS_COLOR_NOTICE_TEXT),
+            0,
+            eyebrowEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        styled.setSpan(
+            StyleSpan(Typeface.BOLD),
+            eyebrowEnd + 1,
+            display.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+        )
+        firstRunOnboardingStatusText.text = styled
+    }
+
     private fun refreshFirstRunNoticeUi() {
         if (!::productPurposeText.isInitialized || !::firstRunNoticeToggleButton.isInitialized) return
         val acknowledged = !::firstRunOnboardingSnapshot.isInitialized ||
@@ -9844,6 +9887,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         firstRunOnboardingStatusText.text = message
         firstRunOnboardingStatusText.contentDescription = message
+        applyStageHeadingStyle(message)
         firstRunPurposeButton.visibility =
             if (snapshot.stage == FirstRunOnboardingStage.PURPOSE_AND_SAFETY) {
                 View.VISIBLE
