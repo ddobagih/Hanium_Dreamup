@@ -19,6 +19,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 from typing import Any, Mapping, Sequence
@@ -57,57 +58,56 @@ SOURCE_CONTROL_PATHS = (
     Path("scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"),
     Path("tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"),
 )
-TRANSACTION_STATUS = "READY_R008_CONTROL_REVIEW_BOUND"
+TRANSACTION_STATUS = "READY_R009_CONTROL_R002_TRANSITION_REVIEW_BOUND"
 
 
 def _control_successor_module() -> Any:
-    """Load the frozen R008 cohort definition without publishing anything."""
+    """Load current control-successor definitions without publishing anything."""
 
     return _load_module(
         "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814"
     )
 
 
-def _expected_r008_control_cohort_paths() -> tuple[Path, ...]:
+def _expected_r009_control_cohort_paths() -> tuple[Path, ...]:
     module = _control_successor_module()
-    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R008_COHORT_PATHS)
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R009_COHORT_PATHS)
     require(
         len(paths) == 23
         and len(set(paths)) == len(paths)
-        and set(SOURCE_CONTROL_PATHS)
-        == set(module.CONTROL_SUCCESSOR_R008_ADDED_CONTROL_PATHS),
-        "R008 control cohort definition differs",
+        and set(SOURCE_CONTROL_PATHS).issubset(paths),
+        "R009 control cohort definition differs",
     )
     return paths
 
 
-def _normalize_r008_control_cohort_paths(
+def _normalize_r009_control_cohort_paths(
     paths: Sequence[Path | str] | None,
 ) -> tuple[Path, ...]:
-    expected = _expected_r008_control_cohort_paths()
+    expected = _expected_r009_control_cohort_paths()
     if paths is None:
         candidate = expected
     else:
         require(
             all(isinstance(path, (Path, str)) for path in paths),
-            "R008 control cohort path type differs",
+            "R009 control cohort path type differs",
         )
         candidate = tuple(Path(path) for path in paths)
     require(
         candidate == expected,
-        "R008 control cohort path order differs",
+        "R009 control cohort path order differs",
     )
     return candidate
 
 
-def _cohort_from_r008_context(context: Any) -> tuple[dict[str, Any], ...]:
+def _cohort_from_r009_context(context: Any) -> tuple[dict[str, Any], ...]:
     cohort = context.current.control_code_cohort
     require(
         isinstance(cohort, tuple)
         and all(isinstance(row, dict) for row in cohort),
-        "R008 control cohort is malformed",
+        "R009 control cohort is malformed",
     )
-    paths = _normalize_r008_control_cohort_paths(
+    paths = _normalize_r009_control_cohort_paths(
         [row.get("path") for row in cohort]
     )
     require(
@@ -118,46 +118,46 @@ def _cohort_from_r008_context(context: Any) -> tuple[dict[str, Any], ...]:
             and isinstance(row["byte_length"], int)
             for row, path in zip(cohort, paths, strict=True)
         ),
-        "R008 control cohort binding differs",
+        "R009 control cohort binding differs",
     )
     return tuple(deepcopy(row) for row in cohort)
 
 
-def _prepared_r008_control_cohort(root: Path) -> tuple[dict[str, Any], ...]:
-    """Read the live 23-path R008 cohort without claiming control approval."""
+def _prepared_r009_control_cohort(root: Path) -> tuple[dict[str, Any], ...]:
+    """Read the live 23-path R009 cohort without claiming control approval."""
 
     module = _control_successor_module()
-    return _cohort_from_r008_context(
-        module.prepare_control_successor_r008_context(root)
+    return _cohort_from_r009_context(
+        module.prepare_control_successor_r009_context(root)
     )
 
 
-def _validated_r008_control_cohort(root: Path) -> tuple[dict[str, Any], ...]:
-    """Require the independent R008 control review before publication."""
+def _validated_r009_control_cohort(root: Path) -> tuple[dict[str, Any], ...]:
+    """Require the independent R009 control review before publication."""
 
     module = _control_successor_module()
-    return _cohort_from_r008_context(
-        module.validated_control_successor_r008_context(root)
+    return _cohort_from_r009_context(
+        module.validated_control_successor_r009_context(root)
     )
 
 
-def _r008_control_review_paths() -> tuple[Path, ...]:
+def _r009_control_review_paths() -> tuple[Path, ...]:
     module = _control_successor_module()
-    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R008_PATHS)
-    require(len(paths) == 3 and len(set(paths)) == 3, "R008 control review paths differ")
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R009_PATHS)
+    require(len(paths) == 3 and len(set(paths)) == 3, "R009 control review paths differ")
     return paths
 
 
-def _r008_control_review_path_by_role() -> dict[str, Path]:
+def _r009_control_review_path_by_role() -> dict[str, Path]:
     module = _control_successor_module()
     paths = {
-        "assignment": Path(module.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL),
-        "review_result": Path(module.CONTROL_SUCCESSOR_R008_RESULT_REL),
-        "independent_review": Path(module.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL),
+        "assignment": Path(module.CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL),
+        "review_result": Path(module.CONTROL_SUCCESSOR_R009_RESULT_REL),
+        "independent_review": Path(module.CONTROL_SUCCESSOR_R009_INDEPENDENT_REL),
     }
     require(
-        tuple(paths.values()) == _r008_control_review_paths(),
-        "R008 control review role paths differ",
+        tuple(paths.values()) == _r009_control_review_paths(),
+        "R009 control review role paths differ",
     )
     return paths
 
@@ -347,35 +347,55 @@ def _transition_review_overlay(root: Path) -> dict[Path, bytes]:
     }
 
 
-def _r008_control_review_binding(
+def _predecessor_transition_review_binding(
     overlay: Mapping[Path, bytes],
 ) -> dict[str, dict[str, Any]]:
     return {
         role: _binding(relative, overlay[relative])
-        for role, relative in _r008_control_review_path_by_role().items()
+        for role, relative in zip(
+            ("assignment", "review_result", "independent_review"),
+            review.TRANSITION_R001_PATHS,
+            strict=True,
+        )
     }
 
 
-def _r008_control_review_overlay(root: Path) -> dict[Path, bytes]:
+def _predecessor_transition_review_overlay(root: Path) -> dict[Path, bytes]:
     return {
-        path: _read_regular(root, path, "R008 control review")
-        for path in _r008_control_review_paths()
+        path: _read_regular(root, path, "frozen transition R001 review")
+        for path in review.TRANSITION_R001_PATHS
     }
 
 
-def _capture_r008_control_material(
+def _r009_control_review_binding(
+    overlay: Mapping[Path, bytes],
+) -> dict[str, dict[str, Any]]:
+    return {
+        role: _binding(relative, overlay[relative])
+        for role, relative in _r009_control_review_path_by_role().items()
+    }
+
+
+def _r009_control_review_overlay(root: Path) -> dict[Path, bytes]:
+    return {
+        path: _read_regular(root, path, "R009 control review")
+        for path in _r009_control_review_paths()
+    }
+
+
+def _capture_r009_control_material(
     root: Path,
 ) -> tuple[
     tuple[dict[str, Any], ...],
     dict[Path, bytes],
     dict[str, dict[str, Any]],
 ]:
-    """Capture one validated R008 cohort/review snapshot for publication."""
+    """Capture one validated R009 cohort/review snapshot for publication."""
 
     module = _control_successor_module()
-    context = module.validated_control_successor_r008_context(root)
-    overlay = _r008_control_review_overlay(root)
-    paths = _r008_control_review_path_by_role()
+    context = module.validated_control_successor_r009_context(root)
+    overlay = _r009_control_review_overlay(root)
+    paths = _r009_control_review_path_by_role()
     assignment_raw = overlay[paths["assignment"]]
     result_raw = overlay[paths["review_result"]]
     independent_raw = overlay[paths["independent_review"]]
@@ -383,7 +403,7 @@ def _capture_r008_control_material(
         assignment_raw, paths["assignment"].as_posix()
     )
     result = module.strict_json_bytes(result_raw, paths["review_result"].as_posix())
-    module.validate_control_successor_r008_result(
+    module.validate_control_successor_r009_result(
         result,
         result_raw,
         assignment,
@@ -392,28 +412,44 @@ def _capture_r008_control_material(
     )
     require(
         independent_raw
-        == module.build_control_successor_r008_independent_review(
+        == module.build_control_successor_r009_independent_review(
             context,
             assignment,
             assignment_raw,
             result,
             result_raw,
         ).encode("utf-8"),
-        "control successor R008 independent review differs",
+        "control successor R009 independent review differs",
     )
     return (
-        _cohort_from_r008_context(context),
+        _cohort_from_r009_context(context),
         overlay,
-        _r008_control_review_binding(overlay),
+        _r009_control_review_binding(overlay),
     )
 
 
 def _capture_transition_material(
     root: Path,
-) -> tuple[dict[str, Any], dict[str, Any], dict[Path, bytes], dict[str, dict[str, Any]]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[Path, bytes],
+    dict[Path, bytes],
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, Any],
+]:
     """Capture one coherent source/triad snapshot for the staged transaction."""
 
     package = review.build_transition_package(root)
+    predecessor_overlay = _predecessor_transition_review_overlay(root)
+    predecessor_binding = _predecessor_transition_review_binding(
+        predecessor_overlay
+    )
+    require(
+        predecessor_binding == package["predecessor_transition_review_bindings"],
+        "transition R001 predecessor binding differs",
+    )
     overlay = _transition_review_overlay(root)
     assignment_raw = overlay[review.TRANSITION_ASSIGNMENT_REL]
     result_raw = overlay[review.TRANSITION_RESULT_REL]
@@ -443,7 +479,15 @@ def _capture_transition_material(
         == review._binding(review.CHECKPOINT_REL, source["checkpoint_raw"]),
         "transition package source checkpoint changed while capturing review",
     )
-    return package, source, overlay, _transition_review_binding(overlay)
+    return (
+        package,
+        source,
+        predecessor_overlay,
+        overlay,
+        predecessor_binding,
+        _transition_review_binding(overlay),
+        deepcopy(package["approval_neutral_plan_core_binding"]),
+    )
 
 
 def _reseal(event: Mapping[str, Any]) -> dict[str, Any]:
@@ -456,55 +500,24 @@ def _reseal(event: Mapping[str, Any]) -> dict[str, Any]:
 def _bind_review_to_preflight(
     plan: Mapping[str, Any],
     review_binding: Mapping[str, Any],
-    r008_control_review_binding: Mapping[str, Any] | None = None,
+    r009_control_review_binding: Mapping[str, Any] | None = None,
+    *,
+    predecessor_review_binding: Mapping[str, Any] | None = None,
+    review_subject_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Bind completed review material to seq72 and replay dependent hashes."""
 
-    result = deepcopy(dict(plan))
-    events = result.get("events")
-    require(type(events) is list and len(events) == 5, "preflight event inventory differs")
-    cbu, fp046, npc, epic03_ready, fp046_ready = events
-    require(all(isinstance(event, dict) for event in events), "preflight event type differs")
-    cbu["transition_review_binding"] = deepcopy(dict(review_binding))
-    if r008_control_review_binding is not None:
-        cbu["r008_control_review_binding"] = deepcopy(
-            dict(r008_control_review_binding)
-        )
-    cbu = _reseal(cbu)
-    for event in (fp046, npc):
-        trigger = event.get("reopen_trigger")
-        require(isinstance(trigger, dict), "successor reopen trigger is missing")
-        trigger["canonical_update_event_sha256"] = cbu["event_sha256"]
-    fp046["previous_event_sha256"] = cbu["event_sha256"]
-    fp046 = _reseal(fp046)
-    npc["previous_event_sha256"] = fp046["event_sha256"]
-    npc = _reseal(npc)
-    final = result.get("final_state")
-    require(isinstance(final, dict), "preflight final state is missing")
-    inventory = final.get("dynamic_goal_inventory")
-    children = final.get("materialized_child_goal_ids_by_parent")
-    require(
-        isinstance(inventory, dict) and isinstance(children, dict),
-        "preflight dynamic Goal inventory is missing",
+    return review.bind_transition_review_evidence(
+        plan,
+        predecessor_transition_review_binding=predecessor_review_binding,
+        transition_review_binding=review_binding,
+        transition_review_subject_binding=review_subject_binding,
+        r009_control_review_binding=r009_control_review_binding,
     )
-    inventory[review.FP046_R002]["materialized_event_sha256"] = fp046["event_sha256"]
-    inventory[review.NPC_R002]["materialized_event_sha256"] = npc["event_sha256"]
-    basis = epic03_ready.get("readiness_basis")
-    require(isinstance(basis, dict), "EPIC03 readiness basis is missing")
-    basis["canonical_update_event_sha256"] = cbu["event_sha256"]
-    basis["successor_event_sha256_by_goal"] = {
-        review.FP046_R002: fp046["event_sha256"],
-        review.NPC_R002: npc["event_sha256"],
-    }
-    epic03_ready["previous_event_sha256"] = npc["event_sha256"]
-    epic03_ready["dynamic_goal_inventory_after"] = deepcopy(inventory)
-    epic03_ready["materialized_child_goal_ids_by_parent_after"] = deepcopy(children)
-    epic03_ready = _reseal(epic03_ready)
-    fp046_ready["previous_event_sha256"] = epic03_ready["event_sha256"]
-    fp046_ready["reopened_container_ready_event_sha256"] = epic03_ready["event_sha256"]
-    fp046_ready = _reseal(fp046_ready)
-    result["events"] = [cbu, fp046, npc, epic03_ready, fp046_ready]
-    return result
+
+
+def _approval_neutral_plan_core(plan: Mapping[str, Any]) -> dict[str, Any]:
+    return review.approval_neutral_plan_core(plan)
 
 
 def _overlay_hashes(
@@ -583,9 +596,10 @@ def _update_current_handoff(checkpoint: dict[str, Any]) -> None:
 def _future_managed_paths(
     checkpoint: Mapping[str, Any],
     output_paths: Sequence[Path],
-    r008_control_cohort_paths: Sequence[Path],
+    r009_control_cohort_paths: Sequence[Path],
+    predecessor_transition_review_paths: Sequence[Path],
     transition_review_paths: Sequence[Path],
-    r008_control_review_paths: Sequence[Path],
+    r009_control_review_paths: Sequence[Path],
 ) -> list[str]:
     snapshot = checkpoint.get("working_tree_snapshot")
     require(isinstance(snapshot, dict), "checkpoint working snapshot is missing")
@@ -595,9 +609,10 @@ def _future_managed_paths(
         path.as_posix()
         for path in (
             *output_paths,
-            *r008_control_cohort_paths,
+            *r009_control_cohort_paths,
+            *predecessor_transition_review_paths,
             *transition_review_paths,
-            *r008_control_review_paths,
+            *r009_control_review_paths,
         )
         if path != CHECKPOINT_REL
     }
@@ -609,9 +624,10 @@ def _project_checkpoint(
     source: Mapping[str, Any],
     plan: Mapping[str, Any],
     output_bytes: Mapping[Path, bytes],
-    r008_control_cohort_paths: Sequence[Path],
+    r009_control_cohort_paths: Sequence[Path],
+    predecessor_transition_review_overlay: Mapping[Path, bytes],
     transition_review_overlay: Mapping[Path, bytes],
-    r008_control_review_overlay: Mapping[Path, bytes],
+    r009_control_review_overlay: Mapping[Path, bytes],
 ) -> dict[str, Any]:
     checkpoint = deepcopy(source["checkpoint"])
     state = checkpoint.get("goal_execution")
@@ -630,6 +646,8 @@ def _project_checkpoint(
         "materialized_child_goal_ids_by_parent",
         "ready_frontier_goal_ids",
         "focus_goal_id",
+        "artifact_work_queue",
+        "completion_boundary",
     ):
         state[field] = deepcopy(final[field])
     history.extend(deepcopy(events))
@@ -661,8 +679,9 @@ def _project_checkpoint(
     state["managed_goal_path_count"] = len(managed_goal_paths)
     hash_overlay = {
         **output_bytes,
+        **predecessor_transition_review_overlay,
         **transition_review_overlay,
-        **r008_control_review_overlay,
+        **r009_control_review_overlay,
     }
     package_path_hash, package_content_hash = _overlay_hashes(
         root, managed_goal_paths, hash_overlay
@@ -674,9 +693,10 @@ def _project_checkpoint(
     managed_paths = _future_managed_paths(
         checkpoint,
         mutable_outputs,
-        r008_control_cohort_paths,
+        r009_control_cohort_paths,
+        tuple(predecessor_transition_review_overlay),
         tuple(transition_review_overlay),
-        tuple(r008_control_review_overlay),
+        tuple(r009_control_review_overlay),
     )
     snapshot = checkpoint["working_tree_snapshot"]
     snapshot["managed_changed_paths"] = managed_paths
@@ -717,7 +737,7 @@ def _catalog_outputs(
 
 
 def _source_binding_paths(
-    r008_control_cohort_paths: Sequence[Path],
+    r009_control_cohort_paths: Sequence[Path],
 ) -> tuple[Path, ...]:
     candidate = review.r029_candidate
     paths = [
@@ -730,24 +750,25 @@ def _source_binding_paths(
         *candidate.R028_INPUT_PATHS,
         *candidate.CURRENT_SOURCE_PATHS,
         *review.R007_REVIEW_PINS,
+        *review.TRANSITION_R001_PATHS,
         review.TRANSITION_ASSIGNMENT_REL,
         review.TRANSITION_RESULT_REL,
         review.TRANSITION_INDEPENDENT_REL,
-        *_r008_control_review_paths(),
+        *_r009_control_review_paths(),
         *CATALOG_RELATIVES,
-        *r008_control_cohort_paths,
+        *r009_control_cohort_paths,
     ]
     return tuple(sorted(set(paths)))
 
 
 def _source_bindings(
     root: Path,
-    r008_control_cohort_paths: Sequence[Path],
+    r009_control_cohort_paths: Sequence[Path],
 ) -> list[dict[str, Any]]:
     return [
         _binding(path, _read_regular(root, path, "transaction source"))
         for path in _source_binding_paths(
-            r008_control_cohort_paths,
+            r009_control_cohort_paths,
         )
     ]
 
@@ -763,7 +784,7 @@ def _validate_control_cohort_source_bindings(
     }
     require(len(by_path) == len(source_bindings), "transaction source binding paths differ")
     for row in cohort:
-        require(isinstance(row, Mapping), "R008 control cohort row is malformed")
+        require(isinstance(row, Mapping), "R009 control cohort row is malformed")
         path = row.get("path")
         require(
             isinstance(path, str)
@@ -773,13 +794,25 @@ def _validate_control_cohort_source_bindings(
                 "sha256": row.get("sha256"),
                 "byte_length": row.get("byte_length"),
             },
-            f"R008 control cohort source binding differs: {path}",
+            f"R009 control cohort source binding differs: {path}",
         )
 
 
 def _validate_control_review_source_bindings(
     review_binding: Mapping[str, Mapping[str, Any]],
     source_bindings: Sequence[Mapping[str, Any]],
+) -> None:
+    _validate_review_source_bindings(
+        review_binding,
+        source_bindings,
+        "R009 control review",
+    )
+
+
+def _validate_review_source_bindings(
+    review_binding: Mapping[str, Mapping[str, Any]],
+    source_bindings: Sequence[Mapping[str, Any]],
+    label: str,
 ) -> None:
     by_path = {
         binding.get("path"): binding
@@ -790,8 +823,132 @@ def _validate_control_review_source_bindings(
         path = binding.get("path")
         require(
             isinstance(path, str) and by_path.get(path) == binding,
-            f"R008 control review source binding differs: {path}",
+            f"{label} source binding differs: {path}",
         )
+
+
+def _projected_goal_nodes(
+    root: Path,
+    state: Mapping[str, Any],
+    output_bytes: Mapping[Path, bytes],
+) -> dict[str, dict[str, Any]]:
+    goal_graph = _load_module("scripts.check_walksafe_goal_graph_v2_4")
+    imported = goal_graph.frozen_goal.imported_goal_binding_map(dict(state))
+    inventory = state.get("dynamic_goal_inventory")
+    require(isinstance(inventory, Mapping), "projected dynamic Goal inventory is missing")
+    relative_paths = {
+        record.get("path")
+        for record in (*imported.values(), *inventory.values())
+        if isinstance(record, Mapping)
+    }
+    require(
+        all(isinstance(relative, str) for relative in relative_paths),
+        "projected Goal path inventory is malformed",
+    )
+    nodes: dict[str, dict[str, Any]] = {}
+    for relative in sorted(relative_paths):
+        relative_path = Path(relative)
+        raw = output_bytes.get(relative_path)
+        if raw is not None:
+            node, _body = review._goal_parts(raw, f"projected Goal {relative}")
+        else:
+            path = continuation.resolve_repo_file(root, relative)
+            require(
+                path is not None,
+                f"projected Goal path is missing or unsafe: {relative}",
+            )
+            try:
+                node, _body = goal_graph.frozen_goal.parse_goal(path)
+            except (OSError, ValueError) as exc:
+                raise BuildError(f"projected Goal cannot be parsed: {relative}: {exc}") from exc
+        goal_id = node.get("goal_id")
+        require(
+            isinstance(goal_id, str) and goal_id not in nodes,
+            f"projected Goal identity differs: {relative}",
+        )
+        nodes[goal_id] = node
+    return nodes
+
+
+def _runtime_projection_replay(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    output_bytes: Mapping[Path, bytes],
+) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    state = checkpoint.get("goal_execution")
+    final = plan.get("final_state")
+    events = plan.get("events")
+    require(
+        isinstance(state, dict)
+        and isinstance(final, Mapping)
+        and isinstance(events, list)
+        and len(events) == 5
+        and all(isinstance(event, Mapping) for event in events),
+        "projected runtime replay input differs",
+    )
+    statuses = deepcopy(final.get("status_by_goal"))
+    require(isinstance(statuses, dict), "projected runtime status map is missing")
+    for event in reversed(events):
+        subject_goal_id = event.get("subject_goal_id")
+        from_status = event.get("from_status")
+        require(
+            isinstance(subject_goal_id, str) and isinstance(from_status, str),
+            "projected runtime source status differs",
+        )
+        statuses[subject_goal_id] = from_status
+        materialized_goal_id = event.get("materialized_goal_id")
+        if isinstance(materialized_goal_id, str):
+            statuses.pop(materialized_goal_id, None)
+
+    goal_graph = _load_module("scripts.check_walksafe_goal_graph_v2_4")
+    nodes = _projected_goal_nodes(root, state, output_bytes)
+    bindings = goal_graph.frozen_goal.canonical_binding_map(dict(checkpoint))
+    register_binding = bindings.get("ARTIFACT_REGISTER")
+    require(
+        isinstance(register_binding, dict),
+        "projected runtime ARTIFACT_REGISTER binding is missing",
+    )
+    register_path = continuation.resolve_repo_file(root, register_binding.get("path"))
+    require(
+        register_path is not None,
+        "projected runtime ARTIFACT_REGISTER path is missing or unsafe",
+    )
+    register = continuation.load_json(register_path)
+    replay: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for event in events:
+        status_changes = event.get("status_changes")
+        runtime = event.get("runtime_after")
+        require(
+            isinstance(status_changes, Mapping) and isinstance(runtime, Mapping),
+            "projected runtime event is malformed",
+        )
+        statuses.update(status_changes)
+        queue_errors, queue = goal_graph.derive_v24_artifact_work_queue_from_register(
+            register_binding,
+            register,
+            nodes,
+            statuses,
+        )
+        require(
+            not queue_errors,
+            "projected artifact queue replay failed: " + "; ".join(queue_errors),
+        )
+        boundary_errors, boundary = goal_graph.frozen_goal.derive_completion_boundary(
+            nodes,
+            statuses,
+            runtime.get("ready_frontier_goal_ids"),
+            state["blockers_by_goal"],
+            queue,
+            package_status=state["package_status"],
+        )
+        require(
+            not boundary_errors,
+            "projected completion boundary replay failed: "
+            + "; ".join(boundary_errors),
+        )
+        replay.append((queue, boundary))
+    return replay
 
 
 def _validate_projected_checkpoint(
@@ -799,9 +956,10 @@ def _validate_projected_checkpoint(
     checkpoint: Mapping[str, Any],
     plan: Mapping[str, Any],
     output_bytes: Mapping[Path, bytes],
-    r008_control_cohort_paths: Sequence[Path],
+    r009_control_cohort_paths: Sequence[Path],
+    predecessor_transition_review_overlay: Mapping[Path, bytes],
     transition_review_overlay: Mapping[Path, bytes],
-    r008_control_review_overlay: Mapping[Path, bytes],
+    r009_control_review_overlay: Mapping[Path, bytes],
 ) -> None:
     state = checkpoint.get("goal_execution")
     require(isinstance(state, dict), "projected checkpoint goal execution is missing")
@@ -869,6 +1027,37 @@ def _validate_projected_checkpoint(
         and state["status_by_goal"].get(review.NPC_R002) == "PLANNED",
         "projected reopen status differs",
     )
+    runtime_replay = _runtime_projection_replay(
+        root,
+        checkpoint,
+        plan,
+        output_bytes,
+    )
+    for event, (queue, boundary) in zip(history[-5:], runtime_replay, strict=True):
+        runtime = event.get("runtime_after")
+        sequence = event.get("sequence")
+        require(isinstance(runtime, dict), f"projected seq{sequence} runtime is missing")
+        require(
+            runtime.get("artifact_work_queue_sha256")
+            == continuation.canonical_json_sha256(queue),
+            f"projected seq{sequence} artifact queue hash differs from independent replay",
+        )
+        require(
+            runtime.get("completion_boundary_sha256")
+            == continuation.canonical_json_sha256(boundary),
+            f"projected seq{sequence} completion boundary hash differs from independent replay",
+        )
+    expected_queue, expected_boundary = runtime_replay[-1]
+    require(
+        plan["final_state"].get("artifact_work_queue") == expected_queue
+        and state.get("artifact_work_queue") == expected_queue,
+        "projected artifact work queue differs from independent replay",
+    )
+    require(
+        plan["final_state"].get("completion_boundary") == expected_boundary
+        and state.get("completion_boundary") == expected_boundary,
+        "projected completion boundary differs from independent replay",
+    )
     for goal_id in (review.EPIC03, review.FP046_R001, review.NPC_R001):
         require(
             goal_id not in state["completion_evidence_by_goal"]
@@ -892,22 +1081,32 @@ def _validate_projected_checkpoint(
     managed = checkpoint.get("working_tree_snapshot", {}).get("managed_changed_paths")
     require(isinstance(managed, list), "projected working path inventory is missing")
     require(
-        set(path.as_posix() for path in r008_control_cohort_paths).issubset(managed),
-        "projected working paths omit the R008 control cohort",
+        set(path.as_posix() for path in r009_control_cohort_paths).issubset(managed),
+        "projected working paths omit the R009 control cohort",
     )
     require(
-        set(path.as_posix() for path in r008_control_review_overlay).issubset(
+        set(path.as_posix() for path in predecessor_transition_review_overlay).issubset(
+            managed
+        )
+        and set(path.as_posix() for path in transition_review_overlay).issubset(
             managed
         ),
-        "projected working paths omit the R008 control review",
+        "projected working paths omit the R001/R002 transition reviews",
+    )
+    require(
+        set(path.as_posix() for path in r009_control_review_overlay).issubset(
+            managed
+        ),
+        "projected working paths omit the R009 control review",
     )
     path_hash, content_hash = _overlay_hashes(
         root,
         managed,
         {
             **output_bytes,
+            **predecessor_transition_review_overlay,
             **transition_review_overlay,
-            **r008_control_review_overlay,
+            **r009_control_review_overlay,
         },
     )
     require(
@@ -1018,33 +1217,62 @@ def _review_overlay(
     return result
 
 
-def _control_review_overlay(
-    r008_control_review_overlay: Mapping[Path | str, bytes] | None,
+def _predecessor_review_overlay(
+    transition_review_overlay: Mapping[Path | str, bytes] | None,
     plan: Mapping[str, Any],
 ) -> dict[Path, bytes]:
     events = plan.get("events")
     require(
         isinstance(events, list) and events and isinstance(events[0], dict),
-        "R008 control review overlay preflight differs",
+        "transition R001 predecessor overlay preflight differs",
     )
-    binding = events[0].get("r008_control_review_binding")
-    if r008_control_review_overlay is None:
+    binding = events[0].get("predecessor_transition_review_binding")
+    if transition_review_overlay is None:
         require(
             binding is None,
-            "R008 control review overlay is required for a bound seq72 plan",
+            "transition R001 predecessor overlay is required for a bound seq72 plan",
+        )
+        return {}
+    result = {Path(path): raw for path, raw in transition_review_overlay.items()}
+    require(
+        set(result) == set(review.TRANSITION_R001_PATHS)
+        and all(isinstance(raw, bytes) for raw in result.values()),
+        "transition R001 predecessor overlay inventory differs",
+    )
+    require(
+        binding == _predecessor_transition_review_binding(result),
+        "transition R001 predecessor overlay binding differs",
+    )
+    return result
+
+
+def _control_review_overlay(
+    r009_control_review_overlay: Mapping[Path | str, bytes] | None,
+    plan: Mapping[str, Any],
+) -> dict[Path, bytes]:
+    events = plan.get("events")
+    require(
+        isinstance(events, list) and events and isinstance(events[0], dict),
+        "R009 control review overlay preflight differs",
+    )
+    binding = events[0].get("r009_control_review_binding")
+    if r009_control_review_overlay is None:
+        require(
+            binding is None,
+            "R009 control review overlay is required for a bound seq72 plan",
         )
         return {}
     result = {
-        Path(path): raw for path, raw in r008_control_review_overlay.items()
+        Path(path): raw for path, raw in r009_control_review_overlay.items()
     }
     require(
-        set(result) == set(_r008_control_review_paths())
+        set(result) == set(_r009_control_review_paths())
         and all(isinstance(raw, bytes) for raw in result.values()),
-        "R008 control review overlay inventory differs",
+        "R009 control review overlay inventory differs",
     )
     require(
-        binding == _r008_control_review_binding(result),
-        "R008 control review overlay binding differs",
+        binding == _r009_control_review_binding(result),
+        "R009 control review overlay binding differs",
     )
     return result
 
@@ -1056,9 +1284,10 @@ def project_transaction(
     staged_outputs: Mapping[Path, bytes],
     source_checkpoint: Mapping[str, Any] | None = None,
     catalog_overlay: Mapping[Path | str, bytes] | None = None,
+    predecessor_transition_review_overlay: Mapping[Path | str, bytes] | None = None,
     transition_review_overlay: Mapping[Path | str, bytes] | None = None,
-    r008_control_review_overlay: Mapping[Path | str, bytes] | None = None,
-    r008_control_cohort_paths: Sequence[Path | str] | None = None,
+    r009_control_review_overlay: Mapping[Path | str, bytes] | None = None,
+    r009_control_cohort_paths: Sequence[Path | str] | None = None,
 ) -> dict[str, Any]:
     """Pure seq72--76 checkpoint/output projection with no review-file reads.
 
@@ -1078,10 +1307,13 @@ def project_transaction(
     require(isinstance(preflight, Mapping), "projection preflight is missing")
     plan = deepcopy(dict(preflight))
     review._validate_replay(plan, source)
-    cohort_paths = _normalize_r008_control_cohort_paths(r008_control_cohort_paths)
+    cohort_paths = _normalize_r009_control_cohort_paths(r009_control_cohort_paths)
+    predecessor_review_overlay = _predecessor_review_overlay(
+        predecessor_transition_review_overlay, plan
+    )
     review_overlay = _review_overlay(transition_review_overlay, plan)
     control_review_overlay = _control_review_overlay(
-        r008_control_review_overlay, plan
+        r009_control_review_overlay, plan
     )
     expected_staged = build_staged_outputs(root, plan)
     outputs = {Path(path): raw for path, raw in staged_outputs.items()}
@@ -1095,11 +1327,13 @@ def project_transaction(
         plan,
         outputs,
         cohort_paths,
+        predecessor_review_overlay,
         review_overlay,
         control_review_overlay,
     )
     future_catalog_paths = [
         *outputs,
+        *predecessor_review_overlay,
         *review_overlay,
         *control_review_overlay,
         *cohort_paths,
@@ -1114,6 +1348,7 @@ def project_transaction(
         plan,
         outputs,
         cohort_paths,
+        predecessor_review_overlay,
         review_overlay,
         control_review_overlay,
     )
@@ -1124,15 +1359,16 @@ def project_transaction(
         plan,
         outputs,
         cohort_paths,
+        predecessor_review_overlay,
         review_overlay,
         control_review_overlay,
     )
     return {
         "checkpoint": checkpoint,
         "output_bytes": outputs,
-        "r008_control_cohort_paths": [path.as_posix() for path in cohort_paths],
-        "r008_control_review_binding": (
-            _r008_control_review_binding(control_review_overlay)
+        "r009_control_cohort_paths": [path.as_posix() for path in cohort_paths],
+        "r009_control_review_binding": (
+            _r009_control_review_binding(control_review_overlay)
             if control_review_overlay
             else None
         ),
@@ -1143,50 +1379,71 @@ def build_transaction(root: Path = ROOT) -> dict[str, Any]:
     """Build the staged transaction entirely in memory; never write output."""
 
     root = _validated_root(root)
-    package, source, transition_review_overlay, review_binding = (
-        _capture_transition_material(root)
-    )
     (
-        r008_control_cohort,
-        r008_control_review_overlay,
-        r008_control_review_binding,
-    ) = _capture_r008_control_material(root)
+        package,
+        source,
+        predecessor_transition_review_overlay,
+        transition_review_overlay,
+        predecessor_review_binding,
+        review_binding,
+        review_subject_binding,
+    ) = _capture_transition_material(root)
+    (
+        r009_control_cohort,
+        r009_control_review_overlay,
+        r009_control_review_binding,
+    ) = _capture_r009_control_material(root)
+    require(
+        r009_control_review_binding
+        == package["r009_control_successor_review_bindings"],
+        "R009 control review differs from the reviewed transition core",
+    )
     plan = _bind_review_to_preflight(
         package["preflight"],
         review_binding,
-        r008_control_review_binding,
+        r009_control_review_binding,
+        predecessor_review_binding=predecessor_review_binding,
+        review_subject_binding=review_subject_binding,
+    )
+    review.validate_reviewed_transition_plan(
+        plan,
+        package,
+        review_binding,
     )
     review._validate_replay(plan, source)
-    r008_control_cohort_paths = _normalize_r008_control_cohort_paths(
-        [row["path"] for row in r008_control_cohort]
+    r009_control_cohort_paths = _normalize_r009_control_cohort_paths(
+        [row["path"] for row in r009_control_cohort]
     )
     projection = project_transaction(
         root,
         preflight=plan,
         staged_outputs=build_staged_outputs(root, plan),
         source_checkpoint=source["checkpoint"],
+        predecessor_transition_review_overlay=predecessor_transition_review_overlay,
         transition_review_overlay=transition_review_overlay,
-        r008_control_review_overlay=r008_control_review_overlay,
-        r008_control_cohort_paths=r008_control_cohort_paths,
+        r009_control_review_overlay=r009_control_review_overlay,
+        r009_control_cohort_paths=r009_control_cohort_paths,
     )
     output_bytes = projection["output_bytes"]
     checkpoint = projection["checkpoint"]
     source_bindings = _source_bindings(
         root,
-        r008_control_cohort_paths,
+        r009_control_cohort_paths,
     )
-    _validate_control_cohort_source_bindings(r008_control_cohort, source_bindings)
+    _validate_control_cohort_source_bindings(r009_control_cohort, source_bindings)
     mutable_bindings = [
         _binding(path, _read_regular(root, path, "mutable transaction target"))
         for path in MUTABLE_TARGETS
     ]
     transaction = {
-        "schema_version": "walksafe.fp046-npc-r002-reopen-seq72-76-transaction.v1",
+        "schema_version": "walksafe.fp046-npc-r002-reopen-seq72-76-transaction.v2",
         "transaction_status": TRANSACTION_STATUS,
         "source_checkpoint": deepcopy(package["source_checkpoint"]),
+        "predecessor_transition_review_binding": predecessor_review_binding,
         "transition_review_binding": review_binding,
-        "r008_control_review_binding": r008_control_review_binding,
-        "r008_control_cohort": list(r008_control_cohort),
+        "transition_review_subject_binding": review_subject_binding,
+        "r009_control_review_binding": r009_control_review_binding,
+        "r009_control_cohort": list(r009_control_cohort),
         "source_bindings": source_bindings,
         "mutable_target_bindings": mutable_bindings,
         "output_bindings": [
@@ -1205,7 +1462,7 @@ def validate_transaction(root: Path, transaction: Mapping[str, Any]) -> None:
     outputs = transaction.get("output_bytes")
     checkpoint = transaction.get("checkpoint")
     plan = transaction.get("preflight")
-    cohort = transaction.get("r008_control_cohort")
+    cohort = transaction.get("r009_control_cohort")
     require(isinstance(outputs, dict), "transaction output bytes are missing")
     require(
         all(isinstance(path, Path) and isinstance(raw, bytes) for path, raw in outputs.items()),
@@ -1216,43 +1473,88 @@ def validate_transaction(root: Path, transaction: Mapping[str, Any]) -> None:
         and isinstance(plan, dict)
         and isinstance(cohort, list)
         and all(isinstance(row, dict) for row in cohort)
-        and isinstance(transaction.get("source_bindings"), list)
-        , "transaction projection is missing",
+        and isinstance(transaction.get("source_bindings"), list),
+        "transaction projection is missing",
     )
-    cohort_paths = _normalize_r008_control_cohort_paths(
+    cohort_paths = _normalize_r009_control_cohort_paths(
         [row.get("path") for row in cohort]
+    )
+    source_bindings = transaction.get("source_bindings", [])
+    require(
+        transaction.get("mutable_target_bindings")
+        == [
+            _binding(path, _read_regular(root, path, "mutable transaction target"))
+            for path in MUTABLE_TARGETS
+        ],
+        "mutable target bindings differ from live source",
     )
     (
         live_cohort,
         live_control_review_overlay,
         live_control_review_binding,
-    ) = _capture_r008_control_material(root)
+    ) = _capture_r009_control_material(root)
+    (
+        package,
+        _source,
+        live_predecessor_review_overlay,
+        live_transition_review_overlay,
+        live_predecessor_review_binding,
+        live_transition_review_binding,
+        live_review_subject_binding,
+    ) = _capture_transition_material(root)
     events = plan.get("events")
     seq72 = events[0] if isinstance(events, list) and events else None
     require(
-        transaction.get("transaction_status") == TRANSACTION_STATUS
+        transaction.get("schema_version")
+        == "walksafe.fp046-npc-r002-reopen-seq72-76-transaction.v2"
+        and transaction.get("transaction_status") == TRANSACTION_STATUS
         and transaction.get("output_bindings")
         == [_binding(path, outputs[path]) for path in sorted(outputs)],
         "transaction output bindings differ",
     )
     require(
         list(live_cohort) == cohort,
-        "R008 approved control cohort differs from the staged transaction",
+        "R009 approved control cohort differs from the staged transaction",
     )
     require(
         isinstance(seq72, dict)
-        and transaction.get("r008_control_review_binding")
+        and "r008_control_review_binding" not in seq72
+        and transaction.get("r009_control_review_binding")
         == live_control_review_binding
-        and seq72.get("r008_control_review_binding")
+        and seq72.get("r009_control_review_binding")
         == live_control_review_binding,
-        "R008 control review transaction binding differs",
+        "R009 control review transaction binding differs",
     )
     require(
         transaction.get("transition_review_binding")
-        == seq72.get("transition_review_binding"),
-        "transition review transaction binding differs",
+        == live_transition_review_binding
+        == seq72.get("transition_review_binding")
+        and transaction.get("predecessor_transition_review_binding")
+        == live_predecessor_review_binding
+        == seq72.get("predecessor_transition_review_binding")
+        and transaction.get("transition_review_subject_binding")
+        == live_review_subject_binding
+        == seq72.get("transition_review_subject_binding"),
+        "R001/R002 transition review transaction binding differs",
     )
-    source_bindings = transaction.get("source_bindings", [])
+    require(
+        live_control_review_binding
+        == package.get("r009_control_successor_review_bindings")
+        and transaction.get("source_checkpoint") == package.get("source_checkpoint"),
+        "reviewed transition source binding differs",
+    )
+    review.validate_reviewed_transition_plan(
+        plan,
+        package,
+        live_transition_review_binding,
+    )
+    staged_outputs = build_staged_outputs(root, plan)
+    require(
+        [_binding(path, staged_outputs[path]) for path in sorted(staged_outputs)]
+        == package.get("staged_subject_bindings")
+        and len(staged_outputs) == 8,
+        "reviewed add-only output bindings differ",
+    )
     require(
         [
             row.get("path") if isinstance(row, Mapping) else None
@@ -1265,9 +1567,23 @@ def validate_transaction(root: Path, transaction: Mapping[str, Any]) -> None:
         live_control_review_binding,
         source_bindings,
     )
+    _validate_review_source_bindings(
+        live_predecessor_review_binding,
+        source_bindings,
+        "transition R001 predecessor review",
+    )
+    _validate_review_source_bindings(
+        live_transition_review_binding,
+        source_bindings,
+        "transition R002 current review",
+    )
     _validate_control_cohort_source_bindings(
         cohort,
         source_bindings,
+    )
+    require(
+        source_bindings == _source_bindings(root, cohort_paths),
+        "transaction source bindings differ from live source",
     )
     _validate_projected_checkpoint(
         root,
@@ -1275,7 +1591,8 @@ def validate_transaction(root: Path, transaction: Mapping[str, Any]) -> None:
         plan,
         outputs,
         cohort_paths,
-        _review_overlay(_transition_review_overlay(root), plan),
+        _predecessor_review_overlay(live_predecessor_review_overlay, plan),
+        _review_overlay(live_transition_review_overlay, plan),
         _control_review_overlay(live_control_review_overlay, plan),
     )
     require(
@@ -1307,7 +1624,7 @@ def _verify_bindings(root: Path, bindings: Sequence[Mapping[str, Any]], label: s
 
 def _stage_files(root: Path, outputs: Mapping[Path, bytes]) -> tuple[Path, dict[Path, Path]]:
     try:
-        stage = Path(tempfile.mkdtemp(prefix=".walksafe-r008-stage-", dir=root))
+        stage = Path(tempfile.mkdtemp(prefix=".walksafe-r009-stage-", dir=root))
     except OSError as exc:
         raise BuildError("transaction staging directory cannot be created") from exc
     files: dict[Path, Path] = {}
@@ -1401,24 +1718,24 @@ def apply_transaction(root: Path = ROOT, transaction: Mapping[str, Any] | None =
         require(transaction == expected, "transaction source changed before apply")
     transaction = expected
     (
-        approved_r008_cohort,
+        approved_r009_cohort,
         _control_review_overlay_bytes,
         approved_control_review_binding,
-    ) = _capture_r008_control_material(root)
+    ) = _capture_r009_control_material(root)
     require(
-        list(approved_r008_cohort) == transaction["r008_control_cohort"],
-        "R008 approved control cohort differs from the staged transaction",
+        list(approved_r009_cohort) == transaction["r009_control_cohort"],
+        "R009 approved control cohort differs from the staged transaction",
     )
     require(
         approved_control_review_binding
-        == transaction["r008_control_review_binding"],
-        "R008 control review transaction binding differs",
+        == transaction["r009_control_review_binding"],
+        "R009 control review transaction binding differs",
     )
     control_review_bindings = list(approved_control_review_binding.values())
     control_review_signatures = _verify_bindings(
         root,
         control_review_bindings,
-        "R008 control review",
+        "R009 control review",
     )
     outputs = transaction["output_bytes"]
     source_signatures = _verify_bindings(
@@ -1459,19 +1776,19 @@ def apply_transaction(root: Path = ROOT, transaction: Mapping[str, Any] | None =
             _verify_bindings(
                 root,
                 control_review_bindings,
-                "R008 control review",
+                "R009 control review",
             )
             == control_review_signatures,
-            "R008 control review changed while staging",
+            "R009 control review changed while staging",
         )
         staged_cohort, _staged_control_overlay, staged_control_binding = (
-            _capture_r008_control_material(root)
+            _capture_r009_control_material(root)
         )
         require(
-            list(staged_cohort) == transaction["r008_control_cohort"]
+            list(staged_cohort) == transaction["r009_control_cohort"]
             and staged_control_binding
-            == transaction["r008_control_review_binding"],
-            "R008 approved control material changed while staging",
+            == transaction["r009_control_review_binding"],
+            "R009 approved control material changed while staging",
         )
         for path in sorted(outputs):
             parent = _ensure_safe_parent(root, path, created_parents)
@@ -1535,8 +1852,19 @@ def validate_applied_transaction(root: Path, transaction: Mapping[str, Any]) -> 
     """Verify published bytes without attempting to rerun or overwrite a transaction."""
 
     root = _validated_root(root)
-    validate_transaction(root, transaction)
-    for binding in transaction["output_bindings"]:
+    output_bindings = transaction.get("output_bindings")
+    outputs = transaction.get("output_bytes")
+    require(
+        transaction.get("schema_version")
+        == "walksafe.fp046-npc-r002-reopen-seq72-76-transaction.v2"
+        and transaction.get("transaction_status") == TRANSACTION_STATUS
+        and isinstance(output_bindings, list)
+        and isinstance(outputs, dict)
+        and output_bindings
+        == [_binding(path, outputs[path]) for path in sorted(outputs)],
+        "published transaction envelope differs",
+    )
+    for binding in output_bindings:
         path = Path(binding["path"])
         raw = _read_regular(root, path, "published transaction output")
         require(
@@ -1547,6 +1875,36 @@ def validate_applied_transaction(root: Path, transaction: Mapping[str, Any]) -> 
         _read_regular(root, CHECKPOINT_REL, "published checkpoint"), "published checkpoint"
     )
     require(checkpoint == transaction["checkpoint"], "published checkpoint projection differs")
+    r002_binding, r002_raw = review.load_validated_transition_r002(root)
+    r002_assignment = review.strict_json_bytes(
+        r002_raw[review.TRANSITION_R002_ASSIGNMENT_REL],
+        "published transition R002 assignment",
+    )
+    predecessor_binding, _predecessor_raw = review.load_frozen_transition_r001(root)
+    cohort, _r009_overlay, r009_binding = _capture_r009_control_material(root)
+    events = transaction.get("preflight", {}).get("events")
+    seq72 = events[0] if isinstance(events, list) and events else None
+    require(
+        isinstance(seq72, dict)
+        and transaction.get("predecessor_transition_review_binding")
+        == predecessor_binding
+        == seq72.get("predecessor_transition_review_binding")
+        and transaction.get("transition_review_binding")
+        == r002_binding
+        == seq72.get("transition_review_binding")
+        and transaction.get("transition_review_subject_binding")
+        == seq72.get("transition_review_subject_binding")
+        and transaction.get("r009_control_review_binding")
+        == r009_binding
+        == seq72.get("r009_control_review_binding")
+        and transaction.get("r009_control_cohort") == list(cohort),
+        "published review bindings differ",
+    )
+    review.validate_reviewed_transition_plan(
+        transaction["preflight"],
+        r002_assignment["review_scope"],
+        r002_binding,
+    )
 
 
 def _validate_published_transaction(
@@ -1576,6 +1934,256 @@ def _validate_published_transaction(
     )
 
 
+def _git_output(
+    root: Path,
+    arguments: Sequence[str],
+    label: str,
+    *,
+    allowed_returncodes: tuple[int, ...] = (0,),
+) -> bytes:
+    try:
+        completed = subprocess.run(
+            ["git", "--no-optional-locks", "-C", str(root), *arguments],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        raise BuildError(f"cannot inspect {label}") from exc
+    require(
+        completed.returncode in allowed_returncodes,
+        f"cannot inspect {label}: {completed.stderr.decode('utf-8', 'replace').strip()}",
+    )
+    return completed.stdout
+
+
+def _absolute_regular_signature(path: Path, label: str) -> tuple[Any, ...]:
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise BuildError(f"required {label} cannot be inspected: {path}") from exc
+    require(
+        stat.S_ISREG(info.st_mode)
+        and not stat.S_ISLNK(info.st_mode)
+        and info.st_nlink == 1,
+        f"{label} must be a single-link regular file: {path}",
+    )
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise BuildError(f"required {label} cannot be read: {path}") from exc
+    return (
+        bytes_sha256(raw),
+        len(raw),
+        info.st_dev,
+        info.st_ino,
+        info.st_mode,
+        info.st_uid,
+        info.st_gid,
+        info.st_nlink,
+        info.st_size,
+        info.st_mtime_ns,
+        info.st_ctime_ns,
+    )
+
+
+def _git_state(root: Path) -> tuple[Path, dict[str, Any]]:
+    raw_git_dir = _git_output(
+        root,
+        ("rev-parse", "--absolute-git-dir"),
+        "absolute git directory",
+    )
+    try:
+        git_dir_text = raw_git_dir.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        raise BuildError("absolute git directory is not UTF-8") from exc
+    require(
+        bool(git_dir_text) and "\x00" not in git_dir_text,
+        "absolute git directory differs",
+    )
+    unresolved_git_dir = Path(git_dir_text)
+    require(unresolved_git_dir.is_absolute(), "absolute git directory differs")
+    try:
+        git_dir = unresolved_git_dir.resolve(strict=True)
+        git_dir_info = git_dir.lstat()
+    except OSError as exc:
+        raise BuildError("absolute git directory cannot be resolved") from exc
+    require(
+        stat.S_ISDIR(git_dir_info.st_mode) and not stat.S_ISLNK(git_dir_info.st_mode),
+        "absolute git directory must resolve to a directory",
+    )
+    state = {
+        "index": _absolute_regular_signature(git_dir / "index", "git index"),
+        "head_file": _absolute_regular_signature(git_dir / "HEAD", "git HEAD"),
+        "head": _git_output(root, ("rev-parse", "--verify", "HEAD"), "git HEAD"),
+        "refs": _git_output(
+            root,
+            ("show-ref", "--head", "--dereference"),
+            "git refs",
+            allowed_returncodes=(0, 1),
+        ),
+        "status": _git_output(
+            root,
+            ("status", "--porcelain=v2", "-z", "--untracked-files=all"),
+            "git status",
+        ),
+    }
+    return git_dir, state
+
+
+def _shadow_copy_manifest(
+    root: Path,
+    paths: Sequence[Path],
+    label: str,
+) -> dict[Path, tuple[str, int, int, int, int]]:
+    manifest: dict[Path, tuple[str, int, int, int, int]] = {}
+    for path in paths:
+        raw = _read_regular(root, path, label)
+        info = (root / path).lstat()
+        manifest[path] = (
+            bytes_sha256(raw),
+            len(raw),
+            info.st_mode,
+            info.st_nlink,
+            info.st_mtime_ns,
+        )
+    return manifest
+
+
+def _copy_shadow_paths(root: Path, shadow: Path, paths: Sequence[Path]) -> None:
+    operands = bytearray()
+    for path in paths:
+        _validate_relative(path, "shadow source")
+        encoded = os.fsencode("./" + path.as_posix())
+        require(b"\x00" not in encoded, f"unsafe shadow source path: {path}")
+        operands.extend(encoded)
+        operands.append(0)
+    try:
+        completed = subprocess.run(
+            [
+                "xargs",
+                "-0",
+                "-r",
+                "cp",
+                "--parents",
+                "--preserve=mode,timestamps",
+                "--reflink=auto",
+                f"--target-directory={shadow}",
+                "--",
+            ],
+            cwd=root,
+            input=bytes(operands),
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except OSError as exc:
+        raise BuildError("shadow repository copy cannot be executed") from exc
+    require(
+        completed.returncode == 0,
+        "shadow repository copy failed: "
+        + completed.stderr.decode("utf-8", "replace").strip(),
+    )
+
+
+def _validate_check_in_shadow(
+    root: Path,
+    transaction: Mapping[str, Any],
+    *,
+    temporary_directory_factory: Any | None = None,
+) -> None:
+    """Apply and officially postvalidate a check-only transaction in isolation."""
+
+    root = _validated_root(root)
+    catalog_paths = tuple(
+        sorted(Path(path) for path in catalogs.discover_source_paths(root))
+    )
+    require(
+        len(catalog_paths) == len(set(catalog_paths)),
+        "source catalog universe contains duplicate paths",
+    )
+    private_paths = tuple(
+        Path(path) for path in _control_successor_module().UNMANAGED_EVIDENCE_PATHS
+    )
+    copy_paths = tuple(sorted(set(catalog_paths).union(private_paths)))
+    copy_manifest = _shadow_copy_manifest(root, copy_paths, "shadow source")
+    source_checkpoint = _binding(
+        CHECKPOINT_REL,
+        _read_regular(root, CHECKPOINT_REL, "source checkpoint"),
+    )
+    require(
+        transaction.get("source_checkpoint") == source_checkpoint,
+        "shadow source checkpoint binding differs",
+    )
+    source_signatures = _verify_bindings(
+        root,
+        transaction.get("source_bindings", []),
+        "shadow transaction source",
+    )
+    git_dir, git_state = _git_state(root)
+    factory = temporary_directory_factory or tempfile.TemporaryDirectory
+    try:
+        with factory(prefix=".walksafe-r009-check-") as temporary:
+            shadow = Path(temporary)
+            shadow_info = shadow.lstat()
+            require(
+                stat.S_ISDIR(shadow_info.st_mode)
+                and not stat.S_ISLNK(shadow_info.st_mode),
+                "shadow root must be a non-symlink directory",
+            )
+            os.chmod(shadow, 0o700)
+            _copy_shadow_paths(root, shadow, copy_paths)
+            os.chmod(shadow, 0o700)
+            require(
+                _shadow_copy_manifest(shadow, copy_paths, "copied shadow source")
+                == copy_manifest,
+                "shadow repository copy differs",
+            )
+            git_link = shadow / ".git"
+            os.symlink(str(git_dir), git_link, target_is_directory=True)
+            require(
+                stat.S_ISLNK(git_link.lstat().st_mode)
+                and os.readlink(git_link) == str(git_dir),
+                "shadow git directory link differs",
+            )
+            shadow_catalog_paths = tuple(
+                sorted(Path(path) for path in catalogs.discover_source_paths(shadow))
+            )
+            require(
+                shadow_catalog_paths == catalog_paths,
+                "shadow catalog universe differs from source",
+            )
+            apply_transaction(shadow, transaction)
+    finally:
+        require(
+            _binding(
+                CHECKPOINT_REL,
+                _read_regular(root, CHECKPOINT_REL, "source checkpoint"),
+            )
+            == source_checkpoint,
+            "source checkpoint changed during shadow validation",
+        )
+        require(
+            _verify_bindings(
+                root,
+                transaction.get("source_bindings", []),
+                "shadow transaction source",
+            )
+            == source_signatures,
+            "transaction source changed during shadow validation",
+        )
+        require(
+            _shadow_copy_manifest(root, copy_paths, "shadow source")
+            == copy_manifest,
+            "source repository files changed during shadow validation",
+        )
+        current_git_dir, current_git_state = _git_state(root)
+        require(
+            current_git_dir == git_dir and current_git_state == git_state,
+            "source git index, HEAD, refs, or status changed during shadow validation",
+        )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--root", type=Path, default=ROOT)
@@ -1592,14 +2200,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.check:
             validate_transaction(args.root, transaction)
             approved, _review_overlay_bytes, approved_binding = (
-                _capture_r008_control_material(args.root)
+                _capture_r009_control_material(args.root)
             )
             require(
-                list(approved) == transaction["r008_control_cohort"]
+                list(approved) == transaction["r009_control_cohort"]
                 and approved_binding
-                == transaction["r008_control_review_binding"],
-                "R008 approved control material differs from the staged transaction",
+                == transaction["r009_control_review_binding"],
+                "R009 approved control material differs from the staged transaction",
             )
+            _validate_check_in_shadow(args.root, transaction)
             print("WalkSafe FP046/NPC R002 seq72-76 transaction: READY")
         else:
             printable = {

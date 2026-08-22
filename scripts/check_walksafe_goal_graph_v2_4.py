@@ -5041,6 +5041,81 @@ def _fp022_seq66_67_successor_matches(
         seq67 = history[66]
         if not isinstance(seq67, dict):
             return False
+        statuses = prefix_state.get("status_by_goal")
+        completion_evidence = prefix_state.get("completion_evidence_by_goal")
+        archived_completion_evidence = prefix_state.get(
+            "archived_completion_evidence_by_goal"
+        )
+        goal_document_paths = prefix_state.get("goal_document_paths")
+        managed_goal_paths = prefix_state.get("managed_goal_paths")
+        if not (
+            isinstance(statuses, dict)
+            and isinstance(completion_evidence, dict)
+            and isinstance(archived_completion_evidence, dict)
+            and isinstance(goal_document_paths, list)
+            and all(isinstance(path, str) for path in goal_document_paths)
+            and isinstance(managed_goal_paths, list)
+            and all(isinstance(path, str) for path in managed_goal_paths)
+        ):
+            return False
+        future_goal_paths: list[str] = []
+        for event in reversed(history[67:]):
+            if not isinstance(event, dict):
+                return False
+            status_changes = event.get("status_changes")
+            subject_goal_id = event.get("subject_goal_id")
+            materialized_goal_id = event.get("materialized_goal_id")
+            if not isinstance(status_changes, dict):
+                return False
+            if isinstance(materialized_goal_id, str):
+                materialized_goal_path = event.get("materialized_goal_path")
+                if not isinstance(materialized_goal_path, str):
+                    return False
+                future_goal_paths.append(materialized_goal_path)
+            for goal_id in status_changes:
+                if not isinstance(goal_id, str):
+                    return False
+                if goal_id == materialized_goal_id:
+                    statuses.pop(goal_id, None)
+                elif goal_id == subject_goal_id and isinstance(
+                    event.get("from_status"), str
+                ):
+                    statuses[goal_id] = event["from_status"]
+                else:
+                    return False
+            if event.get("event_type") == "GOAL_COMPLETED":
+                if not isinstance(subject_goal_id, str):
+                    return False
+                completion_evidence.pop(subject_goal_id, None)
+            if event.get("from_status") == "COMPLETE_AT_TARGET":
+                if not isinstance(subject_goal_id, str):
+                    return False
+                archived_roles = archived_completion_evidence.pop(
+                    subject_goal_id,
+                    None,
+                )
+                if not isinstance(archived_roles, list):
+                    return False
+                completion_evidence[subject_goal_id] = archived_roles
+        if len(future_goal_paths) != len(set(future_goal_paths)):
+            return False
+        for path in future_goal_paths:
+            if (
+                goal_document_paths.count(path) != 1
+                or managed_goal_paths.count(path) != 1
+            ):
+                return False
+            goal_document_paths.remove(path)
+            managed_goal_paths.remove(path)
+        prefix_state["goal_document_count"] = len(goal_document_paths)
+        prefix_state["managed_goal_path_count"] = len(managed_goal_paths)
+        try:
+            (
+                prefix_state["path_set_sha256"],
+                prefix_state["content_set_sha256"],
+            ) = continuation.package_hashes(root, managed_goal_paths)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            return False
         prefix_state["transition_history"] = copy.deepcopy(history[:67])
         prefix_state["transition_history_anchor_sha256"] = seq67.get(
             "event_sha256"
@@ -5057,9 +5132,6 @@ def _fp022_seq66_67_successor_matches(
             "ready_frontier_goal_ids",
         ):
             prefix_state[field] = copy.deepcopy(runtime.get(field))
-        prefix_state["status_by_goal"][
-            "WS-GOAL-EPIC-04-FP-022-R001"
-        ] = "READY"
         prefix_state["goal_status"] = "READY"
         prefix_state["dynamic_goal_inventory"] = copy.deepcopy(
             seq67.get("dynamic_goal_inventory_after")
@@ -5073,9 +5145,6 @@ def _fp022_seq66_67_successor_matches(
         prefix_state["blocker_resolution_ids"] = copy.deepcopy(
             seq67.get("blocker_resolution_ids_after")
         )
-        completion_evidence = prefix_state.get("completion_evidence_by_goal")
-        if isinstance(completion_evidence, dict):
-            completion_evidence.pop("WS-GOAL-EPIC-04-FP-022-R001", None)
         canonical = seq67.get("canonical_binding_snapshot_after")
         if not isinstance(canonical, dict):
             return False
@@ -11150,7 +11219,8 @@ def _materialization_projection_at_sequence(
         for event in history
         if (
             isinstance(event, dict)
-            and event.get("event_type") == "GOAL_MATERIALIZED"
+            and event.get("event_type")
+            in {"GOAL_MATERIALIZED", "GOAL_SUPERSEDED"}
             and isinstance(event.get("sequence"), int)
             and event["sequence"] > cutoff_sequence
             and isinstance(event.get("materialized_goal_id"), str)
@@ -15502,7 +15572,19 @@ def validate_fp022_completion_seq70_71(
             build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
         )
 
-        expected_review = review.transition_review_binding(root)
+        review.prepare_frozen_control_successor_r008(root)
+        expected_review = {
+            role: {
+                "path": relative.as_posix(),
+                "sha256": review.COMPLETED_REVIEW_PINS[relative][0],
+                "byte_length": review.COMPLETED_REVIEW_PINS[relative][1],
+            }
+            for role, relative in zip(
+                ("assignment", "review_result", "independent_review"),
+                review.COMPLETED_REVIEW_PATHS,
+                strict=True,
+            )
+        }
     except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
         errors.append(f"FP022 completion transition review cannot be replayed: {exc}")
     else:
@@ -15603,6 +15685,13 @@ def _r002_reopen_suffix(
     if not isinstance(history, list):
         return None
     if len(history) < R002_REOPEN_FIRST_SEQUENCE:
+        return []
+    post_source = history[R002_REOPEN_FIRST_SEQUENCE - 1 :]
+    if (
+        len(post_source) == 2
+        and all(isinstance(event, dict) for event in post_source)
+        and [event.get("sequence") for event in post_source] == [70, 71]
+    ):
         return []
     suffix = history[
         R002_REOPEN_FIRST_SEQUENCE - 1 : R002_REOPEN_FIRST_SEQUENCE + 4
@@ -15843,6 +15932,348 @@ def _r002_control_review_errors(
     return errors
 
 
+def _r002_checkpoint_review_plan(
+    root: Path,
+    checkpoint: dict[str, Any],
+    suffix: list[dict[str, Any]],
+    review: Any,
+) -> dict[str, Any] | None:
+    state = checkpoint.get("goal_execution")
+    if not isinstance(state, dict):
+        return None
+    documents: dict[str, str] = {}
+    for specification in R002_REOPEN_SUCCESSORS:
+        relative = specification["goal_path"]
+        path = _exact_repo_file(root, relative)
+        if path is None:
+            return None
+        try:
+            documents[relative] = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return None
+    history = state.get("transition_history")
+    final_state: dict[str, Any]
+    final_runtime = suffix[-1].get("runtime_after")
+    if (
+        isinstance(history, list)
+        and len(history) >= R002_REOPEN_FIRST_SEQUENCE + 4
+        and isinstance(final_runtime, dict)
+        and isinstance(suffix[2].get("completion_evidence_by_goal_after"), dict)
+        and isinstance(
+            suffix[2].get("archived_completion_evidence_by_goal_after"),
+            dict,
+        )
+        and isinstance(suffix[3].get("dynamic_goal_inventory_after"), dict)
+        and isinstance(
+            suffix[3].get("materialized_child_goal_ids_by_parent_after"),
+            dict,
+        )
+    ):
+        statuses = copy.deepcopy(state.get("status_by_goal"))
+        if not isinstance(statuses, dict):
+            return None
+        for event in reversed(history[R002_REOPEN_FIRST_SEQUENCE + 4 :]):
+            if not isinstance(event, dict):
+                return None
+            status_changes = event.get("status_changes")
+            subject_goal_id = event.get("subject_goal_id")
+            materialized_goal_id = event.get("materialized_goal_id")
+            if not isinstance(status_changes, dict):
+                return None
+            for goal_id in status_changes:
+                if goal_id == materialized_goal_id:
+                    statuses.pop(goal_id, None)
+                elif goal_id == subject_goal_id and isinstance(
+                    event.get("from_status"), str
+                ):
+                    statuses[goal_id] = event["from_status"]
+                else:
+                    return None
+        artifact_work_queue: Any
+        completion_boundary: Any
+        if len(history) == R002_REOPEN_FIRST_SEQUENCE + 4:
+            artifact_work_queue = copy.deepcopy(
+                state.get("artifact_work_queue")
+            )
+            completion_boundary = copy.deepcopy(
+                state.get("completion_boundary")
+            )
+        else:
+            canonical = suffix[0].get("canonical_binding_snapshot_after")
+            ready = final_runtime.get("ready_frontier_goal_ids")
+            blockers = suffix[-1].get("blockers_after")
+            package_status = final_runtime.get("package_status")
+            if not (
+                isinstance(canonical, dict)
+                and isinstance(ready, list)
+                and isinstance(blockers, dict)
+                and isinstance(package_status, str)
+            ):
+                return None
+            projected_state = copy.deepcopy(state)
+            projected_state.update(
+                {
+                    "status_by_goal": statuses,
+                    "dynamic_goal_inventory": copy.deepcopy(
+                        suffix[3]["dynamic_goal_inventory_after"]
+                    ),
+                    "materialized_child_goal_ids_by_parent": copy.deepcopy(
+                        suffix[3][
+                            "materialized_child_goal_ids_by_parent_after"
+                        ]
+                    ),
+                }
+            )
+            projected_checkpoint = copy.deepcopy(checkpoint)
+            projected_checkpoint["goal_execution"] = projected_state
+            projected_checkpoint["canonical_bindings"] = [
+                copy.deepcopy(binding)
+                for binding in canonical.values()
+                if isinstance(binding, dict)
+            ]
+            bindings = frozen_goal.canonical_binding_map(projected_checkpoint)
+            register_binding = bindings.get("ARTIFACT_REGISTER")
+            register_path = (
+                _exact_repo_file(root, register_binding.get("path"))
+                if isinstance(register_binding, dict)
+                else None
+            )
+            if register_path is None:
+                return None
+            try:
+                if (
+                    register_binding.get("file_sha256")
+                    != continuation.sha256_file(register_path)
+                ):
+                    return None
+                register = continuation.load_json(register_path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                return None
+            node_errors, nodes = frozen_goal.current_goal_nodes(
+                root,
+                projected_state,
+            )
+            queue_errors, artifact_work_queue = (
+                derive_v24_artifact_work_queue_from_register(
+                    register_binding,
+                    register,
+                    nodes,
+                    statuses,
+                )
+            )
+            boundary_errors, completion_boundary = (
+                frozen_goal.derive_completion_boundary(
+                    nodes,
+                    statuses,
+                    ready,
+                    blockers,
+                    artifact_work_queue,
+                    package_status=package_status,
+                )
+            )
+            if node_errors or queue_errors or boundary_errors:
+                return None
+        if not (
+            isinstance(artifact_work_queue, dict)
+            and isinstance(completion_boundary, dict)
+            and final_runtime.get("artifact_work_queue_sha256")
+            == continuation.canonical_json_sha256(artifact_work_queue)
+            and final_runtime.get("completion_boundary_sha256")
+            == continuation.canonical_json_sha256(completion_boundary)
+        ):
+            return None
+        final_state = {
+            "status_by_goal": statuses,
+            "completion_evidence_by_goal": copy.deepcopy(
+                suffix[2]["completion_evidence_by_goal_after"]
+            ),
+            "archived_completion_evidence_by_goal": copy.deepcopy(
+                suffix[2]["archived_completion_evidence_by_goal_after"]
+            ),
+            "dynamic_goal_inventory": copy.deepcopy(
+                suffix[3]["dynamic_goal_inventory_after"]
+            ),
+            "materialized_child_goal_ids_by_parent": copy.deepcopy(
+                suffix[3]["materialized_child_goal_ids_by_parent_after"]
+            ),
+            "ready_frontier_goal_ids": copy.deepcopy(
+                final_runtime.get("ready_frontier_goal_ids")
+            ),
+            "focus_goal_id": final_runtime.get("focus_goal_id"),
+            "artifact_work_queue": artifact_work_queue,
+            "completion_boundary": completion_boundary,
+        }
+    else:
+        final_fields = (
+            "status_by_goal",
+            "completion_evidence_by_goal",
+            "archived_completion_evidence_by_goal",
+            "dynamic_goal_inventory",
+            "materialized_child_goal_ids_by_parent",
+            "ready_frontier_goal_ids",
+            "focus_goal_id",
+            "artifact_work_queue",
+            "completion_boundary",
+        )
+        final_state = {
+            field: copy.deepcopy(state.get(field)) for field in final_fields
+        }
+    if any(value is None for value in final_state.values()):
+        return None
+    try:
+        required_before_apply = review.r029_candidate.operational_application_boundary()[
+            "required_before_apply"
+        ]
+        candidate_paths = {
+            name: Path(path).as_posix()
+            for name, path in review.R029_PATHS.items()
+        }
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+    return {
+        "schema_version": "walksafe.fp046-npc-r002-reopen-preflight.v1",
+        "transaction_status": "PREFLIGHT_ONLY_NOT_AUTHORIZED",
+        "final_state_projection_only": True,
+        "required_before_apply": copy.deepcopy(required_before_apply),
+        "source_sequence": R002_REOPEN_FIRST_SEQUENCE - 1,
+        "candidate_paths": candidate_paths,
+        "documents": documents,
+        "events": copy.deepcopy(suffix),
+        "final_state": final_state,
+    }
+
+
+def _r002_exact_review_binding(
+    root: Path,
+    paths: tuple[Path, ...],
+    raw_by_path: dict[Path, bytes],
+) -> dict[str, dict[str, Any]] | None:
+    roles = ("assignment", "review_result", "independent_review")
+    if (
+        len(paths) != len(roles)
+        or len(set(paths)) != len(roles)
+        or set(raw_by_path) != set(paths)
+    ):
+        return None
+    result: dict[str, dict[str, Any]] = {}
+    for role, relative in zip(roles, paths, strict=True):
+        path = _exact_repo_file(root, relative.as_posix())
+        raw = raw_by_path.get(relative)
+        if path is None or not isinstance(raw, bytes):
+            return None
+        try:
+            if path.read_bytes() != raw or path.stat().st_size != len(raw):
+                return None
+        except OSError:
+            return None
+        result[role] = {
+            "path": relative.as_posix(),
+            "sha256": continuation.sha256_bytes(raw),
+            "byte_length": len(raw),
+        }
+    return result
+
+
+def _r002_review_authority_errors(
+    root: Path,
+    checkpoint: dict[str, Any],
+    canonical_update: dict[str, Any],
+    suffix: list[dict[str, Any]],
+) -> list[str]:
+    """Validate all reviewed seq72 authorities without continuation replay."""
+
+    try:
+        from scripts import (  # noqa: E402
+            apply_walksafe_fp046_npc_r002_reopen_20260815 as review,
+        )
+        from scripts import (  # noqa: E402
+            build_walksafe_fp022_completion_seq70_71_review_20260814
+            as control_review,
+        )
+
+        plan = _r002_checkpoint_review_plan(
+            root,
+            checkpoint,
+            suffix,
+            review,
+        )
+        if plan is None:
+            raise ValueError("reviewed checkpoint plan is malformed")
+        r001_binding, r001_raw = review.load_frozen_transition_r001(root)
+        r002_binding, r002_raw = review.load_validated_transition_r002(root)
+        r009_binding, r009_raw = review.load_validated_control_successor_r009(
+            root
+        )
+        path_groups = (
+            (tuple(Path(path) for path in review.TRANSITION_R001_PATHS), r001_raw),
+            (tuple(Path(path) for path in review.TRANSITION_R002_PATHS), r002_raw),
+            (
+                tuple(
+                    Path(path)
+                    for path in control_review.CONTROL_SUCCESSOR_R009_PATHS
+                ),
+                r009_raw,
+            ),
+        )
+        exact_bindings = tuple(
+            _r002_exact_review_binding(root, paths, raw_by_path)
+            for paths, raw_by_path in path_groups
+        )
+        if any(binding is None for binding in exact_bindings):
+            raise ValueError("review file path/SHA-256/length differs")
+        expected_r001, expected_r002, expected_r009 = exact_bindings
+        if (
+            r001_binding != expected_r001
+            or r002_binding != expected_r002
+            or r009_binding != expected_r009
+        ):
+            raise ValueError("validated review role binding differs")
+        assignment = review.strict_json_bytes(
+            r002_raw[review.TRANSITION_R002_ASSIGNMENT_REL],
+            "transition R002 assignment",
+        )
+        scope = assignment.get("review_scope")
+        if not isinstance(scope, dict):
+            raise ValueError("transition R002 review scope is missing")
+        review.validate_reviewed_transition_plan(
+            plan,
+            scope,
+            expected_r002,
+        )
+        core_binding = scope.get("corrected_plan_core_binding")
+        if not isinstance(core_binding, dict):
+            raise ValueError("corrected plan core binding is missing")
+    except Exception as exc:
+        return [f"FP046/NPC R002 reviewed authority differs: {exc}"]
+
+    errors: list[str] = []
+    expected_event_bindings = {
+        "predecessor_transition_review_binding": expected_r001,
+        "transition_review_binding": expected_r002,
+        "transition_review_subject_binding": core_binding,
+        "r009_control_review_binding": expected_r009,
+    }
+    if "r008_control_review_binding" in canonical_update or any(
+        canonical_update.get(field) != binding
+        for field, binding in expected_event_bindings.items()
+    ):
+        errors.append("FP046/NPC R002 seq72 review binding differs")
+    snapshot = checkpoint.get("working_tree_snapshot")
+    managed = (
+        snapshot.get("managed_changed_paths")
+        if isinstance(snapshot, dict)
+        else None
+    )
+    required_paths = {
+        path.as_posix()
+        for paths, _raw_by_path in path_groups
+        for path in paths
+    }
+    if not isinstance(managed, list) or not required_paths.issubset(managed):
+        errors.append("FP046/NPC R002 review managed paths differ")
+    return errors
+
+
 def _r002_archive_projection(
     active: dict[str, Any],
     archived: dict[str, Any],
@@ -16065,8 +16496,9 @@ def validate_fp046_npc_r002_reopen_seq72_76(
         return errors + ["FP046/NPC R002 reopen source completion lineage differs"]
     source_active, source_archived = evidence
     cbu, fp046, npc, parent_ready, fp046_ready = suffix
-    errors.extend(_r002_transition_review_errors(root, cbu, suffix))
-    errors.extend(_r002_control_review_errors(root, cbu, checkpoint))
+    errors.extend(
+        _r002_review_authority_errors(root, checkpoint, cbu, suffix)
+    )
     parent_completion = completion_events[R002_REOPEN_PARENT_GOAL_ID]
     fp046_completion = completion_events[FP046_GOAL_ID]
     npc_completion = completion_events[NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID]

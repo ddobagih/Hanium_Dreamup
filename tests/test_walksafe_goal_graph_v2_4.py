@@ -6620,6 +6620,7 @@ class WalkSafeFp022Seq66Seq67SuccessorTest(unittest.TestCase):
             "event_id": graph.continuation.FP022_COMPLETION_UPDATE_EVENT_ID,
             "event_type": "CANONICAL_BINDINGS_UPDATED",
             "previous_event_sha256": history[-1]["event_sha256"],
+            "status_changes": {},
         }
         update["event_sha256"] = graph.continuation.event_sha256(update)
         completion = {
@@ -6627,6 +6628,11 @@ class WalkSafeFp022Seq66Seq67SuccessorTest(unittest.TestCase):
             "event_id": graph.continuation.FP022_COMPLETION_EVENT_ID,
             "event_type": "GOAL_COMPLETED",
             "subject_goal_id": graph.continuation.FP022_GOAL_ID,
+            "from_status": "IN_PROGRESS",
+            "to_status": "COMPLETE_AT_TARGET",
+            "status_changes": {
+                graph.continuation.FP022_GOAL_ID: "COMPLETE_AT_TARGET"
+            },
             "previous_event_sha256": update["event_sha256"],
         }
         completion["event_sha256"] = graph.continuation.event_sha256(
@@ -8306,108 +8312,239 @@ class WalkSafeFp022CompletionGraphSuffixTest(unittest.TestCase):
 
 
 class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
-    @staticmethod
-    def _write_transition_review(root: Path) -> dict[Path, bytes]:
-        r002_preflight.write_transition_assignment(
-            root, assigned_at="2026-08-15T12:00:00+09:00"
+    def _review_authority_fixture(
+        self,
+    ) -> tuple[Path, dict, list[dict], dict[Path, bytes]]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        review_paths = (
+            *(Path(path) for path in r002_preflight.TRANSITION_R001_PATHS),
+            *(Path(path) for path in r002_preflight.TRANSITION_R002_PATHS),
+            *(
+                Path(path)
+                for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
+            ),
         )
-        assignment_raw = (
-            root / r002_preflight.TRANSITION_ASSIGNMENT_REL
-        ).read_bytes()
-        assignment = json.loads(assignment_raw)
-        result = {
-            "schema_version": "1.0",
-            "evidence_type": (
-                "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
-            ),
-            "goal_id": r002_preflight.TRANSITION_GOAL_ID,
-            "round_id": r002_preflight.TRANSITION_ROUND_ID,
-            "reviewed_at": assignment["assigned_at"],
-            "reviewer": copy.deepcopy(assignment["reviewer"]),
-            "assignment_binding": r002_preflight._binding(
-                r002_preflight.TRANSITION_ASSIGNMENT_REL,
-                assignment_raw,
-            ),
-            "decision": "APPROVED",
-            "findings": {"blocking": [], "major_open": [], "minor_open": []},
-            "finding_dispositions": [],
-            "review_scope": assignment["review_scope"],
-            "review_boundary": assignment["review_boundary"],
-        }
-        result_path = root / r002_preflight.TRANSITION_RESULT_REL
-        result_path.parent.mkdir(parents=True, exist_ok=True)
-        result_path.write_bytes(
-            r002_preflight.json_text(result).encode("utf-8")
-        )
-        r002_preflight.write_transition_independent_review(root)
-        return {
-            relative: (root / relative).read_bytes()
-            for relative in (
-                r002_preflight.TRANSITION_ASSIGNMENT_REL,
-                r002_preflight.TRANSITION_RESULT_REL,
-                r002_preflight.TRANSITION_INDEPENDENT_REL,
-            )
-        }
-
-    @staticmethod
-    def _write_control_review(
-        root: Path,
-        *,
-        assigned_at: str = "2026-08-15T12:00:00+09:00",
-    ) -> dict[Path, bytes]:
-        context = completion_review.prepare_control_successor_r008_context(root)
-        assignment_raw = (
-            completion_review.build_control_successor_r008_assignment(
-                context, assigned_at=assigned_at
-            ).encode("utf-8")
-        )
-        assignment = json.loads(assignment_raw)
-        result = {
-            "schema_version": "1.0",
-            "evidence_type": (
-                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_"
-                "REVIEW_RESULT"
-            ),
-            "goal_id": completion_review.GOAL_ID,
-            "round_id": completion_review.CONTROL_SUCCESSOR_R008_ROUND_ID,
-            "reviewed_at": assigned_at,
-            "reviewer": copy.deepcopy(assignment["reviewer"]),
-            "assignment_binding": completion_review._binding(
-                completion_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL,
-                assignment_raw,
-            ),
-            "review_scope": copy.deepcopy(assignment["review_scope"]),
-            "decision": "APPROVED",
-            "findings": {"blocking": [], "major_open": [], "minor_open": []},
-            "finding_dispositions": [],
-            "review_boundary": copy.deepcopy(assignment["review_boundary"]),
-        }
-        result_raw = completion_review.json_text(result).encode("utf-8")
-        independent_raw = (
-            completion_review.build_control_successor_r008_independent_review(
-                context,
-                assignment,
-                assignment_raw,
-                result,
-                result_raw,
-            ).encode("utf-8")
-        )
-        overlay = {
-            completion_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL: (
-                assignment_raw
-            ),
-            completion_review.CONTROL_SUCCESSOR_R008_RESULT_REL: result_raw,
-            completion_review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL: (
-                independent_raw
-            ),
-        }
-        for relative, raw in overlay.items():
+        frozen_raw: dict[Path, bytes] = {}
+        for index, relative in enumerate(review_paths):
+            raw = f'{{"review":{index}}}\n'.encode("utf-8")
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(raw)
-        return overlay
+            frozen_raw[relative] = raw
+        for specification in graph.R002_REOPEN_SUCCESSORS:
+            target = root / specification["goal_path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                f"goal_id = {specification['goal_id']}\n",
+                encoding="utf-8",
+            )
+        suffix = [
+            {
+                "sequence": sequence,
+                "event_id": f"WS-TEST-{sequence}",
+                "event_type": event_type,
+                "status_changes": {},
+            }
+            for sequence, event_type in zip(
+                range(72, 77),
+                graph.R002_REOPEN_EVENT_TYPES,
+                strict=True,
+            )
+        ]
+        checkpoint = {
+            "goal_execution": {
+                "status_by_goal": {},
+                "completion_evidence_by_goal": {},
+                "archived_completion_evidence_by_goal": {},
+                "dynamic_goal_inventory": {},
+                "materialized_child_goal_ids_by_parent": {},
+                "ready_frontier_goal_ids": [],
+                "focus_goal_id": "WS-TEST-FOCUS",
+                "artifact_work_queue": {},
+                "completion_boundary": {},
+            },
+            "working_tree_snapshot": {
+                "managed_changed_paths": sorted(
+                    path.as_posix() for path in review_paths
+                ),
+            },
+        }
+        return root, checkpoint, suffix, frozen_raw
 
-    def _checkpoint(self, *, approved: bool = True) -> tuple[Path, dict]:
+    def _review_authority_errors(
+        self,
+        root: Path,
+        checkpoint: dict,
+        suffix: list[dict],
+        frozen_raw: dict[Path, bytes],
+    ) -> list[str]:
+        roles = ("assignment", "review_result", "independent_review")
+
+        def binding(paths: tuple[Path, ...], raw_by_path: dict[Path, bytes]) -> dict:
+            return {
+                role: {
+                    "path": path.as_posix(),
+                    "sha256": hashlib.sha256(raw_by_path[path]).hexdigest(),
+                    "byte_length": len(raw_by_path[path]),
+                }
+                for role, path in zip(roles, paths, strict=True)
+            }
+
+        r001_paths = tuple(
+            Path(path) for path in r002_preflight.TRANSITION_R001_PATHS
+        )
+        r002_paths = tuple(
+            Path(path) for path in r002_preflight.TRANSITION_R002_PATHS
+        )
+        r009_paths = tuple(
+            Path(path)
+            for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
+        )
+
+        def load(paths: tuple[Path, ...]) -> tuple[dict, dict[Path, bytes]]:
+            raw_by_path = {
+                path: (root / path).read_bytes() for path in paths
+            }
+            if any(raw_by_path[path] != frozen_raw[path] for path in paths):
+                raise ValueError("frozen review bytes differ")
+            return binding(paths, raw_by_path), raw_by_path
+
+        r001_binding = binding(
+            r001_paths,
+            {path: frozen_raw[path] for path in r001_paths},
+        )
+        r002_binding = binding(
+            r002_paths,
+            {path: frozen_raw[path] for path in r002_paths},
+        )
+        r009_binding = binding(
+            r009_paths,
+            {path: frozen_raw[path] for path in r009_paths},
+        )
+
+        def neutral(plan: dict) -> dict:
+            result = copy.deepcopy(plan)
+            first = result["events"][0]
+            first.pop("transition_review_binding", None)
+            first.pop("transition_review_subject_binding", None)
+            for event in result["events"]:
+                event.pop("event_sha256", None)
+                event.pop("previous_event_sha256", None)
+            return result
+
+        def core_binding(plan: dict) -> dict:
+            raw = json.dumps(
+                plan,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            return {
+                "content_type": (
+                    "FP046_NPC_R002_APPROVAL_NEUTRAL_SEQ72_76_PLAN_CORE"
+                ),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_length": len(raw),
+            }
+
+        first = suffix[0]
+        first.setdefault(
+            "predecessor_transition_review_binding",
+            r001_binding,
+        )
+        first.setdefault("r009_control_review_binding", r009_binding)
+        plan = graph._r002_checkpoint_review_plan(
+            root,
+            checkpoint,
+            suffix,
+            r002_preflight,
+        )
+        self.assertIsNotNone(plan)
+        expected_core = checkpoint.setdefault(
+            "_test_review_core_binding",
+            core_binding(neutral(plan)),
+        )
+        first.setdefault("transition_review_binding", r002_binding)
+        first.setdefault("transition_review_subject_binding", expected_core)
+
+        def load_r002(_root: Path) -> tuple[dict, dict[Path, bytes]]:
+            return load(r002_paths)
+
+        assignment = {
+            "review_scope": {
+                "predecessor_transition_review_bindings": r001_binding,
+                "r009_control_successor_review_bindings": r009_binding,
+                "corrected_plan_core_binding": expected_core,
+            }
+        }
+
+        def strict_json_bytes(raw: bytes, _label: str) -> dict:
+            del raw
+            return copy.deepcopy(assignment)
+
+        def validate_plan(
+            reviewed_plan: dict,
+            scope: dict,
+            transition_binding: dict,
+        ) -> None:
+            if (
+                transition_binding != r002_binding
+                or reviewed_plan["events"][0].get(
+                    "predecessor_transition_review_binding"
+                )
+                != r001_binding
+                or reviewed_plan["events"][0].get(
+                    "r009_control_review_binding"
+                )
+                != r009_binding
+                or reviewed_plan["events"][0].get(
+                    "transition_review_subject_binding"
+                )
+                != scope.get("corrected_plan_core_binding")
+                or core_binding(neutral(reviewed_plan))
+                != scope.get("corrected_plan_core_binding")
+            ):
+                raise ValueError("reviewed core differs")
+
+        with mock.patch.object(
+            r002_preflight,
+            "load_frozen_transition_r001",
+            side_effect=lambda _root: load(r001_paths),
+        ), mock.patch.object(
+            r002_preflight,
+            "load_validated_transition_r002",
+            side_effect=load_r002,
+        ), mock.patch.object(
+            r002_preflight,
+            "load_validated_control_successor_r009",
+            side_effect=lambda _root: load(r009_paths),
+        ), mock.patch.object(
+            r002_preflight,
+            "strict_json_bytes",
+            side_effect=strict_json_bytes,
+        ), mock.patch.object(
+            r002_preflight,
+            "approval_neutral_plan_core",
+            side_effect=neutral,
+        ), mock.patch.object(
+            r002_preflight,
+            "transition_plan_core_binding",
+            side_effect=core_binding,
+        ), mock.patch.object(
+            r002_preflight,
+            "validate_reviewed_transition_plan",
+            side_effect=validate_plan,
+        ):
+            return graph._r002_review_authority_errors(
+                root,
+                checkpoint,
+                first,
+                suffix,
+            )
+
+    def _checkpoint(self) -> tuple[Path, dict]:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -8452,7 +8589,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             r002_preflight.EPIC03_REL,
             *r002_preflight.r029_candidate.CURRENT_SOURCE_PATHS,
             *r002_preflight.R007_REVIEW_PINS,
-            *completion_review.CONTROL_SUCCESSOR_R008_COHORT_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R009_COHORT_PATHS,
             *control_review_support_paths,
             *r002_transaction.CATALOG_RELATIVES,
             *(
@@ -8460,6 +8597,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 for path in source_checkpoint["goal_execution"][
                     "managed_goal_paths"
                 ]
+            ),
+            *(
+                Path(binding["path"])
+                for binding in source_checkpoint["canonical_bindings"]
             ),
         )
         for relative in sorted(set(source_paths)):
@@ -8493,21 +8634,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         (root / r002_preflight.CHECKPOINT_REL).write_text(
             r002_preflight.json_text(checkpoint), encoding="utf-8"
         )
-        review_overlay = (
-            self._write_transition_review(root) if approved else None
-        )
-        control_review_overlay = (
-            self._write_control_review(root) if approved else None
-        )
         plan = r002_preflight.build_canonical_preflight(root)
-        if review_overlay is not None:
-            plan = r002_transaction._bind_review_to_preflight(
-                plan,
-                r002_transaction._transition_review_binding(review_overlay),
-                r002_transaction._r008_control_review_binding(
-                    control_review_overlay
-                ),
-            )
         projection = r002_transaction.project_transaction(
             root,
             preflight=plan,
@@ -8517,10 +8644,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 path: (ROOT / path).read_bytes()
                 for path in r002_transaction.CATALOG_RELATIVES
             },
-            transition_review_overlay=review_overlay,
-            r008_control_review_overlay=control_review_overlay,
-            r008_control_cohort_paths=(
-                completion_review.CONTROL_SUCCESSOR_R008_COHORT_PATHS
+            transition_review_overlay=None,
+            r009_control_review_overlay=None,
+            r009_control_cohort_paths=(
+                completion_review.CONTROL_SUCCESSOR_R009_COHORT_PATHS
             ),
         )
         for relative, raw in projection["output_bytes"].items():
@@ -8586,52 +8713,388 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         )
 
     def test_seq72_76_projection_without_actual_review_fails_closed(self) -> None:
-        root, checkpoint = self._checkpoint(approved=False)
+        root, checkpoint = self._checkpoint()
 
         errors = graph.validate_fp046_npc_r002_reopen_seq72_76(
             root, checkpoint
         )
         joined = "\n".join(errors)
         self.assertIn(
-            "transition review differs: required transition review is missing",
-            joined,
-        )
-        self.assertIn(
-            "R008 control review differs: review input is missing",
+            "FP046/NPC R002 reviewed authority differs",
             joined,
         )
 
-    def test_exact_approved_seq72_76_archives_and_reopens(self) -> None:
-        root, checkpoint = self._checkpoint()
+    def test_direct_review_authority_accepts_exact_nine_file_core(self) -> None:
+        root, checkpoint, suffix, frozen_raw = (
+            self._review_authority_fixture()
+        )
 
         self.assertEqual(
-            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint),
+            self._review_authority_errors(
+                root,
+                checkpoint,
+                suffix,
+                frozen_raw,
+            ),
             [],
         )
-        self.assertEqual(
-            checkpoint["goal_execution"]["transition_history"][71][
-                "canonical_binding_snapshot_after"
-            ]["IMPLEMENTATION_BACKLOG"],
-            graph.R002_REOPEN_CANONICAL_BINDING_UPDATES[
-                "IMPLEMENTATION_BACKLOG"
-            ],
+
+    def test_direct_review_authority_rejects_each_missing_review_file(
+        self,
+    ) -> None:
+        review_paths = (
+            *(Path(path) for path in r002_preflight.TRANSITION_R001_PATHS),
+            *(Path(path) for path in r002_preflight.TRANSITION_R002_PATHS),
+            *(
+                Path(path)
+                for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
+            ),
         )
-        self.assertTrue(
+        for relative in review_paths:
+            with self.subTest(relative=relative):
+                root, checkpoint, suffix, frozen_raw = (
+                    self._review_authority_fixture()
+                )
+                (root / relative).unlink()
+
+                self.assertTrue(
+                    self._review_authority_errors(
+                        root,
+                        checkpoint,
+                        suffix,
+                        frozen_raw,
+                    )
+                )
+
+    def test_direct_review_authority_rejects_tamper_and_event_reseal(
+        self,
+    ) -> None:
+        for relative in (
+            Path(r002_preflight.TRANSITION_R001_RESULT_REL),
+            Path(r002_preflight.TRANSITION_R002_RESULT_REL),
+            Path(completion_review.CONTROL_SUCCESSOR_R009_RESULT_REL),
+        ):
+            with self.subTest(relative=relative):
+                root, checkpoint, suffix, frozen_raw = (
+                    self._review_authority_fixture()
+                )
+                self.assertEqual(
+                    self._review_authority_errors(
+                        root,
+                        checkpoint,
+                        suffix,
+                        frozen_raw,
+                    ),
+                    [],
+                )
+                target = root / relative
+                tampered = target.read_bytes() + b" "
+                target.write_bytes(tampered)
+                for field in (
+                    "predecessor_transition_review_binding",
+                    "transition_review_binding",
+                    "r009_control_review_binding",
+                ):
+                    rows = suffix[0].get(field)
+                    if not isinstance(rows, dict):
+                        continue
+                    for row in rows.values():
+                        if row.get("path") == relative.as_posix():
+                            row["sha256"] = hashlib.sha256(tampered).hexdigest()
+                            row["byte_length"] = len(tampered)
+                previous_sha256 = "0" * 64
+                for event in suffix:
+                    event["previous_event_sha256"] = previous_sha256
+                    event["event_sha256"] = graph.continuation.event_sha256(
+                        event
+                    )
+                    previous_sha256 = event["event_sha256"]
+
+                self.assertTrue(
+                    self._review_authority_errors(
+                        root,
+                        checkpoint,
+                        suffix,
+                        frozen_raw,
+                    )
+                )
+
+    def test_direct_review_authority_rejects_four_binding_and_core_reseal(
+        self,
+    ) -> None:
+        binding_fields = (
+            "predecessor_transition_review_binding",
+            "transition_review_binding",
+            "transition_review_subject_binding",
+            "r009_control_review_binding",
+        )
+        for field in (*binding_fields, "core"):
+            with self.subTest(field=field):
+                root, checkpoint, suffix, frozen_raw = (
+                    self._review_authority_fixture()
+                )
+                self.assertEqual(
+                    self._review_authority_errors(
+                        root,
+                        checkpoint,
+                        suffix,
+                        frozen_raw,
+                    ),
+                    [],
+                )
+                if field == "core":
+                    suffix[-1]["status_changes"]["WS-FORGED"] = "READY"
+                else:
+                    binding = suffix[0][field]
+                    if field.endswith("subject_binding"):
+                        binding["sha256"] = "0" * 64
+                    else:
+                        binding["assignment"]["sha256"] = "0" * 64
+                previous_sha256 = "0" * 64
+                for event in suffix:
+                    event["previous_event_sha256"] = previous_sha256
+                    event["event_sha256"] = graph.continuation.event_sha256(
+                        event
+                    )
+                    previous_sha256 = event["event_sha256"]
+
+                self.assertTrue(
+                    self._review_authority_errors(
+                        root,
+                        checkpoint,
+                        suffix,
+                        frozen_raw,
+                    )
+                )
+
+    def test_transaction_built_seq76_review_plan_uses_checkpoint_bodies(
+        self,
+    ) -> None:
+        root, checkpoint = self._checkpoint()
+        state = checkpoint["goal_execution"]
+        suffix = state["transition_history"][71:76]
+
+        plan = graph._r002_checkpoint_review_plan(
+            root,
+            checkpoint,
+            suffix,
+            r002_preflight,
+        )
+
+        self.assertIsNotNone(plan)
+        self.assertEqual(
+            plan["final_state"]["artifact_work_queue"],
+            state["artifact_work_queue"],
+        )
+        self.assertEqual(
+            plan["final_state"]["completion_boundary"],
+            state["completion_boundary"],
+        )
+
+    def test_transaction_built_seq77_review_plan_rewinds_seq76_bodies(
+        self,
+    ) -> None:
+        root, checkpoint = self._checkpoint()
+        suffix = checkpoint["goal_execution"]["transition_history"][71:76]
+        expected = graph._r002_checkpoint_review_plan(
+            root,
+            checkpoint,
+            suffix,
+            r002_preflight,
+        )
+        self.assertIsNotNone(expected)
+        later = copy.deepcopy(checkpoint)
+        state = later["goal_execution"]
+        goal_id = graph.R002_REOPEN_SUCCESSORS[0]["goal_id"]
+        state["status_by_goal"][goal_id] = "IN_PROGRESS"
+        state["artifact_work_queue"] = {"projected_at_sequence": 77}
+        state["completion_boundary"] = {"projected_at_sequence": 77}
+        state["transition_history"].append(
             {
-                path.as_posix()
-                for path in completion_review.CONTROL_SUCCESSOR_R008_COHORT_PATHS
-            }.issubset(checkpoint["working_tree_snapshot"]["managed_changed_paths"])
+                "sequence": 77,
+                "event_id": "WS-TEST-R002-SEQ77",
+                "event_type": "GOAL_STARTED",
+                "subject_goal_id": goal_id,
+                "from_status": "READY",
+                "to_status": "IN_PROGRESS",
+                "status_changes": {goal_id: "IN_PROGRESS"},
+            }
         )
-        overlay = graph._r002_legacy_completion_overlay(root, checkpoint)
-        self.assertIsNotNone(overlay)
-        state = overlay["goal_execution"]
+
+        actual = graph._r002_checkpoint_review_plan(
+            root,
+            later,
+            suffix,
+            r002_preflight,
+        )
+
+        self.assertEqual(actual, expected)
+
+    def test_transaction_built_review_plan_requires_runtime_body_hashes(
+        self,
+    ) -> None:
+        root, checkpoint = self._checkpoint()
+        for field in (
+            "artifact_work_queue_sha256",
+            "completion_boundary_sha256",
+        ):
+            for mutation in ("missing", "mismatched"):
+                with self.subTest(field=field, mutation=mutation):
+                    projected = copy.deepcopy(checkpoint)
+                    suffix = projected["goal_execution"]["transition_history"][
+                        71:76
+                    ]
+                    runtime = suffix[-1]["runtime_after"]
+                    if mutation == "missing":
+                        runtime.pop(field)
+                    else:
+                        runtime[field] = "0" * 64
+
+                    self.assertIsNone(
+                        graph._r002_checkpoint_review_plan(
+                            root,
+                            projected,
+                            suffix,
+                            r002_preflight,
+                        )
+                    )
+
+    def test_transaction_built_seq76_body_must_match_runtime_hash(self) -> None:
+        root, checkpoint = self._checkpoint()
+        for field in ("artifact_work_queue", "completion_boundary"):
+            with self.subTest(field=field):
+                projected = copy.deepcopy(checkpoint)
+                state = projected["goal_execution"]
+                suffix = state["transition_history"][71:76]
+                state[field] = {"forged": True}
+
+                self.assertIsNone(
+                    graph._r002_checkpoint_review_plan(
+                        root,
+                        projected,
+                        suffix,
+                        r002_preflight,
+                    )
+                )
+
+    def test_materialization_projection_excludes_later_superseded_successors(
+        self,
+    ) -> None:
+        state = {
+            "dynamic_goal_inventory": {
+                "WS-EXISTING": {"goal_id": "WS-EXISTING"},
+                "WS-FUTURE-R002": {"goal_id": "WS-FUTURE-R002"},
+            },
+            "materialized_child_goal_ids_by_parent": {
+                "WS-PARENT": ["WS-EXISTING", "WS-FUTURE-R002"],
+            },
+        }
+        history = [
+            {
+                "sequence": 73,
+                "event_type": "GOAL_SUPERSEDED",
+                "materialized_goal_id": "WS-FUTURE-R002",
+            }
+        ]
+        projection = graph._materialization_projection_at_sequence(
+            state,
+            history,
+            23,
+        )
+
+        self.assertIsNotNone(projection)
+        inventory, children = projection
         self.assertEqual(
-            state["status_by_goal"][graph.FP046_GOAL_ID],
-            "COMPLETE_AT_TARGET",
+            inventory,
+            {"WS-EXISTING": {"goal_id": "WS-EXISTING"}},
         )
         self.assertEqual(
-            state["completion_evidence_by_goal"][graph.FP046_GOAL_ID],
-            state["archived_completion_evidence_by_goal"][graph.FP046_GOAL_ID],
+            children,
+            {"WS-PARENT": ["WS-EXISTING"]},
+        )
+
+    def test_seq72_76_suffix_rewinds_to_exact_seq67_state(self) -> None:
+        checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
+        state = checkpoint["goal_execution"]
+        statuses = state["status_by_goal"]
+        active = state["completion_evidence_by_goal"]
+        archived = state.setdefault("archived_completion_evidence_by_goal", {})
+        future_goals = (
+            (graph.FP046_GOAL_ID, "WS-FUTURE-FP046-R002"),
+            (
+                graph.NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID,
+                "WS-FUTURE-NPC-R002",
+            ),
+        )
+        future_paths = (
+            "docs/control/goals/future-fp046-r002.md",
+            "docs/control/goals/future-npc-r002.md",
+        )
+        events = [
+            {
+                "sequence": 72,
+                "event_type": "CANONICAL_BINDINGS_UPDATED",
+                "subject_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
+                "from_status": "COMPLETE_AT_TARGET",
+                "to_status": "PLANNED",
+                "status_changes": {
+                    graph.R002_REOPEN_PARENT_GOAL_ID: "PLANNED"
+                },
+            },
+            *[
+                {
+                    "sequence": sequence,
+                    "event_type": "GOAL_SUPERSEDED",
+                    "subject_goal_id": predecessor,
+                    "materialized_goal_id": successor,
+                    "materialized_goal_path": path,
+                    "from_status": "COMPLETE_AT_TARGET",
+                    "to_status": "SUPERSEDED",
+                    "status_changes": {
+                        predecessor: "SUPERSEDED",
+                        successor: "PLANNED",
+                    },
+                }
+                for sequence, (predecessor, successor), path in zip(
+                    (73, 74), future_goals, future_paths
+                )
+            ],
+            {
+                "sequence": 75,
+                "event_type": "GOAL_READY",
+                "subject_goal_id": graph.R002_REOPEN_PARENT_GOAL_ID,
+                "from_status": "PLANNED",
+                "to_status": "READY",
+                "status_changes": {
+                    graph.R002_REOPEN_PARENT_GOAL_ID: "READY"
+                },
+            },
+            {
+                "sequence": 76,
+                "event_type": "GOAL_READY",
+                "subject_goal_id": future_goals[0][1],
+                "from_status": "PLANNED",
+                "to_status": "READY",
+                "status_changes": {future_goals[0][1]: "READY"},
+            },
+        ]
+        for predecessor, successor in future_goals:
+            archived[predecessor] = active.pop(predecessor)
+            statuses[predecessor] = "SUPERSEDED"
+            statuses[successor] = "PLANNED"
+        archived[graph.R002_REOPEN_PARENT_GOAL_ID] = active.pop(
+            graph.R002_REOPEN_PARENT_GOAL_ID
+        )
+        statuses[graph.R002_REOPEN_PARENT_GOAL_ID] = "READY"
+        statuses[future_goals[0][1]] = "READY"
+        state["transition_history"].extend(events)
+        state["goal_document_paths"].extend(future_paths)
+        state["managed_goal_paths"].extend(future_paths)
+        state["goal_document_count"] += len(future_paths)
+        state["managed_goal_path_count"] += len(future_paths)
+
+        self.assertTrue(
+            graph._fp022_seq66_67_successor_matches(ROOT, checkpoint)
         )
 
     def test_seq75_parent_ready_transition_is_required(self) -> None:
@@ -8647,29 +9110,6 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                     root, checkpoint
                 )
             ),
-        )
-
-    def test_later_fp046_r002_start_keeps_archived_r001_proof_valid(self) -> None:
-        root, checkpoint = self._checkpoint()
-        state = checkpoint["goal_execution"]
-        start = {
-            "sequence": 77,
-            "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-STARTED-FP046-R002-20260815-001",
-            "event_type": "GOAL_STARTED",
-            "subject_goal_id": graph.R002_REOPEN_SUCCESSORS[0]["goal_id"],
-            "previous_event_sha256": state["transition_history"][-1][
-                "event_sha256"
-            ],
-        }
-        start["event_sha256"] = graph.continuation.event_sha256(start)
-        state["transition_history"].append(start)
-        state["status_by_goal"][graph.R002_REOPEN_SUCCESSORS[0]["goal_id"]] = (
-            "IN_PROGRESS"
-        )
-
-        self.assertEqual(
-            graph.validate_fp046_npc_r002_reopen_seq72_76(root, checkpoint),
-            [],
         )
 
     def test_canonical_binding_and_r002_inventory_tamper_fail_closed(self) -> None:
@@ -8784,92 +9224,6 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                         root, checkpoint
                     )
                 )
-
-    def test_transition_review_binding_and_actual_bytes_fail_closed(self) -> None:
-        root, checkpoint = self._checkpoint()
-        checkpoint["goal_execution"]["transition_history"][71].pop(
-            "transition_review_binding"
-        )
-        self._reseal_suffix(checkpoint)
-        self.assertIn(
-            "FP046/NPC R002 transition review byte binding differs",
-            "\n".join(
-                graph.validate_fp046_npc_r002_reopen_seq72_76(
-                    root, checkpoint
-                )
-            ),
-        )
-
-        for relative, expected in (
-            (
-                r002_preflight.TRANSITION_ASSIGNMENT_REL,
-                "transition assignment is noncanonical",
-            ),
-            (
-                r002_preflight.TRANSITION_RESULT_REL,
-                "transition review result is noncanonical",
-            ),
-            (
-                r002_preflight.TRANSITION_INDEPENDENT_REL,
-                "transition independent review differs",
-            ),
-        ):
-            with self.subTest(relative=relative):
-                root, checkpoint = self._checkpoint()
-                path = root / relative
-                path.write_bytes(path.read_bytes() + b" ")
-
-                self.assertIn(
-                    expected,
-                    "\n".join(
-                        graph.validate_fp046_npc_r002_reopen_seq72_76(
-                            root, checkpoint
-                        )
-                    ),
-                )
-
-    def test_r008_control_review_binding_is_direct_and_byte_exact(self) -> None:
-        for mutation in ("missing", "path", "sha256", "byte_length"):
-            with self.subTest(mutation=mutation):
-                root, checkpoint = self._checkpoint()
-                event = checkpoint["goal_execution"]["transition_history"][71]
-                binding = event["r008_control_review_binding"]
-                if mutation == "missing":
-                    event.pop("r008_control_review_binding")
-                elif mutation == "path":
-                    binding["assignment"]["path"] = (
-                        completion_review.CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL.as_posix()
-                    )
-                elif mutation == "sha256":
-                    binding["review_result"]["sha256"] = "0" * 64
-                else:
-                    binding["independent_review"]["byte_length"] += 1
-                self._reseal_suffix(checkpoint)
-
-                self.assertIn(
-                    "FP046/NPC R002 R008 control review byte binding differs",
-                    "\n".join(
-                        graph.validate_fp046_npc_r002_reopen_seq72_76(
-                            root, checkpoint
-                        )
-                    ),
-                )
-
-    def test_goal_graph_rejects_another_valid_r008_review_triad(self) -> None:
-        root, checkpoint = self._checkpoint()
-        self._write_control_review(
-            root, assigned_at="2026-08-15T12:00:01+09:00"
-        )
-        completion_review.validated_control_successor_r008_context(root)
-
-        self.assertIn(
-            "FP046/NPC R002 R008 control review byte binding differs",
-            "\n".join(
-                graph.validate_fp046_npc_r002_reopen_seq72_76(
-                    root, checkpoint
-                )
-            ),
-        )
 
     def test_r029_gap_and_backlog_actual_bytes_fail_with_specific_error(self) -> None:
         for role, label in (

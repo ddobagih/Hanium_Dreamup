@@ -15,6 +15,25 @@ from scripts import apply_walksafe_fp046_npc_r002_reopen_20260815 as subject
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _fake_r009_material() -> tuple[dict[str, dict], dict[Path, bytes]]:
+    module = subject._control_successor_module()
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R009_PATHS)
+    raw_by_path = {
+        path: f"reviewed R009 {index}\n".encode("utf-8")
+        for index, path in enumerate(paths, start=1)
+    }
+    return subject._review_binding_by_role(paths, raw_by_path), raw_by_path
+
+
+@pytest.fixture(autouse=True)
+def _validated_r009_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        subject,
+        "load_validated_control_successor_r009",
+        lambda root: _fake_r009_material(),
+    )
+
+
 def _write(root: Path, relative: Path, raw: bytes) -> None:
     target = root / relative
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -22,14 +41,29 @@ def _write(root: Path, relative: Path, raw: bytes) -> None:
 
 
 def _copy_source(root: Path) -> None:
+    checkpoint = json.loads(
+        (ROOT / subject.CHECKPOINT_REL).read_text(encoding="utf-8")
+    )
+    artifact_register = next(
+        Path(binding["path"])
+        for binding in checkpoint["canonical_bindings"]
+        if binding["role"] == "ARTIFACT_REGISTER"
+    )
     paths = (
         subject.CHECKPOINT_REL,
+        artifact_register,
         *subject.R028_PATHS,
         subject.FP046_R001_REL,
         subject.NPC_R001_REL,
         subject.FP022_R001_REL,
         subject.EPIC03_REL,
         *subject.r029_candidate.CURRENT_SOURCE_PATHS,
+        *subject.R007_REVIEW_PINS,
+        *subject.TRANSITION_R001_PATHS,
+        *(
+            Path(path)
+            for path in checkpoint["goal_execution"]["goal_document_paths"]
+        ),
     )
     for path in paths:
         _write(root, path, (ROOT / path).read_bytes())
@@ -56,6 +90,112 @@ def _snapshot(root: Path) -> dict[str, bytes]:
 def _build(root: Path) -> dict:
     _fixture(root)
     return subject.build_preflight(root)
+
+
+def _post_publish_fixture(root: Path) -> dict:
+    _copy_source(root)
+    package = subject.build_transition_package(root)
+    subject.write_transition_assignment(
+        root,
+        assigned_at="2026-08-15T12:00:00+09:00",
+    )
+    assignment, assignment_raw, _current_package = subject._read_transition_assignment(
+        root
+    )
+    result = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
+        ),
+        "goal_id": subject.TRANSITION_GOAL_ID,
+        "round_id": subject.TRANSITION_ROUND_ID,
+        "reviewed_at": assignment["assigned_at"],
+        "reviewer": deepcopy(assignment["reviewer"]),
+        "assignment_binding": subject._binding(
+            subject.TRANSITION_ASSIGNMENT_REL,
+            assignment_raw,
+        ),
+        "decision": "APPROVED",
+        "findings": {"blocking": [], "major_open": [], "minor_open": []},
+        "finding_dispositions": [],
+        "review_scope": deepcopy(assignment["review_scope"]),
+        "review_boundary": deepcopy(assignment["review_boundary"]),
+    }
+    _write(
+        root,
+        subject.TRANSITION_RESULT_REL,
+        subject.json_text(result).encode("utf-8"),
+    )
+    subject.write_transition_independent_review(root)
+    review_raw = {
+        path: (root / path).read_bytes() for path in subject.TRANSITION_R002_PATHS
+    }
+    review_binding = subject._review_binding_by_role(
+        subject.TRANSITION_R002_PATHS,
+        review_raw,
+    )
+    final_plan = subject.bind_transition_review_evidence(
+        package["preflight"],
+        predecessor_transition_review_binding=package[
+            "predecessor_transition_review_bindings"
+        ],
+        transition_review_binding=review_binding,
+        transition_review_subject_binding=package[
+            "approval_neutral_plan_core_binding"
+        ],
+        r009_control_review_binding=package[
+            "r009_control_successor_review_bindings"
+        ],
+    )
+    canonical_outputs, _source_evidence = (
+        subject.r029_bridge.build_outputs_and_source_evidence(root)
+    )
+    for path, text in canonical_outputs.items():
+        _write(root, path, text.encode("utf-8"))
+    for path, text in final_plan["documents"].items():
+        _write(root, Path(path), text.encode("utf-8"))
+    _write(
+        root,
+        subject.AUTHORIZATION_REL,
+        subject.json_text(subject._authorization_document()).encode("utf-8"),
+    )
+    _write(
+        root,
+        subject.INITIAL_START_GATE_CONTRACT_REL,
+        subject.json_text(subject._initial_start_gate_contract(final_plan)).encode(
+            "utf-8"
+        ),
+    )
+    checkpoint = json.loads(
+        (root / subject.CHECKPOINT_REL).read_text(encoding="utf-8")
+    )
+    checkpoint["goal_execution"]["transition_history"].extend(final_plan["events"])
+    _write(
+        root,
+        subject.CHECKPOINT_REL,
+        subject.json_text(checkpoint).encode("utf-8"),
+    )
+    return checkpoint
+
+
+def _move_seq72_before_exact_position(history: list[dict]) -> None:
+    event = next(event for event in history if event.get("sequence") == 72)
+    history.remove(event)
+    history.insert(70, event)
+
+
+def _insert_event_between_seq73_and_seq74(history: list[dict]) -> None:
+    seq74_index = next(
+        index for index, event in enumerate(history) if event.get("sequence") == 74
+    )
+    history.insert(
+        seq74_index,
+        {
+            "sequence": 9_999,
+            "event_id": "UNEXPECTED-INTERLEAVED-EVENT",
+            "event_type": "UNEXPECTED_INTERLEAVING",
+        },
+    )
 
 
 def test_preflight_builds_exact_five_events_and_two_r002_docs_without_writing(
@@ -150,6 +290,30 @@ def test_preflight_builds_exact_five_events_and_two_r002_docs_without_writing(
     assert cbu["source_bindings"][
         "regression_trigger_discovery"
     ]["role"] == "REGRESSION_TRIGGER_DISCOVERY_CANDIDATE"
+    assert {
+        event["runtime_after"]["artifact_work_queue_sha256"]
+        for event in plan["events"]
+    } == {"ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc"}
+    assert [
+        event["runtime_after"]["completion_boundary_sha256"]
+        for event in plan["events"]
+    ] == [
+        "2127b6d84ae4384962adecbc05209402e40453112c1cb51618496f8382397b32",
+        "53654aabc9f05755069ded61795d7b759a5e863acbda038a91ecd8e875a7d4a0",
+        "afd738793dd68bffe2ba9066f268b2b27f410f19c9f92fca704b84f8c40c9120",
+        "23e17ac7f337528ca17d5f3dc4bd6c4ef95923facf807cad922055f4a7d6f5b7",
+        "4f3f0e675ca6772dc95451e2f72d1f6170edbdc6b16b0ddc92586ce0699bb0cf",
+    ]
+    assert subject.goal_graph.continuation.canonical_json_sha256(
+        plan["final_state"]["artifact_work_queue"]
+    ) == (
+        "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc"
+    )
+    assert subject.goal_graph.continuation.canonical_json_sha256(
+        plan["final_state"]["completion_boundary"]
+    ) == (
+        "4f3f0e675ca6772dc95451e2f72d1f6170edbdc6b16b0ddc92586ce0699bb0cf"
+    )
 
     fp046, _ = subject._goal_parts(
         plan["documents"][subject.FP046_R002_REL.as_posix()].encode(), "FP046 R002"
@@ -197,13 +361,172 @@ def test_transition_package_is_read_only_and_apply_stays_in_actual_writer(
     tmp_path: Path,
 ) -> None:
     _copy_source(tmp_path)
-    for path in subject.R007_REVIEW_PINS:
-        _write(tmp_path, path, (ROOT / path).read_bytes())
     before = _snapshot(tmp_path)
 
     assert subject.main(["--root", str(tmp_path), "--print-transition-package"]) == 0
     assert subject.main(["--root", str(tmp_path), "--apply"]) == 1
     assert before == _snapshot(tmp_path)
+
+
+def test_r001_is_exact_frozen_predecessor_and_r002_is_add_only_current(
+    tmp_path: Path,
+) -> None:
+    _copy_source(tmp_path)
+    before = {
+        path: (tmp_path / path).read_bytes()
+        for path in subject.TRANSITION_R001_PATHS
+    }
+
+    binding, raw_by_path = subject.load_frozen_transition_r001(tmp_path)
+
+    assert binding == subject._review_binding_by_role(
+        subject.TRANSITION_R001_PATHS,
+        raw_by_path,
+    )
+    assert subject.TRANSITION_ASSIGNMENT_REL == subject.TRANSITION_R002_ASSIGNMENT_REL
+    assert subject.TRANSITION_RESULT_REL == subject.TRANSITION_R002_RESULT_REL
+    assert subject.TRANSITION_INDEPENDENT_REL == subject.TRANSITION_R002_INDEPENDENT_REL
+    assert not set(subject.TRANSITION_R001_PATHS) & set(subject.TRANSITION_R002_PATHS)
+
+    subject.write_transition_assignment(
+        tmp_path,
+        assigned_at="2026-08-15T12:00:00+09:00",
+    )
+
+    assert (tmp_path / subject.TRANSITION_R002_ASSIGNMENT_REL).is_file()
+    assert before == {
+        path: (tmp_path / path).read_bytes()
+        for path in subject.TRANSITION_R001_PATHS
+    }
+
+
+def test_frozen_r001_loader_rejects_one_byte_drift(tmp_path: Path) -> None:
+    _copy_source(tmp_path)
+    target = tmp_path / subject.TRANSITION_R001_RESULT_REL
+    target.write_bytes(target.read_bytes() + b" ")
+
+    with pytest.raises(subject.BuildError, match="frozen transition R001 review differs"):
+        subject.load_frozen_transition_r001(tmp_path)
+
+
+def test_r002_scope_exactly_binds_neutral_core_and_eight_outputs(
+    tmp_path: Path,
+) -> None:
+    _copy_source(tmp_path)
+    package = subject.build_transition_package(tmp_path)
+    scope = subject._transition_scope(package)
+
+    assert package["schema_version"].endswith("transition-package.v2")
+    assert "r007_control_successor_review_bindings" not in scope
+    assert len(scope["corrected_add_only_output_bindings"]) == 8
+    assert scope["corrected_plan_core_binding"] == subject.transition_plan_core_binding(
+        package["approval_neutral_plan_core"]
+    )
+    seq72 = package["approval_neutral_plan_core"]["events"][0]
+    assert seq72["predecessor_transition_review_binding"] == package[
+        "predecessor_transition_review_bindings"
+    ]
+    assert seq72["r009_control_review_binding"] == package[
+        "r009_control_successor_review_bindings"
+    ]
+    assert "transition_review_binding" not in seq72
+    assert "transition_review_subject_binding" not in seq72
+
+    tampered = deepcopy(package)
+    next(
+        row
+        for row in tampered["staged_subject_bindings"]
+        if row["path"] == subject.AUTHORIZATION_REL.as_posix()
+    )["sha256"] = "0" * 64
+    with pytest.raises(subject.BuildError, match="add-only output bindings differ"):
+        subject._transition_scope(tampered)
+
+
+def test_post_publish_r002_loader_allows_seq77_and_seq78_suffix(
+    tmp_path: Path,
+) -> None:
+    checkpoint = _post_publish_fixture(tmp_path)
+    checkpoint["goal_execution"]["transition_history"].extend(
+        [
+            {
+                "sequence": 77,
+                "event_id": "TEST-SEQ77-GOAL-STARTED",
+                "event_type": "GOAL_STARTED",
+            },
+            {
+                "sequence": 78,
+                "event_id": "TEST-SEQ78-GOAL-COMPLETED",
+                "event_type": "GOAL_COMPLETED",
+            },
+        ]
+    )
+    _write(
+        tmp_path,
+        subject.CHECKPOINT_REL,
+        subject.json_text(checkpoint).encode("utf-8"),
+    )
+
+    binding, raw_by_path = subject.load_validated_transition_r002(tmp_path)
+
+    assert binding == subject._review_binding_by_role(
+        subject.TRANSITION_R002_PATHS,
+        raw_by_path,
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    (
+        pytest.param(
+            lambda history: history.append(
+                deepcopy(next(event for event in history if event.get("sequence") == 72))
+            ),
+            "post-publish seq72 transition is missing or non-unique",
+            id="duplicate-seq72",
+        ),
+        pytest.param(
+            lambda history: history.__setitem__(
+                slice(None),
+                [event for event in history if event.get("sequence") != 74],
+            ),
+            "post-publish seq74 transition is missing or non-unique",
+            id="missing-seq74",
+        ),
+        pytest.param(
+            lambda history: next(
+                event for event in history if event.get("sequence") == 75
+            ).__setitem__("event_id", "TAMPERED-SEQ75-EVENT"),
+            "post-publish seq75 transition identity differs",
+            id="tampered-seq75-event-id",
+        ),
+        pytest.param(
+            _move_seq72_before_exact_position,
+            "post-publish seq72-76 transition position differs",
+            id="seq72-moved-before-index-71",
+        ),
+        pytest.param(
+            _insert_event_between_seq73_and_seq74,
+            "post-publish seq72-76 transition position differs",
+            id="event-inserted-between-seq73-and-seq74",
+        ),
+    ),
+)
+def test_post_publish_r002_loader_rejects_non_exact_seq72_76_history(
+    tmp_path: Path,
+    mutate,
+    message: str,
+) -> None:
+    checkpoint = _post_publish_fixture(tmp_path)
+    history = checkpoint["goal_execution"]["transition_history"]
+    mutate(history)
+    _write(
+        tmp_path,
+        subject.CHECKPOINT_REL,
+        subject.json_text(checkpoint).encode("utf-8"),
+    )
+
+    with pytest.raises(subject.BuildError, match=message):
+        subject.load_validated_transition_r002(tmp_path)
 
 
 def test_authorization_uses_exact_latest_user_instruction_and_stops_before_seq77(
@@ -226,8 +549,6 @@ def test_transition_review_binds_separate_reviewer_and_review_time(
     tmp_path: Path,
 ) -> None:
     _copy_source(tmp_path)
-    for path in subject.R007_REVIEW_PINS:
-        _write(tmp_path, path, (ROOT / path).read_bytes())
     assignment_raw = subject.build_transition_assignment(
         tmp_path,
         assigned_at="2026-08-15T12:00:00+09:00",
@@ -296,12 +617,8 @@ def test_plain_subprocess_does_not_write_pyc_in_isolated_copy(
     tmp_path: Path,
 ) -> None:
     isolated = tmp_path / "isolated"
-    for relative in (
-        Path("scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py"),
-            Path("scripts/build_walksafe_fp008_admin_review_delivery_trace_20260803.py"),
-            Path("scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py"),
-            Path("scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py"),
-        ):
+    for source in sorted((ROOT / "scripts").glob("*.py")):
+        relative = Path("scripts") / source.name
         _write(isolated, relative, (ROOT / relative).read_bytes())
     _fixture(isolated)
     environment = os.environ.copy()

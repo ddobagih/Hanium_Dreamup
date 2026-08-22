@@ -6279,158 +6279,289 @@ def _completion_source_is_allowed(
     )
 
 
-def _validate_r008_transition_review_binding(
+def _seq76_reviewed_final_state(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+    events: list[dict[str, Any]],
+    review: Any,
+) -> dict[str, Any]:
+    """Rewind later status transitions to the reviewed seq76 projection."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if (
+        not isinstance(state, dict)
+        or not isinstance(history, list)
+        or len(history) < 76
+        or len(events) != 5
+        or history[71:76] != events
+    ):
+        raise ValueError("seq72-76 reviewed history slice differs")
+    seq74, seq75, seq76 = events[2:]
+    completion = seq74.get("completion_evidence_by_goal_after")
+    archived = seq74.get("archived_completion_evidence_by_goal_after")
+    inventory = seq75.get("dynamic_goal_inventory_after")
+    children = seq75.get("materialized_child_goal_ids_by_parent_after")
+    runtime = seq76.get("runtime_after")
+    statuses = copy.deepcopy(state.get("status_by_goal"))
+    if not all(
+        isinstance(value, dict)
+        for value in (completion, archived, inventory, children, runtime, statuses)
+    ):
+        raise ValueError("seq76 reviewed snapshot is incomplete")
+
+    for sequence, later in reversed(
+        list(enumerate(history[76:], start=77))
+    ):
+        if not isinstance(later, dict) or later.get("sequence") != sequence:
+            raise ValueError("post-seq76 history sequence is ambiguous")
+        changes = later.get("status_changes")
+        if not isinstance(changes, dict) or not all(
+            isinstance(goal_id, str) and isinstance(status, str)
+            for goal_id, status in changes.items()
+        ):
+            raise ValueError(f"post-seq76 status changes are malformed: {sequence}")
+        subject = later.get("subject_goal_id")
+        materialized = later.get("materialized_goal_id")
+        from_status = later.get("from_status")
+        to_status = later.get("to_status")
+        if changes:
+            for goal_id, after_status in changes.items():
+                if statuses.get(goal_id) != after_status:
+                    raise ValueError(
+                        f"post-seq76 status transition is ambiguous: {sequence}"
+                    )
+                if goal_id == materialized:
+                    statuses.pop(goal_id)
+                elif goal_id == subject and isinstance(from_status, str):
+                    statuses[goal_id] = from_status
+                else:
+                    raise ValueError(
+                        f"post-seq76 status transition is ambiguous: {sequence}"
+                    )
+            boundary_goal_id = (
+                subject
+                if isinstance(subject, str) and subject in changes
+                else materialized
+                if isinstance(materialized, str) and materialized in changes
+                else None
+            )
+            if (
+                boundary_goal_id is None
+                or to_status != changes[boundary_goal_id]
+            ):
+                raise ValueError(
+                    f"post-seq76 status boundary differs: {sequence}"
+                )
+        elif any(
+            value is not None
+            for value in (subject, materialized, from_status, to_status)
+        ) and (
+            not isinstance(subject, str)
+            or materialized is not None
+            or not isinstance(from_status, str)
+            or from_status != to_status
+            or statuses.get(subject) != to_status
+        ):
+            raise ValueError(
+                f"post-seq76 no-op status boundary differs: {sequence}"
+            )
+
+    ready = runtime.get("ready_frontier_goal_ids")
+    focus = runtime.get("focus_goal_id")
+    canonical = events[0].get("canonical_binding_snapshot_after")
+    blockers = seq76.get("blockers_after")
+    if (
+        not isinstance(ready, list)
+        or not all(isinstance(goal_id, str) for goal_id in ready)
+        or not isinstance(focus, str)
+        or not isinstance(canonical, dict)
+        or not isinstance(blockers, dict)
+    ):
+        raise ValueError("seq76 runtime projection is incomplete")
+    checkpoint_view = copy.deepcopy(dict(checkpoint))
+    state_view = checkpoint_view.get("goal_execution")
+    if not isinstance(state_view, dict):
+        raise ValueError("seq76 checkpoint projection is malformed")
+    state_view.update(
+        {
+            "status_by_goal": copy.deepcopy(statuses),
+            "completion_evidence_by_goal": copy.deepcopy(completion),
+            "archived_completion_evidence_by_goal": copy.deepcopy(archived),
+            "dynamic_goal_inventory": copy.deepcopy(inventory),
+            "materialized_child_goal_ids_by_parent": copy.deepcopy(children),
+            "ready_frontier_goal_ids": copy.deepcopy(ready),
+            "focus_goal_id": focus,
+            "blockers_by_goal": copy.deepcopy(blockers),
+            "package_status": runtime.get("package_status"),
+        }
+    )
+    checkpoint_view["canonical_bindings"] = [
+        copy.deepcopy(binding)
+        for binding in canonical.values()
+        if isinstance(binding, dict)
+    ]
+    if len(checkpoint_view["canonical_bindings"]) != len(canonical):
+        raise ValueError("seq76 canonical snapshot is malformed")
+    node_errors, nodes = review.goal_graph.frozen_goal.current_goal_nodes(
+        root,
+        state_view,
+    )
+    if node_errors:
+        raise ValueError(
+            "seq76 Goal nodes cannot be recovered: " + "; ".join(node_errors)
+        )
+    queue, boundary = review._derive_queue_and_boundary(
+        root,
+        checkpoint_view,
+        nodes,
+        statuses,
+        ready,
+    )
+    if (
+        runtime.get("artifact_work_queue_sha256")
+        != canonical_json_sha256(queue)
+        or runtime.get("completion_boundary_sha256")
+        != canonical_json_sha256(boundary)
+    ):
+        raise ValueError("seq76 runtime projection cannot be recovered exactly")
+    return {
+        "status_by_goal": statuses,
+        "completion_evidence_by_goal": copy.deepcopy(completion),
+        "archived_completion_evidence_by_goal": copy.deepcopy(archived),
+        "dynamic_goal_inventory": copy.deepcopy(inventory),
+        "materialized_child_goal_ids_by_parent": copy.deepcopy(children),
+        "ready_frontier_goal_ids": copy.deepcopy(ready),
+        "focus_goal_id": focus,
+        "artifact_work_queue": copy.deepcopy(queue),
+        "completion_boundary": copy.deepcopy(boundary),
+    }
+
+
+def _seq72_76_reviewed_plan(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+    events: list[dict[str, Any]],
+    review: Any,
+) -> dict[str, Any]:
+    """Reconstruct the exact public preflight subject from applied state."""
+
+    documents = {
+        relative.as_posix(): review._safe_regular_bytes(
+            root, relative, "published R002 Goal"
+        ).decode("utf-8")
+        for relative in (review.FP046_R002_REL, review.NPC_R002_REL)
+    }
+    return {
+        "schema_version": "walksafe.fp046-npc-r002-reopen-preflight.v1",
+        "transaction_status": "PREFLIGHT_ONLY_NOT_AUTHORIZED",
+        "final_state_projection_only": True,
+        "required_before_apply": list(
+            review.r029_candidate.OPERATIONAL_APPLICATION_PREREQUISITES
+        ),
+        "source_sequence": review.SOURCE_SEQUENCE,
+        "candidate_paths": {
+            "gap_json": review.r029_bridge.CANONICAL_GAP_JSON_REL.as_posix(),
+            "gap_md": review.r029_bridge.CANONICAL_GAP_MD_REL.as_posix(),
+            "backlog_json": (
+                review.r029_bridge.CANONICAL_BACKLOG_JSON_REL.as_posix()
+            ),
+            "backlog_md": (
+                review.r029_bridge.CANONICAL_BACKLOG_MD_REL.as_posix()
+            ),
+            "discovery_json": review.DISCOVERY_JSON_REL.as_posix(),
+            "discovery_md": review.DISCOVERY_MD_REL.as_posix(),
+        },
+        "documents": documents,
+        "events": copy.deepcopy(events),
+        "final_state": _seq76_reviewed_final_state(
+            root,
+            checkpoint,
+            events,
+            review,
+        ),
+    }
+
+
+def _validate_seq72_review_boundary(
     root: Path,
     event: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
     suffix: list[dict[str, Any]],
 ) -> list[str]:
-    """Bind seq72 to the actual approved transition-review triplet."""
+    """Bind seq72 to frozen R001, current R002, approved R009 and its core."""
 
     try:
         from scripts import (  # noqa: E402
             apply_walksafe_fp046_npc_r002_reopen_20260815 as review,
         )
-        review_paths = {
-            "assignment": review.TRANSITION_ASSIGNMENT_REL,
-            "review_result": review.TRANSITION_RESULT_REL,
-            "independent_review": review.TRANSITION_INDEPENDENT_REL,
-        }
-        raw_by_path = {
-            relative: review._safe_regular_bytes(
-                root, relative, "transition review"
-            )
-            for relative in review_paths.values()
-        }
-        expected_binding = {
-            role: review._binding(relative, raw_by_path[relative])
-            for role, relative in review_paths.items()
-        }
-        errors = []
-        if event.get("transition_review_binding") != expected_binding:
-            errors.append(
-                "FP046/NPC R002 seq72 transition review byte binding differs"
-            )
-
-        assignment_raw = raw_by_path[review.TRANSITION_ASSIGNMENT_REL]
-        result_raw = raw_by_path[review.TRANSITION_RESULT_REL]
-        independent_raw = raw_by_path[review.TRANSITION_INDEPENDENT_REL]
-        assignment = review.strict_json_bytes(
-            assignment_raw, "transition assignment"
-        )
-        result = review.strict_json_bytes(
-            result_raw, "transition review result"
-        )
-        source_bindings = event.get("source_bindings")
-        source_checkpoint = (
-            source_bindings.get("checkpoint")
-            if isinstance(source_bindings, dict)
-            else None
-        )
-        if (
-            not isinstance(source_checkpoint, dict)
-            or set(source_checkpoint) != {"path", "sha256", "byte_length"}
-            or source_checkpoint.get("path")
-            != review.CHECKPOINT_REL.as_posix()
-            or not SHA256_RE.fullmatch(str(source_checkpoint.get("sha256", "")))
-            or not isinstance(source_checkpoint.get("byte_length"), int)
-            or isinstance(source_checkpoint.get("byte_length"), bool)
-            or source_checkpoint["byte_length"] <= 0
-        ):
-            raise ValueError("transition source checkpoint binding differs")
-
-        def actual_binding(relative: Path) -> dict[str, Any]:
-            raw = review._safe_regular_bytes(root, relative, "review subject")
-            return review._binding(relative, raw)
-
-        for relative, (digest, byte_length) in review.R007_REVIEW_PINS.items():
-            binding = actual_binding(relative)
-            if (
-                binding["sha256"] != digest
-                or binding["byte_length"] != byte_length
-            ):
-                raise ValueError(f"R007 review binding differs: {relative}")
-        subject_paths = sorted(
-            {
-                *review.r029_bridge.CANONICAL_OUTPUT_PATHS,
-                review.FP046_R002_REL,
-                review.NPC_R002_REL,
-                review.AUTHORIZATION_REL,
-                review.INITIAL_START_GATE_CONTRACT_REL,
-            }
-        )
-        package = {
-            "source_checkpoint": copy.deepcopy(source_checkpoint),
-            "r007_control_successor_review_bindings": [
-                actual_binding(relative) for relative in review.R007_REVIEW_PINS
-            ],
-            "authorization": actual_binding(review.AUTHORIZATION_REL),
-            "initial_start_gate_contract": actual_binding(
-                review.INITIAL_START_GATE_CONTRACT_REL
-            ),
-            "staged_subject_bindings": [
-                actual_binding(relative) for relative in subject_paths
-            ],
-            "preflight": {"events": suffix},
-        }
-        review.validate_transition_assignment_document(
-            assignment, assignment_raw, package
-        )
-        review._validate_transition_result_document(
-            result, result_raw, assignment, assignment_raw
-        )
-        expected_independent = review.build_transition_independent_review(
-            assignment, assignment_raw, result, result_raw
-        ).encode("utf-8")
-        if independent_raw != expected_independent:
-            raise ValueError("transition independent review differs")
     except Exception as exc:
-        return [f"FP046/NPC R002 seq72 transition review differs: {exc}"]
-    return errors
+        return [f"FP046/NPC R002 seq72 review validator is unavailable: {exc}"]
 
+    loaded: dict[str, tuple[dict[str, dict[str, Any]], dict[Path, bytes]]] = {}
+    for label, loader in (
+        ("frozen R001 transition review", review.load_frozen_transition_r001),
+        ("approved R009 control review", review.load_validated_control_successor_r009),
+        ("current R002 transition review", review.load_validated_transition_r002),
+    ):
+        try:
+            loaded[label] = loader(root)
+        except Exception as exc:
+            return [f"FP046/NPC R002 seq72 {label} differs: {exc}"]
 
-def _validate_r008_control_review_boundary(
-    root: Path,
-    event: Mapping[str, Any],
-    checkpoint: Mapping[str, Any],
-) -> list[str]:
-    """Bind seq72 and its managed snapshot to the live validated R008 triad."""
+    r001_binding, r001_raw = loaded["frozen R001 transition review"]
+    r002_binding, r002_raw = loaded["current R002 transition review"]
+    r009_binding, r009_raw = loaded["approved R009 control review"]
+    errors: list[str] = []
+    for field, expected, label in (
+        (
+            "predecessor_transition_review_binding",
+            r001_binding,
+            "frozen R001 transition review",
+        ),
+        ("transition_review_binding", r002_binding, "current R002 transition review"),
+        ("r009_control_review_binding", r009_binding, "approved R009 control review"),
+    ):
+        if event.get(field) != expected:
+            errors.append(f"FP046/NPC R002 seq72 {label} byte binding differs")
+    if "r008_control_review_binding" in event:
+        errors.append("FP046/NPC R002 seq72 superseded R008 review binding is present")
+
+    all_raw = {**r001_raw, **r002_raw, **r009_raw}
+    expected_paths = {path.as_posix() for path in all_raw}
+    if len(all_raw) != 9 or len(expected_paths) != 9:
+        errors.append("FP046/NPC R002 seq72 review source path inventory differs")
+    snapshot = checkpoint.get("working_tree_snapshot")
+    managed = (
+        snapshot.get("managed_changed_paths")
+        if isinstance(snapshot, dict)
+        else None
+    )
+    handoff = checkpoint.get("session_handoff")
+    changed_files = (
+        handoff.get("changed_files") if isinstance(handoff, dict) else None
+    )
+    if (
+        not isinstance(managed, list)
+        or not expected_paths.issubset(managed)
+        or not isinstance(changed_files, list)
+        or not expected_paths.issubset(changed_files)
+    ):
+        errors.append("FP046/NPC R002 seq72 nine-file review managed closure differs")
 
     try:
-        from scripts import (  # noqa: E402
-            build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+        plan = _seq72_76_reviewed_plan(root, checkpoint, suffix, review)
+        assignment = review.strict_json_bytes(
+            r002_raw[review.TRANSITION_R002_ASSIGNMENT_REL],
+            "transition R002 assignment",
         )
-
-        review.validated_control_successor_r008_context(root)
-        path_by_role = {
-            "assignment": Path(review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL),
-            "review_result": Path(review.CONTROL_SUCCESSOR_R008_RESULT_REL),
-            "independent_review": Path(
-                review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL
-            ),
-        }
-        if tuple(path_by_role.values()) != tuple(
-            Path(path) for path in review.CONTROL_SUCCESSOR_R008_PATHS
-        ):
-            raise ValueError("R008 control review role paths differ")
-        expected_binding = {
-            role: review._binding(relative, review._raw(root, relative))
-            for role, relative in path_by_role.items()
-        }
+        scope = assignment.get("review_scope")
+        if not isinstance(scope, dict):
+            raise ValueError("transition R002 review scope is missing")
+        review.validate_reviewed_transition_plan(plan, scope, r002_binding)
     except Exception as exc:
-        return [f"FP046/NPC R002 seq72 R008 control review differs: {exc}"]
-    errors: list[str] = []
-    if event.get("r008_control_review_binding") != expected_binding:
         errors.append(
-            "FP046/NPC R002 seq72 R008 control review byte binding differs"
-        )
-    state = checkpoint.get("working_tree_snapshot")
-    managed = state.get("managed_changed_paths") if isinstance(state, dict) else None
-    expected_paths = {
-        relative.as_posix() for relative in path_by_role.values()
-    }
-    if not isinstance(managed, list) or not expected_paths.issubset(managed):
-        errors.append(
-            "FP046/NPC R002 seq72 R008 control review managed paths differ"
+            f"FP046/NPC R002 seq72 approval-neutral reviewed core differs: {exc}"
         )
     return errors
 
@@ -6522,9 +6653,13 @@ def validate_fp046_npc_r002_seq72_boundary(
             )
 
     suffix = [item for item in history[71:76] if isinstance(item, dict)]
-    errors.extend(_validate_r008_transition_review_binding(root, event, suffix))
     errors.extend(
-        _validate_r008_control_review_boundary(root, event, checkpoint)
+        _validate_seq72_review_boundary(
+            root,
+            event,
+            checkpoint,
+            suffix,
+        )
     )
     return errors
 

@@ -917,6 +917,20 @@ CONTROL_SUCCESSOR_R008_PATHS = (
     CONTROL_SUCCESSOR_R008_RESULT_REL,
     CONTROL_SUCCESSOR_R008_INDEPENDENT_REL,
 )
+CONTROL_SUCCESSOR_R008_PINS = {
+    CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL: (
+        "4522d3a2b650ff9defa31621f4b1e5758bda0539352a97add753ddae6f898061",
+        15_571,
+    ),
+    CONTROL_SUCCESSOR_R008_RESULT_REL: (
+        "6e501cba3c0705dea9e27fb2374d88317207795c765c9b07093ab8b8c1a907fa",
+        15_586,
+    ),
+    CONTROL_SUCCESSOR_R008_INDEPENDENT_REL: (
+        "923dc933eca1e340b5d4aa8fad33f2ee3f471321f29e21adb1aab0cbe12d923e",
+        15_887,
+    ),
+}
 CONTROL_SUCCESSOR_R008_ROUND_ID = (
     "WS-FP022-SEQ70-71-CURRENT-ACCEPTANCE-CONTROL-SUCCESSOR-20260815-R008"
 )
@@ -956,6 +970,52 @@ CONTROL_SUCCESSOR_R008_COHORT_PATHS = (
     *CONTROL_PATHS,
     *CONTROL_SUCCESSOR_R008_ADDED_CONTROL_PATHS,
 )
+CONTROL_SUCCESSOR_R009_DIR = (
+    Path("docs/control/execution/workstream-transitions/seq70-71")
+    / "control-successor-reviews/20260815/R009"
+)
+CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL = (
+    CONTROL_SUCCESSOR_R009_DIR / "assignment.json"
+)
+CONTROL_SUCCESSOR_R009_RESULT_REL = (
+    CONTROL_SUCCESSOR_R009_DIR / "review-result.json"
+)
+CONTROL_SUCCESSOR_R009_INDEPENDENT_REL = (
+    CONTROL_SUCCESSOR_R009_DIR / "independent-review.json"
+)
+CONTROL_SUCCESSOR_R009_PATHS = (
+    CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+    CONTROL_SUCCESSOR_R009_RESULT_REL,
+    CONTROL_SUCCESSOR_R009_INDEPENDENT_REL,
+)
+CONTROL_SUCCESSOR_R009_ROUND_ID = (
+    "WS-FP022-SEQ70-71-CURRENT-ACCEPTANCE-CONTROL-SUCCESSOR-20260815-R009"
+)
+CONTROL_SUCCESSOR_R009_ASSIGNER_ID = (
+    "codex-root-current-acceptance-control-r009-assigner-20260815"
+)
+CONTROL_SUCCESSOR_R009_ASSIGNER_TASK = "/root"
+CONTROL_SUCCESSOR_R009_EXECUTOR_ID = (
+    "codex-control-successor-r009-implementation-executor-20260815"
+)
+CONTROL_SUCCESSOR_R009_EXECUTOR_TASK = "/root/r009_control_review"
+CONTROL_SUCCESSOR_R009_REVIEWER_ID = (
+    "codex-control-successor-r009-independent-reviewer-20260815"
+)
+CONTROL_SUCCESSOR_R009_REVIEWER_TASK = "/root/r009_final_review"
+CONTROL_SUCCESSOR_R009_CHANGED_PATHS = {
+    SCRIPT_REL,
+    TEST_REL,
+    Path("scripts/check_walksafe_project_continuation_v2_4.py"),
+    Path("tests/test_walksafe_project_continuation_v2_4.py"),
+    Path("scripts/check_walksafe_goal_graph_v2_4.py"),
+    Path("tests/test_walksafe_goal_graph_v2_4.py"),
+    Path("scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py"),
+    Path("tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py"),
+    Path("scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"),
+    Path("tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"),
+}
+CONTROL_SUCCESSOR_R009_COHORT_PATHS = CONTROL_SUCCESSOR_R008_COHORT_PATHS
 
 PRODUCT_EXECUTOR_ID = "codex-fp022-navigation-implementer-20260814"
 PRODUCT_EXECUTOR_TASK = "/root"
@@ -1082,6 +1142,15 @@ class ControlSuccessorR008Context:
     predecessor_review_bindings: tuple[dict[str, Any], ...]
     control_code_successors: tuple[dict[str, Any], ...]
     added_control_code_bindings: tuple[dict[str, Any], ...]
+
+
+@dataclass(frozen=True)
+class ControlSuccessorR009Context:
+    root: Path
+    current: ReviewContext
+    predecessor: ControlSuccessorR008Context
+    predecessor_review_bindings: tuple[dict[str, Any], ...]
+    control_code_successors: tuple[dict[str, Any], ...]
 
 
 def _safe_path(root: Path, relative: Path) -> Path:
@@ -4904,6 +4973,346 @@ def validated_control_successor_r008_context(
     return context
 
 
+def prepare_frozen_control_successor_r008(
+    root: Path = ROOT,
+) -> tuple[ControlSuccessorR008Context, tuple[dict[str, Any], ...]]:
+    """Replay approved R008 from its add-only triad, not current cohort bytes."""
+
+    predecessor, predecessor_bindings = prepare_frozen_control_successor_r007(root)
+    documents: dict[Path, dict[str, Any]] = {}
+    raw_by_path: dict[Path, bytes] = {}
+    require(
+        tuple(CONTROL_SUCCESSOR_R008_PINS) == CONTROL_SUCCESSOR_R008_PATHS,
+        "control successor R008 pin inventory differs",
+    )
+    for relative in CONTROL_SUCCESSOR_R008_PATHS:
+        raw = _raw(root, relative)
+        expected_sha256, expected_length = CONTROL_SUCCESSOR_R008_PINS[relative]
+        require(
+            bytes_sha256(raw) == expected_sha256 and len(raw) == expected_length,
+            f"exact control successor R008 review differs: {relative}",
+        )
+        document = strict_json_bytes(raw, relative.as_posix())
+        documents[relative] = document
+        raw_by_path[relative] = raw
+
+    assignment = documents[CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL]
+    scope = assignment.get("review_scope")
+    require(type(scope) is dict, "control successor R008 scope is missing")
+    require(
+        scope.get("predecessor_control_successor_review_bindings")
+        == list(predecessor_bindings)
+        and scope.get("predecessor_current_control_code_cohort_sha256")
+        == predecessor.current.control_code_cohort_sha256,
+        "control successor R008 predecessor binding differs",
+    )
+    current_cohort = _validated_binding_cohort(
+        scope.get("reviewed_current_control_code_cohort"),
+        CONTROL_SUCCESSOR_R008_COHORT_PATHS,
+        "control successor R008 current control",
+    )
+    current_cohort_sha256 = scope.get(
+        "reviewed_current_control_code_cohort_sha256"
+    )
+    require(
+        type(current_cohort_sha256) is str
+        and current_cohort_sha256 == object_sha256(list(current_cohort)),
+        "control successor R008 current control aggregate differs",
+    )
+    successors = scope.get("reviewed_control_code_successors")
+    added = scope.get("reviewed_added_control_code_bindings")
+    require(
+        type(successors) is list and type(added) is list,
+        "control successor R008 semantic delta is missing",
+    )
+    before_by_path = {
+        row["path"]: row for row in predecessor.current.control_code_cohort
+    }
+    after_by_path = {row["path"]: row for row in current_cohort}
+    expected_successors = tuple(
+        {
+            "path": path.as_posix(),
+            "predecessor": copy.deepcopy(before_by_path[path.as_posix()]),
+            "successor": copy.deepcopy(after_by_path[path.as_posix()]),
+        }
+        for path in CONTROL_PATHS
+        if before_by_path[path.as_posix()] != after_by_path[path.as_posix()]
+    )
+    expected_added = tuple(
+        _validated_binding(
+            after_by_path[path.as_posix()],
+            path.as_posix(),
+            "control successor R008 added control",
+        )
+        for path in CONTROL_SUCCESSOR_R008_ADDED_CONTROL_PATHS
+    )
+    require(
+        tuple(successors) == expected_successors
+        and {row["path"] for row in expected_successors}
+        == {path.as_posix() for path in CONTROL_SUCCESSOR_R008_CHANGED_PATHS}
+        and tuple(added) == expected_added,
+        "control successor R008 frozen semantic delta differs",
+    )
+    current = ReviewContext(
+        root=root.resolve(strict=True),
+        start_review_bindings=predecessor.current.start_review_bindings,
+        completion_evidence_bindings=(
+            predecessor.current.completion_evidence_bindings
+        ),
+        superseded_assignment_bindings=(
+            predecessor.current.superseded_assignment_bindings
+        ),
+        control_code_cohort=current_cohort,
+        control_code_cohort_sha256=current_cohort_sha256,
+    )
+    frozen = ControlSuccessorR008Context(
+        root=root.resolve(strict=True),
+        current=current,
+        predecessor=predecessor,
+        predecessor_review_bindings=predecessor_bindings,
+        control_code_successors=copy.deepcopy(expected_successors),
+        added_control_code_bindings=copy.deepcopy(expected_added),
+    )
+    validate_control_successor_r008_review(root, frozen)
+    return frozen, tuple(
+        _binding(path, raw_by_path[path]) for path in CONTROL_SUCCESSOR_R008_PATHS
+    )
+
+
+def prepare_control_successor_r009_context(
+    root: Path = ROOT,
+) -> ControlSuccessorR009Context:
+    predecessor, predecessor_bindings = prepare_frozen_control_successor_r008(root)
+    current = _r008_live_current_review_context(root)
+    before_by_path = {
+        row["path"]: row for row in predecessor.current.control_code_cohort
+    }
+    after_by_path = {row["path"]: row for row in current.control_code_cohort}
+    expected_paths = tuple(
+        path.as_posix() for path in CONTROL_SUCCESSOR_R009_COHORT_PATHS
+    )
+    require(
+        tuple(before_by_path) == expected_paths
+        and tuple(after_by_path) == expected_paths,
+        "control successor R009 cohort path order differs",
+    )
+    successors = tuple(
+        {
+            "path": path.as_posix(),
+            "predecessor": copy.deepcopy(before_by_path[path.as_posix()]),
+            "successor": copy.deepcopy(after_by_path[path.as_posix()]),
+        }
+        for path in CONTROL_SUCCESSOR_R009_COHORT_PATHS
+        if before_by_path[path.as_posix()] != after_by_path[path.as_posix()]
+    )
+    require(
+        {row["path"] for row in successors}
+        == {path.as_posix() for path in CONTROL_SUCCESSOR_R009_CHANGED_PATHS},
+        "control successor R009 changed path set differs",
+    )
+    return ControlSuccessorR009Context(
+        root=root.resolve(strict=True),
+        current=current,
+        predecessor=predecessor,
+        predecessor_review_bindings=predecessor_bindings,
+        control_code_successors=copy.deepcopy(successors),
+    )
+
+
+def _control_successor_r009_scope(
+    context: ControlSuccessorR009Context,
+) -> dict[str, Any]:
+    require(
+        len(context.predecessor.current.control_code_cohort) == 23
+        and len(context.current.control_code_cohort) == 23
+        and len(context.control_code_successors)
+        == len(CONTROL_SUCCESSOR_R009_CHANGED_PATHS),
+        "control successor R009 cohort counts differ",
+    )
+    return {
+        "predecessor_control_successor_review_bindings": copy.deepcopy(
+            list(context.predecessor_review_bindings)
+        ),
+        "predecessor_current_control_code_cohort_sha256": (
+            context.predecessor.current.control_code_cohort_sha256
+        ),
+        "predecessor_control_code_cohort_path_count": len(
+            context.predecessor.current.control_code_cohort
+        ),
+        "reviewed_control_code_successors": copy.deepcopy(
+            list(context.control_code_successors)
+        ),
+        "reviewed_control_code_successor_path_count": len(
+            context.control_code_successors
+        ),
+        "reviewed_current_control_code_cohort": copy.deepcopy(
+            list(context.current.control_code_cohort)
+        ),
+        "reviewed_current_control_code_cohort_path_count": len(
+            context.current.control_code_cohort
+        ),
+        "reviewed_current_control_code_cohort_sha256": (
+            context.current.control_code_cohort_sha256
+        ),
+        "change_purpose": (
+            "Bind exact pre/post seq72-76 official validation parity and "
+            "fail-closed historical completion replay and queue boundaries "
+            "as the ten-path successor of approved R008, without seq77 or "
+            "product-code authority."
+        ),
+        "acceptance": {
+            "r008_review_triplet_is_replayed_as_exact_predecessor": True,
+            "predecessor_control_cohort_has_exactly_23_paths": True,
+            "current_control_cohort_has_exactly_23_paths": True,
+            "only_declared_ten_control_paths_changed": True,
+            "seq72_76_pre_and_post_official_validation_parity_is_exact": True,
+            "historical_completion_replay_is_fail_closed": True,
+            "queue_boundary_validation_is_fail_closed": True,
+            "seq77_goal_started_remains_excluded": True,
+            "product_code_change_remains_excluded": True,
+            "completion_formal_external_and_release_credit_remain_zero": True,
+        },
+    }
+
+
+def build_control_successor_r009_assignment(
+    context: ControlSuccessorR009Context,
+    *,
+    assigned_at: str,
+) -> str:
+    assignment = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_ASSIGNMENT"
+        ),
+        "goal_id": GOAL_ID,
+        "round_id": CONTROL_SUCCESSOR_R009_ROUND_ID,
+        "assigned_at": assigned_at,
+        "assigner": {
+            "role": "INTERNAL_REVIEW_ASSIGNER",
+            "agent_instance_id": CONTROL_SUCCESSOR_R009_ASSIGNER_ID,
+            "canonical_task": CONTROL_SUCCESSOR_R009_ASSIGNER_TASK,
+        },
+        "executor": {
+            "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
+            "agent_instance_id": CONTROL_SUCCESSOR_R009_EXECUTOR_ID,
+            "canonical_task": CONTROL_SUCCESSOR_R009_EXECUTOR_TASK,
+        },
+        "reviewer": {
+            "role": "SEPARATE_INTERNAL_REVIEWER",
+            "agent_instance_id": CONTROL_SUCCESSOR_R009_REVIEWER_ID,
+            "canonical_task": CONTROL_SUCCESSOR_R009_REVIEWER_TASK,
+        },
+        "review_scope": _control_successor_r009_scope(context),
+        "review_boundary": copy.deepcopy(BOUNDARY),
+    }
+    raw = json_text(assignment)
+    validate_control_successor_r009_assignment(assignment, raw.encode(), context)
+    return raw
+
+
+def validate_control_successor_r009_assignment(
+    assignment: Mapping[str, Any],
+    raw: bytes,
+    context: ControlSuccessorR009Context,
+) -> None:
+    _validate_control_successor_assignment_envelope(
+        assignment,
+        raw,
+        _control_successor_r009_scope(context),
+        round_id=CONTROL_SUCCESSOR_R009_ROUND_ID,
+        assigner_id=CONTROL_SUCCESSOR_R009_ASSIGNER_ID,
+        assigner_task=CONTROL_SUCCESSOR_R009_ASSIGNER_TASK,
+        executor_id=CONTROL_SUCCESSOR_R009_EXECUTOR_ID,
+        executor_task=CONTROL_SUCCESSOR_R009_EXECUTOR_TASK,
+        reviewer_id=CONTROL_SUCCESSOR_R009_REVIEWER_ID,
+        reviewer_task=CONTROL_SUCCESSOR_R009_REVIEWER_TASK,
+        label="control successor R009",
+    )
+
+
+def validate_control_successor_r009_result(
+    result: Mapping[str, Any],
+    raw: bytes,
+    assignment: Mapping[str, Any],
+    assignment_raw: bytes,
+    context: ControlSuccessorR009Context,
+) -> None:
+    validate_control_successor_r009_assignment(
+        assignment, assignment_raw, context
+    )
+    _validate_control_successor_result_envelope(
+        result,
+        raw,
+        assignment,
+        assignment_raw,
+        _control_successor_r009_scope(context),
+        round_id=CONTROL_SUCCESSOR_R009_ROUND_ID,
+        assignment_rel=CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+        label="control successor R009",
+    )
+
+
+def build_control_successor_r009_independent_review(
+    context: ControlSuccessorR009Context,
+    assignment: Mapping[str, Any],
+    assignment_raw: bytes,
+    result: Mapping[str, Any],
+    result_raw: bytes,
+) -> str:
+    validate_control_successor_r009_result(
+        result,
+        result_raw,
+        assignment,
+        assignment_raw,
+        context,
+    )
+    return _build_control_successor_independent(
+        assignment_raw,
+        result,
+        result_raw,
+        round_id=CONTROL_SUCCESSOR_R009_ROUND_ID,
+        assignment_rel=CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+        result_rel=CONTROL_SUCCESSOR_R009_RESULT_REL,
+    )
+
+
+def validate_control_successor_r009_review(
+    root: Path,
+    context: ControlSuccessorR009Context,
+) -> None:
+    assignment, assignment_raw = _document(
+        root, CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL
+    )
+    result, result_raw = _document(root, CONTROL_SUCCESSOR_R009_RESULT_REL)
+    validate_control_successor_r009_result(
+        result,
+        result_raw,
+        assignment,
+        assignment_raw,
+        context,
+    )
+    require(
+        _raw(root, CONTROL_SUCCESSOR_R009_INDEPENDENT_REL)
+        == build_control_successor_r009_independent_review(
+            context,
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        ).encode(),
+        "control successor R009 independent review differs",
+    )
+
+
+def validated_control_successor_r009_context(
+    root: Path = ROOT,
+) -> ControlSuccessorR009Context:
+    context = prepare_control_successor_r009_context(root)
+    validate_control_successor_r009_review(root, context)
+    return context
+
+
 def validated_control_successor_managed_closure_sources(
     root: Path = ROOT,
 ) -> tuple[dict[str, Any], ...]:
@@ -4917,7 +5326,7 @@ def validated_control_successor_managed_closure_sources(
 
 
 def validate_post_review(root: Path = ROOT) -> ReviewContext:
-    return validated_control_successor_r008_context(root).current
+    return validated_control_successor_r009_context(root).current
 
 
 def transition_review_binding(root: Path = ROOT) -> dict[str, dict[str, Any]]:
@@ -5207,6 +5616,34 @@ def write_control_successor_r008_independent(root: Path) -> None:
     )
 
 
+def write_control_successor_r009_assignment(root: Path) -> None:
+    context = prepare_control_successor_r009_context(root)
+    _write_add_only(
+        root,
+        CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+        build_control_successor_r009_assignment(context, assigned_at=_now()),
+    )
+
+
+def write_control_successor_r009_independent(root: Path) -> None:
+    context = prepare_control_successor_r009_context(root)
+    assignment, assignment_raw = _document(
+        root, CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL
+    )
+    result, result_raw = _document(root, CONTROL_SUCCESSOR_R009_RESULT_REL)
+    _write_add_only(
+        root,
+        CONTROL_SUCCESSOR_R009_INDEPENDENT_REL,
+        build_control_successor_r009_independent_review(
+            context,
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        ),
+    )
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--root", type=Path, default=ROOT)
@@ -5354,6 +5791,26 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     mode.add_argument(
         "--check-control-successor-r008-post-review",
+        action="store_true",
+    )
+    mode.add_argument(
+        "--write-control-successor-r009-assignment",
+        action="store_true",
+    )
+    mode.add_argument(
+        "--check-control-successor-r009-assignment",
+        action="store_true",
+    )
+    mode.add_argument(
+        "--check-control-successor-r009-review-result",
+        action="store_true",
+    )
+    mode.add_argument(
+        "--write-control-successor-r009-independent",
+        action="store_true",
+    )
+    mode.add_argument(
+        "--check-control-successor-r009-post-review",
         action="store_true",
     )
     return parser.parse_args(argv)
@@ -5557,7 +6014,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.write_control_successor_r008_independent:
             write_control_successor_r008_independent(root)
         elif args.check_control_successor_r008_post_review:
-            validate_post_review(root)
+            validated_control_successor_r008_context(root)
+        elif args.write_control_successor_r009_assignment:
+            write_control_successor_r009_assignment(root)
+        elif args.check_control_successor_r009_assignment:
+            context = prepare_control_successor_r009_context(root)
+            assignment, raw = _document(
+                root,
+                CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+            )
+            validate_control_successor_r009_assignment(assignment, raw, context)
+        elif args.check_control_successor_r009_review_result:
+            context = prepare_control_successor_r009_context(root)
+            assignment, assignment_raw = _document(
+                root,
+                CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+            )
+            result, result_raw = _document(
+                root,
+                CONTROL_SUCCESSOR_R009_RESULT_REL,
+            )
+            validate_control_successor_r009_result(
+                result,
+                result_raw,
+                assignment,
+                assignment_raw,
+                context,
+            )
+        elif args.write_control_successor_r009_independent:
+            write_control_successor_r009_independent(root)
+        elif args.check_control_successor_r009_post_review:
+            validated_control_successor_r009_context(root)
         else:
             raise ReviewError("unsupported completion review mode")
     except (OSError, ValueError, TypeError, ReviewError) as exc:
