@@ -1,0 +1,262 @@
+{
+  "assignment_binding": {
+    "byte_length": 11687,
+    "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/assignment.json",
+    "sha256": "37048f966e88bdd70ddf0a4752be79126dcbd9433cb854af1fd0c51b5dd3e4a3"
+  },
+  "decision": "APPROVED",
+  "evidence_type": "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT",
+  "finding_dispositions": [],
+  "findings": {
+    "blocking": [],
+    "major_open": [],
+    "minor_open": []
+  },
+  "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+  "review_boundary": {
+    "actual_device_credit_added": 0,
+    "approval_credit_added": 0,
+    "deployment_credit_added": 0,
+    "external_independence_claimed": false,
+    "external_review_credit_added": 0,
+    "formal_test_credit_added": 0,
+    "product_implementation_credit_added": 0,
+    "release_credit_added": 0,
+    "release_status": "NOT_ELIGIBLE"
+  },
+  "review_scope": {
+    "acceptance": {
+      "all_eight_add_only_outputs_are_byte_exact": true,
+      "atomic_apply_requires_exact_source_compare_exchange": true,
+      "discovery_records_remain_candidate_only": true,
+      "epic03_fp046_npc_completion_evidence_moves_active_to_archive": true,
+      "no_product_formal_device_external_deployment_or_release_credit": true,
+      "r003_transition_review_is_frozen_predecessor_only": true,
+      "r004_approval_envelope_normalizes_to_reviewed_plan_core": true,
+      "r009_control_successor_review_is_exact_and_frozen": true,
+      "r010_control_successor_review_is_exact_and_frozen": true,
+      "r011_control_successor_review_is_exact_and_approved": true,
+      "r029_canonical_outputs_are_byte_exact_bridge_outputs": true,
+      "seq72_through_seq76_only": true,
+      "seq77_goal_started_remains_not_authorized_not_run": true
+    },
+    "authorization": {
+      "byte_length": 828,
+      "path": "docs/control/execution/workstream-transitions/seq72-76/authorization.json",
+      "sha256": "60c7d6220d4a6de832747d28019a9b6b55a6982d45d1571746968300394445d1"
+    },
+    "candidate_discovery_publication": "NOT_APPLIED_CANDIDATE_ONLY",
+    "canonical_r029_subject_bindings": [
+      {
+        "byte_length": 533697,
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+        "sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922"
+      },
+      {
+        "byte_length": 612,
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.md",
+        "sha256": "d4ced7d5c298a9532e94a8bee11138de98724b54586a9037805a297898bae68f"
+      },
+      {
+        "byte_length": 65896,
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
+      },
+      {
+        "byte_length": 363,
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.md",
+        "sha256": "932602ef6b31d276aa4f8c75f37d708472469577d202decbb255b6aa6ac88b47"
+      }
+    ],
+    "corrected_add_only_output_bindings": [
+      {
+        "byte_length": 533697,
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+        "sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922"
+      },
+      {
+        "byte_length": 612,
+        "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.md",
+        "sha256": "d4ced7d5c298a9532e94a8bee11138de98724b54586a9037805a297898bae68f"
+      },
+      {
+        "byte_length": 65896,
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
+      },
+      {
+        "byte_length": 363,
+        "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.md",
+        "sha256": "932602ef6b31d276aa4f8c75f37d708472469577d202decbb255b6aa6ac88b47"
+      },
+      {
+        "byte_length": 1011,
+        "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
+        "sha256": "506d6afb202b63e4e30f3bb5ba1a560b18b8f76679a37a18a144a442a4a0fe5e"
+      },
+      {
+        "byte_length": 828,
+        "path": "docs/control/execution/workstream-transitions/seq72-76/authorization.json",
+        "sha256": "60c7d6220d4a6de832747d28019a9b6b55a6982d45d1571746968300394445d1"
+      },
+      {
+        "byte_length": 4963,
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+        "sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429"
+      },
+      {
+        "byte_length": 4685,
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
+        "sha256": "540cc240f0e9154431706ee595e2dc24426e51c358a938d5986ce774bb076b70"
+      }
+    ],
+    "corrected_plan_core_binding": {
+      "byte_length": 168509,
+      "content_type": "FP046_NPC_R002_APPROVAL_NEUTRAL_SEQ72_76_PLAN_CORE",
+      "sha256": "a24b6ef281382bcf07761e5e8d0bde0c7b1cfdf206a5914abf515cdd50a2ce31"
+    },
+    "initial_start_gate_contract": {
+      "byte_length": 1011,
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
+      "sha256": "506d6afb202b63e4e30f3bb5ba1a560b18b8f76679a37a18a144a442a4a0fe5e"
+    },
+    "predecessor_transition_review_bindings": {
+      "assignment": {
+        "byte_length": 10715,
+        "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/assignment.json",
+        "sha256": "d387f5058b00b50c15aadfa77b844d59d7b08529e4efadacf96719dccc2cbdd8"
+      },
+      "independent_review": {
+        "byte_length": 10964,
+        "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/independent-review.json",
+        "sha256": "a0ddc130d23048a6c5ab39e6dd78d8d485338caaee3192f83c01dcb3eca0210e"
+      },
+      "review_result": {
+        "byte_length": 10706,
+        "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/review-result.json",
+        "sha256": "c4c1c8820df69ef0c6ac73f39ab175c5704e6c97200f8c73764975d1846799bc"
+      }
+    },
+    "projected_transition": [
+      {
+        "event_id": "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP046-R002-20260815-001",
+        "event_type": "CANONICAL_BINDINGS_UPDATED",
+        "sequence": 72,
+        "status_changes": {
+          "WS-GOAL-EPIC-03": "PLANNED"
+        }
+      },
+      {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-FP046-R002-20260815-001",
+        "event_type": "GOAL_SUPERSEDED",
+        "sequence": 73,
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R001": "SUPERSEDED",
+          "WS-GOAL-EPIC-03-FP-046-R002": "PLANNED"
+        }
+      },
+      {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-NPC-SINGLE-ADMIN-RECOVERY-R002-20260815-001",
+        "event_type": "GOAL_SUPERSEDED",
+        "sequence": 74,
+        "status_changes": {
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": "SUPERSEDED",
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": "PLANNED"
+        }
+      },
+      {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-EPIC03-REOPEN-20260815-001",
+        "event_type": "GOAL_READY",
+        "sequence": 75,
+        "status_changes": {
+          "WS-GOAL-EPIC-03": "READY"
+        }
+      },
+      {
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001",
+        "event_type": "GOAL_READY",
+        "sequence": 76,
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R002": "READY"
+        }
+      }
+    ],
+    "r002_goal_subject_bindings": [
+      {
+        "byte_length": 4963,
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+        "sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429"
+      },
+      {
+        "byte_length": 4685,
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
+        "sha256": "540cc240f0e9154431706ee595e2dc24426e51c358a938d5986ce774bb076b70"
+      }
+    ],
+    "r009_control_successor_review_bindings": {
+      "assignment": {
+        "byte_length": 13943,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/assignment.json",
+        "sha256": "e7199de7e86e9d07ab0e78a4b5a19d1ba97ea990e3b9a1eead4a1f3a3972ae52"
+      },
+      "independent_review": {
+        "byte_length": 14262,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/independent-review.json",
+        "sha256": "1ec639abee046dd0ca2a023b8a1773d2300ef92b525c2787f2282aa7b47741d1"
+      },
+      "review_result": {
+        "byte_length": 13961,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/review-result.json",
+        "sha256": "170efe098440d41da2173af29527cae8278db90db6d82a7eacf1e3826097ba94"
+      }
+    },
+    "r010_control_successor_review_bindings": {
+      "assignment": {
+        "byte_length": 13933,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/assignment.json",
+        "sha256": "fba3cd9619af6fb159f06682b15079caccc69d8ce6959903935b8a196021969d"
+      },
+      "independent_review": {
+        "byte_length": 14252,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/independent-review.json",
+        "sha256": "307bd88a6057d28b282b1d554d276ac420cf60e5448abf47efe61bc7c1c86710"
+      },
+      "review_result": {
+        "byte_length": 13951,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/review-result.json",
+        "sha256": "bd605d25773a7a904724448b0dd5f0d47c8d1acaa04e223aa493659565f8c095"
+      }
+    },
+    "r011_control_successor_review_bindings": {
+      "assignment": {
+        "byte_length": 13846,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+        "sha256": "aa2a5341346fb383d681f42216e4bb8642be4f6d46fa1fded6040032c0f5403f"
+      },
+      "independent_review": {
+        "byte_length": 14165,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+        "sha256": "98b9575e681e118be12773e05aad7c7f408a71c94ba673edcd91e8eea6357794"
+      },
+      "review_result": {
+        "byte_length": 13864,
+        "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
+        "sha256": "bc768f559ae645972df09b7f05ab46cb8e5bbadb723d642a23c217962f2bd000"
+      }
+    },
+    "source_checkpoint": {
+      "byte_length": 2089622,
+      "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+      "sha256": "3744c9b8e70c968bfb7d0c0759a9c3dc2ca6a0e8ef1dfea1114ed52916c0adaa"
+    },
+    "source_sequence": 71
+  },
+  "reviewed_at": "2026-08-22T21:18:06+00:00",
+  "reviewer": {
+    "agent_instance_id": "codex-fp046-npc-r002-transition-successor-r004-reviewer-20260823",
+    "canonical_task": "/root/r004_transition_final_review",
+    "role": "SEPARATE_INTERNAL_REVIEWER"
+  },
+  "round_id": "WS-FP046-NPC-R002-REOPEN-TRANSITION-20260815-R004",
+  "schema_version": "1.0"
+}
