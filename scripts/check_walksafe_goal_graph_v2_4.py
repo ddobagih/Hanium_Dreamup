@@ -6516,7 +6516,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             else None
         )
         fp022_control_successor_context = (
-            fp022_completion_review.validated_control_successor_r010_context(
+            fp022_completion_review.validated_control_successor_r011_context(
                 root
             )
             if fp022_completion_suffix
@@ -16216,17 +16216,22 @@ def _r002_review_authority_errors(
             raise ValueError("reviewed checkpoint plan is malformed")
         r001_binding, r001_raw = review.load_frozen_transition_r001(root)
         r002_binding, r002_raw = review.load_frozen_transition_r002(root)
-        r003_binding, r003_raw = review.load_validated_transition_r003(root)
+        r003_binding, r003_raw = review.load_frozen_transition_r003(root)
+        r004_binding, r004_raw = review.load_validated_transition_r004(root)
         r009_binding, r009_raw = review.load_frozen_control_successor_r009(
             root
         )
-        r010_binding, r010_raw = review.load_validated_control_successor_r010(
+        r010_binding, r010_raw = review.load_frozen_control_successor_r010(
+            root
+        )
+        r011_binding, r011_raw = review.load_validated_control_successor_r011(
             root
         )
         path_groups = (
             (tuple(Path(path) for path in review.TRANSITION_R001_PATHS), r001_raw),
             (tuple(Path(path) for path in review.TRANSITION_R002_PATHS), r002_raw),
             (tuple(Path(path) for path in review.TRANSITION_R003_PATHS), r003_raw),
+            (tuple(Path(path) for path in review.TRANSITION_R004_PATHS), r004_raw),
             (
                 tuple(
                     Path(path)
@@ -16241,6 +16246,13 @@ def _r002_review_authority_errors(
                 ),
                 r010_raw,
             ),
+            (
+                tuple(
+                    Path(path)
+                    for path in control_review.CONTROL_SUCCESSOR_R011_PATHS
+                ),
+                r011_raw,
+            ),
         )
         exact_bindings = tuple(
             _r002_exact_review_binding(root, paths, raw_by_path)
@@ -16252,28 +16264,32 @@ def _r002_review_authority_errors(
             expected_r001,
             expected_r002,
             expected_r003,
+            expected_r004,
             expected_r009,
             expected_r010,
+            expected_r011,
         ) = exact_bindings
         if (
             r001_binding != expected_r001
             or r002_binding != expected_r002
             or r003_binding != expected_r003
+            or r004_binding != expected_r004
             or r009_binding != expected_r009
             or r010_binding != expected_r010
+            or r011_binding != expected_r011
         ):
             raise ValueError("validated review role binding differs")
         assignment = review.strict_json_bytes(
-            r003_raw[review.TRANSITION_R003_ASSIGNMENT_REL],
-            "transition R003 assignment",
+            r004_raw[review.TRANSITION_R004_ASSIGNMENT_REL],
+            "transition R004 assignment",
         )
         scope = assignment.get("review_scope")
         if not isinstance(scope, dict):
-            raise ValueError("transition R003 review scope is missing")
+            raise ValueError("transition R004 review scope is missing")
         review.validate_reviewed_transition_plan(
             plan,
             scope,
-            expected_r003,
+            expected_r004,
         )
         core_binding = scope.get("corrected_plan_core_binding")
         if not isinstance(core_binding, dict):
@@ -16283,11 +16299,12 @@ def _r002_review_authority_errors(
 
     errors: list[str] = []
     expected_event_bindings = {
-        "predecessor_transition_review_binding": expected_r002,
-        "transition_review_binding": expected_r003,
+        "predecessor_transition_review_binding": expected_r003,
+        "transition_review_binding": expected_r004,
         "transition_review_subject_binding": core_binding,
         "r009_control_review_binding": expected_r009,
         "r010_control_review_binding": expected_r010,
+        "r011_control_review_binding": expected_r011,
     }
     actual_review_fields = {
         field
@@ -16312,7 +16329,7 @@ def _r002_review_authority_errors(
         for path in paths
     }
     if (
-        len(required_paths) != 15
+        len(required_paths) != 21
         or not isinstance(managed, list)
         or not required_paths.issubset(managed)
     ):

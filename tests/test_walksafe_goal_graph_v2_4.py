@@ -7109,7 +7109,7 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
             )
         validate_post_review.assert_called_once_with(ROOT)
 
-    def test_seq71_managed_closure_uses_frozen_start_and_current_r010_review(
+    def test_seq71_managed_closure_uses_frozen_start_and_current_r011_review(
         self,
     ) -> None:
         checkpoint = (
@@ -7181,7 +7181,7 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
             ) as frozen_loader,
             mock.patch(
                 "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
-                "validated_control_successor_r010_context",
+                "validated_control_successor_r011_context",
                 return_value=completion_successor_context,
             ) as completion_loader,
             mock.patch(
@@ -7205,12 +7205,12 @@ class WalkSafeNpcSingleAdminRecoverySuccessorTest(unittest.TestCase):
         completion_loader.assert_called_once_with(ROOT)
         closure_loader.assert_called_once_with(ROOT)
 
-    def test_seq71_managed_closure_rejects_malformed_r010(self) -> None:
+    def test_seq71_managed_closure_rejects_malformed_r011(self) -> None:
         checkpoint = load_json(ROOT / graph.CHECKPOINT_RELATIVE)
         with mock.patch(
             "scripts.build_walksafe_fp022_completion_seq70_71_review_20260814."
-            "validated_control_successor_r010_context",
-            side_effect=RuntimeError("malformed R010"),
+            "validated_control_successor_r011_context",
+            side_effect=RuntimeError("malformed R011"),
         ):
             self.assertFalse(
                 graph._npc_single_admin_recovery_completion_managed_closure_matches(
@@ -8342,6 +8342,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *(Path(path) for path in r002_preflight.TRANSITION_R001_PATHS),
             *(Path(path) for path in r002_preflight.TRANSITION_R002_PATHS),
             *(Path(path) for path in r002_preflight.TRANSITION_R003_PATHS),
+            *(Path(path) for path in r002_preflight.TRANSITION_R004_PATHS),
             *(
                 Path(path)
                 for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
@@ -8349,6 +8350,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *(
                 Path(path)
                 for path in completion_review.CONTROL_SUCCESSOR_R010_PATHS
+            ),
+            *(
+                Path(path)
+                for path in completion_review.CONTROL_SUCCESSOR_R011_PATHS
             ),
         )
         frozen_raw: dict[Path, bytes] = {}
@@ -8426,6 +8431,9 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         r003_paths = tuple(
             Path(path) for path in r002_preflight.TRANSITION_R003_PATHS
         )
+        r004_paths = tuple(
+            Path(path) for path in r002_preflight.TRANSITION_R004_PATHS
+        )
         r009_paths = tuple(
             Path(path)
             for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
@@ -8433,6 +8441,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         r010_paths = tuple(
             Path(path)
             for path in completion_review.CONTROL_SUCCESSOR_R010_PATHS
+        )
+        r011_paths = tuple(
+            Path(path)
+            for path in completion_review.CONTROL_SUCCESSOR_R011_PATHS
         )
 
         def load(paths: tuple[Path, ...]) -> tuple[dict, dict[Path, bytes]]:
@@ -8455,6 +8467,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             r003_paths,
             {path: frozen_raw[path] for path in r003_paths},
         )
+        r004_binding = binding(
+            r004_paths,
+            {path: frozen_raw[path] for path in r004_paths},
+        )
         r009_binding = binding(
             r009_paths,
             {path: frozen_raw[path] for path in r009_paths},
@@ -8462,6 +8478,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         r010_binding = binding(
             r010_paths,
             {path: frozen_raw[path] for path in r010_paths},
+        )
+        r011_binding = binding(
+            r011_paths,
+            {path: frozen_raw[path] for path in r011_paths},
         )
 
         def neutral(plan: dict) -> dict:
@@ -8492,10 +8512,11 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
         first = suffix[0]
         first.setdefault(
             "predecessor_transition_review_binding",
-            r002_binding,
+            r003_binding,
         )
         first.setdefault("r009_control_review_binding", r009_binding)
         first.setdefault("r010_control_review_binding", r010_binding)
+        first.setdefault("r011_control_review_binding", r011_binding)
         plan = graph._r002_checkpoint_review_plan(
             root,
             checkpoint,
@@ -8507,14 +8528,15 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             "_test_review_core_binding",
             core_binding(neutral(plan)),
         )
-        first.setdefault("transition_review_binding", r003_binding)
+        first.setdefault("transition_review_binding", r004_binding)
         first.setdefault("transition_review_subject_binding", expected_core)
 
         assignment = {
             "review_scope": {
-                "predecessor_transition_review_bindings": r002_binding,
+                "predecessor_transition_review_bindings": r003_binding,
                 "r009_control_successor_review_bindings": r009_binding,
                 "r010_control_successor_review_bindings": r010_binding,
+                "r011_control_successor_review_bindings": r011_binding,
                 "corrected_plan_core_binding": expected_core,
             }
         }
@@ -8529,11 +8551,11 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             transition_binding: dict,
         ) -> None:
             if (
-                transition_binding != r003_binding
+                transition_binding != r004_binding
                 or reviewed_plan["events"][0].get(
                     "predecessor_transition_review_binding"
                 )
-                != r002_binding
+                != r003_binding
                 or reviewed_plan["events"][0].get(
                     "r009_control_review_binding"
                 )
@@ -8542,6 +8564,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                     "r010_control_review_binding"
                 )
                 != r010_binding
+                or reviewed_plan["events"][0].get(
+                    "r011_control_review_binding"
+                )
+                != r011_binding
                 or reviewed_plan["events"][0].get(
                     "transition_review_subject_binding"
                 )
@@ -8561,16 +8587,24 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             side_effect=lambda _root: load(r002_paths),
         ), mock.patch.object(
             r002_preflight,
-            "load_validated_transition_r003",
+            "load_frozen_transition_r003",
             side_effect=lambda _root: load(r003_paths),
+        ), mock.patch.object(
+            r002_preflight,
+            "load_validated_transition_r004",
+            side_effect=lambda _root: load(r004_paths),
         ), mock.patch.object(
             r002_preflight,
             "load_frozen_control_successor_r009",
             side_effect=lambda _root: load(r009_paths),
         ), mock.patch.object(
             r002_preflight,
-            "load_validated_control_successor_r010",
+            "load_frozen_control_successor_r010",
             side_effect=lambda _root: load(r010_paths),
+        ), mock.patch.object(
+            r002_preflight,
+            "load_validated_control_successor_r011",
+            side_effect=lambda _root: load(r011_paths),
         ), mock.patch.object(
             r002_preflight,
             "strict_json_bytes",
@@ -8630,6 +8664,9 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *completion_review.CONTROL_SUCCESSOR_R005_PATHS,
             *completion_review.CONTROL_SUCCESSOR_R006_PATHS,
             *completion_review.CONTROL_SUCCESSOR_R007_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R008_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R009_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R010_PATHS,
         }
         source_paths = (
             r002_preflight.CHECKPOINT_REL,
@@ -8640,9 +8677,15 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             r002_preflight.EPIC03_REL,
             *r002_preflight.r029_candidate.CURRENT_SOURCE_PATHS,
             *r002_preflight.R007_REVIEW_PINS,
-            *completion_review.CONTROL_SUCCESSOR_R009_COHORT_PATHS,
+            *completion_review.CONTROL_SUCCESSOR_R011_COHORT_PATHS,
             *control_review_support_paths,
             *r002_transaction.CATALOG_RELATIVES,
+            *(
+                Path(path)
+                for path in source_checkpoint["working_tree_snapshot"][
+                    "managed_changed_paths"
+                ]
+            ),
             *(
                 Path(path)
                 for path in source_checkpoint["goal_execution"][
@@ -8658,34 +8701,103 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             target = root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((ROOT / relative).read_bytes())
+        r011_context = (
+            completion_review.prepare_control_successor_r011_context(root)
+        )
+        r011_assignment_raw = (
+            completion_review.build_control_successor_r011_assignment(
+                r011_context,
+                assigned_at="2026-08-23T00:00:00+09:00",
+            ).encode("utf-8")
+        )
+        r011_assignment = completion_review.strict_json_bytes(
+            r011_assignment_raw,
+            completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL.as_posix(),
+        )
+        r011_result = {
+            "schema_version": "1.0",
+            "evidence_type": (
+                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
+            ),
+            "goal_id": completion_review.GOAL_ID,
+            "round_id": completion_review.CONTROL_SUCCESSOR_R011_ROUND_ID,
+            "reviewed_at": r011_assignment["assigned_at"],
+            "reviewer": copy.deepcopy(r011_assignment["reviewer"]),
+            "assignment_binding": completion_review._binding(
+                completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
+                r011_assignment_raw,
+            ),
+            "review_scope": copy.deepcopy(r011_assignment["review_scope"]),
+            "decision": "APPROVED",
+            "findings": {"blocking": [], "major_open": [], "minor_open": []},
+            "finding_dispositions": [],
+            "review_boundary": copy.deepcopy(completion_review.BOUNDARY),
+        }
+        r011_result_raw = completion_review.json_text(r011_result).encode(
+            "utf-8"
+        )
+        r011_independent_raw = (
+            completion_review.build_control_successor_r011_independent_review(
+                r011_context,
+                r011_assignment,
+                r011_assignment_raw,
+                r011_result,
+                r011_result_raw,
+            ).encode("utf-8")
+        )
+        for relative, raw in (
+            (
+                completion_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
+                r011_assignment_raw,
+            ),
+            (
+                completion_review.CONTROL_SUCCESSOR_R011_RESULT_REL,
+                r011_result_raw,
+            ),
+            (
+                completion_review.CONTROL_SUCCESSOR_R011_INDEPENDENT_REL,
+                r011_independent_raw,
+            ),
+        ):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+        completion_review.validated_control_successor_r011_context(root)
         checkpoint = load_json(root / r002_preflight.CHECKPOINT_REL)
         historical_review_overlay = {
             Path(path): (ROOT / path).read_bytes()
-            for path in r002_preflight.TRANSITION_R001_PATHS
+            for path in (
+                *r002_preflight.TRANSITION_R001_PATHS,
+                *r002_preflight.TRANSITION_R002_PATHS,
+            )
         }
         predecessor_review_overlay = {
             Path(path): (ROOT / path).read_bytes()
-            for path in r002_preflight.TRANSITION_R002_PATHS
+            for path in r002_preflight.TRANSITION_R003_PATHS
         }
         transition_review_overlay = {
-            Path(path): f"transition-R003-{role}".encode("utf-8")
+            Path(path): f"transition-R004-{role}".encode("utf-8")
             for role, path in zip(
                 ("assignment", "review-result", "independent-review"),
-                r002_preflight.TRANSITION_R003_PATHS,
+                r002_preflight.TRANSITION_R004_PATHS,
                 strict=True,
             )
         }
+        for relative, raw in transition_review_overlay.items():
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
         r009_control_review_overlay = {
             Path(path): (ROOT / path).read_bytes()
             for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
         }
         r010_control_review_overlay = {
-            Path(path): f"control-R010-{role}".encode("utf-8")
-            for role, path in zip(
-                ("assignment", "review-result", "independent-review"),
-                completion_review.CONTROL_SUCCESSOR_R010_PATHS,
-                strict=True,
-            )
+            Path(path): (ROOT / path).read_bytes()
+            for path in completion_review.CONTROL_SUCCESSOR_R010_PATHS
+        }
+        r011_control_review_overlay = {
+            Path(path): (root / path).read_bytes()
+            for path in completion_review.CONTROL_SUCCESSOR_R011_PATHS
         }
         review_closure_paths = {
             *historical_review_overlay,
@@ -8693,6 +8805,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *transition_review_overlay,
             *r009_control_review_overlay,
             *r010_control_review_overlay,
+            *r011_control_review_overlay,
         }
         compact_paths = sorted(
             {
@@ -8700,8 +8813,14 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 for path in (
                     *r002_transaction.SOURCE_CONTROL_PATHS,
                     *r002_transaction.CATALOG_RELATIVES,
-                    *completion_review.CONTROL_SUCCESSOR_R010_COHORT_PATHS,
+                    *completion_review.CONTROL_SUCCESSOR_R011_COHORT_PATHS,
                     *review_closure_paths,
+                    *(
+                        Path(path)
+                        for path in source_checkpoint[
+                            "working_tree_snapshot"
+                        ]["managed_changed_paths"]
+                    ),
                 )
             }
         )
@@ -8733,6 +8852,9 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             r002_transaction._r010_control_review_binding(
                 r010_control_review_overlay
             ),
+            r002_transaction._r011_control_review_binding(
+                r011_control_review_overlay
+            ),
             predecessor_review_binding=(
                 r002_transaction._predecessor_transition_review_binding(
                     predecessor_review_overlay
@@ -8758,8 +8880,9 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             transition_review_overlay=transition_review_overlay,
             r009_control_review_overlay=r009_control_review_overlay,
             r010_control_review_overlay=r010_control_review_overlay,
-            r010_control_cohort_paths=(
-                completion_review.CONTROL_SUCCESSOR_R010_COHORT_PATHS
+            r011_control_review_overlay=r011_control_review_overlay,
+            r011_control_cohort_paths=(
+                completion_review.CONTROL_SUCCESSOR_R011_COHORT_PATHS
             ),
         )
         for relative, raw in projection["output_bytes"].items():
@@ -8836,7 +8959,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             joined,
         )
 
-    def test_direct_review_authority_accepts_exact_fifteen_file_core(self) -> None:
+    def test_direct_review_authority_accepts_exact_twenty_one_file_core(self) -> None:
         root, checkpoint, suffix, frozen_raw = (
             self._review_authority_fixture()
         )
@@ -8858,6 +8981,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *(Path(path) for path in r002_preflight.TRANSITION_R001_PATHS),
             *(Path(path) for path in r002_preflight.TRANSITION_R002_PATHS),
             *(Path(path) for path in r002_preflight.TRANSITION_R003_PATHS),
+            *(Path(path) for path in r002_preflight.TRANSITION_R004_PATHS),
             *(
                 Path(path)
                 for path in completion_review.CONTROL_SUCCESSOR_R009_PATHS
@@ -8865,6 +8989,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             *(
                 Path(path)
                 for path in completion_review.CONTROL_SUCCESSOR_R010_PATHS
+            ),
+            *(
+                Path(path)
+                for path in completion_review.CONTROL_SUCCESSOR_R011_PATHS
             ),
         )
         for relative in review_paths:
@@ -8890,8 +9018,10 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             Path(r002_preflight.TRANSITION_R001_RESULT_REL),
             Path(r002_preflight.TRANSITION_R002_RESULT_REL),
             Path(r002_preflight.TRANSITION_R003_RESULT_REL),
+            Path(r002_preflight.TRANSITION_R004_RESULT_REL),
             Path(completion_review.CONTROL_SUCCESSOR_R009_RESULT_REL),
             Path(completion_review.CONTROL_SUCCESSOR_R010_RESULT_REL),
+            Path(completion_review.CONTROL_SUCCESSOR_R011_RESULT_REL),
         ):
             with self.subTest(relative=relative):
                 root, checkpoint, suffix, frozen_raw = (
@@ -8914,6 +9044,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                     "transition_review_binding",
                     "r009_control_review_binding",
                     "r010_control_review_binding",
+                    "r011_control_review_binding",
                 ):
                     rows = suffix[0].get(field)
                     if not isinstance(rows, dict):
@@ -8939,7 +9070,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                     )
                 )
 
-    def test_direct_review_authority_rejects_five_binding_and_core_reseal(
+    def test_direct_review_authority_rejects_six_binding_and_core_reseal(
         self,
     ) -> None:
         binding_fields = (
@@ -8948,6 +9079,7 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             "transition_review_subject_binding",
             "r009_control_review_binding",
             "r010_control_review_binding",
+            "r011_control_review_binding",
         )
         for field in (*binding_fields, "core"):
             with self.subTest(field=field):
@@ -9032,8 +9164,8 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             ),
             [],
         )
-        suffix[0]["r011_control_review_binding"] = copy.deepcopy(
-            suffix[0]["r010_control_review_binding"]
+        suffix[0]["r012_control_review_binding"] = copy.deepcopy(
+            suffix[0]["r011_control_review_binding"]
         )
         previous_sha256 = "0" * 64
         for event in suffix:
@@ -9129,15 +9261,64 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
                 )
             ),
         )
+        r011_context = (
+            completion_review.validated_control_successor_r011_context(root)
+        )
+        cursor = r011_context
+        while not isinstance(
+            cursor,
+            completion_review.ControlSuccessorR004Context,
+        ):
+            cursor = cursor.predecessor
+        self.assertIsInstance(
+            cursor.predecessor,
+            completion_review.ControlSuccessorR003Context,
+        )
+        self.assertIsInstance(
+            cursor.predecessor.predecessor,
+            completion_review.ReviewContext,
+        )
+        self.assertEqual(
+            {
+                round_id: len(rows)
+                for round_id, rows in (
+                    completion_review.validated_control_successor_managed_closure_sources_by_round(
+                        root
+                    ).items()
+                )
+            },
+            {"R002": 2, "R003": 2, "R004": 1},
+        )
         with mock.patch.object(
             graph,
             "_r002_review_authority_errors",
             return_value=[],
-        ), mock.patch.object(
-            graph,
-            "_npc_single_admin_recovery_completion_managed_closure_matches",
-            return_value=True,
         ):
+            self.assertTrue(
+                graph._npc_single_admin_recovery_completion_managed_closure_matches(
+                    root,
+                    checkpoint,
+                )
+            )
+            self.assertIsNotNone(
+                graph._npc_single_admin_recovery_completion_package(
+                    root,
+                    checkpoint,
+                )
+            )
+            self.assertIsNotNone(
+                graph._npc_single_admin_recovery_sealed_product_successor_artifacts(
+                    root,
+                    checkpoint,
+                )
+            )
+            self.assertEqual(
+                graph.validate_npc_single_admin_recovery_canonical_completion(
+                    root,
+                    checkpoint,
+                ),
+                [],
+            )
             self.assertIsNotNone(
                 graph._r002_legacy_completion_overlay(root, checkpoint)
             )

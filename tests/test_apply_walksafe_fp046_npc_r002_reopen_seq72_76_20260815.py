@@ -18,11 +18,11 @@ from scripts import build_walksafe_fp022_completion_seq70_71_review_20260814 as 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_transaction_contract_advances_to_r010_control_and_r003_transition() -> None:
-    assert subject.TRANSACTION_STATUS == "READY_R010_CONTROL_R003_TRANSITION_REVIEW_BOUND"
-    assert subject._expected_r010_control_cohort_paths()
-    assert subject._r010_control_review_paths()
-    assert not hasattr(subject, "_expected_r009_control_cohort_paths")
+def test_transaction_contract_advances_to_r011_control_and_r004_transition() -> None:
+    assert subject.TRANSACTION_STATUS == "READY_R011_CONTROL_R004_TRANSITION_REVIEW_BOUND"
+    assert subject._expected_r011_control_cohort_paths()
+    assert subject._r011_control_review_paths()
+    assert not hasattr(subject, "_expected_r010_control_cohort_paths")
 
 
 def _write(root: Path, relative: Path, raw: bytes) -> None:
@@ -101,39 +101,16 @@ def _r029(root: Path) -> None:
         _write(root, path, text.encode("utf-8"))
 
 
-def _fake_r010_context(root: Path) -> control_review.ControlSuccessorR010Context:
-    predecessor, predecessor_bindings = (
-        control_review.prepare_frozen_control_successor_r009(root)
-    )
-    current = control_review._r008_live_current_review_context(root)
-    before_by_path = {
-        row["path"]: row for row in predecessor.current.control_code_cohort
-    }
-    after_by_path = {row["path"]: row for row in current.control_code_cohort}
-    successors = tuple(
-        {
-            "path": path.as_posix(),
-            "predecessor": deepcopy(before_by_path[path.as_posix()]),
-            "successor": deepcopy(after_by_path[path.as_posix()]),
-        }
-        for path in control_review.CONTROL_SUCCESSOR_R010_COHORT_PATHS
-        if path in control_review.CONTROL_SUCCESSOR_R010_CHANGED_PATHS
-    )
-    return control_review.ControlSuccessorR010Context(
-        root=root.resolve(strict=True),
-        current=current,
-        predecessor=predecessor,
-        predecessor_review_bindings=predecessor_bindings,
-        control_code_successors=successors,
-    )
+def _fake_r011_context(root: Path) -> control_review.ControlSuccessorR011Context:
+    return control_review.prepare_control_successor_r011_context(root)
 
 
 @pytest.fixture(autouse=True)
-def _validated_r010_context_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+def _validated_r011_context_stub(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         control_review,
-        "validated_control_successor_r010_context",
-        _fake_r010_context,
+        "validated_control_successor_r011_context",
+        _fake_r011_context,
     )
 
 
@@ -188,6 +165,7 @@ def _control_review_support_paths() -> set[Path]:
         *control_review.CONTROL_SUCCESSOR_R007_PATHS,
         *control_review.CONTROL_SUCCESSOR_R008_PATHS,
         *control_review.CONTROL_SUCCESSOR_R009_PATHS,
+        *control_review.CONTROL_SUCCESSOR_R010_PATHS,
     }
 
 
@@ -196,8 +174,8 @@ def _write_control_review(
     *,
     assigned_at: str = "2026-08-15T12:00:00+09:00",
 ) -> dict[Path, bytes]:
-    context = _fake_r010_context(root)
-    assignment_raw = control_review.build_control_successor_r010_assignment(
+    context = _fake_r011_context(root)
+    assignment_raw = control_review.build_control_successor_r011_assignment(
         context, assigned_at=assigned_at
     ).encode("utf-8")
     assignment = json.loads(assignment_raw)
@@ -207,11 +185,11 @@ def _write_control_review(
             "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
         ),
         "goal_id": control_review.GOAL_ID,
-        "round_id": control_review.CONTROL_SUCCESSOR_R010_ROUND_ID,
+        "round_id": control_review.CONTROL_SUCCESSOR_R011_ROUND_ID,
         "reviewed_at": assigned_at,
         "reviewer": deepcopy(assignment["reviewer"]),
         "assignment_binding": control_review._binding(
-            control_review.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL,
+            control_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL,
             assignment_raw,
         ),
         "review_scope": deepcopy(assignment["review_scope"]),
@@ -221,7 +199,7 @@ def _write_control_review(
         "review_boundary": deepcopy(assignment["review_boundary"]),
     }
     result_raw = control_review.json_text(result).encode("utf-8")
-    independent_raw = control_review.build_control_successor_r010_independent_review(
+    independent_raw = control_review.build_control_successor_r011_independent_review(
         context,
         assignment,
         assignment_raw,
@@ -229,9 +207,9 @@ def _write_control_review(
         result_raw,
     ).encode("utf-8")
     overlay = {
-        control_review.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL: assignment_raw,
-        control_review.CONTROL_SUCCESSOR_R010_RESULT_REL: result_raw,
-        control_review.CONTROL_SUCCESSOR_R010_INDEPENDENT_REL: independent_raw,
+        control_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL: assignment_raw,
+        control_review.CONTROL_SUCCESSOR_R011_RESULT_REL: result_raw,
+        control_review.CONTROL_SUCCESSOR_R011_INDEPENDENT_REL: independent_raw,
     }
     for relative, raw in overlay.items():
         _write(root, relative, raw)
@@ -265,7 +243,8 @@ def _stage_fixture(
         *review.R007_REVIEW_PINS,
         *review.TRANSITION_R001_PATHS,
         *review.TRANSITION_R002_PATHS,
-        *subject._expected_r010_control_cohort_paths(),
+        *review.TRANSITION_R003_PATHS,
+        *subject._expected_r011_control_cohort_paths(),
         *_control_review_support_paths(),
         *subject.CATALOG_RELATIVES,
         *(Path(path) for path in state["managed_goal_paths"]),
@@ -280,7 +259,7 @@ def _stage_fixture(
         {
             path.as_posix()
             for path in (
-                *subject._expected_r010_control_cohort_paths(),
+                *subject._expected_r011_control_cohort_paths(),
                 *subject.CATALOG_RELATIVES,
             )
         }
@@ -301,7 +280,7 @@ def _stage_fixture(
         _transition_result(root)
         review.write_transition_independent_review(root)
     if not with_control_review:
-        for relative in control_review.CONTROL_SUCCESSOR_R010_PATHS:
+        for relative in control_review.CONTROL_SUCCESSOR_R011_PATHS:
             target = root / relative
             if target.exists():
                 target.unlink()
@@ -328,7 +307,7 @@ def _fake_catalogs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple[str, ...
 def _catalog_overlay() -> dict[Path, bytes]:
     return {
         Path(path): review.json_text(
-            {"catalog": path, "source": "pure-r010-projection"}
+            {"catalog": path, "source": "pure-r011-projection"}
         ).encode("utf-8")
         for path in subject.catalogs.OUTPUT_PATHS
     }
@@ -379,20 +358,26 @@ def _pure_review_material(
     dict[Path, bytes],
     dict[Path, bytes],
     dict[Path, bytes],
+    dict[Path, bytes],
 ]:
     historical_overlay = {
-        path: (root / path).read_bytes() for path in review.TRANSITION_R001_PATHS
+        path: (root / path).read_bytes()
+        for path in (*review.TRANSITION_R001_PATHS, *review.TRANSITION_R002_PATHS)
     }
     predecessor_overlay = {
-        path: (root / path).read_bytes() for path in review.TRANSITION_R002_PATHS
+        path: (root / path).read_bytes() for path in review.TRANSITION_R003_PATHS
     }
     r009_overlay = {
         path: (root / path).read_bytes()
         for path in subject._r009_control_review_paths()
     }
-    r010_overlay = _in_memory_control_review_overlay(
-        subject._r010_control_review_path_by_role(),
-        round_id="R010",
+    r010_overlay = {
+        path: (root / path).read_bytes()
+        for path in subject._r010_control_review_paths()
+    }
+    r011_overlay = _in_memory_control_review_overlay(
+        subject._r011_control_review_path_by_role(),
+        round_id="R011",
     )
     return (
         historical_overlay,
@@ -400,6 +385,7 @@ def _pure_review_material(
         _in_memory_review_overlay(),
         r009_overlay,
         r010_overlay,
+        r011_overlay,
     )
 
 
@@ -410,12 +396,14 @@ def _pure_projection(root: Path) -> tuple[dict, dict]:
         transition_overlay,
         r009_overlay,
         r010_overlay,
+        r011_overlay,
     ) = _pure_review_material(root)
     plan = subject._bind_review_to_preflight(
         review.build_canonical_preflight(root),
         subject._transition_review_binding(transition_overlay),
         subject._r009_control_review_binding(r009_overlay),
         subject._r010_control_review_binding(r010_overlay),
+        subject._r011_control_review_binding(r011_overlay),
         predecessor_review_binding=subject._predecessor_transition_review_binding(
             predecessor_overlay
         ),
@@ -431,6 +419,7 @@ def _pure_projection(root: Path) -> tuple[dict, dict]:
         transition_review_overlay=transition_overlay,
         r009_control_review_overlay=r009_overlay,
         r010_control_review_overlay=r010_overlay,
+        r011_control_review_overlay=r011_overlay,
     )
     return plan, projection
 
@@ -526,7 +515,7 @@ def test_pure_projection_builds_full_seq72_76_without_transition_review_files(
         review.NPC_R001,
     }
     managed = checkpoint["working_tree_snapshot"]["managed_changed_paths"]
-    assert set(path.as_posix() for path in subject._expected_r010_control_cohort_paths()).issubset(managed)
+    assert set(path.as_posix() for path in subject._expected_r011_control_cohort_paths()).issubset(managed)
     assert checkpoint["goal_execution"]["artifact_work_queue"] == plan[
         "final_state"
     ]["artifact_work_queue"]
@@ -560,7 +549,8 @@ def test_projected_checkpoint_rejects_stale_completion_boundary(
             stale,
             plan,
             projection["output_bytes"],
-            tuple(subject._expected_r010_control_cohort_paths()),
+            tuple(subject._expected_r011_control_cohort_paths()),
+            {},
             {},
             {},
             _in_memory_review_overlay(),
@@ -601,7 +591,8 @@ def test_projected_checkpoint_rejects_stale_event_runtime_boundary_hash(
             stale_checkpoint,
             stale_plan,
             projection["output_bytes"],
-            tuple(subject._expected_r010_control_cohort_paths()),
+            tuple(subject._expected_r011_control_cohort_paths()),
+            {},
             {},
             {},
             _in_memory_review_overlay(),
@@ -624,12 +615,14 @@ def test_pure_projection_optionally_binds_control_review_overlay_exactly(
         transition_overlay,
         r009_overlay,
         r010_overlay,
+        r011_overlay,
     ) = _pure_review_material(tmp_path)
     plan = subject._bind_review_to_preflight(
         review.build_canonical_preflight(tmp_path),
         subject._transition_review_binding(transition_overlay),
         subject._r009_control_review_binding(r009_overlay),
         subject._r010_control_review_binding(r010_overlay),
+        subject._r011_control_review_binding(r011_overlay),
         predecessor_review_binding=subject._predecessor_transition_review_binding(
             predecessor_overlay
         ),
@@ -646,16 +639,17 @@ def test_pure_projection_optionally_binds_control_review_overlay_exactly(
         transition_review_overlay=transition_overlay,
         r009_control_review_overlay=r009_overlay,
         r010_control_review_overlay=r010_overlay,
+        r011_control_review_overlay=r011_overlay,
     )
 
-    expected_binding = subject._r010_control_review_binding(r010_overlay)
-    assert plan["events"][0]["r010_control_review_binding"] == expected_binding
-    assert projection["r010_control_review_binding"] == expected_binding
+    expected_binding = subject._r011_control_review_binding(r011_overlay)
+    assert plan["events"][0]["r011_control_review_binding"] == expected_binding
+    assert projection["r011_control_review_binding"] == expected_binding
     managed = projection["checkpoint"]["working_tree_snapshot"][
         "managed_changed_paths"
     ]
     assert {
-        path.as_posix() for path in r010_overlay
+        path.as_posix() for path in r011_overlay
     }.issubset(managed)
 
     tampered_binding = deepcopy(expected_binding)
@@ -666,13 +660,14 @@ def test_pure_projection_optionally_binds_control_review_overlay_exactly(
         review.build_canonical_preflight(tmp_path),
         subject._transition_review_binding(transition_overlay),
         subject._r009_control_review_binding(r009_overlay),
+        subject._r010_control_review_binding(r010_overlay),
         tampered_binding,
         predecessor_review_binding=subject._predecessor_transition_review_binding(
             predecessor_overlay
         ),
     )
     with pytest.raises(
-        review.BuildError, match="R010 control review overlay binding differs"
+        review.BuildError, match="R011 control review overlay binding differs"
     ):
         subject.project_transaction(
             tmp_path,
@@ -685,6 +680,7 @@ def test_pure_projection_optionally_binds_control_review_overlay_exactly(
             transition_review_overlay=transition_overlay,
             r009_control_review_overlay=r009_overlay,
             r010_control_review_overlay=r010_overlay,
+            r011_control_review_overlay=r011_overlay,
         )
 
 
@@ -710,6 +706,8 @@ def test_public_builder_binds_validated_control_review_into_transaction_and_snap
     r009_binding = subject._r009_control_review_binding(r009_overlay)
     r010_overlay = subject._r010_control_review_overlay(tmp_path)
     r010_binding = subject._r010_control_review_binding(r010_overlay)
+    r011_overlay = subject._r011_control_review_overlay(tmp_path)
+    r011_binding = subject._r011_control_review_binding(r011_overlay)
     seq72 = transaction["preflight"]["events"][0]
     assert transaction["predecessor_transition_review_binding"] == predecessor_binding
     assert transaction["transition_review_binding"] == transition_binding
@@ -718,6 +716,7 @@ def test_public_builder_binds_validated_control_review_into_transaction_and_snap
     ]
     assert transaction["r009_control_review_binding"] == r009_binding
     assert transaction["r010_control_review_binding"] == r010_binding
+    assert transaction["r011_control_review_binding"] == r011_binding
     assert seq72["predecessor_transition_review_binding"] == predecessor_binding
     assert seq72["transition_review_binding"] == transition_binding
     assert seq72["transition_review_subject_binding"] == package[
@@ -725,6 +724,17 @@ def test_public_builder_binds_validated_control_review_into_transaction_and_snap
     ]
     assert seq72["r009_control_review_binding"] == r009_binding
     assert seq72["r010_control_review_binding"] == r010_binding
+    assert seq72["r011_control_review_binding"] == r011_binding
+    assert {
+        key for key in seq72 if "review" in key and key.endswith("binding")
+    } == {
+        "predecessor_transition_review_binding",
+        "transition_review_binding",
+        "transition_review_subject_binding",
+        "r009_control_review_binding",
+        "r010_control_review_binding",
+        "r011_control_review_binding",
+    }
     assert "r008_control_review_binding" not in seq72
     assert subject._approval_neutral_plan_core(transaction["preflight"]) == package[
         "approval_neutral_plan_core"
@@ -733,7 +743,7 @@ def test_public_builder_binds_validated_control_review_into_transaction_and_snap
         "managed_changed_paths"
     ]
     closure_paths = subject._review_closure_paths()
-    assert len(closure_paths) == len(set(closure_paths)) == 15
+    assert len(closure_paths) == len(set(closure_paths)) == 21
     closure = {path.as_posix() for path in closure_paths}
     assert closure.issubset(managed)
     assert transaction["checkpoint"]["session_handoff"]["changed_files"] == managed
@@ -749,6 +759,7 @@ def test_public_builder_binds_validated_control_review_into_transaction_and_snap
             **subject._transition_review_overlay(tmp_path),
             **r009_overlay,
             **r010_overlay,
+            **r011_overlay,
         },
     )
     assert transaction["checkpoint"]["working_tree_snapshot"][
@@ -946,27 +957,32 @@ def test_validate_transaction_rejects_plan_outside_reviewed_neutral_core(
         (
             "predecessor_transition_review_binding",
             "assignment",
-            "R002/R003 transition review transaction binding differs",
+            "R003/R004 transition review transaction binding differs",
         ),
         (
             "transition_review_binding",
             "review_result",
-            "R002/R003 transition review transaction binding differs",
+            "R003/R004 transition review transaction binding differs",
         ),
         (
             "transition_review_subject_binding",
             None,
-            "R002/R003 transition review transaction binding differs",
+            "R003/R004 transition review transaction binding differs",
         ),
         (
             "r009_control_review_binding",
             "independent_review",
-            "R009/R010 control review transaction binding differs",
+            "R009/R010/R011 control review transaction binding differs",
         ),
         (
             "r010_control_review_binding",
             "assignment",
-            "R009/R010 control review transaction binding differs",
+            "R009/R010/R011 control review transaction binding differs",
+        ),
+        (
+            "r011_control_review_binding",
+            "review_result",
+            "R009/R010/R011 control review transaction binding differs",
         ),
     ),
 )
@@ -1004,9 +1020,9 @@ def test_validate_transaction_rejects_each_seq72_review_binding_tamper(
     (
         (
             "predecessor_transition_review_binding",
-            "transition R002 predecessor review",
+            "transition R003 predecessor review",
         ),
-        ("transition_review_binding", "transition R003 current review"),
+        ("transition_review_binding", "transition R004 current review"),
     ),
 )
 def test_validate_transaction_rejects_transition_review_source_binding_tamper(
@@ -1033,17 +1049,17 @@ def test_validate_transaction_rejects_transition_review_source_binding_tamper(
         subject.validate_transaction(tmp_path, transaction)
 
 
-def test_public_builder_requires_independent_r010_control_context(tmp_path: Path) -> None:
+def test_public_builder_requires_independent_r011_control_context(tmp_path: Path) -> None:
     _stage_fixture(tmp_path, with_control_review=False)
 
     with pytest.raises(
         review.BuildError,
-        match="review input is missing|required R010 control-successor review",
+        match="review input is missing|required R011 control-successor review",
     ):
         subject.build_transaction(tmp_path)
 
 
-def test_apply_requires_validated_r010_control_context_before_writing(
+def test_apply_requires_validated_r011_control_context_before_writing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _stage_fixture(tmp_path, with_control_review=False)
@@ -1052,7 +1068,7 @@ def test_apply_requires_validated_r010_control_context_before_writing(
 
     with pytest.raises(
         review.BuildError,
-        match="review input is missing|required R010 control-successor review",
+        match="review input is missing|required R011 control-successor review",
     ):
         subject.apply_transaction(tmp_path)
 
@@ -1073,28 +1089,28 @@ def test_validate_transaction_rejects_another_valid_control_review_triad(
     with pytest.raises(
         review.BuildError,
         match=(
-            "R009/R010 control review transaction binding differs|reviewed transition core|"
+            "R009/R010/R011 control review transaction binding differs|reviewed transition core|"
             "transition assignment envelope differs"
         ),
     ):
         subject.validate_transaction(tmp_path, transaction)
 
 
-def test_public_builder_preserves_r010_actor_separation(
+def test_public_builder_preserves_r011_actor_separation(
     tmp_path: Path,
 ) -> None:
     _stage_fixture(tmp_path)
     assignment = json.loads(
-        (tmp_path / control_review.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL).read_bytes()
+        (tmp_path / control_review.CONTROL_SUCCESSOR_R011_ASSIGNMENT_REL).read_bytes()
     )
-    result_path = tmp_path / control_review.CONTROL_SUCCESSOR_R010_RESULT_REL
+    result_path = tmp_path / control_review.CONTROL_SUCCESSOR_R011_RESULT_REL
     result = json.loads(result_path.read_bytes())
     result["reviewer"] = deepcopy(assignment["executor"])
     result_path.write_bytes(control_review.json_text(result).encode("utf-8"))
 
     with pytest.raises(
         review.BuildError,
-        match="control successor R010 reviewer identity differs",
+        match="control successor R011 reviewer identity differs",
     ):
         subject.build_transaction(tmp_path)
 
@@ -1112,9 +1128,13 @@ def test_validate_transaction_rejects_removed_control_review_managed_path_after_
     snapshot["managed_changed_path_count"] -= 1
     overlay = {
         **transaction["output_bytes"],
+        **subject._historical_transition_r001_review_overlay(tmp_path),
+        **subject._historical_transition_r002_review_overlay(tmp_path),
         **subject._predecessor_transition_review_overlay(tmp_path),
         **subject._transition_review_overlay(tmp_path),
         **subject._r009_control_review_overlay(tmp_path),
+        **subject._r010_control_review_overlay(tmp_path),
+        **subject._r011_control_review_overlay(tmp_path),
     }
     path_hash, content_hash = subject._overlay_hashes(
         tmp_path, snapshot["managed_changed_paths"], overlay
@@ -1140,7 +1160,7 @@ def test_validate_transaction_rejects_removed_control_review_managed_path_after_
 
     with pytest.raises(
         review.BuildError,
-        match="projected working paths omit the R001/R002/R003/R009/R010 review closure",
+        match="projected working paths omit the R001/R002/R003/R004/R009/R010/R011 review closure",
     ):
         subject.validate_transaction(tmp_path, transaction)
 
@@ -1189,14 +1209,28 @@ def test_validate_transaction_requires_control_review_source_binding(
             "assignment",
             "sha256",
             "0" * 64,
-            "current R010 control review",
+            "frozen R010 control review",
         ),
         (
             "r010_control_review_binding",
             "independent_review",
             "byte_length",
             1,
-            "current R010 control review",
+            "frozen R010 control review",
+        ),
+        (
+            "r011_control_review_binding",
+            "assignment",
+            "sha256",
+            "0" * 64,
+            "current R011 control review",
+        ),
+        (
+            "r011_control_review_binding",
+            "independent_review",
+            "byte_length",
+            1,
+            "current R011 control review",
         ),
     ),
 )
@@ -1237,7 +1271,7 @@ def test_validate_and_apply_reject_complete_source_binding_tamper(
     checkpoint_path = transaction["source_checkpoint"]["path"]
     cohort_path = next(
         row["path"]
-        for row in transaction["r010_control_cohort"]
+        for row in transaction["r011_control_cohort"]
         if row["path"] != checkpoint_path
     )
 
@@ -1288,7 +1322,7 @@ def test_validate_and_apply_reject_complete_source_binding_tamper(
             lambda candidate: change(
                 candidate, cohort_path, "sha256", "f" * 64
             ),
-            "R010 control cohort source binding differs",
+                "R011 control cohort source binding differs",
         ),
         (
             lambda candidate: candidate["source_bindings"].append(
@@ -1363,6 +1397,11 @@ def test_validate_and_apply_reject_complete_mutable_target_binding_tamper(
         "_validated_r008_control_cohort",
         "_r008_control_review_paths",
         "_r008_control_review_path_by_role",
+        "_expected_r010_control_cohort_paths",
+        "_normalize_r010_control_cohort_paths",
+        "_prepared_r010_control_cohort",
+        "_validated_r010_control_cohort",
+        "_capture_r010_control_material",
     ),
 )
 def test_transaction_module_exposes_no_misleading_r008_alias(stale_name: str) -> None:
@@ -1375,6 +1414,7 @@ def test_transaction_module_exposes_no_misleading_r008_alias(stale_name: str) ->
         "r008_control_review_overlay",
         "r008_control_cohort_paths",
         "r009_control_cohort_paths",
+        "r010_control_cohort_paths",
     ),
 )
 def test_project_transaction_rejects_stale_control_keyword(stale_kwarg: str) -> None:
@@ -1516,7 +1556,7 @@ def test_apply_publishes_all_outputs_only_after_review(tmp_path: Path, monkeypat
     assert (tmp_path / review.FP046_R002_REL).is_file()
     assert (tmp_path / review.NPC_R002_REL).is_file()
     assert all((tmp_path / path).is_file() for path in subject.CATALOG_RELATIVES)
-    assert not list(tmp_path.glob(".walksafe-r010-stage-*"))
+    assert not list(tmp_path.glob(".walksafe-r011-stage-*"))
     assert (tmp_path / review.AUTHORIZATION_REL).stat().st_mode & 0o777 == 0o644
 
 
@@ -1571,7 +1611,7 @@ def test_failed_rollback_preserves_backup_and_primary_error_context(
     ):
         subject.apply_transaction(tmp_path, transaction)
 
-    stages = list(tmp_path.glob(".walksafe-r010-stage-*"))
+    stages = list(tmp_path.glob(".walksafe-r011-stage-*"))
     assert len(stages) == 1
     assert list(stages[0].glob("backup-*.payload"))
 
