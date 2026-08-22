@@ -86,8 +86,8 @@ class RepositoryCatalogCurrentTreeTests(unittest.TestCase):
                 "repository-write-capability-exact",
             ),
             "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py": (
-                "READ_ONLY",
-                "read-only-code-review-exact",
+                "REPOSITORY_WRITE",
+                "repository-write-capability-exact",
             ),
             "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py": (
                 "REPOSITORY_WRITE",

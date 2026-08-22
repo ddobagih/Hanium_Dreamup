@@ -582,6 +582,7 @@ REPOSITORY_WRITE_SCRIPT_EXACT = frozenset(
         "scripts/generate_repository_catalogs.py",
         "scripts/generate_walksafe_openapi.py",
         "scripts/build_walksafe_historical_git_witness_20260812.py",
+        "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
         "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
         "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
         "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
@@ -624,7 +625,6 @@ LOCAL_BUILD_SCRIPT_EXACT = frozenset(
 )
 READ_ONLY_SCRIPT_EXACT = frozenset(
     {
-        "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
         "scripts/validate_submission_forms_20260710.py",
         "scripts/validate_submission_materials_20260710.py",
         "scripts/validate_walksafe_formal_deliverables_0_6.py",
