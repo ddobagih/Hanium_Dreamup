@@ -8798,11 +8798,13 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         fun accessiblePriorityUserButton(
             label: String,
             emphasis: Boolean = false,
+            spokenLabel: String? = null,
             onClick: () -> Unit,
         ) = Button(this).apply {
             id = View.generateViewId()
             text = label
-            contentDescription = label
+            // 화면 라벨은 짧게 두되 TalkBack 은 맥락을 잃지 않는다.
+            contentDescription = spokenLabel ?: label
             isAllCaps = false
             setSingleLine(false)
             ellipsize = null
@@ -8835,7 +8837,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
-                bottomMargin = (WS_CONTROL_GAP_DP * density).roundToInt()
+                bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
             }
             setOnClickListener { onClick() }
         }
@@ -8913,7 +8915,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
                 topMargin = (WS_SECTION_GAP_DP * resources.displayMetrics.density).roundToInt()
-                bottomMargin = (WS_CONTROL_GAP_DP * resources.displayMetrics.density).roundToInt()
+                bottomMargin = (WS_TITLE_GAP_DP * resources.displayMetrics.density).roundToInt()
             }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -8937,7 +8939,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 FirstRunAgeBand.UNDER_14 -> "만 14세 미만"
             }
             firstRunAgeButtons[ageBand] = accessiblePriorityUserButton(
-                label = "가입 연령: $label",
+                label = label,
+                spokenLabel = "가입 연령: $label",
                 onClick = { selectFirstRunAgeBand(ageBand) },
             )
         }
@@ -20865,6 +20868,10 @@ generation != cameraFallbackGeneration
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_VISIBLE_STAGE_COUNT = 3
         const val WS_SECTION_GAP_DP = 24f
+        /** 같은 그룹의 버튼 사이. 섹션 간격보다 좁아야 덩어리로 읽힌다. */
+        const val WS_GROUP_GAP_DP = 8f
+        /** 제목과 첫 컨트롤 사이. */
+        const val WS_TITLE_GAP_DP = 16f
         const val WS_CONTROL_GAP_DP = 12f
 
         const val OVERLAY_BOTTOM_PADDING_DP = 24f
