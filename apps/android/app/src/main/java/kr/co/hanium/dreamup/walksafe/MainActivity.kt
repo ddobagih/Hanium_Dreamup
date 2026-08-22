@@ -8627,6 +8627,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         fun accessiblePriorityUserButton(
             label: String,
+            emphasis: Boolean = false,
             onClick: () -> Unit,
         ) = Button(this).apply {
             id = View.generateViewId()
@@ -8640,11 +8641,19 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             val density = resources.displayMetrics.density
             textSize = 17f
             setTextColor(WS_COLOR_BUTTON_TEXT)
+            if (emphasis) {
+                // 이 단계의 주 행동. 더 큰 터치 영역과 강조 테두리로 구분한다.
+                minimumHeight = (WS_TOUCH_PRIMARY_DP * density).roundToInt()
+                setTypeface(typeface, Typeface.BOLD)
+            }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = WS_CORNER_RADIUS_DP * density
                 setColor(WS_COLOR_BUTTON_FILL)
-                setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+                setStroke(
+                    ((if (emphasis) 2f else 1f) * density).roundToInt(),
+                    if (emphasis) WS_COLOR_EMPHASIS else WS_COLOR_LINE,
+                )
             }
             setPadding(
                 (20f * density).roundToInt(),
@@ -8743,6 +8752,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         ViewCompat.setAccessibilityHeading(firstRunOnboardingStatusText, true)
         firstRunPurposeButton = accessiblePriorityUserButton(
             label = "목적과 안전 한계 확인",
+            emphasis = true,
             onClick = ::acknowledgeFirstRunPurposeAndSafety,
         )
         firstRunAgeButtons.clear()
@@ -8790,6 +8800,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         }
         firstRunIntegratedConsentSaveButton = accessiblePriorityUserButton(
             label = "네 가지 선택을 서버에 저장하고 확인",
+            emphasis = true,
             onClick = { persistIntegratedConsentDraft(announce = true) },
         )
         firstRunOnboardingControls = LinearLayout(this).apply {
@@ -20287,6 +20298,8 @@ generation != cameraFallbackGeneration
         const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
         const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
+        const val WS_COLOR_EMPHASIS = 0xffffe8bd.toInt()
+        const val WS_TOUCH_PRIMARY_DP = 56f
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_VISIBLE_STAGE_COUNT = 3
         const val WS_SECTION_GAP_DP = 24f

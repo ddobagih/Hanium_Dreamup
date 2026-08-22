@@ -564,4 +564,23 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(caller.contains("firstRunOnboardingStatusText.contentDescription = message"))
         assertTrue(caller.contains("applyStageHeadingStyle("))
     }
+    @Test
+    fun primaryActionIsVisuallySeparatedFromSecondaryChoices() {
+        // 각 단계의 주 행동만 56dp 와 강조 테두리를 갖는다. 연령 3개처럼 대등한 선택은
+        // 어느 하나를 권장처럼 보이게 하면 안 되므로 모두 보조로 둔다.
+        assertTrue(source.contains("WS_TOUCH_PRIMARY_DP"))
+        assertTrue(source.contains("WS_COLOR_EMPHASIS"))
+
+        val factory = source.substringAfter("fun accessiblePriorityUserButton(")
+            .substringBefore("firstRunNoticeToggleButton =")
+        assertTrue(factory.contains("emphasis: Boolean"))
+        // 기존 접근성 계약 유지
+        assertTrue(factory.contains("minimumHeight = (48f * resources.displayMetrics.density).roundToInt()"))
+        assertTrue(factory.contains("setSingleLine(false)"))
+
+        assertTrue(source.contains("label = \"목적과 안전 한계 확인\",\n            emphasis = true,"))
+        assertTrue(
+            source.contains("label = \"네 가지 선택을 서버에 저장하고 확인\",\n            emphasis = true,"),
+        )
+    }
 }
