@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -203,6 +204,92 @@ def test_transition_package_is_read_only_and_apply_stays_in_actual_writer(
     assert subject.main(["--root", str(tmp_path), "--print-transition-package"]) == 0
     assert subject.main(["--root", str(tmp_path), "--apply"]) == 1
     assert before == _snapshot(tmp_path)
+
+
+def test_authorization_uses_exact_latest_user_instruction_and_stops_before_seq77(
+) -> None:
+    expected_quote = "계획 세워서 단계적으로 진행해 어떻게 진행해야 하는지 알지?"
+
+    authorization = subject._authorization_document()
+
+    assert subject.USER_AUTHORIZATION_QUOTE == expected_quote
+    assert authorization["authorization_quote"] == expected_quote
+    assert authorization["authorization_status"] == "AUTHORIZED_FOR_SEQ72_76_ONLY"
+    assert authorization["sequence_77_status"] == "NOT_AUTHORIZED"
+    assert {
+        "SEQ77_GOAL_STARTED",
+        "PRODUCT_CODE_CHANGE",
+    }.issubset(authorization["authorization_scope"]["excluded_actions"])
+
+
+def test_transition_review_binds_separate_reviewer_and_review_time(
+    tmp_path: Path,
+) -> None:
+    _copy_source(tmp_path)
+    for path in subject.R007_REVIEW_PINS:
+        _write(tmp_path, path, (ROOT / path).read_bytes())
+    assignment_raw = subject.build_transition_assignment(
+        tmp_path,
+        assigned_at="2026-08-15T12:00:00+09:00",
+    ).encode("utf-8")
+    assignment = json.loads(assignment_raw)
+    result = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
+        ),
+        "goal_id": subject.TRANSITION_GOAL_ID,
+        "round_id": subject.TRANSITION_ROUND_ID,
+        "reviewed_at": "2026-08-15T12:01:00+09:00",
+        "reviewer": deepcopy(assignment["reviewer"]),
+        "assignment_binding": subject._binding(
+            subject.TRANSITION_ASSIGNMENT_REL,
+            assignment_raw,
+        ),
+        "decision": "APPROVED",
+        "findings": {"blocking": [], "major_open": [], "minor_open": []},
+        "finding_dispositions": [],
+        "review_scope": deepcopy(assignment["review_scope"]),
+        "review_boundary": deepcopy(assignment["review_boundary"]),
+    }
+    result_raw = subject.json_text(result).encode("utf-8")
+
+    subject._validate_transition_result_document(
+        result,
+        result_raw,
+        assignment,
+        assignment_raw,
+    )
+    independent = json.loads(
+        subject.build_transition_independent_review(
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        )
+    )
+    assert independent["reviewer"] == assignment["reviewer"]
+    assert independent["reviewed_at"] == result["reviewed_at"]
+
+    for field, value, message in (
+        ("reviewer", assignment["executor"], "reviewer identity differs"),
+        ("reviewed_at", "2026-08-15T11:59:59+09:00", "predates assignment"),
+    ):
+        changed = deepcopy(result)
+        changed[field] = value
+        with pytest.raises(subject.BuildError, match=message):
+            subject._validate_transition_result_document(
+                changed,
+                subject.json_text(changed).encode("utf-8"),
+                assignment,
+                assignment_raw,
+            )
+
+
+def test_transition_tool_has_no_reviewer_result_writer() -> None:
+    assert not hasattr(subject, "write_transition_review_result")
+    with pytest.raises(SystemExit):
+        subject.main(["--write-transition-review-result"])
 
 
 def test_plain_subprocess_does_not_write_pyc_in_isolated_copy(

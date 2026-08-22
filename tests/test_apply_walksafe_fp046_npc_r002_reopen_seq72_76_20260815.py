@@ -37,6 +37,8 @@ def _transition_result(root: Path) -> None:
         "evidence_type": "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT",
         "goal_id": review.TRANSITION_GOAL_ID,
         "round_id": review.TRANSITION_ROUND_ID,
+        "reviewed_at": assignment["assigned_at"],
+        "reviewer": deepcopy(assignment["reviewer"]),
         "assignment_binding": review._binding(
             review.TRANSITION_ASSIGNMENT_REL, assignment_raw
         ),

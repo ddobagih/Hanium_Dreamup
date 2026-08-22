@@ -1361,7 +1361,7 @@ INITIAL_START_GATE_CONTRACT_REL = Path(
     "initial-start-gate-contract-r001.json"
 )
 USER_AUTHORIZATION_QUOTE = (
-    "알겠어 계획 먼저 세우고 진행해. 계획은 니가 세우고 진행은 테라 울트라로 진행해"
+    "계획 세워서 단계적으로 진행해 어떻게 진행해야 하는지 알지?"
 )
 R007_REVIEW_DIR = Path(
     "docs/control/execution/workstream-transitions/seq70-71/"
@@ -1806,8 +1806,9 @@ def _validate_transition_result_document(
     require(
         set(result)
         == {
-            "schema_version", "evidence_type", "goal_id", "round_id", "assignment_binding",
-            "decision", "findings", "finding_dispositions", "review_scope", "review_boundary",
+            "schema_version", "evidence_type", "goal_id", "round_id", "reviewed_at",
+            "reviewer", "assignment_binding", "decision", "findings",
+            "finding_dispositions", "review_scope", "review_boundary",
         }
         and result.get("schema_version") == "1.0"
         and result.get("evidence_type") == "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
@@ -1820,6 +1821,27 @@ def _validate_transition_result_document(
         and result.get("review_scope") == assignment.get("review_scope")
         and result.get("review_boundary") == assignment.get("review_boundary"),
         "transition review result differs",
+    )
+    reviewer = result.get("reviewer")
+    require(
+        isinstance(reviewer, dict) and reviewer == assignment.get("reviewer"),
+        "transition review reviewer identity differs",
+    )
+    assigner = assignment.get("assigner")
+    executor = assignment.get("executor")
+    require(
+        isinstance(assigner, dict)
+        and isinstance(executor, dict)
+        and reviewer.get("agent_instance_id")
+        not in {assigner.get("agent_instance_id"), executor.get("agent_instance_id")}
+        and reviewer.get("canonical_task")
+        not in {assigner.get("canonical_task"), executor.get("canonical_task")},
+        "transition review reviewer is not separate",
+    )
+    require(
+        _parse_time(result.get("reviewed_at"), "transition review time")
+        >= _parse_time(assignment.get("assigned_at"), "transition assignment time"),
+        "transition review predates assignment",
     )
 
 
@@ -1843,6 +1865,8 @@ def build_transition_independent_review(
         "evidence_type": "FP046_NPC_R002_REOPEN_TRANSITION_INDEPENDENT_INTERNAL_REVIEW",
         "goal_id": TRANSITION_GOAL_ID,
         "round_id": TRANSITION_ROUND_ID,
+        "reviewed_at": result["reviewed_at"],
+        "reviewer": deepcopy(result["reviewer"]),
         "assignment_provenance": _binding(TRANSITION_ASSIGNMENT_REL, assignment_raw),
         "review_result_provenance": _binding(TRANSITION_RESULT_REL, result_raw),
         "decision": "APPROVED",

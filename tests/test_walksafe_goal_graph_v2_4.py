@@ -8322,6 +8322,8 @@ class WalkSafeFp046NpcR002ReopenGraphTest(unittest.TestCase):
             ),
             "goal_id": r002_preflight.TRANSITION_GOAL_ID,
             "round_id": r002_preflight.TRANSITION_ROUND_ID,
+            "reviewed_at": assignment["assigned_at"],
+            "reviewer": copy.deepcopy(assignment["reviewer"]),
             "assignment_binding": r002_preflight._binding(
                 r002_preflight.TRANSITION_ASSIGNMENT_REL,
                 assignment_raw,
