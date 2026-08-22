@@ -99,6 +99,7 @@ import kr.co.hanium.dreamup.walksafe.device.RuntimeMetricPreflightStatus
 import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_LIMITED_DISTANCE_NOTICE_KO
 import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_DEVICE_PROFILE_POLICY_STATUS
 import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO
+import kr.co.hanium.dreamup.walksafe.device.WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeApprovedDeviceProfiles
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityDecision
 import kr.co.hanium.dreamup.walksafe.device.WalkSafeStartupCapabilityTier
@@ -438,6 +439,8 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountLogoutButton: Button
     private lateinit var reportPrivacyDisclosureText: TextView
     private lateinit var privacyConsentStatusText: TextView
+    private lateinit var firstRunNoticeToggleButton: Button
+    private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
     private val firstRunProgressSegments = mutableListOf<View>()
     private lateinit var privacyControls: LinearLayout
@@ -8656,18 +8659,38 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         productPurposeText = TextView(this).apply {
             text = "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n앱 버전: ${BuildConfig.VERSION_NAME}"
             textSize = 18f
-            setTextColor(0xffffffff.toInt())
+            setTextColor(WS_COLOR_NOTICE_TEXT)
             setLineSpacing(0f, 1.45f)
+            val density = resources.displayMetrics.density
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = WS_CORNER_RADIUS_DP * density
+                setColor(WS_COLOR_NOTICE_FILL)
+                setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+            }
+            setPadding(
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+                (16f * density).roundToInt(),
+            )
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply {
-                bottomMargin = (WS_SECTION_GAP_DP * resources.displayMetrics.density).roundToInt()
+                bottomMargin = (WS_SECTION_GAP_DP * density).roundToInt()
             }
             contentDescription = text
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_NONE
         }
+        firstRunNoticeToggleButton = accessiblePriorityUserButton(
+            label = "안전 고지 다시 보기",
+            onClick = {
+                firstRunNoticeExpandedByUser = !firstRunNoticeExpandedByUser
+                refreshFirstRunNoticeUi()
+            },
+        )
         firstRunProgressSegments.clear()
         firstRunProgressBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -9270,6 +9293,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             setPadding(32, 48, 32, overlayBottomPaddingPx)
             setBackgroundColor(0x66000000)
             addView(productPurposeText)
+            addView(firstRunNoticeToggleButton)
             addView(permissionDenialPanel)
             addView(firstRunOnboardingControls)
             addView(priorityUserOnboardingControls)
@@ -9321,6 +9345,29 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP),
             )
         }
+    }
+
+    /**
+     * 안전 고지는 1단계에서 전문이 펼쳐진 채로 확인 버튼보다 앞에 온다. 순서 자체가
+     * 게이트이므로 스크롤 위치 같은 시각 전용 조건은 걸지 않는다. 사용자가 확인한 뒤에는
+     * 접히되 삭제되지 않고, 접힌 줄은 정책 상수를 그대로 발췌한다.
+     */
+    private fun refreshFirstRunNoticeUi() {
+        if (!::productPurposeText.isInitialized || !::firstRunNoticeToggleButton.isInitialized) return
+        val acknowledged = !::firstRunOnboardingSnapshot.isInitialized ||
+            firstRunOnboardingSnapshot.stage != FirstRunOnboardingStage.PURPOSE_AND_SAFETY
+        val expanded = !acknowledged || firstRunNoticeExpandedByUser
+        val version = "앱 버전: ${BuildConfig.VERSION_NAME}"
+        productPurposeText.text = if (expanded) {
+            "$WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO\n$version"
+        } else {
+            "안전 제한: $WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"
+        }
+        productPurposeText.contentDescription = productPurposeText.text
+        firstRunNoticeToggleButton.visibility = if (acknowledged) View.VISIBLE else View.GONE
+        firstRunNoticeToggleButton.text =
+            if (expanded) "안전 고지 접기" else "안전 고지 다시 보기"
+        firstRunNoticeToggleButton.contentDescription = firstRunNoticeToggleButton.text
     }
 
     private fun linkFirstRunAccessibilityTraversal() {
@@ -9681,6 +9728,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
         if (::runtimeControls.isInitialized && !mayUseWalk) {
             runtimeControls.visibility = View.GONE
         }
+        refreshFirstRunNoticeUi()
         if (::firstRunProgressBar.isInitialized) {
             val completedStages = when (snapshot.stage) {
                 FirstRunOnboardingStage.PURPOSE_AND_SAFETY -> 1
@@ -20191,6 +20239,9 @@ generation != cameraFallbackGeneration
         /** 실측 대비 기준 디자인 토큰. 흰 글자/회색 면 6.97:1, 테두리 4.08:1. */
         const val WS_COLOR_BUTTON_FILL = 0xff5a595b.toInt()
         const val WS_COLOR_BUTTON_TEXT = 0xffffffff.toInt()
+        /** 상시 안전 고지. 카드 위 10.81:1 로 AAA 를 유지하면서 순백보다 한 단계 뒤로 물린다. */
+        const val WS_COLOR_NOTICE_TEXT = 0xffc9c6c0.toInt()
+        const val WS_COLOR_NOTICE_FILL = 0xff141414.toInt()
         const val WS_COLOR_LINE = 0xff6e6d70.toInt()
         const val WS_CORNER_RADIUS_DP = 10f
         const val FIRST_RUN_VISIBLE_STAGE_COUNT = 3
