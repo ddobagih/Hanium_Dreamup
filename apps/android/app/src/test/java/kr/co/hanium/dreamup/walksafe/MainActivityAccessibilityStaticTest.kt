@@ -548,4 +548,20 @@ class MainActivityAccessibilityStaticTest {
         }
         error("unterminated: $marker")
     }
+    @Test
+    fun stageHeadingRendersEyebrowAndTitleWithoutSplittingTheAnnouncement() {
+        // "첫 실행 N단계." 는 작고 흐리게, 나머지는 크고 굵게. 한 TextView 안에서
+        // Spannable 로 처리하므로 text 와 contentDescription 은 전체 문장 그대로 남고
+        // 접근성 heading 계약도 유지된다.
+        val update = functionBlock("private fun applyStageHeadingStyle")
+        assertTrue(update.contains("SpannableString"))
+        assertTrue(update.contains("RelativeSizeSpan"))
+        assertTrue(update.contains("StyleSpan"))
+        assertTrue(update.contains("ForegroundColorSpan"))
+
+        val caller = functionBlock("private fun updateFirstRunOnboardingUi")
+        assertTrue(caller.contains("firstRunOnboardingStatusText.text = message"))
+        assertTrue(caller.contains("firstRunOnboardingStatusText.contentDescription = message"))
+        assertTrue(caller.contains("applyStageHeadingStyle("))
+    }
 }
