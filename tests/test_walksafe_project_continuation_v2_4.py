@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,8 +15,11 @@ import unittest
 from unittest import mock
 
 from scripts import (
+    apply_walksafe_fp046_npc_r002_reopen_20260815 as r008_review,
+    apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815 as r008_transaction,
     build_walksafe_fp046_gap_backlog_r029_20260815 as r029_bridge,
     build_walksafe_fp046_gap_backlog_r029_candidate_20260815 as r029_candidate,
+    build_walksafe_fp022_completion_seq70_71_review_20260814 as r008_control_review,
 )
 from scripts import check_walksafe_goal_graph_v2_3 as frozen_goal_graph
 from scripts import check_walksafe_goal_graph_v2_4 as goal_graph
@@ -2374,7 +2378,10 @@ class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
         dispatch.update(
             sequence=72, event_id="WS-SYNTHETIC-CLOSURE-072", event_type="CANONICAL_BINDINGS_UPDATED",
             previous_event_sha256=history[-1]["event_sha256"], subject_goal_id="WS-GOAL-EPIC-03",
-            produced_by_goal_id=None, canonical_binding_snapshot_after=continuation.canonical_binding_snapshot(checkpoint),
+            produced_by_goal_id=None, produced_binding_roles=[],
+            producer_completion_receipt_binding=None,
+            producer_output_subject_ids_by_role={},
+            canonical_binding_snapshot_after=continuation.canonical_binding_snapshot(checkpoint),
             changed_binding_roles=[], changed_subject_ids_by_role={}, impact_closure_goal_ids=[],
             impact_disposition_by_goal={"WS-GOAL-EPIC-03": {"result": "REOPEN_CONTAINER", "target_status": "PLANNED"}},
             reopened_completion_event_sha256_by_goal={"WS-GOAL-EPIC-03": "e" * 64}, status_changes={"WS-GOAL-EPIC-03": "PLANNED"},
@@ -2871,6 +2878,593 @@ class WalkSafeGenericDependencyClosureTest(unittest.TestCase):
                     upgraded(before_binding, after_binding, raw_subjects),
                     label,
                 )
+
+
+class WalkSafeR008Seq72BoundaryTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        assigned_at = "2026-08-15T12:00:00+09:00"
+        assignment_raw = r008_review.build_transition_assignment(
+            ROOT, assigned_at=assigned_at
+        ).encode("utf-8")
+        assignment = json.loads(assignment_raw)
+        result = {
+            "schema_version": "1.0",
+            "evidence_type": (
+                "FP046_NPC_R002_REOPEN_TRANSITION_REVIEWER_AUTHORED_RESULT"
+            ),
+            "goal_id": r008_review.TRANSITION_GOAL_ID,
+            "round_id": r008_review.TRANSITION_ROUND_ID,
+            "reviewed_at": assigned_at,
+            "reviewer": copy.deepcopy(assignment["reviewer"]),
+            "assignment_binding": r008_review._binding(
+                r008_review.TRANSITION_ASSIGNMENT_REL, assignment_raw
+            ),
+            "decision": "APPROVED",
+            "findings": {"blocking": [], "major_open": [], "minor_open": []},
+            "finding_dispositions": [],
+            "review_scope": assignment["review_scope"],
+            "review_boundary": assignment["review_boundary"],
+        }
+        result_raw = r008_review.json_text(result).encode("utf-8")
+        independent_raw = r008_review.build_transition_independent_review(
+            assignment, assignment_raw, result, result_raw
+        ).encode("utf-8")
+        review_overlay = {
+            r008_review.TRANSITION_ASSIGNMENT_REL: assignment_raw,
+            r008_review.TRANSITION_RESULT_REL: result_raw,
+            r008_review.TRANSITION_INDEPENDENT_REL: independent_raw,
+        }
+        review_paths = {
+            "assignment": r008_review.TRANSITION_ASSIGNMENT_REL,
+            "review_result": r008_review.TRANSITION_RESULT_REL,
+            "independent_review": r008_review.TRANSITION_INDEPENDENT_REL,
+        }
+        review_binding = {
+            role: r008_review._binding(relative, review_overlay[relative])
+            for role, relative in review_paths.items()
+        }
+        plan = r008_transaction._bind_review_to_preflight(
+            r008_review.build_canonical_preflight(ROOT), review_binding
+        )
+        projection = r008_transaction.project_transaction(
+            ROOT,
+            preflight=plan,
+            staged_outputs=r008_transaction.build_staged_outputs(ROOT, plan),
+            transition_review_overlay=review_overlay,
+        )
+        cls.checkpoint = projection["checkpoint"]
+        cls.archive = continuation.load_json(V23_ARCHIVE)
+        cls.authorization_sha256 = cls.checkpoint["goal_execution"][
+            "transition_history"
+        ][1]["package_activation_authorization_binding"]["file_sha256"]
+
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        paths = {
+            value.decode("utf-8")
+            for value in tracked.split(b"\0")
+            if value
+        }
+        paths.update(
+            relative.as_posix()
+            for relative in r008_control_review.EVIDENCE_PATHS
+        )
+        paths.update(
+            cls.checkpoint["working_tree_snapshot"]["managed_changed_paths"]
+        )
+
+        def collect_paths(value: object) -> None:
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if (
+                        key in {"path", "relative_path", "receipt_path", "contract_path"}
+                        and isinstance(item, str)
+                        and not Path(item).is_absolute()
+                        and ".." not in Path(item).parts
+                    ):
+                        paths.add(item)
+                    collect_paths(item)
+            elif isinstance(value, list):
+                for item in value:
+                    collect_paths(item)
+
+        collect_paths(cls.checkpoint)
+        cls._temporary = tempfile.TemporaryDirectory(
+            dir=ROOT, prefix=".tmp-continuation-seq72-76-"
+        )
+        cls.addClassCleanup(cls._temporary.cleanup)
+        cls.root = Path(cls._temporary.name)
+        for relative in paths:
+            source = ROOT / relative
+            if not source.is_file():
+                continue
+            target = cls.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+        directories = {path.parent for path in cls.root.rglob("*")}
+        for directory in sorted(
+            directories, key=lambda path: len(path.parts), reverse=True
+        ):
+            source = ROOT / directory.relative_to(cls.root)
+            if source.is_dir():
+                os.chmod(directory, source.stat().st_mode & 0o777)
+        control_context = (
+            r008_control_review.prepare_control_successor_r008_context(
+                cls.root
+            )
+        )
+        control_assignment_raw = (
+            r008_control_review.build_control_successor_r008_assignment(
+                control_context, assigned_at=assigned_at
+            ).encode("utf-8")
+        )
+        control_assignment = json.loads(control_assignment_raw)
+        control_result = {
+            "schema_version": "1.0",
+            "evidence_type": (
+                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_"
+                "REVIEW_RESULT"
+            ),
+            "goal_id": r008_control_review.GOAL_ID,
+            "round_id": r008_control_review.CONTROL_SUCCESSOR_R008_ROUND_ID,
+            "reviewed_at": assigned_at,
+            "reviewer": copy.deepcopy(control_assignment["reviewer"]),
+            "assignment_binding": r008_control_review._binding(
+                r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL,
+                control_assignment_raw,
+            ),
+            "review_scope": copy.deepcopy(control_assignment["review_scope"]),
+            "decision": "APPROVED",
+            "findings": {"blocking": [], "major_open": [], "minor_open": []},
+            "finding_dispositions": [],
+            "review_boundary": copy.deepcopy(
+                control_assignment["review_boundary"]
+            ),
+        }
+        control_result_raw = r008_control_review.json_text(
+            control_result
+        ).encode("utf-8")
+        control_independent_raw = (
+            r008_control_review.build_control_successor_r008_independent_review(
+                control_context,
+                control_assignment,
+                control_assignment_raw,
+                control_result,
+                control_result_raw,
+            ).encode("utf-8")
+        )
+        for relative, raw in (
+            (
+                r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL,
+                control_assignment_raw,
+            ),
+            (
+                r008_control_review.CONTROL_SUCCESSOR_R008_RESULT_REL,
+                control_result_raw,
+            ),
+            (
+                r008_control_review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL,
+                control_independent_raw,
+            ),
+        ):
+            target = cls.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+
+        control_overlay = {
+            r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL: (
+                control_assignment_raw
+            ),
+            r008_control_review.CONTROL_SUCCESSOR_R008_RESULT_REL: (
+                control_result_raw
+            ),
+            r008_control_review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL: (
+                control_independent_raw
+            ),
+        }
+        control_binding = r008_transaction._r008_control_review_binding(
+            control_overlay
+        )
+        plan = r008_transaction._bind_review_to_preflight(
+            r008_review.build_canonical_preflight(cls.root),
+            review_binding,
+            control_binding,
+        )
+        projection = r008_transaction.project_transaction(
+            cls.root,
+            preflight=plan,
+            staged_outputs=r008_transaction.build_staged_outputs(
+                cls.root, plan
+            ),
+            catalog_overlay={
+                relative: projection["output_bytes"][relative]
+                for relative in r008_transaction.CATALOG_RELATIVES
+            },
+            transition_review_overlay=review_overlay,
+            r008_control_review_overlay=control_overlay,
+        )
+        cls.checkpoint = projection["checkpoint"]
+        cls.authorization_sha256 = cls.checkpoint["goal_execution"][
+            "transition_history"
+        ][1]["package_activation_authorization_binding"]["file_sha256"]
+        for relative, raw in {
+            **projection["output_bytes"],
+            **review_overlay,
+            **control_overlay,
+        }.items():
+            target = cls.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(raw)
+
+    @classmethod
+    def _replay(cls, checkpoint: dict[str, object]) -> list[str]:
+        return continuation.validate_transition_replay(
+            cls.root,
+            checkpoint,
+            cls.archive,
+            V24_MANIFEST.relative_to(ROOT),
+            expected_authorization_sha256=cls.authorization_sha256,
+        )
+
+    @staticmethod
+    def _reseal_from(checkpoint: dict[str, object], start: int) -> None:
+        state = checkpoint["goal_execution"]
+        history = state["transition_history"]
+        previous = history[start - 1]["event_sha256"] if start else ""
+        for event in history[start:]:
+            event["previous_event_sha256"] = previous
+            event["event_sha256"] = continuation.event_sha256(event)
+            previous = event["event_sha256"]
+        state["transition_history_anchor_sha256"] = previous
+
+    @classmethod
+    def _alternate_control_review_overlay(cls) -> dict[Path, bytes]:
+        assigned_at = "2026-08-15T12:00:01+09:00"
+        context = r008_control_review.prepare_control_successor_r008_context(
+            cls.root
+        )
+        assignment_raw = (
+            r008_control_review.build_control_successor_r008_assignment(
+                context, assigned_at=assigned_at
+            ).encode("utf-8")
+        )
+        assignment = json.loads(assignment_raw)
+        result = {
+            "schema_version": "1.0",
+            "evidence_type": (
+                "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_"
+                "REVIEW_RESULT"
+            ),
+            "goal_id": r008_control_review.GOAL_ID,
+            "round_id": r008_control_review.CONTROL_SUCCESSOR_R008_ROUND_ID,
+            "reviewed_at": assigned_at,
+            "reviewer": copy.deepcopy(assignment["reviewer"]),
+            "assignment_binding": r008_control_review._binding(
+                r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL,
+                assignment_raw,
+            ),
+            "review_scope": copy.deepcopy(assignment["review_scope"]),
+            "decision": "APPROVED",
+            "findings": {"blocking": [], "major_open": [], "minor_open": []},
+            "finding_dispositions": [],
+            "review_boundary": copy.deepcopy(assignment["review_boundary"]),
+        }
+        result_raw = r008_control_review.json_text(result).encode("utf-8")
+        independent_raw = (
+            r008_control_review.build_control_successor_r008_independent_review(
+                context,
+                assignment,
+                assignment_raw,
+                result,
+                result_raw,
+            ).encode("utf-8")
+        )
+        return {
+            r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL: (
+                assignment_raw
+            ),
+            r008_control_review.CONTROL_SUCCESSOR_R008_RESULT_REL: result_raw,
+            r008_control_review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL: (
+                independent_raw
+            ),
+        }
+
+    def test_actual_seq72_76_projection_passes_full_replay(self) -> None:
+        self.assertEqual(self._replay(copy.deepcopy(self.checkpoint)), [])
+        history = self.checkpoint["goal_execution"]["transition_history"]
+        self.assertEqual(history[71]["to_status"], "PLANNED")
+        self.assertEqual(history[74]["to_status"], "READY")
+
+    def test_seq72_requires_materialized_control_review(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        self.assertEqual(
+            continuation.validate_fp046_npc_r002_seq72_boundary(
+                self.root, checkpoint
+            ),
+            [],
+        )
+        for relative, expected in (
+            (
+                r008_control_review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL,
+                "seq72 R008 control review differs: review input is missing",
+            ),
+            (
+                r008_review.TRANSITION_ASSIGNMENT_REL,
+                "seq72 transition review differs: required transition review is missing",
+            ),
+        ):
+            path = self.root / relative
+            original = path.read_bytes()
+            try:
+                path.unlink()
+                errors = continuation.validate_fp046_npc_r002_seq72_boundary(
+                    self.root, checkpoint
+                )
+            finally:
+                path.write_bytes(original)
+            self.assertIn(expected, "\n".join(errors), relative)
+
+    def test_seq72_transition_review_triad_tamper_errors_are_specific(self) -> None:
+        for relative, expected in (
+            (
+                r008_review.TRANSITION_ASSIGNMENT_REL,
+                "transition assignment is noncanonical",
+            ),
+            (
+                r008_review.TRANSITION_RESULT_REL,
+                "transition review result is noncanonical",
+            ),
+            (
+                r008_review.TRANSITION_INDEPENDENT_REL,
+                "transition independent review differs",
+            ),
+        ):
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                original = path.read_bytes()
+                try:
+                    path.write_bytes(original + b" ")
+                    errors = continuation.validate_fp046_npc_r002_seq72_boundary(
+                        self.root, copy.deepcopy(self.checkpoint)
+                    )
+                finally:
+                    path.write_bytes(original)
+                self.assertIn(expected, "\n".join(errors))
+
+    def test_seq72_r029_gap_and_backlog_tamper_errors_are_specific(self) -> None:
+        for role, expected in (
+            ("IMPLEMENTATION_GAP", "canonical IMPLEMENTATION_GAP file differs"),
+            (
+                "IMPLEMENTATION_BACKLOG",
+                "canonical IMPLEMENTATION_BACKLOG file differs",
+            ),
+        ):
+            with self.subTest(role=role):
+                relative = Path(
+                    self.checkpoint["goal_execution"]["transition_history"][71][
+                        "canonical_binding_snapshot_after"
+                    ][role]["path"]
+                )
+                path = self.root / relative
+                original = path.read_bytes()
+                try:
+                    path.write_bytes(b"{}\n")
+                    errors = continuation.validate_fp046_npc_r002_seq72_boundary(
+                        self.root, copy.deepcopy(self.checkpoint)
+                    )
+                finally:
+                    path.write_bytes(original)
+                self.assertIn(expected, "\n".join(errors))
+
+    def test_seq72_rejects_ready_instead_of_two_stage_planned_reopen(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        event = checkpoint["goal_execution"]["transition_history"][71]
+        goal_id = event["subject_goal_id"]
+        event["status_changes"][goal_id] = "READY"
+        event["impact_disposition_by_goal"][goal_id]["target_status"] = "READY"
+        event["to_status"] = "READY"
+        self._reseal_from(checkpoint, 71)
+        errors = self._replay(checkpoint)
+        self.assertIn(
+            "canonical change impact disposition set differs", "\n".join(errors)
+        )
+
+    def test_full_replay_requires_seq75_parent_ready_transition(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        checkpoint["goal_execution"]["transition_history"][74][
+            "to_status"
+        ] = "PLANNED"
+        self._reseal_from(checkpoint, 74)
+
+        self.assertIn(
+            "generic order: generic event 75 from/to boundary differs",
+            "\n".join(self._replay(checkpoint)),
+        )
+
+    def test_seq72_r008_control_review_binding_shape_is_byte_exact(self) -> None:
+        for mutation in ("missing", "path", "sha256", "byte_length"):
+            with self.subTest(mutation=mutation):
+                checkpoint = copy.deepcopy(self.checkpoint)
+                event = checkpoint["goal_execution"]["transition_history"][71]
+                binding = event["r008_control_review_binding"]
+                if mutation == "missing":
+                    event.pop("r008_control_review_binding")
+                elif mutation == "path":
+                    binding["assignment"]["path"] = (
+                        r008_control_review.CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL.as_posix()
+                    )
+                elif mutation == "sha256":
+                    binding["review_result"]["sha256"] = "0" * 64
+                else:
+                    binding["independent_review"]["byte_length"] += 1
+                self._reseal_from(checkpoint, 71)
+
+                self.assertIn(
+                    "seq72 R008 control review byte binding differs",
+                    "\n".join(self._replay(checkpoint)),
+                )
+
+    def test_seq72_rejects_another_internally_valid_r008_triad(self) -> None:
+        alternate = self._alternate_control_review_overlay()
+        originals = {
+            relative: (self.root / relative).read_bytes()
+            for relative in alternate
+        }
+        try:
+            for relative, raw in alternate.items():
+                (self.root / relative).write_bytes(raw)
+            r008_control_review.validated_control_successor_r008_context(
+                self.root
+            )
+            errors = self._replay(copy.deepcopy(self.checkpoint))
+        finally:
+            for relative, raw in originals.items():
+                (self.root / relative).write_bytes(raw)
+
+        self.assertIn(
+            "seq72 R008 control review byte binding differs",
+            "\n".join(errors),
+        )
+
+    def test_seq72_requires_control_review_in_managed_snapshot_after_rehash(
+        self,
+    ) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        snapshot = checkpoint["working_tree_snapshot"]
+        removed = (
+            r008_control_review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL.as_posix()
+        )
+        snapshot["managed_changed_paths"].remove(removed)
+        snapshot["managed_changed_path_count"] -= 1
+        path_hash, content_hash = r008_transaction._overlay_hashes(
+            self.root,
+            snapshot["managed_changed_paths"],
+            {},
+        )
+        snapshot["path_set_sha256"] = path_hash
+        snapshot["content_set_sha256"] = content_hash
+        handoff = checkpoint["session_handoff"]
+        handoff["changed_files"] = copy.deepcopy(
+            snapshot["managed_changed_paths"]
+        )
+        handoff["source_commit_or_snapshot"].update(
+            {
+                "file_count": snapshot["managed_changed_path_count"],
+                "path_set_sha256": path_hash,
+                "content_set_sha256": content_hash,
+            }
+        )
+
+        self.assertIn(
+            "seq72 R008 control review managed paths differ",
+            "\n".join(self._replay(checkpoint)),
+        )
+
+    def test_seq72_rejects_forged_missing_or_empty_producer_control(self) -> None:
+        for value in ("missing", "", continuation.FP022_GOAL_ID):
+            with self.subTest(value=value):
+                checkpoint = copy.deepcopy(self.checkpoint)
+                event = checkpoint["goal_execution"]["transition_history"][71]
+                if value == "missing":
+                    event.pop("produced_by_goal_id")
+                else:
+                    event["produced_by_goal_id"] = value
+                self._reseal_from(checkpoint, 71)
+                self.assertIn(
+                    "dependency closure producer control differs",
+                    "\n".join(self._replay(checkpoint)),
+                )
+
+    def test_seq72_boundary_rejects_event_type_agnostic_state_projection(self) -> None:
+        cases = {
+            "canonical": "event type cannot change canonical bindings",
+            "completion": "event type cannot project completion evidence",
+            "archived": "event type cannot project archived completion evidence",
+            "inventory": "ordinary Goal inventory projection differs",
+            "blockers": "event type cannot change blocker map",
+        }
+        for mutation, expected in cases.items():
+            with self.subTest(mutation=mutation):
+                checkpoint = copy.deepcopy(self.checkpoint)
+                state = checkpoint["goal_execution"]
+                event = state["transition_history"][-1]
+                if mutation == "canonical":
+                    candidate = continuation.canonical_binding_snapshot(checkpoint)
+                    candidate["SMUGGLED"] = {
+                        "role": "SMUGGLED",
+                        "document_id": "SMUGGLED",
+                        "path": "missing-smuggled.json",
+                        "file_sha256": "0" * 64,
+                    }
+                    event["canonical_binding_snapshot_after"] = candidate
+                elif mutation == "completion":
+                    value = copy.deepcopy(state["completion_evidence_by_goal"])
+                    value["SMUGGLED"] = []
+                    event["completion_evidence_by_goal_after"] = value
+                    state["completion_evidence_by_goal"] = value
+                elif mutation == "archived":
+                    value = copy.deepcopy(
+                        state["archived_completion_evidence_by_goal"]
+                    )
+                    value["SMUGGLED"] = []
+                    event["archived_completion_evidence_by_goal_after"] = value
+                    state["archived_completion_evidence_by_goal"] = value
+                elif mutation == "inventory":
+                    inventory = copy.deepcopy(state["dynamic_goal_inventory"])
+                    inventory["SMUGGLED"] = {"goal_id": "SMUGGLED"}
+                    event["dynamic_goal_inventory_after"] = inventory
+                    event["materialized_child_goal_ids_by_parent_after"] = (
+                        copy.deepcopy(state["materialized_child_goal_ids_by_parent"])
+                    )
+                    state["dynamic_goal_inventory"] = inventory
+                else:
+                    blockers = {"SMUGGLED": []}
+                    event["blockers_after"] = blockers
+                    state["blockers_by_goal"] = blockers
+                self._reseal_from(checkpoint, len(state["transition_history"]) - 1)
+                self.assertIn(expected, "\n".join(self._replay(checkpoint)))
+
+    def test_full_replay_rejects_unknown_top_level_after_projection(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        event = checkpoint["goal_execution"]["transition_history"][75]
+        event["arbitrary_after"] = {"smuggled": True}
+        self._reseal_from(checkpoint, 75)
+
+        self.assertIn(
+            "v2.4 event 76 top-level after projection fields are not allowed: arbitrary_after",
+            "\n".join(self._replay(checkpoint)),
+        )
+
+    def test_full_replay_rejects_runtime_after_extra_field(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        event = checkpoint["goal_execution"]["transition_history"][75]
+        event["runtime_after"]["smuggled"] = True
+        self._reseal_from(checkpoint, 75)
+
+        self.assertIn(
+            "v2.4 event 76 runtime_after field set differs",
+            "\n".join(self._replay(checkpoint)),
+        )
+
+    def test_successor_predecessor_hash_is_bound_to_live_goal_bytes(self) -> None:
+        checkpoint = copy.deepcopy(self.checkpoint)
+        successor = checkpoint["goal_execution"]["transition_history"][72]
+        paths = continuation._goal_path_by_id(self.archive, checkpoint)
+        predecessor = self.root / paths[successor["predecessor_goal_id"]]
+        original = predecessor.read_bytes()
+        try:
+            predecessor.write_bytes(original + b"\n")
+            errors = self._replay(checkpoint)
+        finally:
+            predecessor.write_bytes(original)
+        self.assertIn(
+            "successor predecessor live binding differs", "\n".join(errors)
+        )
 
 
 class WalkSafeFp022CompletionSuffixTest(unittest.TestCase):

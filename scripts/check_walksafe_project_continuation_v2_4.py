@@ -596,6 +596,30 @@ GENERIC_DEPENDENCY_CLOSURE_DIRECT_FIELDS = (
     "reopened_completion_event_sha256_by_goal",
     "status_changes",
 )
+GENERIC_AFTER_PROJECTION_FIELDS = {
+    "runtime_after",
+    "canonical_binding_snapshot_after",
+    "completion_evidence_by_goal_after",
+    "archived_completion_evidence_by_goal_after",
+    "dynamic_goal_inventory_after",
+    "materialized_child_goal_ids_by_parent_after",
+    "blockers_after",
+    "blocker_resolution_ids_after",
+}
+GENERIC_RUNTIME_AFTER_FIELDS = {
+    "focus_goal_id",
+    "focus_goal_path",
+    "focus_source",
+    "focus_work_item_id",
+    "ready_frontier_goal_ids",
+    "blocked_goal_ids",
+    "pending_questions",
+    "open_question_count",
+    "activation_status",
+    "package_status",
+    "artifact_work_queue_sha256",
+    "completion_boundary_sha256",
+}
 
 
 def _is_dependency_closure_event(event_type: object, event: Mapping[str, Any]) -> bool:
@@ -603,7 +627,11 @@ def _is_dependency_closure_event(event_type: object, event: Mapping[str, Any]) -
         event_type == "CANONICAL_BINDINGS_UPDATED"
         and isinstance(event.get("sequence"), int)
         and event["sequence"] >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
-        and event.get("produced_by_goal_id") in (None, "")
+        and "produced_by_goal_id" in event
+        and event.get("produced_by_goal_id") is None
+        and event.get("produced_binding_roles") == []
+        and event.get("producer_completion_receipt_binding") is None
+        and event.get("producer_output_subject_ids_by_role") == {}
     )
 GOAL_START_CONTROL_REANCHOR_EVENT_FIELDS = {
     "sequence",
@@ -847,6 +875,17 @@ R008_R028_BACKLOG_BINDING = {
         "acf975cffcdec26906099236567f825a616226bfb030ef70d20bb7a21bcfbe55"
     ),
 }
+R008_R029_CANONICAL_GAP_BINDING = {
+    "role": "IMPLEMENTATION_GAP",
+    "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+    "path": (
+        "docs/control/audits/"
+        "walksafe-implementation-gap-analysis-20260815-r029.json"
+    ),
+    "file_sha256": (
+        "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922"
+    ),
+}
 R008_R029_CANONICAL_BACKLOG_BINDING = {
     "role": "IMPLEMENTATION_BACKLOG",
     "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
@@ -858,6 +897,10 @@ R008_R029_CANONICAL_BACKLOG_BINDING = {
         "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
     ),
 }
+R008_SEQ72_EVENT_ID = (
+    "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-"
+    "FP046-R002-20260815-001"
+)
 R008_R028_LEGACY_BACKLOG_SOURCE_PREDECESSOR = {
     "path": (
         "docs/control/audits/"
@@ -6236,6 +6279,256 @@ def _completion_source_is_allowed(
     )
 
 
+def _validate_r008_transition_review_binding(
+    root: Path,
+    event: Mapping[str, Any],
+    suffix: list[dict[str, Any]],
+) -> list[str]:
+    """Bind seq72 to the actual approved transition-review triplet."""
+
+    try:
+        from scripts import (  # noqa: E402
+            apply_walksafe_fp046_npc_r002_reopen_20260815 as review,
+        )
+        review_paths = {
+            "assignment": review.TRANSITION_ASSIGNMENT_REL,
+            "review_result": review.TRANSITION_RESULT_REL,
+            "independent_review": review.TRANSITION_INDEPENDENT_REL,
+        }
+        raw_by_path = {
+            relative: review._safe_regular_bytes(
+                root, relative, "transition review"
+            )
+            for relative in review_paths.values()
+        }
+        expected_binding = {
+            role: review._binding(relative, raw_by_path[relative])
+            for role, relative in review_paths.items()
+        }
+        errors = []
+        if event.get("transition_review_binding") != expected_binding:
+            errors.append(
+                "FP046/NPC R002 seq72 transition review byte binding differs"
+            )
+
+        assignment_raw = raw_by_path[review.TRANSITION_ASSIGNMENT_REL]
+        result_raw = raw_by_path[review.TRANSITION_RESULT_REL]
+        independent_raw = raw_by_path[review.TRANSITION_INDEPENDENT_REL]
+        assignment = review.strict_json_bytes(
+            assignment_raw, "transition assignment"
+        )
+        result = review.strict_json_bytes(
+            result_raw, "transition review result"
+        )
+        source_bindings = event.get("source_bindings")
+        source_checkpoint = (
+            source_bindings.get("checkpoint")
+            if isinstance(source_bindings, dict)
+            else None
+        )
+        if (
+            not isinstance(source_checkpoint, dict)
+            or set(source_checkpoint) != {"path", "sha256", "byte_length"}
+            or source_checkpoint.get("path")
+            != review.CHECKPOINT_REL.as_posix()
+            or not SHA256_RE.fullmatch(str(source_checkpoint.get("sha256", "")))
+            or not isinstance(source_checkpoint.get("byte_length"), int)
+            or isinstance(source_checkpoint.get("byte_length"), bool)
+            or source_checkpoint["byte_length"] <= 0
+        ):
+            raise ValueError("transition source checkpoint binding differs")
+
+        def actual_binding(relative: Path) -> dict[str, Any]:
+            raw = review._safe_regular_bytes(root, relative, "review subject")
+            return review._binding(relative, raw)
+
+        for relative, (digest, byte_length) in review.R007_REVIEW_PINS.items():
+            binding = actual_binding(relative)
+            if (
+                binding["sha256"] != digest
+                or binding["byte_length"] != byte_length
+            ):
+                raise ValueError(f"R007 review binding differs: {relative}")
+        subject_paths = sorted(
+            {
+                *review.r029_bridge.CANONICAL_OUTPUT_PATHS,
+                review.FP046_R002_REL,
+                review.NPC_R002_REL,
+                review.AUTHORIZATION_REL,
+                review.INITIAL_START_GATE_CONTRACT_REL,
+            }
+        )
+        package = {
+            "source_checkpoint": copy.deepcopy(source_checkpoint),
+            "r007_control_successor_review_bindings": [
+                actual_binding(relative) for relative in review.R007_REVIEW_PINS
+            ],
+            "authorization": actual_binding(review.AUTHORIZATION_REL),
+            "initial_start_gate_contract": actual_binding(
+                review.INITIAL_START_GATE_CONTRACT_REL
+            ),
+            "staged_subject_bindings": [
+                actual_binding(relative) for relative in subject_paths
+            ],
+            "preflight": {"events": suffix},
+        }
+        review.validate_transition_assignment_document(
+            assignment, assignment_raw, package
+        )
+        review._validate_transition_result_document(
+            result, result_raw, assignment, assignment_raw
+        )
+        expected_independent = review.build_transition_independent_review(
+            assignment, assignment_raw, result, result_raw
+        ).encode("utf-8")
+        if independent_raw != expected_independent:
+            raise ValueError("transition independent review differs")
+    except Exception as exc:
+        return [f"FP046/NPC R002 seq72 transition review differs: {exc}"]
+    return errors
+
+
+def _validate_r008_control_review_boundary(
+    root: Path,
+    event: Mapping[str, Any],
+    checkpoint: Mapping[str, Any],
+) -> list[str]:
+    """Bind seq72 and its managed snapshot to the live validated R008 triad."""
+
+    try:
+        from scripts import (  # noqa: E402
+            build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+        )
+
+        review.validated_control_successor_r008_context(root)
+        path_by_role = {
+            "assignment": Path(review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL),
+            "review_result": Path(review.CONTROL_SUCCESSOR_R008_RESULT_REL),
+            "independent_review": Path(
+                review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL
+            ),
+        }
+        if tuple(path_by_role.values()) != tuple(
+            Path(path) for path in review.CONTROL_SUCCESSOR_R008_PATHS
+        ):
+            raise ValueError("R008 control review role paths differ")
+        expected_binding = {
+            role: review._binding(relative, review._raw(root, relative))
+            for role, relative in path_by_role.items()
+        }
+    except Exception as exc:
+        return [f"FP046/NPC R002 seq72 R008 control review differs: {exc}"]
+    errors: list[str] = []
+    if event.get("r008_control_review_binding") != expected_binding:
+        errors.append(
+            "FP046/NPC R002 seq72 R008 control review byte binding differs"
+        )
+    state = checkpoint.get("working_tree_snapshot")
+    managed = state.get("managed_changed_paths") if isinstance(state, dict) else None
+    expected_paths = {
+        relative.as_posix() for relative in path_by_role.values()
+    }
+    if not isinstance(managed, list) or not expected_paths.issubset(managed):
+        errors.append(
+            "FP046/NPC R002 seq72 R008 control review managed paths differ"
+        )
+    return errors
+
+
+def validate_fp046_npc_r002_seq72_boundary(
+    root: Path,
+    checkpoint: Mapping[str, Any],
+) -> list[str]:
+    """Fail closed on seq72's reviewed R029 canonical transition boundary."""
+
+    state = checkpoint.get("goal_execution")
+    history = state.get("transition_history") if isinstance(state, dict) else None
+    if not isinstance(history, list) or len(history) < 72:
+        return []
+    if not isinstance(history[70], dict) or not isinstance(history[71], dict):
+        return ["FP046/NPC R002 seq72 source or event is malformed"]
+    source, event = history[70], history[71]
+    errors: list[str] = []
+    if (
+        source.get("sequence") != 71
+        or source.get("event_id") != FP022_COMPLETION_EVENT_ID
+        or source.get("event_type") != "GOAL_COMPLETED"
+        or source.get("subject_goal_id") != FP022_GOAL_ID
+    ):
+        errors.append("FP046/NPC R002 seq72 source seq71 differs")
+    if (
+        event.get("sequence") != 72
+        or event.get("event_id") != R008_SEQ72_EVENT_ID
+        or event.get("event_type") != "CANONICAL_BINDINGS_UPDATED"
+    ):
+        errors.append("FP046/NPC R002 seq72 event identity differs")
+
+    source_canonical = source.get("canonical_binding_snapshot_after")
+    if not isinstance(source_canonical, dict):
+        errors.append("FP046/NPC R002 seq72 source canonical snapshot differs")
+        expected_canonical: dict[str, Any] = {}
+    else:
+        expected_canonical = copy.deepcopy(source_canonical)
+        expected_canonical.update(
+            {
+                "IMPLEMENTATION_GAP": R008_R029_CANONICAL_GAP_BINDING,
+                "IMPLEMENTATION_BACKLOG": (
+                    R008_R029_CANONICAL_BACKLOG_BINDING
+                ),
+            }
+        )
+    canonical = event.get("canonical_binding_snapshot_after")
+    if canonical != expected_canonical:
+        errors.append("FP046/NPC R002 seq72 canonical R029 snapshot differs")
+
+    for role, expected_binding in (
+        ("IMPLEMENTATION_GAP", R008_R029_CANONICAL_GAP_BINDING),
+        ("IMPLEMENTATION_BACKLOG", R008_R029_CANONICAL_BACKLOG_BINDING),
+    ):
+        binding = canonical.get(role) if isinstance(canonical, dict) else None
+        relative = expected_binding["path"]
+        if binding != expected_binding:
+            errors.append(
+                f"FP046/NPC R002 seq72 canonical binding differs: {role}"
+            )
+        source_bindings = event.get("source_bindings")
+        source_key = "r029_gap" if role == "IMPLEMENTATION_GAP" else "r029_backlog"
+        source_binding = (
+            source_bindings.get(source_key)
+            if isinstance(source_bindings, dict)
+            else None
+        )
+        path = resolve_repo_file(root, relative)
+        if path is None:
+            errors.append(
+                f"FP046/NPC R002 seq72 canonical {role} is missing or unsafe"
+            )
+            continue
+        expected_source_binding = {
+            "path": relative,
+            "sha256": expected_binding["file_sha256"],
+            "byte_length": path.stat().st_size,
+        }
+        if source_binding != expected_source_binding:
+            errors.append(
+                f"FP046/NPC R002 seq72 source {source_key} binding differs"
+            )
+        if (
+            _contains_symlink(root, relative)
+            or sha256_file(path) != expected_binding["file_sha256"]
+        ):
+            errors.append(
+                f"FP046/NPC R002 seq72 canonical {role} file differs"
+            )
+
+    suffix = [item for item in history[71:76] if isinstance(item, dict)]
+    errors.extend(_validate_r008_transition_review_binding(root, event, suffix))
+    errors.extend(
+        _validate_r008_control_review_boundary(root, event, checkpoint)
+    )
+    return errors
+
+
 def _legacy_backlog_upgrade_subjects(
     root: Path,
     graph: Any,
@@ -6566,8 +6859,28 @@ def _validate_dependency_closure_successor(
         return errors + [f"{label} successor contract cannot be derived: {exc}"]
     subject_path = resolve_repo_file(root, goal_paths.get(subject))
     successor_path = resolve_repo_file(root, goal_paths.get(successor))
+    predecessor_id = replacement.get("predecessor_goal_id")
+    predecessor_relative = (
+        goal_paths.get(predecessor_id)
+        if isinstance(predecessor_id, str)
+        else None
+    )
+    predecessor_path = resolve_repo_file(root, predecessor_relative)
     subject_sha = sha256_file(subject_path) if subject_path is not None else None
     successor_sha = sha256_file(successor_path) if successor_path is not None else None
+    predecessor_sha = (
+        sha256_file(predecessor_path)
+        if predecessor_path is not None
+        and not _contains_symlink(root, predecessor_relative)
+        else None
+    )
+    if (
+        predecessor_sha is None
+        or replacement.get("predecessor_goal_content_sha256")
+        != predecessor_sha
+        or event.get("predecessor_goal_content_sha256") != predecessor_sha
+    ):
+        errors.append(f"{label} successor predecessor live binding differs")
     materialization = {
         "artifact_trigger_evidence_refs": replacement.get(
             "artifact_trigger_evidence_refs"
@@ -6576,8 +6889,8 @@ def _validate_dependency_closure_successor(
         "materialized_goal_id": successor,
         "materialized_goal_path": goal_paths.get(successor),
         "materialized_goal_content_sha256": successor_sha,
-        "predecessor_goal_id": replacement.get("predecessor_goal_id"),
-        "predecessor_goal_content_sha256": replacement.get("predecessor_goal_content_sha256"),
+        "predecessor_goal_id": predecessor_id,
+        "predecessor_goal_content_sha256": predecessor_sha,
         "supersedes_goal_id": subject,
         "supersedes_goal_content_sha256": subject_sha,
     }
@@ -6875,7 +7188,24 @@ def validate_generic_event_order(
                 errors.append(f"{label} does not resume IN_PROGRESS work")
         elif event_type == "CANONICAL_BINDINGS_UPDATED":
             producer = event.get("produced_by_goal_id")
-            if producer not in (None, ""):
+            closure_event = _is_dependency_closure_event(event_type, event)
+            if (
+                isinstance(event.get("sequence"), int)
+                and event["sequence"] >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+                and not closure_event
+                and "subject_goal_id" in event
+            ):
+                errors.append(
+                    f"{label} dependency closure producer control differs"
+                )
+            elif (
+                isinstance(event.get("sequence"), int)
+                and event["sequence"] >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+                and not closure_event
+                and (not isinstance(producer, str) or not producer)
+            ):
+                errors.append(f"{label} producer control is missing")
+            elif not closure_event and producer not in (None, ""):
                 if (
                     not isinstance(producer, str)
                     or before.get(producer) != "IN_PROGRESS"
@@ -7022,6 +7352,7 @@ def validate_transition_replay(
         f"generic order: {error}"
         for error in validate_generic_event_order(history)
     )
+    errors.extend(validate_fp046_npc_r002_seq72_boundary(root, checkpoint))
     prepared = history[0] if isinstance(history[0], dict) else {}
     archived_statuses = archived_state.get("status_by_goal")
     if not isinstance(archived_statuses, dict):
@@ -7105,6 +7436,12 @@ def validate_transition_replay(
 
     for index, raw_event in enumerate(history, start=1):
         label = f"v2.4 event {index}"
+        strict_projection_boundary = (
+            index >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+        )
+        closure_event = False
+        closure_successor_event = False
+        dependency_inventory_projection = False
         if not isinstance(raw_event, dict):
             errors.append(f"{label} is not an object")
             continue
@@ -7123,6 +7460,24 @@ def validate_transition_replay(
             seen_ids.add(event_id)
         if event_type not in ALLOWED_EVENT_TYPES:
             errors.append(f"{label} type is invalid")
+        if strict_projection_boundary:
+            unknown_after = sorted(
+                field
+                for field in event
+                if field.endswith("_after")
+                and field not in GENERIC_AFTER_PROJECTION_FIELDS
+            )
+            if unknown_after:
+                errors.append(
+                    f"{label} top-level after projection fields are not allowed: "
+                    + ", ".join(unknown_after)
+                )
+            runtime_projection = event.get("runtime_after")
+            if (
+                isinstance(runtime_projection, dict)
+                and set(runtime_projection) != GENERIC_RUNTIME_AFTER_FIELDS
+            ):
+                errors.append(f"{label} runtime_after field set differs")
         if event.get("previous_event_sha256") != previous_hash:
             errors.append(f"{label} previous hash differs")
         actual_hash = event_sha256(event)
@@ -7360,6 +7715,15 @@ def validate_transition_replay(
 
             subject = event.get("subject_goal_id")
             materialized = event.get("materialized_goal_id")
+            closure_successor_event = (
+                event_type == "GOAL_SUPERSEDED"
+                and isinstance(subject, str)
+                and subject in pending_reopen_source_event_by_goal
+            )
+            dependency_inventory_projection = (
+                event_type == "GOAL_READY"
+                and bool(pending_successor_inventory_event_by_goal)
+            )
             if pending_producer is not None and not (
                 event_type == "GOAL_COMPLETED"
                 and subject == pending_producer
@@ -7490,7 +7854,25 @@ def validate_transition_replay(
                     )
             elif event_type == "CANONICAL_BINDINGS_UPDATED":
                 producer = event.get("produced_by_goal_id")
-                if not closure_event and producer not in (None, ""):
+                if (
+                    isinstance(event.get("sequence"), int)
+                    and event["sequence"]
+                    >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+                    and not closure_event
+                    and "subject_goal_id" in event
+                ):
+                    errors.append(
+                        f"{label} dependency closure producer control differs"
+                    )
+                elif (
+                    isinstance(event.get("sequence"), int)
+                    and event["sequence"]
+                    >= GENERIC_DEPENDENCY_CLOSURE_FIRST_SEQUENCE
+                    and not closure_event
+                    and (not isinstance(producer, str) or not producer)
+                ):
+                    errors.append(f"{label} producer control is missing")
+                elif not closure_event and producer not in (None, ""):
                     if (
                         not isinstance(producer, str)
                         or before.get(producer) != "IN_PROGRESS"
@@ -7718,8 +8100,18 @@ def validate_transition_replay(
             if not isinstance(candidate_bindings, dict):
                 errors.append(f"{label} canonical binding snapshot is malformed")
             else:
-                latest_canonical_bindings = candidate_bindings
-                latest_canonical_bindings_label = label
+                canonical_update = index == 1 or event_type == "CANONICAL_BINDINGS_UPDATED"
+                if (
+                    strict_projection_boundary
+                    and not canonical_update
+                    and candidate_bindings != latest_canonical_bindings
+                ):
+                    errors.append(
+                        f"{label} event type cannot change canonical bindings"
+                    )
+                elif canonical_update or not strict_projection_boundary:
+                    latest_canonical_bindings = candidate_bindings
+                    latest_canonical_bindings_label = label
                 for role, binding in candidate_bindings.items():
                     path = resolve_repo_file(
                         root,
@@ -7737,29 +8129,126 @@ def validate_transition_replay(
                         errors.append(
                             f"{label} canonical binding is malformed: {role}"
                         )
-        for event_field, current_value_name in (
-            ("completion_evidence_by_goal_after", "completion"),
+        completion_present = "completion_evidence_by_goal_after" in event
+        archived_present = "archived_completion_evidence_by_goal_after" in event
+        closure_projection = closure_event or closure_successor_event
+        if event_type == "GOAL_COMPLETED":
+            expected_completion = (
+                {**latest_completion_evidence, subject: event.get("evidence_refs")}
+                if isinstance(latest_completion_evidence, dict)
+                and isinstance(subject, str)
+                else None
+            )
+            if (
+                not completion_present
+                or event.get("completion_evidence_by_goal_after")
+                != expected_completion
+            ):
+                errors.append(f"{label} completion evidence projection differs")
+        elif (
+            strict_projection_boundary
+            and not closure_projection
+            and completion_present
+        ):
+            errors.append(
+                f"{label} event type cannot project completion evidence"
+            )
+        if (
+            strict_projection_boundary
+            and not closure_projection
+            and archived_present
+        ):
+            errors.append(
+                f"{label} event type cannot project archived completion evidence"
+            )
+        if closure_projection and completion_present != archived_present:
+            errors.append(f"{label} completion archive projection is incomplete")
+        if index == 1 or event_type == "GOAL_COMPLETED" or closure_projection:
+            if completion_present:
+                latest_completion_evidence = event.get(
+                    "completion_evidence_by_goal_after"
+                )
+            if archived_present:
+                latest_archived_completion_evidence = event.get(
+                    "archived_completion_evidence_by_goal_after"
+                )
+
+        inventory_present = "dynamic_goal_inventory_after" in event
+        children_present = "materialized_child_goal_ids_by_parent_after" in event
+        if inventory_present != children_present:
+            errors.append(f"{label} Goal inventory projection is incomplete")
+        inventory_projection_allowed = (
+            index == 1
+            or event_type == "GOAL_READY"
+            and dependency_inventory_projection
+        )
+        if (
+            inventory_present
+            and event_type == "GOAL_READY"
+            and not dependency_inventory_projection
+        ):
+            inventory = event.get("dynamic_goal_inventory_after")
+            children = event.get("materialized_child_goal_ids_by_parent_after")
+            record = (
+                inventory.get(subject)
+                if isinstance(inventory, dict) and isinstance(subject, str)
+                else None
+            )
+            parent = record.get("parent_goal_id") if isinstance(record, dict) else None
+            members = (
+                latest_children.get(parent)
+                if isinstance(latest_children, dict) and isinstance(parent, str)
+                else None
+            )
+            ordinary_projection_valid = (
+                isinstance(latest_inventory, dict)
+                and isinstance(latest_children, dict)
+                and isinstance(inventory, dict)
+                and isinstance(children, dict)
+                and isinstance(record, dict)
+                and isinstance(subject, str)
+                and subject not in latest_inventory
+                and inventory == {**latest_inventory, subject: record}
+                and isinstance(parent, str)
+                and isinstance(members, list)
+                and subject not in members
+                and children
+                == {**latest_children, parent: [*members, subject]}
+            )
+            if strict_projection_boundary and not ordinary_projection_valid:
+                errors.append(f"{label} ordinary Goal inventory projection differs")
+            inventory_projection_allowed = True
+        elif (
+            strict_projection_boundary
+            and inventory_present
+            and not inventory_projection_allowed
+        ):
+            errors.append(f"{label} event type cannot project Goal inventory")
+        if inventory_present and inventory_projection_allowed:
+            latest_inventory = event.get("dynamic_goal_inventory_after")
+            latest_children = event.get(
+                "materialized_child_goal_ids_by_parent_after"
+            )
+
+        for event_field, current_value, state_name in (
+            ("blockers_after", latest_blockers, "blocker map"),
             (
-                "archived_completion_evidence_by_goal_after",
-                "archived_completion",
+                "blocker_resolution_ids_after",
+                latest_resolution_ids,
+                "blocker resolution IDs",
             ),
-            ("dynamic_goal_inventory_after", "inventory"),
-            ("materialized_child_goal_ids_by_parent_after", "children"),
-            ("blockers_after", "blockers"),
-            ("blocker_resolution_ids_after", "resolution_ids"),
         ):
             if event_field not in event:
                 continue
             value = event.get(event_field)
-            if current_value_name == "completion":
-                latest_completion_evidence = value
-            elif current_value_name == "archived_completion":
-                latest_archived_completion_evidence = value
-            elif current_value_name == "inventory":
-                latest_inventory = value
-            elif current_value_name == "children":
-                latest_children = value
-            elif current_value_name == "blockers":
+            if (
+                strict_projection_boundary
+                and event_type not in {"BLOCKER_RECORDED", "BLOCKER_RESOLVED"}
+                and value != current_value
+            ):
+                errors.append(f"{label} event type cannot change {state_name}")
+                continue
+            if event_field == "blockers_after":
                 latest_blockers = value
             else:
                 latest_resolution_ids = value

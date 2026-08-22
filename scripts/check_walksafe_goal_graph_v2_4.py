@@ -15797,6 +15797,52 @@ def _r002_transition_review_errors(
     return errors
 
 
+def _r002_control_review_errors(
+    root: Path,
+    canonical_update: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> list[str]:
+    """Validate seq72's direct binding to the live approved R008 triad."""
+    try:
+        from scripts import (  # noqa: E402
+            build_walksafe_fp022_completion_seq70_71_review_20260814 as review,
+        )
+
+        review.validated_control_successor_r008_context(root)
+        path_by_role = {
+            "assignment": Path(review.CONTROL_SUCCESSOR_R008_ASSIGNMENT_REL),
+            "review_result": Path(review.CONTROL_SUCCESSOR_R008_RESULT_REL),
+            "independent_review": Path(
+                review.CONTROL_SUCCESSOR_R008_INDEPENDENT_REL
+            ),
+        }
+        if tuple(path_by_role.values()) != tuple(
+            Path(path) for path in review.CONTROL_SUCCESSOR_R008_PATHS
+        ):
+            raise ValueError("R008 control review role paths differ")
+        expected_binding = {
+            role: review._binding(relative, review._raw(root, relative))
+            for role, relative in path_by_role.items()
+        }
+    except Exception as exc:
+        return [f"FP046/NPC R002 R008 control review differs: {exc}"]
+    errors: list[str] = []
+    if canonical_update.get("r008_control_review_binding") != expected_binding:
+        errors.append("FP046/NPC R002 R008 control review byte binding differs")
+    snapshot = checkpoint.get("working_tree_snapshot")
+    managed = (
+        snapshot.get("managed_changed_paths")
+        if isinstance(snapshot, dict)
+        else None
+    )
+    required_paths = {
+        relative.as_posix() for relative in path_by_role.values()
+    }
+    if not isinstance(managed, list) or not required_paths.issubset(managed):
+        errors.append("FP046/NPC R002 R008 control review managed paths differ")
+    return errors
+
+
 def _r002_archive_projection(
     active: dict[str, Any],
     archived: dict[str, Any],
@@ -16020,6 +16066,7 @@ def validate_fp046_npc_r002_reopen_seq72_76(
     source_active, source_archived = evidence
     cbu, fp046, npc, parent_ready, fp046_ready = suffix
     errors.extend(_r002_transition_review_errors(root, cbu, suffix))
+    errors.extend(_r002_control_review_errors(root, cbu, checkpoint))
     parent_completion = completion_events[R002_REOPEN_PARENT_GOAL_ID]
     fp046_completion = completion_events[FP046_GOAL_ID]
     npc_completion = completion_events[NPC_SINGLE_ADMIN_RECOVERY_GOAL_ID]
