@@ -503,4 +503,49 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(title.contains("Typeface.BOLD"))
         assertTrue(title.contains("textSize = 22f"))
     }
+    @Test
+    fun standingSafetyNoticeReadsAsAContainedBlockNotTheWholeScreen() {
+        // 고지는 순서를 유지한 채(FirstOnTheStartupSurface 계약) 카드로 감싸 시각적으로
+        // 뒤로 물린다. 본문색 #c9c6c0 은 카드 위에서 10.81:1 로 AAA 를 유지한다.
+        assertTrue(source.contains("WS_COLOR_NOTICE_TEXT"))
+        assertTrue(source.contains("WS_COLOR_NOTICE_FILL"))
+
+        val notice = source.substringAfter("productPurposeText = TextView(this).apply")
+            .substringBefore("firstRunProgressSegments.clear()")
+        assertTrue(notice.contains("GradientDrawable()"))
+        assertTrue(notice.contains("WS_COLOR_NOTICE_TEXT"))
+        assertFalse(notice.contains("setTextColor(0xffffffff.toInt())"))
+    }
+    @Test
+    fun safetyNoticeCollapsesOnlyAfterTheUserAcknowledgesIt() {
+        // 1단계에서는 전문이 펼쳐진 채 확인 버튼이 그 아래에 온다. 순서 자체가 게이트이므로
+        // 스크롤 위치 같은 시각 전용 조건을 걸지 않는다. 확인 뒤에는 접히고, 접힌 줄은
+        // 정책 상수 WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO 를 그대로 발췌해 새 문구를 만들지 않는다.
+        assertTrue(source.contains("firstRunNoticeToggleButton"))
+        assertTrue(source.contains("WALKSAFE_PRODUCT_SAFETY_LIMITATION_KO"))
+
+        val update = functionBlock("private fun refreshFirstRunNoticeUi")
+        assertTrue(update.contains("FirstRunOnboardingStage.PURPOSE_AND_SAFETY"))
+        assertTrue(update.contains("WALKSAFE_PRODUCT_PURPOSE_NOTICE_KO"))
+        assertTrue(update.contains("contentDescription"))
+        assertFalse(update.contains("scrollY"))
+        assertFalse(update.contains("canScrollVertically"))
+    }
+
+    private fun functionBlock(marker: String): String {
+        val start = source.indexOf(marker)
+        require(start >= 0) { "missing: $marker" }
+        val open = source.indexOf('{', start)
+        var depth = 0
+        for (index in open until source.length) {
+            when (source[index]) {
+                '{' -> depth += 1
+                '}' -> {
+                    depth -= 1
+                    if (depth == 0) return source.substring(start, index + 1)
+                }
+            }
+        }
+        error("unterminated: $marker")
+    }
 }
