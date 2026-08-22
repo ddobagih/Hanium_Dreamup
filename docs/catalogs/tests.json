@@ -4,7 +4,7 @@
     "ANDROID_GATEWAY": 12,
     "ANDROID_USER": 114,
     "BACKEND": 31,
-    "CONTROL": 100,
+    "CONTROL": 104,
     "CROSS_REPOSITORY": 67,
     "LEGACY_WEB": 20,
     "MODEL_DATA": 8,
@@ -1437,6 +1437,20 @@
     {
       "area": "CONTROL",
       "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "test-runner-historical-array",
       "path": "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py"
@@ -1524,6 +1538,20 @@
       "lifecycle": "CURRENT",
       "lifecycle_rule": "current-test",
       "path": "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py"
+    },
+    {
+      "area": "CONTROL",
+      "framework": "PYTEST",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-test",
+      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py"
     },
     {
       "area": "CONTROL",
@@ -2692,15 +2720,15 @@
     "ANDROID_INSTRUMENTATION_JUNIT": 2,
     "JUNIT": 124,
     "NODE_TEST": 12,
-    "PYTEST": 222,
+    "PYTEST": 226,
     "PYTHON_CLI": 2,
     "TYPESCRIPT_POLICY": 20
   },
   "lifecycle_counts": {
-    "CURRENT": 239,
+    "CURRENT": 243,
     "HISTORICAL": 143
   },
-  "path_count": 382,
+  "path_count": 386,
   "schema_version": "1.0",
   "selection": [
     "test_*.py",
@@ -2718,5 +2746,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8f0ebca05a26e194f404d47170a952cdd06e5661438093b3e9129f3806ef5a97"
+  "source_set_sha256": "bb49f85723d704c2c5373cb04e4fad26e43d6b7e837f47c9f800273c11e126f3"
 }

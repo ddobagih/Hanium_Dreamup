@@ -166,6 +166,24 @@
     {
       "entrypoint": true,
       "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
       "lifecycle": "HISTORICAL",
       "lifecycle_rule": "documented-historical-exact",
       "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
@@ -855,6 +873,24 @@
       "path": "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
       "strongest_side_effect": "REPOSITORY_WRITE",
       "strongest_side_effect_rule": "verb:build"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
+    },
+    {
+      "entrypoint": true,
+      "language": "PYTHON",
+      "lifecycle": "CURRENT",
+      "lifecycle_rule": "current-maintained-script",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+      "strongest_side_effect": "REPOSITORY_WRITE",
+      "strongest_side_effect_rule": "repository-write-capability-exact"
     },
     {
       "entrypoint": true,
@@ -2488,10 +2524,10 @@
   ],
   "lifecycle_counts": {
     "BLOCKED": 3,
-    "CURRENT": 159,
+    "CURRENT": 163,
     "HISTORICAL": 114
   },
-  "path_count": 276,
+  "path_count": 280,
   "roots": [
     "data_sources/scripts/",
     "scripts/"
@@ -2507,12 +2543,12 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8f0ebca05a26e194f404d47170a952cdd06e5661438093b3e9129f3806ef5a97",
+  "source_set_sha256": "bb49f85723d704c2c5373cb04e4fad26e43d6b7e837f47c9f800273c11e126f3",
   "strongest_side_effect_counts": {
     "DB_DEVICE": 21,
     "EXTERNAL": 8,
     "LOCAL_BUILD": 42,
     "READ_ONLY": 39,
-    "REPOSITORY_WRITE": 166
+    "REPOSITORY_WRITE": 170
   }
 }

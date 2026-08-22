@@ -77,19 +77,19 @@
       "role": "REQUIREMENTS_TRACEABILITY"
     },
     {
-      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260814-028",
-      "file_sha256": "f7be788ed4bcde8440d2539dceed9105421019f38ec1a4106648a5fab7120bab",
+      "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+      "file_sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922",
       "identity_json_path": "metadata.report_id",
       "mutable": false,
-      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
       "role": "IMPLEMENTATION_GAP"
     },
     {
-      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
-      "file_sha256": "acf975cffcdec26906099236567f825a616226bfb030ef70d20bb7a21bcfbe55",
+      "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+      "file_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
       "identity_json_path": "metadata.backlog_id",
       "mutable": false,
-      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
       "role": "IMPLEMENTATION_BACKLOG"
     },
     {
@@ -383,38 +383,32 @@
     }
   ],
   "current_work": {
-    "current_focus": "EPIC-04 workstream READY; FP-023/GAP-032 rank25 is the semantic next pointer",
+    "current_focus": "EPIC-03 FP-046/GAP-055 R002 READY; seq77 initial start gate NOT_AUTHORIZED/NOT_RUN",
     "deferred_release_gate_ids": [
       "GATE-PHONE-QUEUE-BYTE-LIMIT",
       "GATE-RAW-COLLECTION-RELEASE-REVIEW",
       "GATE-SERVER-CAPACITY-STATE-CONTRACT"
     ],
-    "epic_id": "WS-GOAL-EPIC-04",
+    "epic_id": "WS-GOAL-EPIC-03",
     "gap_ids": [
-      "GAP-007",
-      "GAP-031",
-      "GAP-032",
-      "GAP-033"
+      "GAP-055"
     ],
-    "gap_ids_semantics": "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE",
-    "last_completed_work_summary": "FP-022/GAP-031 repository-internal TMAP destination, route, arrival and user-decision controls completed",
-    "next_action": "경로를 암호화해 종료 또는 24시간까지 보관하고, 이탈 때 회전안내 중지→설명→새 경로/재확인/보행종료 선택의 승인된 10단계를 구현한다.",
+    "gap_ids_semantics": "FOCUS_GOAL_EXACT_SCOPE",
+    "last_completed_work_summary": "EPIC-03/FP-046/NPC prior completion evidence archived by the seq72-76 canonical-change reopen",
+    "next_action": "FP-046 R002 초기 시작 gate의 권한과 검사 기록을 별도 확인한다.",
     "policy_change_required": false,
     "release_completion_claimed": false,
-    "scope_kind": "BACKLOG_EPIC_AGGREGATE",
+    "scope_kind": "GOAL_FOCUS",
     "source_policy_ids": [
-      "NPC-NAVIGATION-ROUTE-DIRECTION",
-      "FP-022",
-      "FP-023",
-      "FP-024"
+      "FP-046"
     ],
-    "source_policy_ids_semantics": "BACKLOG_EPIC_AGGREGATE_NOT_FOCUS_GOAL_COMPLETION_SCOPE",
-    "status": "IN_PROGRESS",
-    "status_scope": "IMPLEMENTATION_BACKLOG_EPIC_STATUS_NOT_GOAL_STATUS",
+    "source_policy_ids_semantics": "FOCUS_GOAL_EXACT_SCOPE",
+    "status": "READY",
+    "status_scope": "GOAL_STATUS",
     "target_completion_level": "IMPLEMENTATION_READY",
-    "title": "경로·도착·이탈 사용자 결정 흐름",
-    "work_item_id": "",
-    "work_item_id_semantics": "NEXT_ACTION_POINTER_ONLY"
+    "title": "동의 철회와 계정 삭제 재개 검증",
+    "work_item_id": "WS-GOAL-EPIC-03-FP-046-R002",
+    "work_item_id_semantics": "FOCUS_GOAL_ID"
   },
   "execution_order": [
     "EPIC-01",
@@ -433,7 +427,22 @@
   "execution_order_semantics": "PRIORITY_TIE_BREAKER_ONLY_NOT_DEPENDENCY",
   "goal_execution": {
     "activation_status": "ACTIVE",
-    "archived_completion_evidence_by_goal": {},
+    "archived_completion_evidence_by_goal": {
+      "WS-GOAL-EPIC-03": [
+        "IMPLEMENTATION_BACKLOG",
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001",
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001",
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001",
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001",
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+      ],
+      "WS-GOAL-EPIC-03-FP-046-R001": [
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+      ],
+      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": [
+        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+      ]
+    },
     "artifact_work_queue": {
       "artifact_code_count": 257,
       "assessment_policy": "INTERNAL_READY_FRONTIER_THEN_PRIORITY_UNLOCK_TOPO_CODE",
@@ -924,6 +933,8 @@
       "external_action_request_basis_sha256": "",
       "external_waiting_goal_ids": [],
       "internal_pending_goal_ids": [
+        "WS-GOAL-EPIC-03-FP-046-R002",
+        "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002",
         "WS-GOAL-EPIC-04",
         "WS-GOAL-EPIC-05",
         "WS-GOAL-EPIC-06",
@@ -935,6 +946,8 @@
         "WS-GOAL-EPIC-12"
       ],
       "internal_runnable_goal_ids": [
+        "WS-GOAL-EPIC-03-FP-046-R002",
+        "WS-GOAL-EPIC-03",
         "WS-GOAL-EPIC-04",
         "WS-GOAL-EPIC-12"
       ],
@@ -1001,19 +1014,8 @@
       "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": [
         "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
       ],
-      "WS-GOAL-EPIC-03": [
-        "IMPLEMENTATION_BACKLOG",
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001",
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001",
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001",
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001",
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
-      ],
       "WS-GOAL-EPIC-03-FP-008-R001": [
         "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
-      ],
-      "WS-GOAL-EPIC-03-FP-046-R001": [
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
       ],
       "WS-GOAL-EPIC-03-FP-047-R001": [
         "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
@@ -1021,14 +1023,11 @@
       "WS-GOAL-EPIC-03-FP-048-R001": [
         "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
       ],
-      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": [
-        "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
-      ],
       "WS-GOAL-EPIC-04-FP-022-R001": [
         "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
       ]
     },
-    "content_set_sha256": "d996feb8d7f00abbbaa0f0dab9c148994f38dcf663911e84098786dcf373c5fa",
+    "content_set_sha256": "a3661f118bed8d0e6f3611c5096735e9ca75b2f7d33bede548ea4c89af902b54",
     "dynamic_goal_inventory": {
       "WS-GOAL-EPIC-02-FP-004-R001": {
         "artifact_trigger_evidence_refs": [],
@@ -1300,6 +1299,26 @@
         "supersedes_goal_id": "",
         "work_item_type": "POLICY_GAP_WORK"
       },
+      "WS-GOAL-EPIC-03-FP-046-R002": {
+        "artifact_trigger_evidence_refs": [],
+        "artifact_work_reason": "",
+        "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "goal_kind": "WORK_ITEM",
+        "initial_status": "PLANNED",
+        "materialized_event_sha256": "eb99b1636274200f3f5c8c0eb37224a5ef84501c638f6b835b1f2bf20d75fc09",
+        "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+        "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+        "parent_goal_id": "WS-GOAL-EPIC-03",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+        "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+        "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+        "sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+        "supersedes_goal_content_sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79",
+        "supersedes_goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+        "work_item_type": "POLICY_GAP_WORK"
+      },
       "WS-GOAL-EPIC-03-FP-047-R001": {
         "artifact_trigger_evidence_refs": [],
         "artifact_work_reason": "",
@@ -1360,6 +1379,26 @@
         "supersedes_goal_id": "",
         "work_item_type": "POLICY_GAP_WORK"
       },
+      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": {
+        "artifact_trigger_evidence_refs": [],
+        "artifact_work_reason": "",
+        "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002",
+        "goal_kind": "WORK_ITEM",
+        "initial_status": "PLANNED",
+        "materialized_event_sha256": "65ef7bbbd692418f54ed48ab1a2cf19404f25842784a82af950ceda1d52b2fa8",
+        "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+        "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+        "parent_goal_id": "WS-GOAL-EPIC-03",
+        "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
+        "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+        "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+        "sha256": "540cc240f0e9154431706ee595e2dc24426e51c358a938d5986ce774bb076b70",
+        "supersedes_goal_content_sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+        "supersedes_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+        "work_item_type": "POLICY_GAP_WORK"
+      },
       "WS-GOAL-EPIC-04-FP-022-R001": {
         "artifact_trigger_evidence_refs": [],
         "artifact_work_reason": "",
@@ -1392,11 +1431,11 @@
       "INDEPENDENT_HUMAN_REVIEW",
       "RELEASE_ACCEPTANCE_HANDOVER_OR_CLOSURE_SIGNATURE"
     ],
-    "focus_goal_id": "WS-GOAL-EPIC-04",
-    "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md",
-    "focus_source": "WORKSTREAM_GRAPH",
-    "focus_work_item_id": "",
-    "goal_document_count": 31,
+    "focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+    "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+    "focus_source": "IMPLEMENTATION_GAP",
+    "focus_work_item_id": "WS-GOAL-EPIC-03-FP-046-R002",
+    "goal_document_count": 33,
     "goal_document_paths": [
       "docs/control/goals/walksafe-completion-graph-v2-2/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-fp004-priority-user-r001.md",
@@ -1425,9 +1464,11 @@
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp016-camera-centered-buttonless-screen-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp048-encryption-connection-security-incident-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md"
     ],
     "goal_status": "READY",
@@ -1630,7 +1671,7 @@
         "status": "READY"
       }
     },
-    "managed_goal_path_count": 37,
+    "managed_goal_path_count": 39,
     "managed_goal_paths": [
       "docs/control/goals/walksafe-completion-graph-v2-2/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-fp004-priority-user-r001.md",
@@ -1665,9 +1706,11 @@
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp016-camera-centered-buttonless-screen-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp048-encryption-connection-security-incident-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md"
     ],
     "master_goal_id": "WS-GOAL-WALKSAFE-COMPLETION-GRAPH-V2",
@@ -1687,11 +1730,13 @@
         "WS-GOAL-EPIC-02-FP-012-R001"
       ],
       "WS-GOAL-EPIC-03": [
-        "WS-GOAL-EPIC-03-FP-047-R001",
-        "WS-GOAL-EPIC-03-FP-048-R001",
         "WS-GOAL-EPIC-03-FP-008-R001",
         "WS-GOAL-EPIC-03-FP-046-R001",
-        "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+        "WS-GOAL-EPIC-03-FP-046-R002",
+        "WS-GOAL-EPIC-03-FP-047-R001",
+        "WS-GOAL-EPIC-03-FP-048-R001",
+        "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+        "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002"
       ],
       "WS-GOAL-EPIC-04": [
         "WS-GOAL-EPIC-04-FP-022-R001"
@@ -1700,11 +1745,13 @@
     "open_question_count": 0,
     "package_id": "WS-GOAL-PACKAGE-WALKSAFE-COMPLETION-GRAPH-V2-4",
     "package_status": "ACTIVE",
-    "path_set_sha256": "90b784d13c3aa37fecf0099d6f0030397e8021886158070f5015b0f51da6f022",
-    "pending_producer_completion_goal_id": "",
+    "path_set_sha256": "f5b81cfc2683c7e0ed32163d4e74423aa5d2ed3e6f8dd9907ed4d6d430d98e55",
+    "pending_producer_completion_goal_id": null,
     "pending_questions": [],
     "pending_reopen_goal_ids": [],
     "ready_frontier_goal_ids": [
+      "WS-GOAL-EPIC-03-FP-046-R002",
+      "WS-GOAL-EPIC-03",
       "WS-GOAL-EPIC-04",
       "WS-GOAL-EPIC-12"
     ],
@@ -1739,12 +1786,14 @@
       "WS-GOAL-EPIC-02-FP-016-R001": "COMPLETE_AT_TARGET",
       "WS-GOAL-EPIC-02-FP-018-R001": "COMPLETE_AT_TARGET",
       "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": "COMPLETE_AT_TARGET",
-      "WS-GOAL-EPIC-03": "COMPLETE_AT_TARGET",
+      "WS-GOAL-EPIC-03": "READY",
       "WS-GOAL-EPIC-03-FP-008-R001": "COMPLETE_AT_TARGET",
-      "WS-GOAL-EPIC-03-FP-046-R001": "COMPLETE_AT_TARGET",
+      "WS-GOAL-EPIC-03-FP-046-R001": "SUPERSEDED",
+      "WS-GOAL-EPIC-03-FP-046-R002": "READY",
       "WS-GOAL-EPIC-03-FP-047-R001": "COMPLETE_AT_TARGET",
       "WS-GOAL-EPIC-03-FP-048-R001": "COMPLETE_AT_TARGET",
-      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": "COMPLETE_AT_TARGET",
+      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": "SUPERSEDED",
+      "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": "PLANNED",
       "WS-GOAL-EPIC-04": "READY",
       "WS-GOAL-EPIC-04-FP-022-R001": "COMPLETE_AT_TARGET",
       "WS-GOAL-EPIC-05": "PLANNED",
@@ -40505,11 +40554,1916 @@
         },
         "subject_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
         "to_status": "COMPLETE_AT_TARGET"
+      },
+      {
+        "archived_completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-03": [
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ]
+        },
+        "blocker_resolution_ids_after": [],
+        "blockers_after": {},
+        "canonical_binding_snapshot_after": {
+          "ARTIFACT_APPLICATION_RECEIPT": {
+            "document_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+            "file_sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+            "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+            "role": "ARTIFACT_APPLICATION_RECEIPT"
+          },
+          "ARTIFACT_CHANGE_LOG": {
+            "document_id": "ART-DOC-05-001",
+            "file_sha256": "4ba96ca95cf3c299d16d8fe14e2c30bf1efa13e363e4badbfb38d8ca3de235af",
+            "path": "docs/deliverables/00-control/artifact-change-log.json",
+            "role": "ARTIFACT_CHANGE_LOG"
+          },
+          "ARTIFACT_REGISTER": {
+            "document_id": "ART-DOC-01-001",
+            "file_sha256": "401e580e6931ac55f33f610b525e4652281b8bba8cd127ce2cf78c48dc6ed350",
+            "path": "docs/deliverables/00-control/artifact-register.json",
+            "role": "ARTIFACT_REGISTER"
+          },
+          "DESIGN_TRACEABILITY": {
+            "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+            "file_sha256": "f203b1c4dbb4d9b46cf0db06232b20971f7dcba9a99e344f654e8ee92bab0e58",
+            "path": "docs/deliverables/04-design/design-traceability-register.json",
+            "role": "DESIGN_TRACEABILITY"
+          },
+          "EPIC01_PHASE_B_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-B-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "f38c93b3d194b12c5c348db25147ec7b96d40216df98ab197572151eb1b3ab2a",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_B_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_B_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-B-ADMIN-AUTH-RECOVERY-IMPLEMENTATION-20260722-001",
+            "file_sha256": "522474786918c5491775c28dfea772d1f786d35412047bf775170e3a4a70ea83",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_B_RECORD"
+          },
+          "EPIC01_PHASE_C_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-C-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "bc03cbe29556d860511e4f1a53e91c5c4096e0a2d84ffd60cf5d8580dfcb808e",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_C_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_C_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+            "file_sha256": "2f38315c2856028d56f29d824d0fcb232a6f0c94b2cd2f801482468befe9ad14",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_C_RECORD"
+          },
+          "EPIC01_PHASE_D_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "a158c3cce36e10141b17fbab91a043f8a0c3ce405df0be620c9d03a86253f5bc",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_D_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_D_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-D-LEGACY-WEB-CLOSURE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "f3352011c4ffd796ba7f9207e465396a51bd4e8941807229548e185dd1160481",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_D_RECORD"
+          },
+          "EPIC01_PHASE_E_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-E-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "30e8275dd29302805b61810633a09276a3199a2328c63feefd9968a57f109ff1",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_E_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_E_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+            "file_sha256": "6deafda42451e5f03c1422bb5bcd02994890a9e05e107eef2f846b4571a72f23",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_E_RECORD"
+          },
+          "EPIC01_PHASE_F_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-F-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "cf264ab050e86b9668005b13bf7e6bd640f30d859c4c771916f75d0e439495ae",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_F_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_F_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-F-PURPOSE-SURFACES-IMPLEMENTATION-20260723-001",
+            "file_sha256": "5c9705238944fb53a4b9961505f9284062d6e60f50a91efa5f4c655730c7af75",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-purpose-surfaces-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_F_RECORD"
+          },
+          "EPIC01_PHASE_G_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-G-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "006e1d404200c959444d82acd880e52a876c426d1a51feac780b9dff8757f2f8",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_G_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_G_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-G-NO-DESTINATION-HAZARD-IMPLEMENTATION-20260723-001",
+            "file_sha256": "c1bbb54ffdefe6c5c2f958182b7aa49366def8eb2bdc36dac312d5ae5e2ce4fa",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-no-destination-hazard-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_G_RECORD"
+          },
+          "EPIC02_PHASE_A_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-02-PHASE-A-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "e849d0cc6f127ef7a2bdba214b433346ac6267c799dfcdbffc8ce63ed0d3511a",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC02_PHASE_A_ACTIVE_OVERLAY"
+          },
+          "EPIC02_PHASE_A_RECORD": {
+            "document_id": "WS-EPIC-02-PHASE-A-WALK-SESSION-LIFECYCLE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "88f326ee7bd80606174476c57dddbccd219b65ad3c8b9a87ac58893d1e7ffd31",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-walk-session-lifecycle-implementation-record-20260723.json",
+            "role": "EPIC02_PHASE_A_RECORD"
+          },
+          "IMPLEMENTATION_BACKLOG": {
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "file_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "role": "IMPLEMENTATION_BACKLOG"
+          },
+          "IMPLEMENTATION_GAP": {
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+            "file_sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+            "role": "IMPLEMENTATION_GAP"
+          },
+          "MODULE_REGISTER": {
+            "document_id": "DEV-18",
+            "file_sha256": "4943fa953dd93c0258a5ade054aedcccf9123fc3b2669cad24d3cdb36362df7c",
+            "path": "docs/deliverables/05-implementation/module-register.json",
+            "role": "MODULE_REGISTER"
+          },
+          "PLANNED_TEST_CASES": {
+            "document_id": "TST-05",
+            "file_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+            "path": "docs/deliverables/06-testing/registers/test-cases.json",
+            "role": "PLANNED_TEST_CASES"
+          },
+          "POLICY_BASELINE": {
+            "document_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+            "file_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+            "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+            "role": "POLICY_BASELINE"
+          },
+          "REQUIREMENTS_TRACEABILITY": {
+            "document_id": "WS-REQ-RTM-DRAFT-20260721-R001",
+            "file_sha256": "cdc550e44f127164d85342628d9775fb0085f2e4dcd4f6039c33b87fcffadda9",
+            "path": "docs/deliverables/03-requirements/rtm.json",
+            "role": "REQUIREMENTS_TRACEABILITY"
+          },
+          "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL": {
+            "document_id": "WS-SINGLE-ADMIN-RECOVERY-DRILL-PROTOCOL-20260722-001",
+            "file_sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+            "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+            "role": "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001": {
+            "document_id": "WS-FP004-PRIORITY-USER-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "1b5173eee6e8c673c4285da34a280b08d2f8c17dafd6283c0489d4d3d743c199",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001": {
+            "document_id": "WS-FP005-OFFICIAL-ENVIRONMENT-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "2b2cefc069dee597e12ad26c51d9a2d78480a5050bb2eaaf1a29551fb2e422b8",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001": {
+            "document_id": "WS-FP006-PHONE-MOUNTING-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "0e44cdd19d80c9a9ca8867cbeb633cb5163bdddbf1cbcb512b082b655ecf347a",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-006-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001": {
+            "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "9726ec3f5a284f7d010508c901b7215fda00d5f57bff623bfd8c92e9ddb87a60",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-010-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001": {
+            "document_id": "WS-FP011-LONG-LIVED-LOGIN-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "b0823351940413c8b81bd9f410c806dc2da32081e05881f1187124c63465dcc3",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001": {
+            "document_id": "WS-FP012-MULTI-DEVICE-SESSION-LEDGER-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "a8cde08850f9bb92fcee01e562922d1f9dfcaab483d6b2b20022adffee532af2",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001": {
+            "document_id": "WS-FP013-INTEGRATED-CONSENT-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "de0a6f4a431bebb8b09ea9989ff1f880a84b5d1d426d33befde135d0d09fce0c",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001": {
+            "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "9eff1f58ddafca0475ebd765bddbeb712c7748db32bcb88259ae8228a3361170",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001": {
+            "document_id": "WS-FP015-WITHDRAWAL-ACCOUNT-DELETION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "aaef00a3c67dfd74202c01ed9d4eacb71e7efdd4d8bd688a795efca0f4d38e24",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001": {
+            "document_id": "WS-FP016-CAMERA-CENTERED-BUTTONLESS-SCREEN-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "389a586e23152a84efd6ec8e0b7d31b5379de6ce8cd886b62b8bed587cff5ecf",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001": {
+            "document_id": "WS-FP018-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "75f12681d2e89703f4ed688a91e562665b785cb6494e2f206c5229af27310ee5",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": {
+            "document_id": "WS-NPC-PERMISSION-SESSION-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "9f3e45bd74181fb8076a34e977fc3cbc3689ddd3a23e2e791feb163e8940ae36",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001": {
+            "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-WORK-ITEM-COMPLETION-20260809-001",
+            "file_sha256": "d5592127c5b2bb30c0d0927554c91b17b1eb1c4b31f470c7aeef07030f43c608",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001": {
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-COMPLETION-20260810-001",
+            "file_sha256": "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001": {
+            "document_id": "WS-FP047-USER-ADMIN-LOGIN-AUTHORIZATION-SEPARATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001": {
+            "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-WORK-ITEM-COMPLETION-20260802-001",
+            "file_sha256": "072dfee0086702250a15dbf320d58ba477561c5d1ec999349e59a55a4df56992",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": {
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-WORK-ITEM-COMPLETION-20260813-002",
+            "file_sha256": "c021a2fad05315c5a31e3726ed4f4b8717977030e95e4f9616d336c346ae5281",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/completion-receipt-v3.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001": {
+            "document_id": "WS-FP022-NAVIGATION-WORK-ITEM-COMPLETION-20260814-001",
+            "file_sha256": "b56c4f2070223289742fe82e4428b25cfc854504d24d6d7f2d2b6fc6b019edbc",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          }
+        },
+        "changed_binding_roles": [
+          "IMPLEMENTATION_BACKLOG",
+          "IMPLEMENTATION_GAP"
+        ],
+        "changed_subject_ids_by_role": {
+          "IMPLEMENTATION_BACKLOG": [
+            "FP-046"
+          ],
+          "IMPLEMENTATION_GAP": [
+            "FP-046",
+            "GAP-055"
+          ]
+        },
+        "completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-01": [
+            "EPIC01_PHASE_G_RECORD",
+            "IMPLEMENTATION_BACKLOG"
+          ],
+          "WS-GOAL-EPIC-02": [
+            "EPIC02_PHASE_A_RECORD",
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-004-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-005-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-006-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-010-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-011-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-012-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-013-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-014-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-015-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-016-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-018-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          ],
+          "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-008-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-046-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-047-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-048-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          ],
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ],
+          "WS-GOAL-EPIC-04-FP-022-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          ]
+        },
+        "event_id": "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP046-R002-20260815-001",
+        "event_sha256": "89ca4459b78ff4f511c2fce028287095cc8dd1b99d8935919d6853879fa9e42f",
+        "event_type": "CANONICAL_BINDINGS_UPDATED",
+        "evidence_refs": [],
+        "focus_goal_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "focus_goal_id": "WS-GOAL-EPIC-04",
+        "from_status": "COMPLETE_AT_TARGET",
+        "impact_closure_goal_ids": [
+          "WS-GOAL-EPIC-03",
+          "WS-GOAL-EPIC-03-FP-046-R001",
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+        ],
+        "impact_disposition_by_goal": {
+          "WS-GOAL-EPIC-03": {
+            "result": "REOPEN_CONTAINER",
+            "target_status": "PLANNED"
+          },
+          "WS-GOAL-EPIC-03-FP-046-R001": {
+            "result": "REOPEN_REQUIRED"
+          },
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": {
+            "result": "REOPEN_REQUIRED"
+          }
+        },
+        "occurred_at": "2026-08-15T00:00:01+09:00",
+        "occurred_on": "2026-08-15",
+        "predecessor_transition_review_binding": {
+          "assignment": {
+            "byte_length": 10715,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/assignment.json",
+            "sha256": "d387f5058b00b50c15aadfa77b844d59d7b08529e4efadacf96719dccc2cbdd8"
+          },
+          "independent_review": {
+            "byte_length": 10964,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/independent-review.json",
+            "sha256": "a0ddc130d23048a6c5ab39e6dd78d8d485338caaee3192f83c01dcb3eca0210e"
+          },
+          "review_result": {
+            "byte_length": 10706,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/review-result.json",
+            "sha256": "c4c1c8820df69ef0c6ac73f39ab175c5704e6c97200f8c73764975d1846799bc"
+          }
+        },
+        "previous_event_sha256": "620a08b62d05a5ffd584797293b4f46ff4c394e0b7c4c5e115269705f809526c",
+        "previous_focus_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-04",
+        "produced_binding_roles": [],
+        "produced_by_goal_id": null,
+        "producer_completion_receipt_binding": null,
+        "producer_output_subject_ids_by_role": {},
+        "r009_control_review_binding": {
+          "assignment": {
+            "byte_length": 13943,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/assignment.json",
+            "sha256": "e7199de7e86e9d07ab0e78a4b5a19d1ba97ea990e3b9a1eead4a1f3a3972ae52"
+          },
+          "independent_review": {
+            "byte_length": 14262,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/independent-review.json",
+            "sha256": "1ec639abee046dd0ca2a023b8a1773d2300ef92b525c2787f2282aa7b47741d1"
+          },
+          "review_result": {
+            "byte_length": 13961,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/review-result.json",
+            "sha256": "170efe098440d41da2173af29527cae8278db90db6d82a7eacf1e3826097ba94"
+          }
+        },
+        "r010_control_review_binding": {
+          "assignment": {
+            "byte_length": 13933,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/assignment.json",
+            "sha256": "fba3cd9619af6fb159f06682b15079caccc69d8ce6959903935b8a196021969d"
+          },
+          "independent_review": {
+            "byte_length": 14252,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/independent-review.json",
+            "sha256": "307bd88a6057d28b282b1d554d276ac420cf60e5448abf47efe61bc7c1c86710"
+          },
+          "review_result": {
+            "byte_length": 13951,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/review-result.json",
+            "sha256": "bd605d25773a7a904724448b0dd5f0d47c8d1acaa04e223aa493659565f8c095"
+          }
+        },
+        "r011_control_review_binding": {
+          "assignment": {
+            "byte_length": 13846,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+            "sha256": "aa2a5341346fb383d681f42216e4bb8642be4f6d46fa1fded6040032c0f5403f"
+          },
+          "independent_review": {
+            "byte_length": 14165,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+            "sha256": "98b9575e681e118be12773e05aad7c7f408a71c94ba673edcd91e8eea6357794"
+          },
+          "review_result": {
+            "byte_length": 13864,
+            "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
+            "sha256": "bc768f559ae645972df09b7f05ab46cb8e5bbadb723d642a23c217962f2bd000"
+          }
+        },
+        "reopened_completion_event_sha256_by_goal": {
+          "WS-GOAL-EPIC-03": "c8eb9b6b90f546af6960fa929c93b1c97b6115d690938c09a33dd9a4155f0a49"
+        },
+        "runtime_after": {
+          "activation_status": "ACTIVE",
+          "artifact_work_queue_sha256": "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc",
+          "blocked_goal_ids": [],
+          "completion_boundary_sha256": "2127b6d84ae4384962adecbc05209402e40453112c1cb51618496f8382397b32",
+          "focus_goal_id": "WS-GOAL-EPIC-04",
+          "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md",
+          "focus_source": "WORKSTREAM_GRAPH",
+          "focus_work_item_id": "",
+          "open_question_count": 0,
+          "package_status": "ACTIVE",
+          "pending_questions": [],
+          "ready_frontier_goal_ids": [
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12"
+          ]
+        },
+        "sequence": 72,
+        "source_bindings": {
+          "checkpoint": {
+            "byte_length": 2089622,
+            "path": "docs/control/walksafe-project-continuation-checkpoint.json",
+            "sha256": "3744c9b8e70c968bfb7d0c0759a9c3dc2ca6a0e8ef1dfea1114ed52916c0adaa"
+          },
+          "last_completed_execution_leaf": {
+            "completion_event_sha256": "620a08b62d05a5ffd584797293b4f46ff4c394e0b7c4c5e115269705f809526c",
+            "completion_evidence_refs": [
+              "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+            ],
+            "current_focus_goal_id": "WS-GOAL-EPIC-04",
+            "current_focus_is_workstream": true,
+            "current_focus_work_item_id": "",
+            "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
+            "sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b"
+          },
+          "r028_backlog": {
+            "byte_length": 66305,
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json",
+            "sha256": "acf975cffcdec26906099236567f825a616226bfb030ef70d20bb7a21bcfbe55"
+          },
+          "r028_gap": {
+            "byte_length": 532549,
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json",
+            "sha256": "f7be788ed4bcde8440d2539dceed9105421019f38ec1a4106648a5fab7120bab"
+          },
+          "r029_backlog": {
+            "byte_length": 65896,
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba"
+          },
+          "r029_gap": {
+            "byte_length": 533697,
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+            "sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922"
+          },
+          "regression_trigger_discovery": {
+            "byte_length": 7245,
+            "document_id": "WS-FP046-GAP055-REGRESSION-TRIGGER-DISCOVERY-20260815-R001",
+            "path": "docs/control/candidates/fp046-gap055-regression-r029/walksafe-fp046-gap055-regression-trigger-discovery-20260815-r001.candidate.json",
+            "role": "REGRESSION_TRIGGER_DISCOVERY_CANDIDATE",
+            "sha256": "e75093a88bc318ee7f51619fa68fe573fdffe90652b3f65b3890d044dc7d5979"
+          },
+          "source_seq70": {
+            "event_id": "WS-GOAL-GRAPH-V2-4-CANONICAL-BINDINGS-UPDATED-FP022-20260814-001",
+            "sha256": "6678d1aa25d495de1ce187c1c126176abc06c921c16f15d282e584e464563d01"
+          },
+          "source_seq71": {
+            "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-COMPLETED-FP022-20260814-001",
+            "sha256": "620a08b62d05a5ffd584797293b4f46ff4c394e0b7c4c5e115269705f809526c"
+          }
+        },
+        "source_checkpoint_version": "1.25.0",
+        "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+        "status_changes": {
+          "WS-GOAL-EPIC-03": "PLANNED"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03",
+        "to_status": "PLANNED",
+        "transition_review_binding": {
+          "assignment": {
+            "byte_length": 11687,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/assignment.json",
+            "sha256": "37048f966e88bdd70ddf0a4752be79126dcbd9433cb854af1fd0c51b5dd3e4a3"
+          },
+          "independent_review": {
+            "byte_length": 11936,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/independent-review.json",
+            "sha256": "0b7a0324bd2d6dd2528b49c1ebe38764d18ca8e7984db730031291e338b186d1"
+          },
+          "review_result": {
+            "byte_length": 11678,
+            "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/review-result.json",
+            "sha256": "8283e451cff965038729fa669c62ccdb67ae1b70d835e88a5ce8d2a660356d69"
+          }
+        },
+        "transition_review_subject_binding": {
+          "byte_length": 168509,
+          "content_type": "FP046_NPC_R002_APPROVAL_NEUTRAL_SEQ72_76_PLAN_CORE",
+          "sha256": "a24b6ef281382bcf07761e5e8d0bde0c7b1cfdf206a5914abf515cdd50a2ce31"
+        }
+      },
+      {
+        "archived_completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-03": [
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-046-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          ]
+        },
+        "artifact_trigger_evidence_refs": [],
+        "artifact_work_reason": "",
+        "blocker_resolution_ids_after": [],
+        "blockers_after": {},
+        "canonical_binding_snapshot_after": {
+          "ARTIFACT_APPLICATION_RECEIPT": {
+            "document_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+            "file_sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+            "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+            "role": "ARTIFACT_APPLICATION_RECEIPT"
+          },
+          "ARTIFACT_CHANGE_LOG": {
+            "document_id": "ART-DOC-05-001",
+            "file_sha256": "4ba96ca95cf3c299d16d8fe14e2c30bf1efa13e363e4badbfb38d8ca3de235af",
+            "path": "docs/deliverables/00-control/artifact-change-log.json",
+            "role": "ARTIFACT_CHANGE_LOG"
+          },
+          "ARTIFACT_REGISTER": {
+            "document_id": "ART-DOC-01-001",
+            "file_sha256": "401e580e6931ac55f33f610b525e4652281b8bba8cd127ce2cf78c48dc6ed350",
+            "path": "docs/deliverables/00-control/artifact-register.json",
+            "role": "ARTIFACT_REGISTER"
+          },
+          "DESIGN_TRACEABILITY": {
+            "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+            "file_sha256": "f203b1c4dbb4d9b46cf0db06232b20971f7dcba9a99e344f654e8ee92bab0e58",
+            "path": "docs/deliverables/04-design/design-traceability-register.json",
+            "role": "DESIGN_TRACEABILITY"
+          },
+          "EPIC01_PHASE_B_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-B-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "f38c93b3d194b12c5c348db25147ec7b96d40216df98ab197572151eb1b3ab2a",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_B_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_B_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-B-ADMIN-AUTH-RECOVERY-IMPLEMENTATION-20260722-001",
+            "file_sha256": "522474786918c5491775c28dfea772d1f786d35412047bf775170e3a4a70ea83",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_B_RECORD"
+          },
+          "EPIC01_PHASE_C_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-C-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "bc03cbe29556d860511e4f1a53e91c5c4096e0a2d84ffd60cf5d8580dfcb808e",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_C_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_C_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+            "file_sha256": "2f38315c2856028d56f29d824d0fcb232a6f0c94b2cd2f801482468befe9ad14",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_C_RECORD"
+          },
+          "EPIC01_PHASE_D_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "a158c3cce36e10141b17fbab91a043f8a0c3ce405df0be620c9d03a86253f5bc",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_D_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_D_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-D-LEGACY-WEB-CLOSURE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "f3352011c4ffd796ba7f9207e465396a51bd4e8941807229548e185dd1160481",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_D_RECORD"
+          },
+          "EPIC01_PHASE_E_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-E-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "30e8275dd29302805b61810633a09276a3199a2328c63feefd9968a57f109ff1",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_E_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_E_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+            "file_sha256": "6deafda42451e5f03c1422bb5bcd02994890a9e05e107eef2f846b4571a72f23",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_E_RECORD"
+          },
+          "EPIC01_PHASE_F_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-F-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "cf264ab050e86b9668005b13bf7e6bd640f30d859c4c771916f75d0e439495ae",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_F_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_F_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-F-PURPOSE-SURFACES-IMPLEMENTATION-20260723-001",
+            "file_sha256": "5c9705238944fb53a4b9961505f9284062d6e60f50a91efa5f4c655730c7af75",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-purpose-surfaces-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_F_RECORD"
+          },
+          "EPIC01_PHASE_G_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-G-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "006e1d404200c959444d82acd880e52a876c426d1a51feac780b9dff8757f2f8",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_G_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_G_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-G-NO-DESTINATION-HAZARD-IMPLEMENTATION-20260723-001",
+            "file_sha256": "c1bbb54ffdefe6c5c2f958182b7aa49366def8eb2bdc36dac312d5ae5e2ce4fa",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-no-destination-hazard-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_G_RECORD"
+          },
+          "EPIC02_PHASE_A_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-02-PHASE-A-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "e849d0cc6f127ef7a2bdba214b433346ac6267c799dfcdbffc8ce63ed0d3511a",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC02_PHASE_A_ACTIVE_OVERLAY"
+          },
+          "EPIC02_PHASE_A_RECORD": {
+            "document_id": "WS-EPIC-02-PHASE-A-WALK-SESSION-LIFECYCLE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "88f326ee7bd80606174476c57dddbccd219b65ad3c8b9a87ac58893d1e7ffd31",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-walk-session-lifecycle-implementation-record-20260723.json",
+            "role": "EPIC02_PHASE_A_RECORD"
+          },
+          "IMPLEMENTATION_BACKLOG": {
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "file_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "role": "IMPLEMENTATION_BACKLOG"
+          },
+          "IMPLEMENTATION_GAP": {
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+            "file_sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+            "role": "IMPLEMENTATION_GAP"
+          },
+          "MODULE_REGISTER": {
+            "document_id": "DEV-18",
+            "file_sha256": "4943fa953dd93c0258a5ade054aedcccf9123fc3b2669cad24d3cdb36362df7c",
+            "path": "docs/deliverables/05-implementation/module-register.json",
+            "role": "MODULE_REGISTER"
+          },
+          "PLANNED_TEST_CASES": {
+            "document_id": "TST-05",
+            "file_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+            "path": "docs/deliverables/06-testing/registers/test-cases.json",
+            "role": "PLANNED_TEST_CASES"
+          },
+          "POLICY_BASELINE": {
+            "document_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+            "file_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+            "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+            "role": "POLICY_BASELINE"
+          },
+          "REQUIREMENTS_TRACEABILITY": {
+            "document_id": "WS-REQ-RTM-DRAFT-20260721-R001",
+            "file_sha256": "cdc550e44f127164d85342628d9775fb0085f2e4dcd4f6039c33b87fcffadda9",
+            "path": "docs/deliverables/03-requirements/rtm.json",
+            "role": "REQUIREMENTS_TRACEABILITY"
+          },
+          "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL": {
+            "document_id": "WS-SINGLE-ADMIN-RECOVERY-DRILL-PROTOCOL-20260722-001",
+            "file_sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+            "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+            "role": "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001": {
+            "document_id": "WS-FP004-PRIORITY-USER-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "1b5173eee6e8c673c4285da34a280b08d2f8c17dafd6283c0489d4d3d743c199",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001": {
+            "document_id": "WS-FP005-OFFICIAL-ENVIRONMENT-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "2b2cefc069dee597e12ad26c51d9a2d78480a5050bb2eaaf1a29551fb2e422b8",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001": {
+            "document_id": "WS-FP006-PHONE-MOUNTING-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "0e44cdd19d80c9a9ca8867cbeb633cb5163bdddbf1cbcb512b082b655ecf347a",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-006-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001": {
+            "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "9726ec3f5a284f7d010508c901b7215fda00d5f57bff623bfd8c92e9ddb87a60",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-010-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001": {
+            "document_id": "WS-FP011-LONG-LIVED-LOGIN-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "b0823351940413c8b81bd9f410c806dc2da32081e05881f1187124c63465dcc3",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001": {
+            "document_id": "WS-FP012-MULTI-DEVICE-SESSION-LEDGER-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "a8cde08850f9bb92fcee01e562922d1f9dfcaab483d6b2b20022adffee532af2",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001": {
+            "document_id": "WS-FP013-INTEGRATED-CONSENT-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "de0a6f4a431bebb8b09ea9989ff1f880a84b5d1d426d33befde135d0d09fce0c",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001": {
+            "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "9eff1f58ddafca0475ebd765bddbeb712c7748db32bcb88259ae8228a3361170",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001": {
+            "document_id": "WS-FP015-WITHDRAWAL-ACCOUNT-DELETION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "aaef00a3c67dfd74202c01ed9d4eacb71e7efdd4d8bd688a795efca0f4d38e24",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001": {
+            "document_id": "WS-FP016-CAMERA-CENTERED-BUTTONLESS-SCREEN-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "389a586e23152a84efd6ec8e0b7d31b5379de6ce8cd886b62b8bed587cff5ecf",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001": {
+            "document_id": "WS-FP018-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "75f12681d2e89703f4ed688a91e562665b785cb6494e2f206c5229af27310ee5",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": {
+            "document_id": "WS-NPC-PERMISSION-SESSION-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "9f3e45bd74181fb8076a34e977fc3cbc3689ddd3a23e2e791feb163e8940ae36",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001": {
+            "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-WORK-ITEM-COMPLETION-20260809-001",
+            "file_sha256": "d5592127c5b2bb30c0d0927554c91b17b1eb1c4b31f470c7aeef07030f43c608",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001": {
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-COMPLETION-20260810-001",
+            "file_sha256": "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001": {
+            "document_id": "WS-FP047-USER-ADMIN-LOGIN-AUTHORIZATION-SEPARATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001": {
+            "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-WORK-ITEM-COMPLETION-20260802-001",
+            "file_sha256": "072dfee0086702250a15dbf320d58ba477561c5d1ec999349e59a55a4df56992",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": {
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-WORK-ITEM-COMPLETION-20260813-002",
+            "file_sha256": "c021a2fad05315c5a31e3726ed4f4b8717977030e95e4f9616d336c346ae5281",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/completion-receipt-v3.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001": {
+            "document_id": "WS-FP022-NAVIGATION-WORK-ITEM-COMPLETION-20260814-001",
+            "file_sha256": "b56c4f2070223289742fe82e4428b25cfc854504d24d6d7f2d2b6fc6b019edbc",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          }
+        },
+        "completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-01": [
+            "EPIC01_PHASE_G_RECORD",
+            "IMPLEMENTATION_BACKLOG"
+          ],
+          "WS-GOAL-EPIC-02": [
+            "EPIC02_PHASE_A_RECORD",
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-004-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-005-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-006-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-010-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-011-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-012-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-013-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-014-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-015-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-016-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-018-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          ],
+          "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-008-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-047-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-048-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          ],
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ],
+          "WS-GOAL-EPIC-04-FP-022-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          ]
+        },
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-FP046-R002-20260815-001",
+        "event_sha256": "eb99b1636274200f3f5c8c0eb37224a5ef84501c638f6b835b1f2bf20d75fc09",
+        "event_type": "GOAL_SUPERSEDED",
+        "evidence_refs": [],
+        "focus_goal_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "focus_goal_id": "WS-GOAL-EPIC-04",
+        "from_status": "COMPLETE_AT_TARGET",
+        "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+        "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+        "materialized_goal_content_sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+        "materialized_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "materialized_goal_path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+        "occurred_at": "2026-08-15T00:00:02+09:00",
+        "occurred_on": "2026-08-15",
+        "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+        "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+        "previous_event_sha256": "89ca4459b78ff4f511c2fce028287095cc8dd1b99d8935919d6853879fa9e42f",
+        "previous_focus_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-04",
+        "reopen_trigger": {
+          "canonical_update_event_sha256": "89ca4459b78ff4f511c2fce028287095cc8dd1b99d8935919d6853879fa9e42f",
+          "decided_at": "2026-08-15T00:00:01+09:00",
+          "target_completion_event_sha256": "7ccdd1990387a68e1b85a69e9fc41cb13c7d0ebf040619247ead3bcf82c10ec6",
+          "target_completion_occurred_at": "2026-08-10T08:28:05+09:00"
+        },
+        "runtime_after": {
+          "activation_status": "ACTIVE",
+          "artifact_work_queue_sha256": "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc",
+          "blocked_goal_ids": [],
+          "completion_boundary_sha256": "53654aabc9f05755069ded61795d7b759a5e863acbda038a91ecd8e875a7d4a0",
+          "focus_goal_id": "WS-GOAL-EPIC-04",
+          "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md",
+          "focus_source": "WORKSTREAM_GRAPH",
+          "focus_work_item_id": "",
+          "open_question_count": 0,
+          "package_status": "ACTIVE",
+          "pending_questions": [],
+          "ready_frontier_goal_ids": [
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12"
+          ]
+        },
+        "sequence": 73,
+        "source_checkpoint_version": "1.25.0",
+        "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R001": "SUPERSEDED",
+          "WS-GOAL-EPIC-03-FP-046-R002": "PLANNED"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+        "supersedes_goal_content_sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79",
+        "supersedes_goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+        "to_status": "SUPERSEDED"
+      },
+      {
+        "archived_completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-03": [
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-046-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          ],
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          ]
+        },
+        "artifact_trigger_evidence_refs": [],
+        "artifact_work_reason": "",
+        "blocker_resolution_ids_after": [],
+        "blockers_after": {},
+        "canonical_binding_snapshot_after": {
+          "ARTIFACT_APPLICATION_RECEIPT": {
+            "document_id": "WS-ARTIFACT-BASELINE-APPLICATION-RECEIPT-20260722-001",
+            "file_sha256": "002355b92c9862a9fbdc443a48b28657975f91fb58caf3504a28df5eb1f524bb",
+            "path": "docs/control/baselines/walksafe-artifact-baseline-application-receipt-20260722-r001.json",
+            "role": "ARTIFACT_APPLICATION_RECEIPT"
+          },
+          "ARTIFACT_CHANGE_LOG": {
+            "document_id": "ART-DOC-05-001",
+            "file_sha256": "4ba96ca95cf3c299d16d8fe14e2c30bf1efa13e363e4badbfb38d8ca3de235af",
+            "path": "docs/deliverables/00-control/artifact-change-log.json",
+            "role": "ARTIFACT_CHANGE_LOG"
+          },
+          "ARTIFACT_REGISTER": {
+            "document_id": "ART-DOC-01-001",
+            "file_sha256": "401e580e6931ac55f33f610b525e4652281b8bba8cd127ce2cf78c48dc6ed350",
+            "path": "docs/deliverables/00-control/artifact-register.json",
+            "role": "ARTIFACT_REGISTER"
+          },
+          "DESIGN_TRACEABILITY": {
+            "document_id": "WS-DESIGN-TRACEABILITY-20260721-001",
+            "file_sha256": "f203b1c4dbb4d9b46cf0db06232b20971f7dcba9a99e344f654e8ee92bab0e58",
+            "path": "docs/deliverables/04-design/design-traceability-register.json",
+            "role": "DESIGN_TRACEABILITY"
+          },
+          "EPIC01_PHASE_B_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-B-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "f38c93b3d194b12c5c348db25147ec7b96d40216df98ab197572151eb1b3ab2a",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_B_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_B_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-B-ADMIN-AUTH-RECOVERY-IMPLEMENTATION-20260722-001",
+            "file_sha256": "522474786918c5491775c28dfea772d1f786d35412047bf775170e3a4a70ea83",
+            "path": "docs/control/execution/walksafe-epic-01-phase-b-admin-auth-recovery-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_B_RECORD"
+          },
+          "EPIC01_PHASE_C_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-C-ACTIVE-LEDGER-OVERLAY-20260722-001",
+            "file_sha256": "bc03cbe29556d860511e4f1a53e91c5c4096e0a2d84ffd60cf5d8580dfcb808e",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-active-ledger-overlay-20260722-r001.json",
+            "role": "EPIC01_PHASE_C_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_C_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-C-RUNTIME-METRIC-PREFLIGHT-IMPLEMENTATION-20260722-001",
+            "file_sha256": "2f38315c2856028d56f29d824d0fcb232a6f0c94b2cd2f801482468befe9ad14",
+            "path": "docs/control/execution/walksafe-epic-01-phase-c-runtime-metric-preflight-implementation-record-20260722.json",
+            "role": "EPIC01_PHASE_C_RECORD"
+          },
+          "EPIC01_PHASE_D_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-D-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "a158c3cce36e10141b17fbab91a043f8a0c3ce405df0be620c9d03a86253f5bc",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_D_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_D_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-D-LEGACY-WEB-CLOSURE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "f3352011c4ffd796ba7f9207e465396a51bd4e8941807229548e185dd1160481",
+            "path": "docs/control/execution/walksafe-epic-01-phase-d-legacy-web-closure-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_D_RECORD"
+          },
+          "EPIC01_PHASE_E_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-E-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "30e8275dd29302805b61810633a09276a3199a2328c63feefd9968a57f109ff1",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_E_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_E_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-E-ANDROID-GATEWAY-IMPLEMENTATION-20260723-001",
+            "file_sha256": "6deafda42451e5f03c1422bb5bcd02994890a9e05e107eef2f846b4571a72f23",
+            "path": "docs/control/execution/walksafe-epic-01-phase-e-android-gateway-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_E_RECORD"
+          },
+          "EPIC01_PHASE_F_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-F-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "cf264ab050e86b9668005b13bf7e6bd640f30d859c4c771916f75d0e439495ae",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_F_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_F_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-F-PURPOSE-SURFACES-IMPLEMENTATION-20260723-001",
+            "file_sha256": "5c9705238944fb53a4b9961505f9284062d6e60f50a91efa5f4c655730c7af75",
+            "path": "docs/control/execution/walksafe-epic-01-phase-f-purpose-surfaces-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_F_RECORD"
+          },
+          "EPIC01_PHASE_G_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-01-PHASE-G-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "006e1d404200c959444d82acd880e52a876c426d1a51feac780b9dff8757f2f8",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC01_PHASE_G_ACTIVE_OVERLAY"
+          },
+          "EPIC01_PHASE_G_RECORD": {
+            "document_id": "WS-EPIC-01-PHASE-G-NO-DESTINATION-HAZARD-IMPLEMENTATION-20260723-001",
+            "file_sha256": "c1bbb54ffdefe6c5c2f958182b7aa49366def8eb2bdc36dac312d5ae5e2ce4fa",
+            "path": "docs/control/execution/walksafe-epic-01-phase-g-no-destination-hazard-implementation-record-20260723.json",
+            "role": "EPIC01_PHASE_G_RECORD"
+          },
+          "EPIC02_PHASE_A_ACTIVE_OVERLAY": {
+            "document_id": "WS-EPIC-02-PHASE-A-ACTIVE-LEDGER-OVERLAY-20260723-001",
+            "file_sha256": "e849d0cc6f127ef7a2bdba214b433346ac6267c799dfcdbffc8ce63ed0d3511a",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-active-ledger-overlay-20260723-r001.json",
+            "role": "EPIC02_PHASE_A_ACTIVE_OVERLAY"
+          },
+          "EPIC02_PHASE_A_RECORD": {
+            "document_id": "WS-EPIC-02-PHASE-A-WALK-SESSION-LIFECYCLE-IMPLEMENTATION-20260723-001",
+            "file_sha256": "88f326ee7bd80606174476c57dddbccd219b65ad3c8b9a87ac58893d1e7ffd31",
+            "path": "docs/control/execution/walksafe-epic-02-phase-a-walk-session-lifecycle-implementation-record-20260723.json",
+            "role": "EPIC02_PHASE_A_RECORD"
+          },
+          "IMPLEMENTATION_BACKLOG": {
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "file_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+            "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "role": "IMPLEMENTATION_BACKLOG"
+          },
+          "IMPLEMENTATION_GAP": {
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+            "file_sha256": "bf0ae2003d53ab310f2321ea3c3026fc9f255909837f6b874a9a4b3738ad3922",
+            "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+            "role": "IMPLEMENTATION_GAP"
+          },
+          "MODULE_REGISTER": {
+            "document_id": "DEV-18",
+            "file_sha256": "4943fa953dd93c0258a5ade054aedcccf9123fc3b2669cad24d3cdb36362df7c",
+            "path": "docs/deliverables/05-implementation/module-register.json",
+            "role": "MODULE_REGISTER"
+          },
+          "PLANNED_TEST_CASES": {
+            "document_id": "TST-05",
+            "file_sha256": "fc51836c1dddd8852a74805e7fc5b1f6e647f461168139ae2565318745f87f2e",
+            "path": "docs/deliverables/06-testing/registers/test-cases.json",
+            "role": "PLANNED_TEST_CASES"
+          },
+          "POLICY_BASELINE": {
+            "document_id": "PB-WALKSAFE-FEATURE-POLICY-1.0.1",
+            "file_sha256": "b6f5b850a3983b8059b85d93dd07864520219d31fa65a65d740b6bab78231308",
+            "path": "docs/control/baselines/walksafe-feature-policy-baseline-1.0.1-manifest-20260722-r001.json",
+            "role": "POLICY_BASELINE"
+          },
+          "REQUIREMENTS_TRACEABILITY": {
+            "document_id": "WS-REQ-RTM-DRAFT-20260721-R001",
+            "file_sha256": "cdc550e44f127164d85342628d9775fb0085f2e4dcd4f6039c33b87fcffadda9",
+            "path": "docs/deliverables/03-requirements/rtm.json",
+            "role": "REQUIREMENTS_TRACEABILITY"
+          },
+          "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL": {
+            "document_id": "WS-SINGLE-ADMIN-RECOVERY-DRILL-PROTOCOL-20260722-001",
+            "file_sha256": "b9b92c584d190964b4c878ad3adc6c677c660dfbe151cbbd2c63ce19b2a8cca7",
+            "path": "docs/control/execution/walksafe-single-admin-recovery-drill-protocol-20260722-r001.json",
+            "role": "SINGLE_ADMIN_RECOVERY_DRILL_PROTOCOL"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001": {
+            "document_id": "WS-FP004-PRIORITY-USER-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "1b5173eee6e8c673c4285da34a280b08d2f8c17dafd6283c0489d4d3d743c199",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-004-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001": {
+            "document_id": "WS-FP005-OFFICIAL-ENVIRONMENT-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "2b2cefc069dee597e12ad26c51d9a2d78480a5050bb2eaaf1a29551fb2e422b8",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-005-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001": {
+            "document_id": "WS-FP006-PHONE-MOUNTING-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "0e44cdd19d80c9a9ca8867cbeb633cb5163bdddbf1cbcb512b082b655ecf347a",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-006-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001": {
+            "document_id": "WS-FP010-FIRST-RUN-REGISTRATION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "9726ec3f5a284f7d010508c901b7215fda00d5f57bff623bfd8c92e9ddb87a60",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-010-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001": {
+            "document_id": "WS-FP011-LONG-LIVED-LOGIN-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "b0823351940413c8b81bd9f410c806dc2da32081e05881f1187124c63465dcc3",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-011-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001": {
+            "document_id": "WS-FP012-MULTI-DEVICE-SESSION-LEDGER-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "a8cde08850f9bb92fcee01e562922d1f9dfcaab483d6b2b20022adffee532af2",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-012-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001": {
+            "document_id": "WS-FP013-INTEGRATED-CONSENT-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "de0a6f4a431bebb8b09ea9989ff1f880a84b5d1d426d33befde135d0d09fce0c",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-013-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001": {
+            "document_id": "WS-FP014-PERMISSION-DENIAL-REVOCATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "9eff1f58ddafca0475ebd765bddbeb712c7748db32bcb88259ae8228a3361170",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-014-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001": {
+            "document_id": "WS-FP015-WITHDRAWAL-ACCOUNT-DELETION-WORK-ITEM-COMPLETION-20260725-001",
+            "file_sha256": "aaef00a3c67dfd74202c01ed9d4eacb71e7efdd4d8bd688a795efca0f4d38e24",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-015-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001": {
+            "document_id": "WS-FP016-CAMERA-CENTERED-BUTTONLESS-SCREEN-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "389a586e23152a84efd6ec8e0b7d31b5379de6ce8cd886b62b8bed587cff5ecf",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-016-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001": {
+            "document_id": "WS-FP018-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "75f12681d2e89703f4ed688a91e562665b785cb6494e2f206c5229af27310ee5",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-FP-018-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": {
+            "document_id": "WS-NPC-PERMISSION-SESSION-WORK-ITEM-COMPLETION-20260724-001",
+            "file_sha256": "9f3e45bd74181fb8076a34e977fc3cbc3689ddd3a23e2e791feb163e8940ae36",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001": {
+            "document_id": "WS-FP008-ADMIN-REVIEW-DELIVERY-WORK-ITEM-COMPLETION-20260809-001",
+            "file_sha256": "d5592127c5b2bb30c0d0927554c91b17b1eb1c4b31f470c7aeef07030f43c608",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-008-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001": {
+            "document_id": "WS-FP046-CONSENT-WITHDRAWAL-DELETION-WORK-ITEM-COMPLETION-20260810-001",
+            "file_sha256": "b3f7e5e94e5ce2beeeabdbc62fb5b871c38df3d6747362500193dc4269fa041f",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-046-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-046-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001": {
+            "document_id": "WS-FP047-USER-ADMIN-LOGIN-AUTHORIZATION-SEPARATION-WORK-ITEM-COMPLETION-20260726-001",
+            "file_sha256": "2b27af16cc88bf8417a5ef2004eefe80904d622c9bd74993c724cb51c728247e",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-047-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001": {
+            "document_id": "WS-FP048-ENCRYPTION-CONNECTION-SECURITY-WORK-ITEM-COMPLETION-20260802-001",
+            "file_sha256": "072dfee0086702250a15dbf320d58ba477561c5d1ec999349e59a55a4df56992",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-FP-048-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": {
+            "document_id": "WS-NPC-SINGLE-ADMIN-RECOVERY-WORK-ITEM-COMPLETION-20260813-002",
+            "file_sha256": "c021a2fad05315c5a31e3726ed4f4b8717977030e95e4f9616d336c346ae5281",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/verification-correction-v2/completion-receipt-v3.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001"
+          },
+          "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001": {
+            "document_id": "WS-FP022-NAVIGATION-WORK-ITEM-COMPLETION-20260814-001",
+            "file_sha256": "b56c4f2070223289742fe82e4428b25cfc854504d24d6d7f2d2b6fc6b019edbc",
+            "path": "docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/completion-receipt.json",
+            "role": "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          }
+        },
+        "completion_evidence_by_goal_after": {
+          "WS-GOAL-EPIC-01": [
+            "EPIC01_PHASE_G_RECORD",
+            "IMPLEMENTATION_BACKLOG"
+          ],
+          "WS-GOAL-EPIC-02": [
+            "EPIC02_PHASE_A_RECORD",
+            "IMPLEMENTATION_BACKLOG",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001",
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-004-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-004-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-005-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-005-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-006-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-006-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-010-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-010-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-011-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-011-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-012-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-013-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-013-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-014-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-014-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-015-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-015-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-016-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-016-R001"
+          ],
+          "WS-GOAL-EPIC-02-FP-018-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-FP-018-R001"
+          ],
+          "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-008-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-008-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-047-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-047-R001"
+          ],
+          "WS-GOAL-EPIC-03-FP-048-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-03-FP-048-R001"
+          ],
+          "WS-GOAL-EPIC-04-FP-022-R001": [
+            "WORK_ITEM_COMPLETION::WS-GOAL-EPIC-04-FP-022-R001"
+          ]
+        },
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-SUPERSEDED-NPC-SINGLE-ADMIN-RECOVERY-R002-20260815-001",
+        "event_sha256": "65ef7bbbd692418f54ed48ab1a2cf19404f25842784a82af950ceda1d52b2fa8",
+        "event_type": "GOAL_SUPERSEDED",
+        "evidence_refs": [],
+        "focus_goal_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "focus_goal_id": "WS-GOAL-EPIC-04",
+        "from_status": "COMPLETE_AT_TARGET",
+        "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+        "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+        "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+        "materialized_goal_content_sha256": "540cc240f0e9154431706ee595e2dc24426e51c358a938d5986ce774bb076b70",
+        "materialized_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002",
+        "materialized_goal_path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
+        "occurred_at": "2026-08-15T00:00:03+09:00",
+        "occurred_on": "2026-08-15",
+        "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+        "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+        "previous_event_sha256": "eb99b1636274200f3f5c8c0eb37224a5ef84501c638f6b835b1f2bf20d75fc09",
+        "previous_focus_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-04",
+        "reopen_trigger": {
+          "canonical_update_event_sha256": "89ca4459b78ff4f511c2fce028287095cc8dd1b99d8935919d6853879fa9e42f",
+          "decided_at": "2026-08-15T00:00:01+09:00",
+          "target_completion_event_sha256": "24f586dda8e19d9c1315bee80e546906359869c49e5fa776bb891ec76beb13c1",
+          "target_completion_occurred_at": "2026-08-13T19:48:37+09:00"
+        },
+        "runtime_after": {
+          "activation_status": "ACTIVE",
+          "artifact_work_queue_sha256": "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc",
+          "blocked_goal_ids": [],
+          "completion_boundary_sha256": "afd738793dd68bffe2ba9066f268b2b27f410f19c9f92fca704b84f8c40c9120",
+          "focus_goal_id": "WS-GOAL-EPIC-04",
+          "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-04-navigation-arrival-deviation.md",
+          "focus_source": "WORKSTREAM_GRAPH",
+          "focus_work_item_id": "",
+          "open_question_count": 0,
+          "package_status": "ACTIVE",
+          "pending_questions": [],
+          "ready_frontier_goal_ids": [
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12"
+          ]
+        },
+        "sequence": 74,
+        "source_checkpoint_version": "1.25.0",
+        "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+        "status_changes": {
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": "SUPERSEDED",
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": "PLANNED"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+        "supersedes_goal_content_sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+        "supersedes_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+        "to_status": "SUPERSEDED"
+      },
+      {
+        "blocker_resolution_ids_after": [],
+        "blockers_after": {},
+        "dynamic_goal_inventory_after": {
+          "WS-GOAL-EPIC-02-FP-004-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "1abcb15fe17fef6ae4f5f365a97b3b19c9e09c21df8142631b0bcdf48a4619ce",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-010",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r010.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "61954297c2679a331ee3e546e0be0682b9d80f5e4439216849a64dfee57625da",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-fp004-priority-user-r001.md",
+            "predecessor_goal_content_sha256": "06ec8298dcc18cb8a8e3f04c05c9bbad2d09709a9538177c842141e3f01ec490",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "sha256": "b558e360daf9cc3ae3682241ff3aceba2822de2dbe26bf67c6b200f7a9ea1bf1",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-005-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "49d7368fc100f6209f38b80b1e55940954c962ad331c2efc945ab93254252db3",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-011",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r011.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "27eb2c1a4a656a921cd3573f11e76d3b5656afa25f3707b60e5e455c906a523e",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-fp005-official-environment-crosswalk-r001.md",
+            "predecessor_goal_content_sha256": "b558e360daf9cc3ae3682241ff3aceba2822de2dbe26bf67c6b200f7a9ea1bf1",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-004-R001",
+            "sha256": "61742bc14a794592978c788b9600db1e1e7185edaa6e6413d37fc49cca286a21",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-006-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "c956a273e25bf408aa5d75588131213f53e883dcc7a3cb2fdb7f36d88845e419",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-012",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r012.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "305e7864f021575ce04aec39bcbb5ba968e2299e4afcf7287712283c12c31fe3",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-3/work-items/epic-02/epic-02-fp006-solo-walk-phone-mounting-r001.md",
+            "predecessor_goal_content_sha256": "61742bc14a794592978c788b9600db1e1e7185edaa6e6413d37fc49cca286a21",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-005-R001",
+            "sha256": "ddf2da4990337b3ce78ccfe85084abbefddfdb46044e88a953b266115c59b901",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-010-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "6a2bf687873015315c04ff2e1772e67f5243cfac5d06cfecc401d8a2899a5e04",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-013",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r013.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "ce22a11e2c3388ef2e728f4a19eb970ecb7bee5658668f159d178a77262c8edb",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-3/work-items/epic-02/epic-02-fp010-first-run-registration-r001.md",
+            "predecessor_goal_content_sha256": "ddf2da4990337b3ce78ccfe85084abbefddfdb46044e88a953b266115c59b901",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-006-R001",
+            "sha256": "eaa31b6e48baf258e5d76886169c1f1c9596e27ca6a38c59b61bc9cb1d7da763",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-011-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "7ef83acdcd8eaaa65cf8e988a37efda2c860bde9449372ae5426a0e1162c8372",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-014",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r014.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "f98ec0f5aa8a7515fb70939569c31175b61652835091046bebf11a87500fd333",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-3/work-items/epic-02/epic-02-fp011-long-lived-login-r001.md",
+            "predecessor_goal_content_sha256": "eaa31b6e48baf258e5d76886169c1f1c9596e27ca6a38c59b61bc9cb1d7da763",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-010-R001",
+            "sha256": "55dbce00b3092053a2766c078f1de83ef79e9193bfb372c7bcf30836c596e56f",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-012-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-012-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "695d3a50d26c9a9c68e42e7282c61800c6dede42c094f2dca8690462b1be8a47",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-019",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r019.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "0c95156951ffcf7004fc92fbd6ca2cffe04febcea86ac457195fb10551ee6e62",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp012-multi-device-session-ledger-r001.md",
+            "predecessor_goal_content_sha256": "d7fe0204199c22acdc3bc6b748cde67b2b3b6227b726ce6a50ddf2c3f019af81",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-016-R001",
+            "sha256": "4f85f016683176ca38de6024cd7fea4c09b9cf65e8c3318d27b785120d634c3f",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-013-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "3486c956e24e2d913316344ced6588eba74f85bad1b62777f1ca524c58a97553",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-015",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r015.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "9b561c89bb870fb15480e1fcb7e39cd32a119eb2286da0413b1d988642aec703",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp013-first-run-integrated-consent-r001.md",
+            "predecessor_goal_content_sha256": "55dbce00b3092053a2766c078f1de83ef79e9193bfb372c7bcf30836c596e56f",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-011-R001",
+            "sha256": "0c3ac09bb4541fa0a881995f49d701cc7dc0c520009b1b68f382e2a54030e217",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-014-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-014-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "f74c2bf5a0185d69c86da4ed0c1b85123900c9d431adaa004e06ea50310e72fd",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-017",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r017.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "0ca4724ffad40891503c7df1578e4bbb274991276ef852d1dd3b74ca3011dc35",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp014-permission-denial-revocation-r001.md",
+            "predecessor_goal_content_sha256": "9b5374de0e8a95140ec83b5f70bfe0c85cc0353c474c93ccdf4dbe9d27a9a0f3",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-015-R001",
+            "sha256": "8790f46e43d410c1fb4dc5c6c0b7013fa2dfc87b511a249068df4bdddbc2c06e",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-015-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-015-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "12e27e50ded92e770dead5af8c0c96c6bac31014e6713ac47a16b250cc2a615d",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260725-016",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260725-r016.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "8c06265e4a721634d27ff82f57284a3c8ba9e033ecfe64d489194f82b80936e8",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp015-withdrawal-account-deletion-r001.md",
+            "predecessor_goal_content_sha256": "0c3ac09bb4541fa0a881995f49d701cc7dc0c520009b1b68f382e2a54030e217",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-013-R001",
+            "sha256": "9b5374de0e8a95140ec83b5f70bfe0c85cc0353c474c93ccdf4dbe9d27a9a0f3",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-016-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-016-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "9a14350249adedf9076c0e0753eb2ca5123a3defaf57ecd18aaadd38aff89253",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-018",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r018.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "667ae83090e73d39e8ea371f2543e560a5d8465505dad323c84e901f369e31b0",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp016-camera-centered-buttonless-screen-r001.md",
+            "predecessor_goal_content_sha256": "8790f46e43d410c1fb4dc5c6c0b7013fa2dfc87b511a249068df4bdddbc2c06e",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-014-R001",
+            "sha256": "d7fe0204199c22acdc3bc6b748cde67b2b3b6227b726ce6a50ddf2c3f019af81",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-FP-018-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "90c16c3ac5d6156a0c64874d87ce472c8f47f9da50daa4ce98e6b5e7fa693ab1",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260723-008",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260723-r008.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "77c11a61bab49853cc53e51f1a72c2399d4fe2a29b9ef284183cdc15679cb342",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-fp018-walk-state-recovery-r001.md",
+            "predecessor_goal_content_sha256": "",
+            "predecessor_goal_id": "",
+            "sha256": "0607dd70faa6def46fe07f9511fc5eec87f884858b650600fe286b4c207aa501",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "goal_kind": "WORK_ITEM",
+            "materialized_event_sha256": "e54083c9a0e270b2858671c96f89c12b88eb89600bd91d20c9a76e7ba3f034ab",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260724-009",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260724-r009.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "ea2c1c278a1cafe87ed44051c70168a29379714df6e8d243ab58235a6295502a",
+            "parent_goal_id": "WS-GOAL-EPIC-02",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-2/work-items/epic-02/epic-02-npc-permission-session-lifecycle-r001.md",
+            "predecessor_goal_content_sha256": "0607dd70faa6def46fe07f9511fc5eec87f884858b650600fe286b4c207aa501",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-018-R001",
+            "sha256": "06ec8298dcc18cb8a8e3f04c05c9bbad2d09709a9538177c842141e3f01ec490",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-FP-008-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "11e8328e2a08bc7e5facc2e95e1aba47d754a7cf3e12a9ac5055bd283861a260",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260802-023",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260802-r023.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "eabd987cff1086c6a45b9b6eee9166213727ab59d63cd5b7075da01e27651021",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
+            "predecessor_goal_content_sha256": "043b5a463914015a5918b885c3f69c242ece190358bd18ab1f884de46f553740",
+            "predecessor_goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+            "sha256": "2654fe5f595aefaecf974a4de70bad7946c2385cba9716200f2d2f49d849dd8e",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-FP-046-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "1d555f00ec2685d51b32642de1e2627b71c0e68f26fe1b990b86d258490eda5c",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260809-024",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260809-r024.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "f2c860d8d5199bdd18da62fd44bf0e161a7f6b9933bde7eebed86afb9fb8b55d",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+            "predecessor_goal_content_sha256": "2654fe5f595aefaecf974a4de70bad7946c2385cba9716200f2d2f49d849dd8e",
+            "predecessor_goal_id": "WS-GOAL-EPIC-03-FP-008-R001",
+            "sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-FP-046-R002": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "eb99b1636274200f3f5c8c0eb37224a5ef84501c638f6b835b1f2bf20d75fc09",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+            "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+            "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+            "sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+            "supersedes_goal_content_sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79",
+            "supersedes_goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-FP-047-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "c3f077662ef3fe175f6168387336138c2b4e952157f35c8450759a66305a59f4",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-020",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r020.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "20b103c83f397894a7b9d5c9eedd696b0aa977b02552f49614876714b540dd6f",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
+            "predecessor_goal_content_sha256": "4f85f016683176ca38de6024cd7fea4c09b9cf65e8c3318d27b785120d634c3f",
+            "predecessor_goal_id": "WS-GOAL-EPIC-02-FP-012-R001",
+            "sha256": "2ff79dde64cb113d755855f05dafb6bab1393717f060b4db387bb2d48bc53b06",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-FP-048-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-FP-048-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "3ce004cbf97caf885ef18cc93eb86237b6323acad0b99060d178adedd5197c15",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260726-021",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260726-r021.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "bcc4561ead39e1d659222f54161c0e063bd41fbf8b60c0a2b144a4535143c6a0",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp048-encryption-connection-security-incident-r001.md",
+            "predecessor_goal_content_sha256": "2ff79dde64cb113d755855f05dafb6bab1393717f060b4db387bb2d48bc53b06",
+            "predecessor_goal_id": "WS-GOAL-EPIC-03-FP-047-R001",
+            "sha256": "043b5a463914015a5918b885c3f69c242ece190358bd18ab1f884de46f553740",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "66d41874a3b1a57a2137f084d38be828c776889b6813667d940f81a6ba421f90",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260810-025",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260810-r025.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "346fadca1cc9fea3f3d0a95a7f4beed061116d2d258080ed3105c50feeeaa5da",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+            "predecessor_goal_content_sha256": "f8f1fc9e9b8c1eaabe543cd64130b5a6dfa3b908b318033cb5969d4a724e8d79",
+            "predecessor_goal_id": "WS-GOAL-EPIC-03-FP-046-R001",
+            "sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "65ef7bbbd692418f54ed48ab1a2cf19404f25842784a82af950ceda1d52b2fa8",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "8128560569c340ce3b60c24972ccaa6bb5a52e5d13035bd709a3f12a2392aeba",
+            "parent_goal_id": "WS-GOAL-EPIC-03",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
+            "predecessor_goal_content_sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+            "predecessor_goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+            "sha256": "540cc240f0e9154431706ee595e2dc24426e51c358a938d5986ce774bb076b70",
+            "supersedes_goal_content_sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+            "supersedes_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+            "work_item_type": "POLICY_GAP_WORK"
+          },
+          "WS-GOAL-EPIC-04-FP-022-R001": {
+            "artifact_trigger_evidence_refs": [],
+            "artifact_work_reason": "",
+            "goal_id": "WS-GOAL-EPIC-04-FP-022-R001",
+            "goal_kind": "WORK_ITEM",
+            "initial_status": "PLANNED",
+            "materialized_event_sha256": "ae10fdd0d30e32c7296f1a80855d8eaf8d9540e63d7c8036e96f48216b0af776",
+            "materialized_from_document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260813-027",
+            "materialized_from_path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.json",
+            "materialized_from_role": "IMPLEMENTATION_BACKLOG",
+            "materialized_from_sha256": "64e91046639ba44600d3584b5258d15f26b9c9161b03f25a4a662903d29e2f45",
+            "parent_goal_id": "WS-GOAL-EPIC-04",
+            "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
+            "predecessor_goal_content_sha256": "234a224883779208ba7878a9865076083bb9cfd205dfdb7a760b043f7af6b16d",
+            "predecessor_goal_id": "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+            "sha256": "939075c1b4bcbf9b8280c37cb7a449fd28763f06cda14faf0ca88f691734576b",
+            "supersedes_goal_content_sha256": "",
+            "supersedes_goal_id": "",
+            "work_item_type": "POLICY_GAP_WORK"
+          }
+        },
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-EPIC03-REOPEN-20260815-001",
+        "event_sha256": "db43144645b2ddd514845ea35536780b0004d49485f8a105f12fc6018ea46210",
+        "event_type": "GOAL_READY",
+        "evidence_refs": [],
+        "focus_goal_content_sha256": "7d2dfb7fe89bd30fc1f6113acb0b533a9fd91a6106cc2ab4798091763beae832",
+        "focus_goal_id": "WS-GOAL-EPIC-03",
+        "from_status": "PLANNED",
+        "materialized_child_goal_ids_by_parent_after": {
+          "WS-GOAL-EPIC-02": [
+            "WS-GOAL-EPIC-02-FP-018-R001",
+            "WS-GOAL-EPIC-02-NPC-PERMISSION-SESSION-LIFECYCLE-R001",
+            "WS-GOAL-EPIC-02-FP-004-R001",
+            "WS-GOAL-EPIC-02-FP-005-R001",
+            "WS-GOAL-EPIC-02-FP-006-R001",
+            "WS-GOAL-EPIC-02-FP-010-R001",
+            "WS-GOAL-EPIC-02-FP-011-R001",
+            "WS-GOAL-EPIC-02-FP-013-R001",
+            "WS-GOAL-EPIC-02-FP-015-R001",
+            "WS-GOAL-EPIC-02-FP-014-R001",
+            "WS-GOAL-EPIC-02-FP-016-R001",
+            "WS-GOAL-EPIC-02-FP-012-R001"
+          ],
+          "WS-GOAL-EPIC-03": [
+            "WS-GOAL-EPIC-03-FP-008-R001",
+            "WS-GOAL-EPIC-03-FP-046-R001",
+            "WS-GOAL-EPIC-03-FP-046-R002",
+            "WS-GOAL-EPIC-03-FP-047-R001",
+            "WS-GOAL-EPIC-03-FP-048-R001",
+            "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001",
+            "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002"
+          ],
+          "WS-GOAL-EPIC-04": [
+            "WS-GOAL-EPIC-04-FP-022-R001"
+          ]
+        },
+        "occurred_at": "2026-08-15T00:00:04+09:00",
+        "occurred_on": "2026-08-15",
+        "previous_event_sha256": "65ef7bbbd692418f54ed48ab1a2cf19404f25842784a82af950ceda1d52b2fa8",
+        "previous_focus_content_sha256": "da4aa5a7ab2abe8c3a746c8df4edd69db77ea1dbc2b3e1bdc00399291b99ac6d",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-04",
+        "readiness_basis": {
+          "archived_completion_event_sha256": "c8eb9b6b90f546af6960fa929c93b1c97b6115d690938c09a33dd9a4155f0a49",
+          "canonical_update_event_sha256": "89ca4459b78ff4f511c2fce028287095cc8dd1b99d8935919d6853879fa9e42f",
+          "mode": "CANONICAL_DEPENDENCY_CLOSURE_REOPEN",
+          "successor_event_sha256_by_goal": {
+            "WS-GOAL-EPIC-03-FP-046-R002": "eb99b1636274200f3f5c8c0eb37224a5ef84501c638f6b835b1f2bf20d75fc09",
+            "WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R002": "65ef7bbbd692418f54ed48ab1a2cf19404f25842784a82af950ceda1d52b2fa8"
+          }
+        },
+        "runtime_after": {
+          "activation_status": "ACTIVE",
+          "artifact_work_queue_sha256": "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc",
+          "blocked_goal_ids": [],
+          "completion_boundary_sha256": "23e17ac7f337528ca17d5f3dc4bd6c4ef95923facf807cad922055f4a7d6f5b7",
+          "focus_goal_id": "WS-GOAL-EPIC-03",
+          "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-2/workstreams/epic-03-account-admin-security.md",
+          "focus_source": "WORKSTREAM_GRAPH",
+          "focus_work_item_id": "",
+          "open_question_count": 0,
+          "package_status": "ACTIVE",
+          "pending_questions": [],
+          "ready_frontier_goal_ids": [
+            "WS-GOAL-EPIC-03",
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12"
+          ]
+        },
+        "sequence": 75,
+        "source_checkpoint_version": "1.25.0",
+        "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+        "status_changes": {
+          "WS-GOAL-EPIC-03": "READY"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03",
+        "to_status": "READY"
+      },
+      {
+        "blocker_resolution_ids_after": [],
+        "blockers_after": {},
+        "event_id": "WS-GOAL-GRAPH-V2-4-GOAL-READY-FP046-R002-20260815-001",
+        "event_sha256": "f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070",
+        "event_type": "GOAL_READY",
+        "evidence_refs": [],
+        "focus_goal_content_sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+        "focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "from_status": "PLANNED",
+        "occurred_at": "2026-08-15T00:00:05+09:00",
+        "occurred_on": "2026-08-15",
+        "previous_event_sha256": "db43144645b2ddd514845ea35536780b0004d49485f8a105f12fc6018ea46210",
+        "previous_focus_content_sha256": "7d2dfb7fe89bd30fc1f6113acb0b533a9fd91a6106cc2ab4798091763beae832",
+        "previous_focus_goal_id": "WS-GOAL-EPIC-03",
+        "readiness_basis": {
+          "dependency_completion_events": [
+            {
+              "event_sha256": "caa5d73aa19416d997e7ef416bfa9a9af5383bde95541ad93fd31e44ee6cafd4",
+              "goal_id": "WS-GOAL-EPIC-03-FP-008-R001"
+            }
+          ]
+        },
+        "reopened_container_ready_event_sha256": "db43144645b2ddd514845ea35536780b0004d49485f8a105f12fc6018ea46210",
+        "runtime_after": {
+          "activation_status": "ACTIVE",
+          "artifact_work_queue_sha256": "ba5dc2d8cdd0d3956840a86c0f0a3b767b4fd4ca2dc54393ce05957f3ac022dc",
+          "blocked_goal_ids": [],
+          "completion_boundary_sha256": "4f3f0e675ca6772dc95451e2f72d1f6170edbdc6b16b0ddc92586ce0699bb0cf",
+          "focus_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+          "focus_goal_path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+          "focus_source": "IMPLEMENTATION_GAP",
+          "focus_work_item_id": "WS-GOAL-EPIC-03-FP-046-R002",
+          "open_question_count": 0,
+          "package_status": "ACTIVE",
+          "pending_questions": [],
+          "ready_frontier_goal_ids": [
+            "WS-GOAL-EPIC-03-FP-046-R002",
+            "WS-GOAL-EPIC-03",
+            "WS-GOAL-EPIC-04",
+            "WS-GOAL-EPIC-12"
+          ]
+        },
+        "sequence": 76,
+        "source_checkpoint_version": "1.25.0",
+        "static_plan_manifest_sha256": "7325de1f413423dff7c19390b85b489c981f46511464ca81969e226ca8908b07",
+        "status_changes": {
+          "WS-GOAL-EPIC-03-FP-046-R002": "READY"
+        },
+        "subject_goal_id": "WS-GOAL-EPIC-03-FP-046-R002",
+        "to_status": "READY"
       }
     ],
-    "transition_history_anchor_sha256": "620a08b62d05a5ffd584797293b4f46ff4c394e0b7c4c5e115269705f809526c",
+    "transition_history_anchor_sha256": "f2a529bae5aa808fccb64191a42902d7e717d0340531410213486bdcfa279070",
     "transition_history_assurance": "INITIAL_EVENT_CHECKER_ANCHORED_TAIL_HASH_CHAINED_EXTERNAL_SNAPSHOT_REQUIRED",
-    "validation_cutoff_at": "2026-08-14T14:55:01+09:00",
+    "validation_cutoff_at": "2026-08-15T00:00:05+09:00",
     "verification_evidence_refs": []
   },
   "implementation_gap_snapshot": {
@@ -41345,6 +43299,8 @@
       "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.md",
       "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json",
       "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.md",
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.json",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r003.json",
@@ -41377,12 +43333,15 @@
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.md",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.md",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/evidence.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-check-receipt-r015.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-ledger-r015.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/evidence.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-check-receipt-r016.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-ledger-r016.json",
+      "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/initial-start-gate-contract-r002.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r002.json",
@@ -41584,6 +43543,15 @@
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/independent-review.json",
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/review-assignment.json",
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R001/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R002/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R003/assignment.json",
@@ -41600,6 +43568,19 @@
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/independent-review.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/authorization.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/review-result.json",
       "docs/control/goals/README.md",
       "docs/control/goals/walksafe-completion-graph-v2-1/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2-1/README.md",
@@ -41667,9 +43648,11 @@
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp016-camera-centered-buttonless-screen-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp048-encryption-connection-security-incident-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2/README.md",
@@ -41809,6 +43792,8 @@
       "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
       "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
       "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+      "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
       "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
       "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
       "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
@@ -41834,6 +43819,8 @@
       "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
       "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
       "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+      "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
       "scripts/build_walksafe_full_rc_20260713.py",
       "scripts/build_walksafe_goal_graph_v2_3.py",
       "scripts/build_walksafe_goal_graph_v2_4.py",
@@ -41900,6 +43887,8 @@
       "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
       "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
       "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+      "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
       "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
       "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
       "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
@@ -41912,6 +43901,8 @@
       "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
       "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py",
       "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py",
+      "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
@@ -41981,10 +43972,10 @@
       "tests/test_web_build_manifest.py",
       "tests/test_web_runtime_trace_scope.py"
     ],
-    "current_epic": "EPIC-04",
-    "last_updated_by_work_item": "WS-GOAL-EPIC-04-FP-022-R001",
-    "last_verification_status": "PASS_INTERNAL_ONLY_FORMAL_EXTERNAL_RELEASE_NOT_RUN",
-    "next_single_action": "경로를 암호화해 종료 또는 24시간까지 보관하고, 이탈 때 회전안내 중지→설명→새 경로/재확인/보행종료 선택의 승인된 10단계를 구현한다.",
+    "current_epic": "EPIC-03 / FP-046/GAP-055 R002 READY",
+    "last_updated_by_work_item": "WS-GOAL-EPIC-03-FP-046-R002",
+    "last_verification_status": "INTERNAL_CONTROL_TRANSITION_REVIEWED_SEQ77_NOT_AUTHORIZED_NOT_RUN",
+    "next_single_action": "FP-046 R002 초기 시작 gate의 권한과 검사 기록을 별도 확인한다.",
     "remaining_blockers_and_gates": [
       {
         "id": "ADMIN-PRODUCTION-PROVISIONING",
@@ -42223,10 +44214,10 @@
     ],
     "source_commit_or_snapshot": {
       "base_commit": "f0093863e82bfc80d9f11915cef33a51d44b8730",
-      "content_set_sha256": "f143217c7d0543aed646df7e5846909a2f5a183b8e9d68ca6c6e3c9078d6b2fb",
+      "content_set_sha256": "47221a8c0cb20dc769b5b906ab97ce2512f43c1872fa44d59fc864cf2d87157c",
       "current_head": "ca0898d56eaa45b947b9f513a2bcdbfcb5bc5a0c",
-      "file_count": 910,
-      "path_set_sha256": "76599330227aa090355fdd8079c3a5cfeab95e6b3e26390280ccd30d0cd45132"
+      "file_count": 947,
+      "path_set_sha256": "1dd756c9b408932b41d7f0f2d0010f102cf5f23357c8d0868a3ffed95f3925b3"
     },
     "verification_commands_and_results": [
       {
@@ -42419,8 +44410,8 @@
   "working_tree_snapshot": {
     "base_head": "f0093863e82bfc80d9f11915cef33a51d44b8730",
     "checkpoint_self_exclusion": "EXCLUDED_TO_AVOID_CIRCULAR_CONTENT_HASH; VALIDATED_SEMANTICALLY",
-    "content_set_sha256": "f143217c7d0543aed646df7e5846909a2f5a183b8e9d68ca6c6e3c9078d6b2fb",
-    "managed_changed_path_count": 910,
+    "content_set_sha256": "47221a8c0cb20dc769b5b906ab97ce2512f43c1872fa44d59fc864cf2d87157c",
+    "managed_changed_path_count": 947,
     "managed_changed_paths": [
       ".github/CODEOWNERS",
       ".github/pull_request_template.md",
@@ -42697,6 +44688,8 @@
       "docs/control/audits/walksafe-implementation-gap-analysis-20260813-r027.md",
       "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.json",
       "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.md",
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+      "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.json",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r002.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260722-r003.json",
@@ -42729,12 +44722,15 @@
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260813-r027.md",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.json",
       "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.md",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+      "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.md",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/evidence.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-check-receipt-r015.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r015/phase1-exact257-successor-ledger-r015.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/evidence.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-check-receipt-r016.json",
       "docs/control/execution/artifact-closure/run-20260727-001/packets/phase1-exact257-successor-r016/phase1-exact257-successor-ledger-r016.json",
+      "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-NPC-SINGLE-ADMIN-RECOVERY-R001/initial-start-gate-contract-r002.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r001.json",
       "docs/control/execution/goal-contracts/WS-GOAL-EPIC-04-FP-022-R001/initial-start-gate-contract-r002.json",
@@ -42936,6 +44932,15 @@
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/independent-review.json",
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/review-assignment.json",
       "docs/control/execution/workstream-transitions/seq68-69/review-rounds/R031/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/review-result.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R001/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R002/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R003/assignment.json",
@@ -42952,6 +44957,19 @@
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/assignment.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/independent-review.json",
       "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/authorization.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/review-result.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/assignment.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/independent-review.json",
+      "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/review-result.json",
       "docs/control/goals/README.md",
       "docs/control/goals/walksafe-completion-graph-v2-1/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2-1/README.md",
@@ -43019,9 +45037,11 @@
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-02/epic-02-fp016-camera-centered-buttonless-screen-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp008-admin-review-delivery-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp048-encryption-connection-security-incident-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+      "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
       "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-04/epic-04-fp022-tmap-destination-route-r001.md",
       "docs/control/goals/walksafe-completion-graph-v2/00-master-goal.md",
       "docs/control/goals/walksafe-completion-graph-v2/README.md",
@@ -43161,6 +45181,8 @@
       "scripts/apply_walksafe_fp022_goal_seq66_67_20260813.py",
       "scripts/apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
       "scripts/apply_walksafe_fp022_goal_started_seq69_20260814.py",
+      "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
       "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
       "scripts/apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
       "scripts/apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
@@ -43186,6 +45208,8 @@
       "scripts/build_walksafe_fp022_navigation_internal_evidence_20260814.py",
       "scripts/build_walksafe_fp022_seq66_67_review_20260814.py",
       "scripts/build_walksafe_fp022_seq68_69_review_20260814.py",
+      "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
       "scripts/build_walksafe_full_rc_20260713.py",
       "scripts/build_walksafe_goal_graph_v2_3.py",
       "scripts/build_walksafe_goal_graph_v2_4.py",
@@ -43252,6 +45276,8 @@
       "tests/test_apply_walksafe_fp022_goal_completed_seq70_71_20260814.py",
       "tests/test_apply_walksafe_fp022_goal_start_control_reanchor_seq68_20260814.py",
       "tests/test_apply_walksafe_fp022_goal_started_seq69_20260814.py",
+      "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
       "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
       "tests/test_apply_walksafe_npc_goal_start_control_reanchor_seq58_20260812.py",
       "tests/test_apply_walksafe_npc_single_admin_recovery_goal_completed_seq61_62_20260812.py",
@@ -43264,6 +45290,8 @@
       "tests/test_build_walksafe_fp022_navigation_internal_evidence_20260814.py",
       "tests/test_build_walksafe_fp022_seq66_67_review_20260814.py",
       "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py",
+      "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_correction_v2_20260813.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_artifact_trace_successor_20260812.py",
       "tests/test_build_walksafe_npc_single_admin_recovery_gap_backlog_r026_20260812.py",
@@ -43333,7 +45361,7 @@
       "tests/test_web_build_manifest.py",
       "tests/test_web_runtime_trace_scope.py"
     ],
-    "path_set_sha256": "76599330227aa090355fdd8079c3a5cfeab95e6b3e26390280ccd30d0cd45132",
+    "path_set_sha256": "1dd756c9b408932b41d7f0f2d0010f102cf5f23357c8d0868a3ffed95f3925b3",
     "scope": "Graph v2.4 through the atomic FP022 canonical producer seq70 and completion seq71 transaction; repository-internal navigation implementation, R028, review and completion evidence are bound; formal, device, external TMAP, deployment and release credit remain zero."
   }
 }

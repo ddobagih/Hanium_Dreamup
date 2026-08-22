@@ -2,20 +2,20 @@
   "bound_or_protected_archive_count": 0,
   "catalog_kind": "REPOSITORY_PATHS",
   "checkpoint": {
-    "bound_path_count": 923,
+    "bound_path_count": 960,
     "canonical_binding_count": 43,
-    "managed_path_count": 910,
+    "managed_path_count": 947,
     "path": "docs/control/walksafe-project-continuation-checkpoint.json",
     "protected_file_count": 5,
     "static_plan_manifest_path": "docs/control/goals/walksafe-completion-graph-v2-4/static-plan-manifest-v2.4.0.json"
   },
   "classification_counts": {
     "CURRENT_PRODUCT": 285,
-    "EVIDENCE": 2374,
+    "EVIDENCE": 2407,
     "GENERATED": 4,
-    "GOVERNANCE": 254,
+    "GOVERNANCE": 256,
     "LEGACY_REFERENCE": 214,
-    "SUPPORT": 692
+    "SUPPORT": 700
   },
   "entries": [
     {
@@ -20924,19 +20924,13 @@
     },
     {
       "canonical": {
-        "bound": true,
-        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260814-028",
-        "mutable": false,
-        "role": "IMPLEMENTATION_GAP"
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
       },
       "checkpoint": {
-        "canonical_bindings": [
-          {
-            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260814-028",
-            "mutable": false,
-            "role": "IMPLEMENTATION_GAP"
-          }
-        ],
+        "canonical_bindings": [],
         "goal_bound": false,
         "managed": true,
         "path_bound": true,
@@ -20977,6 +20971,64 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
       "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260814-r028.md",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": true,
+        "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+        "mutable": false,
+        "role": "IMPLEMENTATION_GAP"
+      },
+      "checkpoint": {
+        "canonical_bindings": [
+          {
+            "document_id": "WS-IMPLEMENTATION-GAP-ANALYSIS-20260815-029",
+            "mutable": false,
+            "role": "IMPLEMENTATION_GAP"
+          }
+        ],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-audits",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-audits",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/audits/walksafe-implementation-gap-analysis-20260815-r029.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
     },
@@ -22308,19 +22360,13 @@
     },
     {
       "canonical": {
-        "bound": true,
-        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
-        "mutable": false,
-        "role": "IMPLEMENTATION_BACKLOG"
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
       },
       "checkpoint": {
-        "canonical_bindings": [
-          {
-            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260814-028",
-            "mutable": false,
-            "role": "IMPLEMENTATION_BACKLOG"
-          }
-        ],
+        "canonical_bindings": [],
         "goal_bound": false,
         "managed": true,
         "path_bound": true,
@@ -22361,6 +22407,64 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
       "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260814-r028.md",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": true,
+        "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+        "mutable": false,
+        "role": "IMPLEMENTATION_BACKLOG"
+      },
+      "checkpoint": {
+        "canonical_bindings": [
+          {
+            "document_id": "WS-IMPLEMENTATION-REMEDIATION-BACKLOG-20260815-029",
+            "mutable": false,
+            "role": "IMPLEMENTATION_BACKLOG"
+          }
+        ],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-audits",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-audits",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/audits/walksafe-implementation-remediation-backlog-20260815-r029.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
     },
@@ -40263,6 +40367,32 @@
       "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R001/initial-start-gate-contract-r001.json",
       "path_kind": "FILE",
       "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/goal-contracts/WS-GOAL-EPIC-03-FP-046-R002/initial-start-gate-contract-r001.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
     },
     {
       "canonical": {
@@ -72296,6 +72426,396 @@
       "checkpoint": {
         "canonical_bindings": [],
         "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R007/assignment.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R007/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R007/review-result.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R008/assignment.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R008/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": false,
+        "path_bound": false,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": false,
+        "source": null
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "docs-execution",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R008/review-result.json",
+      "path_kind": "FILE",
+      "reason": "repository rule docs-execution"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R009/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R010/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq70-71/control-successor-reviews/20260815/R011/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
         "managed": true,
         "path_bound": true,
         "static_protected": false
@@ -72699,6 +73219,344 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
       "path": "docs/control/execution/workstream-transitions/seq70-71/review-rounds/R014/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/authorization.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R001/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R002/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003/review-result.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/assignment.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/independent-review.json",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "EVIDENCE",
+      "classification_rule": "docs-execution",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R004/review-result.json",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
     },
@@ -74466,6 +75324,32 @@
       },
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp046-consent-withdrawal-deletion-r002.md",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": true,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "GOVERNANCE",
+      "classification_rule": "docs-control",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
       "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-fp047-user-admin-login-authorization-separation-r001.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
@@ -74519,6 +75403,32 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
       "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r001.md",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": true,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "GOVERNANCE",
+      "classification_rule": "docs-control",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "docs/control/goals/walksafe-completion-graph-v2-4/work-items/epic-03/epic-03-npc-single-admin-recovery-r002.md",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
     },
@@ -87294,6 +88204,58 @@
       },
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
+      "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "scripts",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "scripts/apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "scripts",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
       "path": "scripts/apply_walksafe_fp048_goal_completed_seq43_44_20260802.py",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
@@ -89273,6 +90235,58 @@
       "path": "scripts/build_walksafe_fp046_gap_backlog_r025_20260810.py",
       "path_kind": "FILE",
       "reason": "repository rule scripts"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "scripts",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "scripts",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "scripts/build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
     },
     {
       "canonical": {
@@ -94626,6 +95640,58 @@
       },
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
+      "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "tests",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "tests/test_apply_walksafe_fp046_npc_r002_reopen_seq72_76_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "tests",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
       "path": "tests/test_apply_walksafe_npc_goal_start_control_correction_seq59_20260812.py",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
@@ -94939,6 +96005,58 @@
       "movement": "KEEP_AT_PATH",
       "movement_basis": "CHECKPOINT_BOUND",
       "path": "tests/test_build_walksafe_fp022_seq68_69_review_20260814.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "tests",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_20260815.py",
+      "path_kind": "FILE",
+      "reason": "checkpoint-bound path"
+    },
+    {
+      "canonical": {
+        "bound": false,
+        "document_id": null,
+        "mutable": null,
+        "role": null
+      },
+      "checkpoint": {
+        "canonical_bindings": [],
+        "goal_bound": false,
+        "managed": true,
+        "path_bound": true,
+        "static_protected": false
+      },
+      "classification": "SUPPORT",
+      "classification_rule": "tests",
+      "managed": {
+        "bound": true,
+        "source": "docs/control/walksafe-project-continuation-checkpoint.json"
+      },
+      "movement": "KEEP_AT_PATH",
+      "movement_basis": "CHECKPOINT_BOUND",
+      "path": "tests/test_build_walksafe_fp046_gap_backlog_r029_candidate_20260815.py",
       "path_kind": "FILE",
       "reason": "checkpoint-bound path"
     },
@@ -99679,9 +100797,9 @@
     "ARCHIVE_AFTER_DECOUPLING": 196,
     "KEEP": 693,
     "KEEP_AS_STUB": 2,
-    "KEEP_AT_PATH": 2932
+    "KEEP_AT_PATH": 2975
   },
-  "path_count": 3823,
+  "path_count": 3866,
   "schema_version": "1.0",
   "source_contract": {
     "digest": "SHA-256 of sorted UTF-8 repository-relative paths, each followed by one NUL byte",
@@ -99693,5 +100811,5 @@
       "docs/catalogs/tests.json"
     ]
   },
-  "source_set_sha256": "8f0ebca05a26e194f404d47170a952cdd06e5661438093b3e9129f3806ef5a97"
+  "source_set_sha256": "bb49f85723d704c2c5373cb04e4fad26e43d6b7e837f47c9f800273c11e126f3"
 }

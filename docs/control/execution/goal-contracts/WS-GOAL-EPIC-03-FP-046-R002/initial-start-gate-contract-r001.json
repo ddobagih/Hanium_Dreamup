@@ -1,0 +1,37 @@
+{
+  "contract_id": "WS-FP046-R002-INTERNAL-START-GATE-R001",
+  "contract_version": "2026-08-15.1",
+  "document_id": "WS-FP046-R002-INITIAL-START-GATE-CONTRACT-20260815-001",
+  "gate_purpose": "INITIAL_START",
+  "ordered_checks": [
+    {
+      "check_id": "CONTINUATION",
+      "status": "NOT_RUN"
+    },
+    {
+      "check_id": "GOAL_GRAPH",
+      "status": "NOT_RUN"
+    },
+    {
+      "check_id": "TEST_LAYER_REGISTRY_VALIDATE",
+      "status": "NOT_RUN"
+    },
+    {
+      "check_id": "ROOT_FP046_R002_CONTROL_REGRESSION",
+      "status": "NOT_RUN"
+    },
+    {
+      "check_id": "REPOSITORY_STATE",
+      "status": "NOT_RUN"
+    }
+  ],
+  "schema_version": "1.0",
+  "sequence_77_boundary": {
+    "authorization_status": "NOT_AUTHORIZED",
+    "event_type": "GOAL_STARTED",
+    "execution_status": "NOT_RUN",
+    "product_code_change_authorized": false
+  },
+  "target_goal_content_sha256": "4627c19b421f626323778fcdfd01cc2edbc36644c48c7d65c2b4847e698ac429",
+  "target_goal_id": "WS-GOAL-EPIC-03-FP-046-R002"
+}

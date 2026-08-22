@@ -1,0 +1,25 @@
+{
+  "authorization_quote": "계획 세워서 단계적으로 진행해 어떻게 진행해야 하는지 알지?",
+  "authorization_scope": {
+    "authorized_actions": [
+      "R029_CANONICAL_GAP_BACKLOG_PUBLICATION",
+      "SEQ72_76_REOPEN_TRANSACTION",
+      "R002_GOAL_DOCUMENT_MATERIALIZATION",
+      "R002_INITIAL_START_GATE_CONTRACT_PUBLICATION"
+    ],
+    "excluded_actions": [
+      "SEQ77_GOAL_STARTED",
+      "PRODUCT_CODE_CHANGE",
+      "FORMAL_TEST_CREDIT",
+      "ACTUAL_DEVICE_CREDIT",
+      "EXTERNAL_REVIEW_CREDIT",
+      "DEPLOYMENT",
+      "RELEASE_APPROVAL"
+    ]
+  },
+  "authorization_status": "AUTHORIZED_FOR_SEQ72_76_ONLY",
+  "document_id": "WS-FP046-NPC-R002-REOPEN-AUTHORIZATION-20260815-001",
+  "evidence_type": "USER_AUTHORIZATION",
+  "schema_version": "1.0",
+  "sequence_77_status": "NOT_AUTHORIZED"
+}
