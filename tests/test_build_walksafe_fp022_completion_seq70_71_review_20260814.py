@@ -1159,6 +1159,132 @@ def test_control_successor_r007_replays_and_rejects_triage_tamper(
         subject.validated_control_successor_r007_context(ROOT)
 
 
+@pytest.mark.parametrize(
+    ("round_id", "predecessor_rounds"),
+    (
+        ("r006", ("r001", "r002", "r003", "r004", "r005")),
+        ("r007", ("r001", "r002", "r003", "r004", "r005", "r006")),
+    ),
+)
+def test_control_successor_staged_writers_use_live_context_before_closed_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    round_id: str,
+    predecessor_rounds: tuple[str, ...],
+) -> None:
+    closed_paths = list(subject.COMPLETED_REVIEW_PATHS)
+    for predecessor_round in predecessor_rounds:
+        closed_paths.extend(
+            getattr(
+                subject,
+                f"CONTROL_SUCCESSOR_{predecessor_round.upper()}_PATHS",
+            )
+        )
+    for relative in closed_paths:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+
+    predecessor_round = predecessor_rounds[-1]
+    predecessor, _bindings = getattr(
+        subject,
+        f"prepare_frozen_control_successor_{predecessor_round}",
+    )(tmp_path)
+    changed_paths = getattr(
+        subject,
+        f"CONTROL_SUCCESSOR_{round_id.upper()}_CHANGED_PATHS",
+    )
+    current_cohort = tuple(
+        _binding(Path(row["path"]), f"-{round_id}-live")
+        if Path(row["path"]) in changed_paths
+        else copy.deepcopy(row)
+        for row in predecessor.current.control_code_cohort
+    )
+    current = replace(
+        predecessor.current,
+        root=tmp_path.resolve(),
+        control_code_cohort=current_cohort,
+        control_code_cohort_sha256=subject.object_sha256(list(current_cohort)),
+    )
+    monkeypatch.setattr(
+        subject,
+        "prepare_review_context",
+        lambda root: current,
+    )
+    monkeypatch.setattr(
+        subject,
+        f"prepare_frozen_control_successor_{round_id}",
+        lambda root: (_ for _ in ()).throw(
+            AssertionError(f"target {round_id} closed replay used before closure")
+        ),
+    )
+
+    upper_round = round_id.upper()
+    assignment_rel = getattr(
+        subject,
+        f"CONTROL_SUCCESSOR_{upper_round}_ASSIGNMENT_REL",
+    )
+    result_rel = getattr(
+        subject,
+        f"CONTROL_SUCCESSOR_{upper_round}_RESULT_REL",
+    )
+    independent_rel = getattr(
+        subject,
+        f"CONTROL_SUCCESSOR_{upper_round}_INDEPENDENT_REL",
+    )
+    command_prefix = ["--root", str(tmp_path)]
+
+    assert subject.main(
+        [*command_prefix, f"--write-control-successor-{round_id}-assignment"]
+    ) == 0
+    assert (tmp_path / assignment_rel).is_file()
+    assert not (tmp_path / result_rel).exists()
+    assert not (tmp_path / independent_rel).exists()
+    assert subject.main(
+        [*command_prefix, f"--check-control-successor-{round_id}-assignment"]
+    ) == 0
+
+    assignment, assignment_raw = subject._document(tmp_path, assignment_rel)
+    result = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
+        ),
+        "goal_id": subject.GOAL_ID,
+        "round_id": getattr(
+            subject,
+            f"CONTROL_SUCCESSOR_{upper_round}_ROUND_ID",
+        ),
+        "reviewed_at": assignment["assigned_at"],
+        "reviewer": copy.deepcopy(assignment["reviewer"]),
+        "assignment_binding": subject._binding(assignment_rel, assignment_raw),
+        "review_scope": copy.deepcopy(assignment["review_scope"]),
+        "decision": "APPROVED",
+        "findings": {"blocking": [], "major_open": [], "minor_open": []},
+        "finding_dispositions": [],
+        "review_boundary": copy.deepcopy(subject.BOUNDARY),
+    }
+    (tmp_path / result_rel).write_bytes(subject.json_text(result).encode())
+
+    assert subject.main(
+        [*command_prefix, f"--check-control-successor-{round_id}-review-result"]
+    ) == 0
+    assert not (tmp_path / independent_rel).exists()
+    assert subject.main(
+        [*command_prefix, f"--write-control-successor-{round_id}-independent"]
+    ) == 0
+    assert (tmp_path / independent_rel).is_file()
+
+    context = getattr(
+        subject,
+        f"prepare_control_successor_{round_id}_context",
+    )(tmp_path)
+    getattr(subject, f"validate_control_successor_{round_id}_review")(
+        tmp_path,
+        context,
+    )
+
+
 def test_control_successor_r008_semantic_cohort_is_exact_and_has_no_fake_predecessors(
     tmp_path: Path,
 ) -> None:
@@ -2016,14 +2142,14 @@ def test_tool_has_no_reviewer_result_writer() -> None:
         ),
         (
             "r006",
-            "prepare_frozen_control_successor_r006",
-            True,
+            "prepare_control_successor_r006_context",
+            False,
             "validated_control_successor_r006_context",
         ),
         (
             "r007",
-            "prepare_frozen_control_successor_r007",
-            True,
+            "prepare_control_successor_r007_context",
+            False,
             "validated_control_successor_r007_context",
         ),
         (

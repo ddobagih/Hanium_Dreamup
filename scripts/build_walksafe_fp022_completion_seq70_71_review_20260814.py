@@ -4344,8 +4344,16 @@ def validated_control_successor_r006_context(
 def prepare_control_successor_r007_context(
     root: Path = ROOT,
 ) -> ControlSuccessorR007Context:
-    context, _bindings = prepare_frozen_control_successor_r007(root)
-    return context
+    predecessor, predecessor_bindings = prepare_frozen_control_successor_r006(root)
+    return _control_successor_live_context(
+        root,
+        predecessor,
+        predecessor_bindings,
+        prepare_review_context(root),
+        changed_paths=CONTROL_SUCCESSOR_R007_CHANGED_PATHS,
+        label="R007",
+        context_ctor=ControlSuccessorR007Context,
+    )
 
 
 def _control_successor_r007_scope(
@@ -5113,7 +5121,7 @@ def write_control_successor_r005_independent(root: Path) -> None:
 
 
 def write_control_successor_r006_assignment(root: Path) -> None:
-    context, _bindings = prepare_frozen_control_successor_r006(root)
+    context = prepare_control_successor_r006_context(root)
     _write_add_only(
         root,
         CONTROL_SUCCESSOR_R006_ASSIGNMENT_REL,
@@ -5122,7 +5130,7 @@ def write_control_successor_r006_assignment(root: Path) -> None:
 
 
 def write_control_successor_r006_independent(root: Path) -> None:
-    context, _bindings = prepare_frozen_control_successor_r006(root)
+    context = prepare_control_successor_r006_context(root)
     assignment, assignment_raw = _document(
         root,
         CONTROL_SUCCESSOR_R006_ASSIGNMENT_REL,
@@ -5142,7 +5150,7 @@ def write_control_successor_r006_independent(root: Path) -> None:
 
 
 def write_control_successor_r007_assignment(root: Path) -> None:
-    context, _bindings = prepare_frozen_control_successor_r007(root)
+    context = prepare_control_successor_r007_context(root)
     _write_add_only(
         root,
         CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL,
@@ -5151,7 +5159,7 @@ def write_control_successor_r007_assignment(root: Path) -> None:
 
 
 def write_control_successor_r007_independent(root: Path) -> None:
-    context, _bindings = prepare_frozen_control_successor_r007(root)
+    context = prepare_control_successor_r007_context(root)
     assignment, assignment_raw = _document(
         root,
         CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL,
@@ -5463,14 +5471,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.write_control_successor_r006_assignment:
             write_control_successor_r006_assignment(root)
         elif args.check_control_successor_r006_assignment:
-            context, _bindings = prepare_frozen_control_successor_r006(root)
+            context = prepare_control_successor_r006_context(root)
             assignment, raw = _document(
                 root,
                 CONTROL_SUCCESSOR_R006_ASSIGNMENT_REL,
             )
             validate_control_successor_r006_assignment(assignment, raw, context)
         elif args.check_control_successor_r006_review_result:
-            context, _bindings = prepare_frozen_control_successor_r006(root)
+            context = prepare_control_successor_r006_context(root)
             assignment, assignment_raw = _document(
                 root,
                 CONTROL_SUCCESSOR_R006_ASSIGNMENT_REL,
@@ -5493,14 +5501,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.write_control_successor_r007_assignment:
             write_control_successor_r007_assignment(root)
         elif args.check_control_successor_r007_assignment:
-            context, _bindings = prepare_frozen_control_successor_r007(root)
+            context = prepare_control_successor_r007_context(root)
             assignment, raw = _document(
                 root,
                 CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL,
             )
             validate_control_successor_r007_assignment(assignment, raw, context)
         elif args.check_control_successor_r007_review_result:
-            context, _bindings = prepare_frozen_control_successor_r007(root)
+            context = prepare_control_successor_r007_context(root)
             assignment, assignment_raw = _document(
                 root,
                 CONTROL_SUCCESSOR_R007_ASSIGNMENT_REL,
