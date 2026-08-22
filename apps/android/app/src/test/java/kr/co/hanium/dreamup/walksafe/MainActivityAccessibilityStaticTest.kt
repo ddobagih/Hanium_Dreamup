@@ -607,4 +607,16 @@ class MainActivityAccessibilityStaticTest {
         assertTrue(factory.contains("WS_GROUP_GAP_DP"))
         assertFalse(factory.contains("bottomMargin = (WS_CONTROL_GAP_DP"))
     }
+    @Test
+    fun consentItemsRenderInsideCards() {
+        // 항목마다 카드로 묶어 시각적으로 분리한다. 버튼 표시 텍스트는 기존 계약대로
+        // "$label: $syncState" 를 유지하므로 상태는 카드 헤더로 옮기지 않는다.
+        assertTrue(source.contains("firstRunConsentCards"))
+
+        val build = source.substringAfter("firstRunIntegratedConsentButtons.clear()")
+            .substringBefore("firstRunIntegratedConsentSaveButton =")
+        assertTrue(build.contains("GradientDrawable()"))
+        assertTrue(build.contains("WS_COLOR_LINE"))
+        assertTrue(build.contains("firstRunConsentCards[item]"))
+    }
 }

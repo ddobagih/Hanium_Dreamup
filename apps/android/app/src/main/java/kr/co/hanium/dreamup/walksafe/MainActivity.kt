@@ -458,6 +458,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
     private lateinit var accountLogoutButton: Button
     private lateinit var reportPrivacyDisclosureText: TextView
     private lateinit var privacyConsentStatusText: TextView
+    private val firstRunConsentCards = mutableMapOf<IntegratedConsentItem, LinearLayout>()
     private lateinit var firstRunNoticeToggleButton: Button
     private var firstRunNoticeExpandedByUser = false
     private lateinit var firstRunProgressBar: LinearLayout
@@ -8960,8 +8961,9 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
         firstRunIntegratedConsentButtons.clear()
+        firstRunConsentCards.clear()
         IntegratedConsentItem.entries.forEach { item ->
-            firstRunIntegratedConsentButtons[item] = accessiblePriorityUserButton(
+            val button = accessiblePriorityUserButton(
                 label = item.name,
                 onClick = {
                     updateIntegratedConsentDraft(
@@ -8970,6 +8972,30 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
                     )
                 },
             )
+            firstRunIntegratedConsentButtons[item] = button
+            firstRunConsentCards[item] = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                val density = resources.displayMetrics.density
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = WS_CORNER_RADIUS_DP * density
+                    setColor(WS_COLOR_NOTICE_FILL)
+                    setStroke((1f * density).roundToInt(), WS_COLOR_LINE)
+                }
+                setPadding(
+                    (14f * density).roundToInt(),
+                    (12f * density).roundToInt(),
+                    (14f * density).roundToInt(),
+                    (12f * density).roundToInt(),
+                )
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    bottomMargin = (WS_GROUP_GAP_DP * density).roundToInt()
+                }
+                addView(button)
+            }
         }
         firstRunIntegratedConsentSaveButton = accessiblePriorityUserButton(
             label = "네 가지 선택을 서버에 저장하고 확인",
@@ -8989,7 +9015,7 @@ class MainActivity : Activity(), GLSurfaceView.Renderer {
             ).forEach { ageBand -> addView(firstRunAgeButtons.getValue(ageBand)) }
             addView(firstRunIntegratedConsentDisclosureText)
             IntegratedConsentItem.entries.forEach { item ->
-                addView(firstRunIntegratedConsentButtons.getValue(item))
+                addView(firstRunConsentCards.getValue(item))
             }
             addView(firstRunIntegratedConsentSaveButton)
         }
