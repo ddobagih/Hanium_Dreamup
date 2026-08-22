@@ -6489,7 +6489,7 @@ def _validate_seq72_review_boundary(
     checkpoint: Mapping[str, Any],
     suffix: list[dict[str, Any]],
 ) -> list[str]:
-    """Bind seq72 to frozen R001, current R002, approved R009 and its core."""
+    """Bind seq72 to the frozen/current R002/R003 and R009/R010 reviews."""
 
     try:
         from scripts import (  # noqa: E402
@@ -6501,35 +6501,61 @@ def _validate_seq72_review_boundary(
     loaded: dict[str, tuple[dict[str, dict[str, Any]], dict[Path, bytes]]] = {}
     for label, loader in (
         ("frozen R001 transition review", review.load_frozen_transition_r001),
-        ("approved R009 control review", review.load_validated_control_successor_r009),
-        ("current R002 transition review", review.load_validated_transition_r002),
+        ("frozen R009 control review", review.load_frozen_control_successor_r009),
+        ("frozen R002 transition review", review.load_frozen_transition_r002),
+        ("current R010 control review", review.load_validated_control_successor_r010),
+        ("current R003 transition review", review.load_validated_transition_r003),
     ):
         try:
             loaded[label] = loader(root)
         except Exception as exc:
             return [f"FP046/NPC R002 seq72 {label} differs: {exc}"]
 
-    r001_binding, r001_raw = loaded["frozen R001 transition review"]
-    r002_binding, r002_raw = loaded["current R002 transition review"]
-    r009_binding, r009_raw = loaded["approved R009 control review"]
+    _r001_binding, r001_raw = loaded["frozen R001 transition review"]
+    r002_binding, r002_raw = loaded["frozen R002 transition review"]
+    r003_binding, r003_raw = loaded["current R003 transition review"]
+    r009_binding, r009_raw = loaded["frozen R009 control review"]
+    r010_binding, r010_raw = loaded["current R010 control review"]
     errors: list[str] = []
+    expected_review_fields = {
+        "predecessor_transition_review_binding",
+        "transition_review_binding",
+        "transition_review_subject_binding",
+        "r009_control_review_binding",
+        "r010_control_review_binding",
+    }
+    actual_review_fields = {
+        field
+        for field in event
+        if field.endswith("_review_binding")
+        or field == "transition_review_subject_binding"
+    }
+    if actual_review_fields != expected_review_fields:
+        errors.append("FP046/NPC R002 seq72 review binding field inventory differs")
     for field, expected, label in (
         (
             "predecessor_transition_review_binding",
-            r001_binding,
-            "frozen R001 transition review",
+            r002_binding,
+            "frozen R002 transition review",
         ),
-        ("transition_review_binding", r002_binding, "current R002 transition review"),
-        ("r009_control_review_binding", r009_binding, "approved R009 control review"),
+        ("transition_review_binding", r003_binding, "current R003 transition review"),
+        ("r009_control_review_binding", r009_binding, "frozen R009 control review"),
+        ("r010_control_review_binding", r010_binding, "current R010 control review"),
     ):
         if event.get(field) != expected:
             errors.append(f"FP046/NPC R002 seq72 {label} byte binding differs")
     if "r008_control_review_binding" in event:
         errors.append("FP046/NPC R002 seq72 superseded R008 review binding is present")
 
-    all_raw = {**r001_raw, **r002_raw, **r009_raw}
+    all_raw = {
+        **r001_raw,
+        **r002_raw,
+        **r003_raw,
+        **r009_raw,
+        **r010_raw,
+    }
     expected_paths = {path.as_posix() for path in all_raw}
-    if len(all_raw) != 9 or len(expected_paths) != 9:
+    if len(all_raw) != 15 or len(expected_paths) != 15:
         errors.append("FP046/NPC R002 seq72 review source path inventory differs")
     snapshot = checkpoint.get("working_tree_snapshot")
     managed = (
@@ -6547,18 +6573,18 @@ def _validate_seq72_review_boundary(
         or not isinstance(changed_files, list)
         or not expected_paths.issubset(changed_files)
     ):
-        errors.append("FP046/NPC R002 seq72 nine-file review managed closure differs")
+        errors.append("FP046/NPC R002 seq72 fifteen-file review managed closure differs")
 
     try:
         plan = _seq72_76_reviewed_plan(root, checkpoint, suffix, review)
         assignment = review.strict_json_bytes(
-            r002_raw[review.TRANSITION_R002_ASSIGNMENT_REL],
-            "transition R002 assignment",
+            r003_raw[review.TRANSITION_R003_ASSIGNMENT_REL],
+            "transition R003 assignment",
         )
         scope = assignment.get("review_scope")
         if not isinstance(scope, dict):
-            raise ValueError("transition R002 review scope is missing")
-        review.validate_reviewed_transition_plan(plan, scope, r002_binding)
+            raise ValueError("transition R003 review scope is missing")
+        review.validate_reviewed_transition_plan(plan, scope, r003_binding)
     except Exception as exc:
         errors.append(
             f"FP046/NPC R002 seq72 approval-neutral reviewed core differs: {exc}"

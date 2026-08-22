@@ -6516,7 +6516,7 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             else None
         )
         fp022_control_successor_context = (
-            fp022_completion_review.validated_control_successor_r008_context(
+            fp022_completion_review.validated_control_successor_r010_context(
                 root
             )
             if fp022_completion_suffix
@@ -6524,6 +6524,13 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
         )
         fp022_completion_context = (
             fp022_control_successor_context.current
+            if fp022_control_successor_context is not None
+            else None
+        )
+        fp022_managed_sources_by_round = (
+            fp022_completion_review.validated_control_successor_managed_closure_sources_by_round(
+                root
+            )
             if fp022_control_successor_context is not None
             else None
         )
@@ -6803,10 +6810,11 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             mandatory[path.as_posix()] = continuation.sha256_bytes(raw)
 
         if fp022_control_successor_context is not None:
-            r002_reviewed_sources = (
-                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor.predecessor
-                .predecessor_managed_closure_source_successors
-            )
+            if not isinstance(fp022_managed_sources_by_round, dict):
+                return False
+            r002_reviewed_sources = fp022_managed_sources_by_round.get("R002")
+            if not isinstance(r002_reviewed_sources, tuple):
+                return False
             overlaid_mandatory = (
                 _overlay_reviewed_managed_closure_source_successors(
                     root,
@@ -6816,14 +6824,13 @@ def _npc_single_admin_recovery_completion_managed_closure_matches(
             )
             if overlaid_mandatory is None:
                 return False
-            r003_reviewed_sources = (
-                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor.predecessor
-                .managed_closure_source_successors
-            )
-            r004_reviewed_sources = (
-                fp022_control_successor_context.predecessor.predecessor.predecessor.predecessor
-                .managed_closure_source_successors
-            )
+            r003_reviewed_sources = fp022_managed_sources_by_round.get("R003")
+            r004_reviewed_sources = fp022_managed_sources_by_round.get("R004")
+            if not isinstance(r003_reviewed_sources, tuple) or not isinstance(
+                r004_reviewed_sources,
+                tuple,
+            ):
+                return False
             overlaid_mandatory = (
                 _overlay_reviewed_managed_closure_source_successors_r003(
                     root,
@@ -16125,8 +16132,16 @@ def _r002_checkpoint_review_plan(
             "required_before_apply"
         ]
         candidate_paths = {
-            name: Path(path).as_posix()
-            for name, path in review.R029_PATHS.items()
+            "gap_json": review.r029_bridge.CANONICAL_GAP_JSON_REL.as_posix(),
+            "gap_md": review.r029_bridge.CANONICAL_GAP_MD_REL.as_posix(),
+            "backlog_json": (
+                review.r029_bridge.CANONICAL_BACKLOG_JSON_REL.as_posix()
+            ),
+            "backlog_md": (
+                review.r029_bridge.CANONICAL_BACKLOG_MD_REL.as_posix()
+            ),
+            "discovery_json": review.DISCOVERY_JSON_REL.as_posix(),
+            "discovery_md": review.DISCOVERY_MD_REL.as_posix(),
         }
     except (AttributeError, KeyError, TypeError, ValueError):
         return None
@@ -16200,19 +16215,31 @@ def _r002_review_authority_errors(
         if plan is None:
             raise ValueError("reviewed checkpoint plan is malformed")
         r001_binding, r001_raw = review.load_frozen_transition_r001(root)
-        r002_binding, r002_raw = review.load_validated_transition_r002(root)
-        r009_binding, r009_raw = review.load_validated_control_successor_r009(
+        r002_binding, r002_raw = review.load_frozen_transition_r002(root)
+        r003_binding, r003_raw = review.load_validated_transition_r003(root)
+        r009_binding, r009_raw = review.load_frozen_control_successor_r009(
+            root
+        )
+        r010_binding, r010_raw = review.load_validated_control_successor_r010(
             root
         )
         path_groups = (
             (tuple(Path(path) for path in review.TRANSITION_R001_PATHS), r001_raw),
             (tuple(Path(path) for path in review.TRANSITION_R002_PATHS), r002_raw),
+            (tuple(Path(path) for path in review.TRANSITION_R003_PATHS), r003_raw),
             (
                 tuple(
                     Path(path)
                     for path in control_review.CONTROL_SUCCESSOR_R009_PATHS
                 ),
                 r009_raw,
+            ),
+            (
+                tuple(
+                    Path(path)
+                    for path in control_review.CONTROL_SUCCESSOR_R010_PATHS
+                ),
+                r010_raw,
             ),
         )
         exact_bindings = tuple(
@@ -16221,24 +16248,32 @@ def _r002_review_authority_errors(
         )
         if any(binding is None for binding in exact_bindings):
             raise ValueError("review file path/SHA-256/length differs")
-        expected_r001, expected_r002, expected_r009 = exact_bindings
+        (
+            expected_r001,
+            expected_r002,
+            expected_r003,
+            expected_r009,
+            expected_r010,
+        ) = exact_bindings
         if (
             r001_binding != expected_r001
             or r002_binding != expected_r002
+            or r003_binding != expected_r003
             or r009_binding != expected_r009
+            or r010_binding != expected_r010
         ):
             raise ValueError("validated review role binding differs")
         assignment = review.strict_json_bytes(
-            r002_raw[review.TRANSITION_R002_ASSIGNMENT_REL],
-            "transition R002 assignment",
+            r003_raw[review.TRANSITION_R003_ASSIGNMENT_REL],
+            "transition R003 assignment",
         )
         scope = assignment.get("review_scope")
         if not isinstance(scope, dict):
-            raise ValueError("transition R002 review scope is missing")
+            raise ValueError("transition R003 review scope is missing")
         review.validate_reviewed_transition_plan(
             plan,
             scope,
-            expected_r002,
+            expected_r003,
         )
         core_binding = scope.get("corrected_plan_core_binding")
         if not isinstance(core_binding, dict):
@@ -16248,12 +16283,19 @@ def _r002_review_authority_errors(
 
     errors: list[str] = []
     expected_event_bindings = {
-        "predecessor_transition_review_binding": expected_r001,
-        "transition_review_binding": expected_r002,
+        "predecessor_transition_review_binding": expected_r002,
+        "transition_review_binding": expected_r003,
         "transition_review_subject_binding": core_binding,
         "r009_control_review_binding": expected_r009,
+        "r010_control_review_binding": expected_r010,
     }
-    if "r008_control_review_binding" in canonical_update or any(
+    actual_review_fields = {
+        field
+        for field in canonical_update
+        if field.endswith("_review_binding")
+        or field == "transition_review_subject_binding"
+    }
+    if actual_review_fields != set(expected_event_bindings) or any(
         canonical_update.get(field) != binding
         for field, binding in expected_event_bindings.items()
     ):
@@ -16269,7 +16311,11 @@ def _r002_review_authority_errors(
         for paths, _raw_by_path in path_groups
         for path in paths
     }
-    if not isinstance(managed, list) or not required_paths.issubset(managed):
+    if (
+        len(required_paths) != 15
+        or not isinstance(managed, list)
+        or not required_paths.issubset(managed)
+    ):
         errors.append("FP046/NPC R002 review managed paths differ")
     return errors
 

@@ -15,22 +15,69 @@ from scripts import apply_walksafe_fp046_npc_r002_reopen_20260815 as subject
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _fake_r009_material() -> tuple[dict[str, dict], dict[Path, bytes]]:
+def test_r003_successor_contract_freezes_r002_and_advances_current_aliases() -> None:
+    assert subject.TRANSITION_R002_PINS == {
+        subject.TRANSITION_R002_ASSIGNMENT_REL: (
+            "a15de9a0b57a7fa207dd8e2a4eab92c2ed1166496a561e289bccba7dec61096e",
+            9731,
+        ),
+        subject.TRANSITION_R002_RESULT_REL: (
+            "432a71a98b86796b836b031da30250daa745f82c49ce492cd52cedac60d103d8",
+            9731,
+        ),
+        subject.TRANSITION_R002_INDEPENDENT_REL: (
+            "5be5009cfa96193b8536b8fcbd451651a4460fecb4d41559b68e7c407dbee095",
+            9988,
+        ),
+    }
+    assert subject.TRANSITION_ASSIGNMENT_REL == subject.TRANSITION_R003_ASSIGNMENT_REL
+    assert subject.TRANSITION_RESULT_REL == subject.TRANSITION_R003_RESULT_REL
+    assert subject.TRANSITION_INDEPENDENT_REL == subject.TRANSITION_R003_INDEPENDENT_REL
+    assert not set(subject.TRANSITION_R002_PATHS) & set(subject.TRANSITION_R003_PATHS)
+
+
+def _frozen_r009_material() -> tuple[dict[str, dict], dict[Path, bytes]]:
     module = subject._control_successor_module()
     paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R009_PATHS)
     raw_by_path = {
-        path: f"reviewed R009 {index}\n".encode("utf-8")
+        path: (ROOT / path).read_bytes()
+        for path in paths
+    }
+    return subject._review_binding_by_role(paths, raw_by_path), raw_by_path
+
+
+def _fake_r010_material() -> tuple[dict[str, dict], dict[Path, bytes]]:
+    module = subject._control_successor_module()
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R010_PATHS)
+    raw_by_path = {
+        path: f"reviewed R010 {index}\n".encode("utf-8")
         for index, path in enumerate(paths, start=1)
     }
     return subject._review_binding_by_role(paths, raw_by_path), raw_by_path
 
 
+def _fake_r003_material() -> tuple[dict[str, dict], dict[Path, bytes]]:
+    raw_by_path = {
+        path: f"reviewed R003 {index}\n".encode("utf-8")
+        for index, path in enumerate(subject.TRANSITION_R003_PATHS, start=1)
+    }
+    return subject._review_binding_by_role(
+        subject.TRANSITION_R003_PATHS,
+        raw_by_path,
+    ), raw_by_path
+
+
 @pytest.fixture(autouse=True)
-def _validated_r009_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+def _control_review_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         subject,
-        "load_validated_control_successor_r009",
-        lambda root: _fake_r009_material(),
+        "load_frozen_control_successor_r009",
+        lambda root: _frozen_r009_material(),
+    )
+    monkeypatch.setattr(
+        subject,
+        "load_validated_control_successor_r010",
+        lambda root: _fake_r010_material(),
     )
 
 
@@ -60,6 +107,7 @@ def _copy_source(root: Path) -> None:
         *subject.r029_candidate.CURRENT_SOURCE_PATHS,
         *subject.R007_REVIEW_PINS,
         *subject.TRANSITION_R001_PATHS,
+        *subject.TRANSITION_R002_PATHS,
         *(
             Path(path)
             for path in checkpoint["goal_execution"]["goal_document_paths"]
@@ -128,10 +176,10 @@ def _post_publish_fixture(root: Path) -> dict:
     )
     subject.write_transition_independent_review(root)
     review_raw = {
-        path: (root / path).read_bytes() for path in subject.TRANSITION_R002_PATHS
+        path: (root / path).read_bytes() for path in subject.TRANSITION_R003_PATHS
     }
     review_binding = subject._review_binding_by_role(
-        subject.TRANSITION_R002_PATHS,
+        subject.TRANSITION_R003_PATHS,
         review_raw,
     )
     final_plan = subject.bind_transition_review_evidence(
@@ -145,6 +193,9 @@ def _post_publish_fixture(root: Path) -> dict:
         ],
         r009_control_review_binding=package[
             "r009_control_successor_review_bindings"
+        ],
+        r010_control_review_binding=package[
+            "r010_control_successor_review_bindings"
         ],
     )
     canonical_outputs, _source_evidence = (
@@ -368,35 +419,35 @@ def test_transition_package_is_read_only_and_apply_stays_in_actual_writer(
     assert before == _snapshot(tmp_path)
 
 
-def test_r001_is_exact_frozen_predecessor_and_r002_is_add_only_current(
+def test_r002_is_exact_frozen_predecessor_and_r003_is_add_only_current(
     tmp_path: Path,
 ) -> None:
     _copy_source(tmp_path)
     before = {
         path: (tmp_path / path).read_bytes()
-        for path in subject.TRANSITION_R001_PATHS
+        for path in (*subject.TRANSITION_R001_PATHS, *subject.TRANSITION_R002_PATHS)
     }
 
-    binding, raw_by_path = subject.load_frozen_transition_r001(tmp_path)
+    binding, raw_by_path = subject.load_frozen_transition_r002(tmp_path)
 
     assert binding == subject._review_binding_by_role(
-        subject.TRANSITION_R001_PATHS,
+        subject.TRANSITION_R002_PATHS,
         raw_by_path,
     )
-    assert subject.TRANSITION_ASSIGNMENT_REL == subject.TRANSITION_R002_ASSIGNMENT_REL
-    assert subject.TRANSITION_RESULT_REL == subject.TRANSITION_R002_RESULT_REL
-    assert subject.TRANSITION_INDEPENDENT_REL == subject.TRANSITION_R002_INDEPENDENT_REL
-    assert not set(subject.TRANSITION_R001_PATHS) & set(subject.TRANSITION_R002_PATHS)
+    assert subject.TRANSITION_ASSIGNMENT_REL == subject.TRANSITION_R003_ASSIGNMENT_REL
+    assert subject.TRANSITION_RESULT_REL == subject.TRANSITION_R003_RESULT_REL
+    assert subject.TRANSITION_INDEPENDENT_REL == subject.TRANSITION_R003_INDEPENDENT_REL
+    assert not set(subject.TRANSITION_R002_PATHS) & set(subject.TRANSITION_R003_PATHS)
 
     subject.write_transition_assignment(
         tmp_path,
         assigned_at="2026-08-15T12:00:00+09:00",
     )
 
-    assert (tmp_path / subject.TRANSITION_R002_ASSIGNMENT_REL).is_file()
+    assert (tmp_path / subject.TRANSITION_R003_ASSIGNMENT_REL).is_file()
     assert before == {
         path: (tmp_path / path).read_bytes()
-        for path in subject.TRANSITION_R001_PATHS
+        for path in (*subject.TRANSITION_R001_PATHS, *subject.TRANSITION_R002_PATHS)
     }
 
 
@@ -409,14 +460,62 @@ def test_frozen_r001_loader_rejects_one_byte_drift(tmp_path: Path) -> None:
         subject.load_frozen_transition_r001(tmp_path)
 
 
-def test_r002_scope_exactly_binds_neutral_core_and_eight_outputs(
+@pytest.mark.parametrize("relative", subject.TRANSITION_R002_PATHS)
+@pytest.mark.parametrize("operation", ("missing", "tampered"))
+def test_frozen_r002_loader_rejects_each_missing_or_tampered_byte(
+    tmp_path: Path,
+    relative: Path,
+    operation: str,
+) -> None:
+    _copy_source(tmp_path)
+    target = tmp_path / relative
+    if operation == "missing":
+        target.unlink()
+    else:
+        target.write_bytes(target.read_bytes() + b" ")
+
+    with pytest.raises(
+        subject.BuildError,
+        match="required frozen transition R002 review is missing|frozen transition R002 review differs",
+    ):
+        subject.load_frozen_transition_r002(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "loader_name",
+    ("load_frozen_transition_r001", "load_frozen_control_successor_r009"),
+)
+def test_frozen_r002_loader_rejects_internal_predecessor_provenance_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    loader_name: str,
+) -> None:
+    _copy_source(tmp_path)
+    loader = getattr(subject, loader_name)
+    binding, raw_by_path = loader(tmp_path)
+    tampered = deepcopy(binding)
+    tampered["assignment"]["sha256"] = "0" * 64
+    monkeypatch.setattr(
+        subject,
+        loader_name,
+        lambda root: (tampered, raw_by_path),
+    )
+
+    with pytest.raises(
+        subject.BuildError,
+        match="frozen transition R002 approval provenance differs",
+    ):
+        subject.load_frozen_transition_r002(tmp_path)
+
+
+def test_r003_scope_exactly_binds_neutral_core_and_eight_outputs(
     tmp_path: Path,
 ) -> None:
     _copy_source(tmp_path)
     package = subject.build_transition_package(tmp_path)
     scope = subject._transition_scope(package)
 
-    assert package["schema_version"].endswith("transition-package.v2")
+    assert package["schema_version"].endswith("transition-package.v3")
     assert "r007_control_successor_review_bindings" not in scope
     assert len(scope["corrected_add_only_output_bindings"]) == 8
     assert scope["corrected_plan_core_binding"] == subject.transition_plan_core_binding(
@@ -429,8 +528,33 @@ def test_r002_scope_exactly_binds_neutral_core_and_eight_outputs(
     assert seq72["r009_control_review_binding"] == package[
         "r009_control_successor_review_bindings"
     ]
+    assert seq72["r010_control_review_binding"] == package[
+        "r010_control_successor_review_bindings"
+    ]
     assert "transition_review_binding" not in seq72
     assert "transition_review_subject_binding" not in seq72
+
+    current_binding = _fake_r003_material()[0]
+    final_plan = subject.bind_transition_review_evidence(
+        package["approval_neutral_plan_core"],
+        predecessor_transition_review_binding=package[
+            "predecessor_transition_review_bindings"
+        ],
+        transition_review_binding=current_binding,
+        transition_review_subject_binding=package[
+            "approval_neutral_plan_core_binding"
+        ],
+        r009_control_review_binding=package[
+            "r009_control_successor_review_bindings"
+        ],
+        r010_control_review_binding=package[
+            "r010_control_successor_review_bindings"
+        ],
+    )
+    assert subject.approval_neutral_plan_core(final_plan) == package[
+        "approval_neutral_plan_core"
+    ]
+    subject.validate_reviewed_transition_plan(final_plan, package, current_binding)
 
     tampered = deepcopy(package)
     next(
@@ -442,7 +566,7 @@ def test_r002_scope_exactly_binds_neutral_core_and_eight_outputs(
         subject._transition_scope(tampered)
 
 
-def test_post_publish_r002_loader_allows_seq77_and_seq78_suffix(
+def test_post_publish_r003_loader_allows_seq77_and_seq78_suffix(
     tmp_path: Path,
 ) -> None:
     checkpoint = _post_publish_fixture(tmp_path)
@@ -466,10 +590,10 @@ def test_post_publish_r002_loader_allows_seq77_and_seq78_suffix(
         subject.json_text(checkpoint).encode("utf-8"),
     )
 
-    binding, raw_by_path = subject.load_validated_transition_r002(tmp_path)
+    binding, raw_by_path = subject.load_validated_transition_r003(tmp_path)
 
     assert binding == subject._review_binding_by_role(
-        subject.TRANSITION_R002_PATHS,
+        subject.TRANSITION_R003_PATHS,
         raw_by_path,
     )
 
@@ -511,7 +635,7 @@ def test_post_publish_r002_loader_allows_seq77_and_seq78_suffix(
         ),
     ),
 )
-def test_post_publish_r002_loader_rejects_non_exact_seq72_76_history(
+def test_post_publish_r003_loader_rejects_non_exact_seq72_76_history(
     tmp_path: Path,
     mutate,
     message: str,
@@ -526,7 +650,7 @@ def test_post_publish_r002_loader_rejects_non_exact_seq72_76_history(
     )
 
     with pytest.raises(subject.BuildError, match=message):
-        subject.load_validated_transition_r002(tmp_path)
+        subject.load_validated_transition_r003(tmp_path)
 
 
 def test_authorization_uses_exact_latest_user_instruction_and_stops_before_seq77(

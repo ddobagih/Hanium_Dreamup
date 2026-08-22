@@ -385,6 +385,51 @@ def _r009_context(tmp_path: Path) -> subject.ControlSuccessorR009Context:
     )
 
 
+def _r010_context(tmp_path: Path) -> subject.ControlSuccessorR010Context:
+    predecessor = _r009_context(tmp_path)
+    before_by_path = {
+        row["path"]: row for row in predecessor.current.control_code_cohort
+    }
+    current_controls = tuple(
+        _binding(path, "r010-control")
+        if path in subject.CONTROL_SUCCESSOR_R010_CHANGED_PATHS
+        else copy.deepcopy(before_by_path[path.as_posix()])
+        for path in subject.CONTROL_SUCCESSOR_R010_COHORT_PATHS
+    )
+    current = subject.ReviewContext(
+        root=tmp_path,
+        start_review_bindings=predecessor.current.start_review_bindings,
+        completion_evidence_bindings=(
+            predecessor.current.completion_evidence_bindings
+        ),
+        superseded_assignment_bindings=(
+            predecessor.current.superseded_assignment_bindings
+        ),
+        control_code_cohort=current_controls,
+        control_code_cohort_sha256=subject.object_sha256(list(current_controls)),
+    )
+    after_by_path = {row["path"]: row for row in current_controls}
+    successors = tuple(
+        {
+            "path": path.as_posix(),
+            "predecessor": copy.deepcopy(before_by_path[path.as_posix()]),
+            "successor": copy.deepcopy(after_by_path[path.as_posix()]),
+        }
+        for path in subject.CONTROL_SUCCESSOR_R010_COHORT_PATHS
+        if before_by_path[path.as_posix()] != after_by_path[path.as_posix()]
+    )
+    return subject.ControlSuccessorR010Context(
+        root=tmp_path,
+        current=current,
+        predecessor=predecessor,
+        predecessor_review_bindings=tuple(
+            _binding(path, "r009-review")
+            for path in subject.CONTROL_SUCCESSOR_R009_PATHS
+        ),
+        control_code_successors=successors,
+    )
+
+
 def _assignment(context: subject.ReviewContext) -> dict:
     return {
         "schema_version": "1.0",
@@ -1611,21 +1656,298 @@ def test_control_successor_r009_live_context_and_review_chain_are_exact(
     subject.validate_control_successor_r009_review(tmp_path, context)
 
 
-def test_post_review_requires_r009_without_r008_fallback(
+def test_control_successor_r009_exact_pins_match_committed_triad() -> None:
+    assert tuple(subject.CONTROL_SUCCESSOR_R009_PINS) == (
+        subject.CONTROL_SUCCESSOR_R009_PATHS
+    )
+    assert subject.CONTROL_SUCCESSOR_R009_PINS == {
+        subject.CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL: (
+            "e7199de7e86e9d07ab0e78a4b5a19d1ba97ea990e3b9a1eead4a1f3a3972ae52",
+            13_943,
+        ),
+        subject.CONTROL_SUCCESSOR_R009_RESULT_REL: (
+            "170efe098440d41da2173af29527cae8278db90db6d82a7eacf1e3826097ba94",
+            13_961,
+        ),
+        subject.CONTROL_SUCCESSOR_R009_INDEPENDENT_REL: (
+            "1ec639abee046dd0ca2a023b8a1773d2300ef92b525c2787f2282aa7b47741d1",
+            14_262,
+        ),
+    }
+    for relative, (digest, byte_length) in (
+        subject.CONTROL_SUCCESSOR_R009_PINS.items()
+    ):
+        raw = (ROOT / relative).read_bytes()
+        assert subject.bytes_sha256(raw) == digest
+        assert len(raw) == byte_length
+
+
+def test_frozen_r009_rejects_recreated_but_self_consistent_triad(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _r009_context(tmp_path)
+    monkeypatch.setattr(
+        subject,
+        "prepare_frozen_control_successor_r008",
+        lambda root: (
+            context.predecessor,
+            context.predecessor_review_bindings,
+        ),
+    )
+    assignment_raw = subject.build_control_successor_r009_assignment(
+        context,
+        assigned_at="2026-08-23T00:00:00+09:00",
+    ).encode()
+    assignment = subject.strict_json_bytes(
+        assignment_raw,
+        subject.CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL.as_posix(),
+    )
+    result = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
+        ),
+        "goal_id": subject.GOAL_ID,
+        "round_id": subject.CONTROL_SUCCESSOR_R009_ROUND_ID,
+        "reviewed_at": assignment["assigned_at"],
+        "reviewer": copy.deepcopy(assignment["reviewer"]),
+        "assignment_binding": subject._binding(
+            subject.CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL,
+            assignment_raw,
+        ),
+        "review_scope": copy.deepcopy(assignment["review_scope"]),
+        "decision": "APPROVED",
+        "findings": {"blocking": [], "major_open": [], "minor_open": []},
+        "finding_dispositions": [],
+        "review_boundary": copy.deepcopy(subject.BOUNDARY),
+    }
+    result_raw = subject.json_text(result).encode()
+    independent_raw = subject.build_control_successor_r009_independent_review(
+        context,
+        assignment,
+        assignment_raw,
+        result,
+        result_raw,
+    ).encode()
+    for relative, raw in (
+        (subject.CONTROL_SUCCESSOR_R009_ASSIGNMENT_REL, assignment_raw),
+        (subject.CONTROL_SUCCESSOR_R009_RESULT_REL, result_raw),
+        (subject.CONTROL_SUCCESSOR_R009_INDEPENDENT_REL, independent_raw),
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+    with pytest.raises(
+        subject.ReviewError,
+        match="exact control successor R009 review differs",
+    ):
+        subject.prepare_frozen_control_successor_r009(tmp_path)
+
+
+@pytest.mark.parametrize("relative", subject.CONTROL_SUCCESSOR_R009_PATHS)
+def test_frozen_r009_replays_and_rejects_tamper(
+    relative: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subject.prepare_frozen_control_successor_r009(ROOT)
+    original = subject._raw
+
+    def drift(root: Path, candidate: Path) -> bytes:
+        raw = original(root, candidate)
+        return b"{" if candidate == relative else raw
+
+    monkeypatch.setattr(subject, "_raw", drift)
+    with pytest.raises(
+        subject.ReviewError,
+        match="exact control successor R009 review differs",
+    ):
+        subject.prepare_frozen_control_successor_r009(ROOT)
+
+
+def test_control_successor_r010_cohort_and_actor_boundary_are_exact(
+    tmp_path: Path,
+) -> None:
+    context = _r010_context(tmp_path)
+    scope = subject._control_successor_r010_scope(context)
+    assert subject.CONTROL_SUCCESSOR_R010_COHORT_PATHS == (
+        subject.CONTROL_SUCCESSOR_R009_COHORT_PATHS
+    )
+    assert len(subject.CONTROL_SUCCESSOR_R010_COHORT_PATHS) == 23
+    assert subject.CONTROL_SUCCESSOR_R010_CHANGED_PATHS == (
+        subject.CONTROL_SUCCESSOR_R009_CHANGED_PATHS
+    )
+    assert len(subject.CONTROL_SUCCESSOR_R010_CHANGED_PATHS) == 10
+    assert {row["path"] for row in context.control_code_successors} == {
+        path.as_posix() for path in subject.CONTROL_SUCCESSOR_R010_CHANGED_PATHS
+    }
+    assert scope["predecessor_control_code_cohort_path_count"] == 23
+    assert scope["reviewed_current_control_code_cohort_path_count"] == 23
+    assert scope["reviewed_control_code_successor_path_count"] == 10
+
+    assignment_raw = subject.build_control_successor_r010_assignment(
+        context,
+        assigned_at="2026-08-23T00:00:00+09:00",
+    ).encode()
+    assignment = subject.strict_json_bytes(
+        assignment_raw,
+        subject.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL.as_posix(),
+    )
+    assert assignment["assigner"]["canonical_task"] == "/root"
+    assert assignment["executor"]["canonical_task"] == (
+        "/root/r010_control_review"
+    )
+    assert assignment["reviewer"]["canonical_task"] == "/root/r010_final_review"
+    assert len(
+        {
+            assignment[role]["agent_instance_id"]
+            for role in ("assigner", "executor", "reviewer")
+        }
+    ) == 3
+    assert scope["acceptance"]["seq77_goal_started_remains_excluded"] is True
+    assert scope["acceptance"]["product_code_change_remains_excluded"] is True
+
+
+def test_control_successor_r010_synthetic_context_and_review_chain_are_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = _r010_context(tmp_path)
+    monkeypatch.setattr(
+        subject,
+        "prepare_frozen_control_successor_r009",
+        lambda root: (
+            expected.predecessor,
+            expected.predecessor_review_bindings,
+        ),
+    )
+    monkeypatch.setattr(
+        subject,
+        "_r008_live_current_review_context",
+        lambda root: expected.current,
+    )
+    context = subject.prepare_control_successor_r010_context(tmp_path)
+    assert context == expected
+
+    assignment_raw = subject.build_control_successor_r010_assignment(
+        context,
+        assigned_at="2026-08-23T00:00:00+09:00",
+    ).encode()
+    assignment = subject.strict_json_bytes(
+        assignment_raw,
+        subject.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL.as_posix(),
+    )
+    result = {
+        "schema_version": "1.0",
+        "evidence_type": (
+            "FP022_SEQ70_71_CURRENT_ACCEPTANCE_CONTROL_SUCCESSOR_REVIEW_RESULT"
+        ),
+        "goal_id": subject.GOAL_ID,
+        "round_id": subject.CONTROL_SUCCESSOR_R010_ROUND_ID,
+        "reviewed_at": assignment["assigned_at"],
+        "reviewer": copy.deepcopy(assignment["reviewer"]),
+        "assignment_binding": subject._binding(
+            subject.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL,
+            assignment_raw,
+        ),
+        "review_scope": copy.deepcopy(assignment["review_scope"]),
+        "decision": "APPROVED",
+        "findings": {"blocking": [], "major_open": [], "minor_open": []},
+        "finding_dispositions": [],
+        "review_boundary": copy.deepcopy(subject.BOUNDARY),
+    }
+    result_raw = subject.json_text(result).encode()
+    subject.validate_control_successor_r010_result(
+        result,
+        result_raw,
+        assignment,
+        assignment_raw,
+        context,
+    )
+    independent = subject.build_control_successor_r010_independent_review(
+        context,
+        assignment,
+        assignment_raw,
+        result,
+        result_raw,
+    )
+    for relative, raw in (
+        (subject.CONTROL_SUCCESSOR_R010_ASSIGNMENT_REL, assignment_raw),
+        (subject.CONTROL_SUCCESSOR_R010_RESULT_REL, result_raw),
+        (subject.CONTROL_SUCCESSOR_R010_INDEPENDENT_REL, independent.encode()),
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+    subject.validate_control_successor_r010_review(tmp_path, context)
+
+
+def test_post_review_requires_r010_without_r009_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     expected = object()
     monkeypatch.setattr(
         subject,
-        "validated_control_successor_r009_context",
-        lambda root: type("R009", (), {"current": expected})(),
+        "validated_control_successor_r010_context",
+        lambda root: type("R010", (), {"current": expected})(),
     )
     monkeypatch.setattr(
         subject,
-        "validated_control_successor_r008_context",
-        lambda root: (_ for _ in ()).throw(AssertionError("R008 fallback used")),
+        "validated_control_successor_r009_context",
+        lambda root: (_ for _ in ()).throw(AssertionError("R009 fallback used")),
     )
     assert subject.validate_post_review(ROOT) is expected
+
+
+def test_latest_r010_exposes_historical_managed_closure_sources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    r002 = _r002_context(tmp_path)
+    r003 = replace(_r003_context(tmp_path), predecessor=r002)
+    r004 = replace(_r004_context(tmp_path), predecessor=r003)
+    r005 = subject.ControlSuccessorR005Context(
+        root=tmp_path,
+        current=r004.current,
+        predecessor=r004,
+        predecessor_review_bindings=(),
+        control_code_successors=(),
+    )
+    r006 = subject.ControlSuccessorR006Context(
+        root=tmp_path,
+        current=r005.current,
+        predecessor=r005,
+        predecessor_review_bindings=(),
+        control_code_successors=(),
+    )
+    r007 = subject.ControlSuccessorR007Context(
+        root=tmp_path,
+        current=r006.current,
+        predecessor=r006,
+        predecessor_review_bindings=(),
+        control_code_successors=(),
+    )
+    synthetic = _r010_context(tmp_path)
+    r008 = replace(synthetic.predecessor.predecessor, predecessor=r007)
+    r009 = replace(synthetic.predecessor, predecessor=r008)
+    r010 = replace(synthetic, predecessor=r009)
+    monkeypatch.setattr(
+        subject,
+        "validated_control_successor_r010_context",
+        lambda root: r010,
+    )
+
+    by_round = subject.validated_control_successor_managed_closure_sources_by_round(
+        tmp_path
+    )
+    assert by_round == {
+        "R002": r002.managed_closure_source_successors,
+        "R003": r003.managed_closure_source_successors,
+        "R004": r004.managed_closure_source_successors,
+    }
+    assert subject.validated_control_successor_managed_closure_sources(
+        tmp_path
+    ) == r004.managed_closure_source_successors
 
 
 @pytest.mark.skipif(
@@ -2349,6 +2671,7 @@ def test_tool_has_no_reviewer_result_writer() -> None:
     assert not hasattr(subject, "write_control_successor_r007_review_result")
     assert not hasattr(subject, "write_control_successor_r008_review_result")
     assert not hasattr(subject, "write_control_successor_r009_review_result")
+    assert not hasattr(subject, "write_control_successor_r010_review_result")
     with pytest.raises(SystemExit):
         subject.parse_args(["--write-control-successor-r002-review-result"])
     for option in (
@@ -2392,6 +2715,11 @@ def test_tool_has_no_reviewer_result_writer() -> None:
         "--check-control-successor-r009-review-result",
         "--write-control-successor-r009-independent",
         "--check-control-successor-r009-post-review",
+        "--write-control-successor-r010-assignment",
+        "--check-control-successor-r010-assignment",
+        "--check-control-successor-r010-review-result",
+        "--write-control-successor-r010-independent",
+        "--check-control-successor-r010-post-review",
     ):
         subject.parse_args([option])
     with pytest.raises(SystemExit):
@@ -2408,6 +2736,8 @@ def test_tool_has_no_reviewer_result_writer() -> None:
         subject.parse_args(["--write-control-successor-r008-review-result"])
     with pytest.raises(SystemExit):
         subject.parse_args(["--write-control-successor-r009-review-result"])
+    with pytest.raises(SystemExit):
+        subject.parse_args(["--write-control-successor-r010-review-result"])
 
 
 @pytest.mark.parametrize(
@@ -2442,6 +2772,12 @@ def test_tool_has_no_reviewer_result_writer() -> None:
             "prepare_control_successor_r009_context",
             False,
             "validated_control_successor_r009_context",
+        ),
+        (
+            "r010",
+            "prepare_control_successor_r010_context",
+            False,
+            "validated_control_successor_r010_context",
         ),
     ),
 )

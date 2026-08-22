@@ -1510,30 +1510,61 @@ TRANSITION_R002_PATHS = (
     TRANSITION_R002_RESULT_REL,
     TRANSITION_R002_INDEPENDENT_REL,
 )
+TRANSITION_R002_PINS = {
+    TRANSITION_R002_ASSIGNMENT_REL: (
+        "a15de9a0b57a7fa207dd8e2a4eab92c2ed1166496a561e289bccba7dec61096e",
+        9_731,
+    ),
+    TRANSITION_R002_RESULT_REL: (
+        "432a71a98b86796b836b031da30250daa745f82c49ce492cd52cedac60d103d8",
+        9_731,
+    ),
+    TRANSITION_R002_INDEPENDENT_REL: (
+        "5be5009cfa96193b8536b8fcbd451651a4460fecb4d41559b68e7c407dbee095",
+        9_988,
+    ),
+}
 TRANSITION_R002_ROUND_ID = (
     "WS-FP046-NPC-R002-REOPEN-TRANSITION-20260815-R002"
 )
 
-# Public current-review aliases.  R001 stays frozen and is never selected by a
-# writer after the R002 successor exists.
-TRANSITION_REVIEW_DIR = TRANSITION_R002_REVIEW_DIR
-TRANSITION_ASSIGNMENT_REL = TRANSITION_R002_ASSIGNMENT_REL
-TRANSITION_RESULT_REL = TRANSITION_R002_RESULT_REL
-TRANSITION_INDEPENDENT_REL = TRANSITION_R002_INDEPENDENT_REL
-TRANSITION_ROUND_ID = TRANSITION_R002_ROUND_ID
+TRANSITION_R003_REVIEW_DIR = Path(
+    "docs/control/execution/workstream-transitions/seq72-76/review-rounds/R003"
+)
+TRANSITION_R003_ASSIGNMENT_REL = TRANSITION_R003_REVIEW_DIR / "assignment.json"
+TRANSITION_R003_RESULT_REL = TRANSITION_R003_REVIEW_DIR / "review-result.json"
+TRANSITION_R003_INDEPENDENT_REL = (
+    TRANSITION_R003_REVIEW_DIR / "independent-review.json"
+)
+TRANSITION_R003_PATHS = (
+    TRANSITION_R003_ASSIGNMENT_REL,
+    TRANSITION_R003_RESULT_REL,
+    TRANSITION_R003_INDEPENDENT_REL,
+)
+TRANSITION_R003_ROUND_ID = (
+    "WS-FP046-NPC-R002-REOPEN-TRANSITION-20260815-R003"
+)
+
+# Public current-review aliases.  R001/R002 stay frozen and are never selected
+# by a writer after the R003 successor exists.
+TRANSITION_REVIEW_DIR = TRANSITION_R003_REVIEW_DIR
+TRANSITION_ASSIGNMENT_REL = TRANSITION_R003_ASSIGNMENT_REL
+TRANSITION_RESULT_REL = TRANSITION_R003_RESULT_REL
+TRANSITION_INDEPENDENT_REL = TRANSITION_R003_INDEPENDENT_REL
+TRANSITION_ROUND_ID = TRANSITION_R003_ROUND_ID
 TRANSITION_GOAL_ID = FP046_R002
-TRANSITION_R002_ASSIGNER_ID = (
-    "codex-root-fp046-npc-r002-transition-successor-assigner-20260823"
+TRANSITION_R003_ASSIGNER_ID = (
+    "codex-root-fp046-npc-r002-transition-successor-r003-assigner-20260823"
 )
-TRANSITION_R002_ASSIGNER_TASK = "/root"
-TRANSITION_R002_EXECUTOR_ID = (
-    "codex-fp046-npc-r002-transition-successor-executor-20260823"
+TRANSITION_R003_ASSIGNER_TASK = "/root"
+TRANSITION_R003_EXECUTOR_ID = (
+    "codex-fp046-npc-r002-transition-successor-r003-executor-20260823"
 )
-TRANSITION_R002_EXECUTOR_TASK = "/root/audit_transaction"
-TRANSITION_R002_REVIEWER_ID = (
-    "codex-fp046-npc-r002-transition-successor-reviewer-20260823"
+TRANSITION_R003_EXECUTOR_TASK = "/root/audit_transaction"
+TRANSITION_R003_REVIEWER_ID = (
+    "codex-fp046-npc-r002-transition-successor-r003-reviewer-20260823"
 )
-TRANSITION_R002_REVIEWER_TASK = "/root/r002_transition_final_review"
+TRANSITION_R003_REVIEWER_TASK = "/root/r003_transition_final_review"
 AUTHORIZATION_REL = Path(
     "docs/control/execution/workstream-transitions/seq72-76/authorization.json"
 )
@@ -1588,9 +1619,10 @@ TRANSITION_REVIEW_ACCEPTANCE = {
     "epic03_fp046_npc_completion_evidence_moves_active_to_archive": True,
     "no_product_formal_device_external_deployment_or_release_credit": True,
     "atomic_apply_requires_exact_source_compare_exchange": True,
-    "r001_transition_review_is_frozen_predecessor_only": True,
-    "r009_control_successor_review_is_exact_and_approved": True,
-    "r002_approval_envelope_normalizes_to_reviewed_plan_core": True,
+    "r002_transition_review_is_frozen_predecessor_only": True,
+    "r009_control_successor_review_is_exact_and_frozen": True,
+    "r010_control_successor_review_is_exact_and_approved": True,
+    "r003_approval_envelope_normalizes_to_reviewed_plan_core": True,
     "all_eight_add_only_outputs_are_byte_exact": True,
 }
 
@@ -1782,6 +1814,127 @@ def load_validated_control_successor_r009(
     return _review_binding_by_role(paths, raw_by_path), raw_by_path
 
 
+def load_frozen_control_successor_r009(
+    root: Path = ROOT,
+) -> tuple[dict[str, dict[str, Any]], dict[Path, bytes]]:
+    """Replay immutable R009 pins without binding them to current code bytes."""
+
+    root = _validated_root(root)
+    module = _control_successor_module()
+    _context, expected_bindings = module.prepare_frozen_control_successor_r009(root)
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R009_PATHS)
+    raw_by_path = {
+        relative: _safe_regular_bytes(root, relative, "frozen R009 control review")
+        for relative in paths
+    }
+    binding = _review_binding_by_role(paths, raw_by_path)
+    require(
+        tuple(binding.values()) == tuple(expected_bindings),
+        "frozen R009 control review binding differs",
+    )
+    return binding, raw_by_path
+
+
+def load_validated_control_successor_r010(
+    root: Path = ROOT,
+) -> tuple[dict[str, dict[str, Any]], dict[Path, bytes]]:
+    """Load the reviewer-approved current R010 control successor."""
+
+    root = _validated_root(root)
+    module = _control_successor_module()
+    context = module.validated_control_successor_r010_context(root)
+    paths = tuple(Path(path) for path in module.CONTROL_SUCCESSOR_R010_PATHS)
+    require(len(paths) == 3 and len(set(paths)) == 3, "R010 control review paths differ")
+    raw_by_path = {
+        relative: _safe_regular_bytes(root, relative, "R010 control-successor review")
+        for relative in paths
+    }
+    assignment_raw, result_raw, independent_raw = (
+        raw_by_path[relative] for relative in paths
+    )
+    assignment = strict_json_bytes(assignment_raw, "R010 control assignment")
+    result = strict_json_bytes(result_raw, "R010 control review result")
+    module.validate_control_successor_r010_result(
+        result,
+        result_raw,
+        assignment,
+        assignment_raw,
+        context,
+    )
+    require(
+        independent_raw
+        == module.build_control_successor_r010_independent_review(
+            context,
+            assignment,
+            assignment_raw,
+            result,
+            result_raw,
+        ).encode("utf-8"),
+        "R010 control independent review differs",
+    )
+    return _review_binding_by_role(paths, raw_by_path), raw_by_path
+
+
+def load_frozen_transition_r002(
+    root: Path = ROOT,
+) -> tuple[dict[str, dict[str, Any]], dict[Path, bytes]]:
+    """Replay immutable R002 pins and its exact R001/R009 provenance."""
+
+    root = _validated_root(root)
+    require(
+        tuple(TRANSITION_R002_PINS) == TRANSITION_R002_PATHS,
+        "frozen transition R002 pin inventory differs",
+    )
+    documents: dict[Path, dict[str, Any]] = {}
+    raw_by_path: dict[Path, bytes] = {}
+    for relative in TRANSITION_R002_PATHS:
+        raw = _safe_regular_bytes(root, relative, "frozen transition R002 review")
+        expected_sha256, expected_length = TRANSITION_R002_PINS[relative]
+        require(
+            bytes_sha256(raw) == expected_sha256 and len(raw) == expected_length,
+            f"frozen transition R002 review differs: {relative}",
+        )
+        document = strict_json_bytes(raw, f"frozen transition R002 {relative.name}")
+        require(
+            raw == json_text(document).encode("utf-8"),
+            f"frozen transition R002 {relative.name} is noncanonical",
+        )
+        documents[relative] = document
+        raw_by_path[relative] = raw
+
+    assignment = documents[TRANSITION_R002_ASSIGNMENT_REL]
+    result = documents[TRANSITION_R002_RESULT_REL]
+    independent = documents[TRANSITION_R002_INDEPENDENT_REL]
+    assignment_binding = _binding(
+        TRANSITION_R002_ASSIGNMENT_REL,
+        raw_by_path[TRANSITION_R002_ASSIGNMENT_REL],
+    )
+    result_binding = _binding(
+        TRANSITION_R002_RESULT_REL,
+        raw_by_path[TRANSITION_R002_RESULT_REL],
+    )
+    r001_binding, _r001_raw = load_frozen_transition_r001(root)
+    r009_binding, _r009_raw = load_frozen_control_successor_r009(root)
+    scope = assignment.get("review_scope")
+    require(
+        assignment.get("round_id") == TRANSITION_R002_ROUND_ID
+        and result.get("round_id") == TRANSITION_R002_ROUND_ID
+        and independent.get("round_id") == TRANSITION_R002_ROUND_ID
+        and result.get("decision") == "APPROVED"
+        and independent.get("decision") == "APPROVED"
+        and result.get("assignment_binding") == assignment_binding
+        and independent.get("assignment_provenance") == assignment_binding
+        and independent.get("review_result_provenance") == result_binding
+        and isinstance(scope, dict)
+        and scope.get("predecessor_transition_review_bindings") == r001_binding
+        and scope.get("r009_control_successor_review_bindings") == r009_binding
+        and result.get("review_scope") == scope
+        and independent.get("review_scope") == scope,
+        "frozen transition R002 approval provenance differs",
+    )
+    return _review_binding_by_role(TRANSITION_R002_PATHS, raw_by_path), raw_by_path
+
+
 def _r007_review_bindings(root: Path) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     documents: dict[Path, dict[str, Any]] = {}
@@ -1958,6 +2111,7 @@ def bind_transition_review_evidence(
     transition_review_binding: Mapping[str, Any] | None = None,
     transition_review_subject_binding: Mapping[str, Any] | None = None,
     r009_control_review_binding: Mapping[str, Any] | None = None,
+    r010_control_review_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Attach review evidence to seq72 and deterministically reseal seq72--76."""
 
@@ -1972,6 +2126,7 @@ def bind_transition_review_evidence(
         "transition_review_subject_binding",
         "r008_control_review_binding",
         "r009_control_review_binding",
+        "r010_control_review_binding",
     ):
         cbu.pop(field, None)
     for field, binding in (
@@ -1979,6 +2134,7 @@ def bind_transition_review_evidence(
         ("transition_review_binding", transition_review_binding),
         ("transition_review_subject_binding", transition_review_subject_binding),
         ("r009_control_review_binding", r009_control_review_binding),
+        ("r010_control_review_binding", r010_control_review_binding),
     ):
         if binding is not None:
             require(isinstance(binding, Mapping), f"{field} is malformed")
@@ -2021,7 +2177,7 @@ def bind_transition_review_evidence(
 
 
 def approval_neutral_plan_core(plan: Mapping[str, Any]) -> dict[str, Any]:
-    """Remove only the current R002 approval envelope and reseal the plan."""
+    """Remove only the current R003 approval envelope and reseal the plan."""
 
     events = plan.get("events")
     require(
@@ -2035,6 +2191,7 @@ def approval_neutral_plan_core(plan: Mapping[str, Any]) -> dict[str, Any]:
             "predecessor_transition_review_binding"
         ),
         r009_control_review_binding=seq72.get("r009_control_review_binding"),
+        r010_control_review_binding=seq72.get("r010_control_review_binding"),
     )
 
 
@@ -2052,7 +2209,7 @@ def validate_reviewed_transition_plan(
     package_or_scope: Mapping[str, Any],
     transition_review_binding: Mapping[str, Any],
 ) -> None:
-    """Require a final R002-bound plan to normalize to its reviewed core."""
+    """Require a final R003-bound plan to normalize to its reviewed core."""
 
     events = plan.get("events")
     require(
@@ -2069,6 +2226,9 @@ def validate_reviewed_transition_plan(
         r009_binding = package_or_scope.get(
             "r009_control_successor_review_bindings"
         )
+        r010_binding = package_or_scope.get(
+            "r010_control_successor_review_bindings"
+        )
     else:
         reviewed_core_binding = package_or_scope.get(
             "approval_neutral_plan_core_binding"
@@ -2078,6 +2238,9 @@ def validate_reviewed_transition_plan(
         )
         r009_binding = package_or_scope.get(
             "r009_control_successor_review_bindings"
+        )
+        r010_binding = package_or_scope.get(
+            "r010_control_successor_review_bindings"
         )
     require(
         isinstance(reviewed_core_binding, dict)
@@ -2097,6 +2260,8 @@ def validate_reviewed_transition_plan(
         == predecessor_binding
         and seq72.get("r009_control_review_binding")
         == r009_binding
+        and seq72.get("r010_control_review_binding")
+        == r010_binding
         and seq72.get("transition_review_binding")
         == transition_review_binding
         and seq72.get("transition_review_subject_binding")
@@ -2117,8 +2282,9 @@ def build_transition_package(root: Path = ROOT) -> dict[str, Any]:
     root = _validated_root(root)
     preflight = build_canonical_preflight(root)
     _paths, _raw, canonical_outputs, source_evidence = _canonical_r029_inputs(root)
-    r001_binding, _r001_raw = load_frozen_transition_r001(root)
-    r009_binding, _r009_raw = load_validated_control_successor_r009(root)
+    r002_binding, _r002_raw = load_frozen_transition_r002(root)
+    r009_binding, _r009_raw = load_frozen_control_successor_r009(root)
+    r010_binding, _r010_raw = load_validated_control_successor_r010(root)
     authorization = json_text(_authorization_document()).encode("utf-8")
     start_contract = json_text(_initial_start_gate_contract(preflight)).encode("utf-8")
     subjects: dict[Path, bytes] = {
@@ -2138,16 +2304,18 @@ def build_transition_package(root: Path = ROOT) -> dict[str, Any]:
     source = _load_source(root)
     approval_neutral_core = bind_transition_review_evidence(
         preflight,
-        predecessor_transition_review_binding=r001_binding,
+        predecessor_transition_review_binding=r002_binding,
         r009_control_review_binding=r009_binding,
+        r010_control_review_binding=r010_binding,
     )
     return {
-        "schema_version": "walksafe.fp046-npc-r002-reopen-transition-package.v2",
+        "schema_version": "walksafe.fp046-npc-r002-reopen-transition-package.v3",
         "transaction_status": "STAGED_NOT_APPLIED",
         "source_checkpoint": _binding(CHECKPOINT_REL, source["checkpoint_raw"]),
         "source_sequence": SOURCE_SEQUENCE,
-        "predecessor_transition_review_bindings": r001_binding,
+        "predecessor_transition_review_bindings": r002_binding,
         "r009_control_successor_review_bindings": r009_binding,
+        "r010_control_successor_review_bindings": r010_binding,
         "canonical_r029_source_evidence": source_evidence,
         "candidate_discovery_publication": "NOT_APPLIED_CANDIDATE_ONLY",
         "authorization": _output_binding(AUTHORIZATION_REL, authorization),
@@ -2169,7 +2337,7 @@ def _transition_scope(package: Mapping[str, Any]) -> dict[str, Any]:
     preflight = package.get("approval_neutral_plan_core")
     require(
         package.get("schema_version")
-        == "walksafe.fp046-npc-r002-reopen-transition-package.v2"
+        == "walksafe.fp046-npc-r002-reopen-transition-package.v3"
         and package.get("transaction_status") == "STAGED_NOT_APPLIED"
         and package.get("source_sequence") == SOURCE_SEQUENCE
         and type(preflight) is dict,
@@ -2214,6 +2382,8 @@ def _transition_scope(package: Mapping[str, Any]) -> dict[str, Any]:
         == package.get("predecessor_transition_review_bindings")
         and seq72.get("r009_control_review_binding")
         == package.get("r009_control_successor_review_bindings")
+        and seq72.get("r010_control_review_binding")
+        == package.get("r010_control_successor_review_bindings")
         and "transition_review_binding" not in seq72
         and "transition_review_subject_binding" not in seq72,
         "approval-neutral transition review bindings differ",
@@ -2226,6 +2396,9 @@ def _transition_scope(package: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "r009_control_successor_review_bindings": deepcopy(
             package["r009_control_successor_review_bindings"]
+        ),
+        "r010_control_successor_review_bindings": deepcopy(
+            package["r010_control_successor_review_bindings"]
         ),
         "corrected_plan_core_binding": deepcopy(
             package["approval_neutral_plan_core_binding"]
@@ -2271,18 +2444,18 @@ def build_transition_assignment(root: Path, *, assigned_at: str) -> str:
         "assigned_at": assigned_at,
         "assigner": {
             "role": "INTERNAL_REVIEW_ASSIGNER",
-            "agent_instance_id": TRANSITION_R002_ASSIGNER_ID,
-            "canonical_task": TRANSITION_R002_ASSIGNER_TASK,
+            "agent_instance_id": TRANSITION_R003_ASSIGNER_ID,
+            "canonical_task": TRANSITION_R003_ASSIGNER_TASK,
         },
         "executor": {
             "role": "INTERNAL_IMPLEMENTATION_EXECUTOR",
-            "agent_instance_id": TRANSITION_R002_EXECUTOR_ID,
-            "canonical_task": TRANSITION_R002_EXECUTOR_TASK,
+            "agent_instance_id": TRANSITION_R003_EXECUTOR_ID,
+            "canonical_task": TRANSITION_R003_EXECUTOR_TASK,
         },
         "reviewer": {
             "role": "SEPARATE_INTERNAL_REVIEWER",
-            "agent_instance_id": TRANSITION_R002_REVIEWER_ID,
-            "canonical_task": TRANSITION_R002_REVIEWER_TASK,
+            "agent_instance_id": TRANSITION_R003_REVIEWER_ID,
+            "canonical_task": TRANSITION_R003_REVIEWER_TASK,
         },
         "review_scope": _transition_scope(package),
         "review_boundary": deepcopy(TRANSITION_BOUNDARY),
@@ -2326,24 +2499,24 @@ def _validate_transition_assignment_envelope(
             "assigner",
             (
                 "INTERNAL_REVIEW_ASSIGNER",
-                TRANSITION_R002_ASSIGNER_ID,
-                TRANSITION_R002_ASSIGNER_TASK,
+                TRANSITION_R003_ASSIGNER_ID,
+                TRANSITION_R003_ASSIGNER_TASK,
             ),
         ),
         (
             "executor",
             (
                 "INTERNAL_IMPLEMENTATION_EXECUTOR",
-                TRANSITION_R002_EXECUTOR_ID,
-                TRANSITION_R002_EXECUTOR_TASK,
+                TRANSITION_R003_EXECUTOR_ID,
+                TRANSITION_R003_EXECUTOR_TASK,
             ),
         ),
         (
             "reviewer",
             (
                 "SEPARATE_INTERNAL_REVIEWER",
-                TRANSITION_R002_REVIEWER_ID,
-                TRANSITION_R002_REVIEWER_TASK,
+                TRANSITION_R003_REVIEWER_ID,
+                TRANSITION_R003_REVIEWER_TASK,
             ),
         ),
     ):
@@ -2480,6 +2653,7 @@ def _validate_post_publish_transition_scope(
         "source_sequence",
         "predecessor_transition_review_bindings",
         "r009_control_successor_review_bindings",
+        "r010_control_successor_review_bindings",
         "corrected_plan_core_binding",
         "authorization",
         "initial_start_gate_contract",
@@ -2507,8 +2681,9 @@ def _validate_post_publish_transition_scope(
         and isinstance(core_binding.get("byte_length"), int),
         "post-publish transition review scope envelope differs",
     )
-    r001_binding, _r001_raw = load_frozen_transition_r001(root)
-    r009_binding, _r009_raw = load_validated_control_successor_r009(root)
+    r002_binding, _r002_raw = load_frozen_transition_r002(root)
+    r009_binding, _r009_raw = load_frozen_control_successor_r009(root)
+    r010_binding, _r010_raw = load_validated_control_successor_r010(root)
     output_bindings = [
         _output_binding(
             relative,
@@ -2529,8 +2704,9 @@ def _validate_post_publish_transition_scope(
     ]
     require(
         scope.get("source_sequence") == SOURCE_SEQUENCE
-        and scope.get("predecessor_transition_review_bindings") == r001_binding
+        and scope.get("predecessor_transition_review_bindings") == r002_binding
         and scope.get("r009_control_successor_review_bindings") == r009_binding
+        and scope.get("r010_control_successor_review_bindings") == r010_binding
         and scope.get("corrected_add_only_output_bindings") == output_bindings
         and scope.get("authorization")
         == output_by_path[AUTHORIZATION_REL.as_posix()]
@@ -2592,19 +2768,19 @@ def _post_publish_transition_events(
     return tuple(event for _index, event in selected)
 
 
-def load_validated_transition_r002(
+def load_validated_transition_r003(
     root: Path = ROOT,
 ) -> tuple[dict[str, dict[str, Any]], dict[Path, bytes]]:
-    """Load the current approved R002 review triplet as exact role bindings."""
+    """Load the current approved R003 review triplet as exact role bindings."""
 
     root = _validated_root(root)
     raw_by_path = {
-        relative: _safe_regular_bytes(root, relative, "transition R002 review")
-        for relative in TRANSITION_R002_PATHS
+        relative: _safe_regular_bytes(root, relative, "transition R003 review")
+        for relative in TRANSITION_R003_PATHS
     }
-    assignment_raw = raw_by_path[TRANSITION_R002_ASSIGNMENT_REL]
-    result_raw = raw_by_path[TRANSITION_R002_RESULT_REL]
-    independent_raw = raw_by_path[TRANSITION_R002_INDEPENDENT_REL]
+    assignment_raw = raw_by_path[TRANSITION_R003_ASSIGNMENT_REL]
+    result_raw = raw_by_path[TRANSITION_R003_RESULT_REL]
+    independent_raw = raw_by_path[TRANSITION_R003_INDEPENDENT_REL]
     checkpoint = strict_json_bytes(
         _safe_regular_bytes(root, CHECKPOINT_REL, "transition checkpoint"),
         "transition checkpoint",
@@ -2614,8 +2790,8 @@ def load_validated_transition_r002(
     if len(history) == SOURCE_SEQUENCE:
         validate_transition_post_review(root)
     else:
-        assignment = strict_json_bytes(assignment_raw, "transition R002 assignment")
-        result = strict_json_bytes(result_raw, "transition R002 review result")
+        assignment = strict_json_bytes(assignment_raw, "transition R003 assignment")
+        result = strict_json_bytes(result_raw, "transition R003 review result")
         _validate_transition_assignment_envelope(assignment, assignment_raw)
         _validate_post_publish_transition_scope(root, assignment, checkpoint)
         _validate_transition_result_document(
@@ -2634,7 +2810,15 @@ def load_validated_transition_r002(
             ).encode("utf-8"),
             "transition independent review differs",
         )
-    return _review_binding_by_role(TRANSITION_R002_PATHS, raw_by_path), raw_by_path
+    return _review_binding_by_role(TRANSITION_R003_PATHS, raw_by_path), raw_by_path
+
+
+def load_validated_transition_r002(
+    root: Path = ROOT,
+) -> tuple[dict[str, dict[str, Any]], dict[Path, bytes]]:
+    """Compatibility loader for the exact frozen R002 predecessor."""
+
+    return load_frozen_transition_r002(root)
 
 
 def write_transition_assignment(root: Path, *, assigned_at: str) -> None:
