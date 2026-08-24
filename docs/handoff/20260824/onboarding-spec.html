@@ -1,0 +1,166 @@
+<title>첫 실행 화면 설계 노트</title>
+<style>
+  :root{
+    --bg:#FAFAF8; --surface:#FFFFFF; --raise:#F3F3F0;
+    --ink:#1A1A17; --muted:#5F5D57; --faint:#918E86;
+    --line:#E4E3DE; --line-strong:#C9C7C0;
+    --accent:#7A5B12; --accent-soft:#F5EEDC;
+    --bad:#8F3A1E; --bad-soft:#F7E8E2;
+    --good:#2F6B3A; --good-soft:#E7F0E8;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+      --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+      --line:#2B2B25; --line-strong:#3B3A33;
+      --accent:#E0BC6A; --accent-soft:#2A2313;
+      --bad:#E09070; --bad-soft:#2B1D17;
+      --good:#7FC78D; --good-soft:#18271B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+    --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+    --line:#2B2B25; --line-strong:#3B3A33;
+    --accent:#E0BC6A; --accent-soft:#2A2313;
+    --bad:#E09070; --bad-soft:#2B1D17;
+    --good:#7FC78D; --good-soft:#18271B;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,"Noto Sans KR",sans-serif;
+    line-height:1.7;margin:0;padding:clamp(1.5rem,4vw,4rem) clamp(1rem,4vw,2rem);-webkit-font-smoothing:antialiased}
+  .page{max-width:54rem;margin:0 auto;display:flex;flex-direction:column;gap:2.75rem}
+  code,pre,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+  code{color:var(--accent);font-size:.92em}
+  header{display:flex;flex-direction:column;gap:.55rem;border-bottom:2px solid var(--line-strong);padding-bottom:1.4rem}
+  .eyebrow{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(1.7rem,4vw,2.25rem);line-height:1.15;margin:0;letter-spacing:-.025em;text-wrap:balance}
+  .lede{color:var(--muted);margin:0;max-width:44rem}
+  section{display:flex;flex-direction:column;gap:.9rem}
+  h2{font-size:1.12rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:.55rem}
+  h2::before{content:"";width:.45rem;height:.45rem;flex:none;background:var(--accent);border-radius:1px;transform:translateY(-.15rem)}
+  p{margin:0}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+  table{border-collapse:collapse;width:100%;font-size:.87rem}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--accent-soft);color:var(--accent);font-size:.71rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .done{color:var(--good);font-weight:700}
+  .block{color:var(--bad);font-weight:700}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;overflow-x:auto;margin:0;font-size:.8rem;line-height:1.55}
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 5px 5px 0;padding:.8rem 1rem;font-size:.9rem}
+  .callout.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+  .callout strong{display:block;margin-bottom:.2rem}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.4rem}
+  footer{border-top:1px solid var(--line);padding-top:1.1rem;font-size:.8rem;color:var(--faint)}
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">WalkSafe · EPIC-02 · 단일 설계 노트</div>
+    <h1>첫 실행 화면 설계 노트</h1>
+    <p class="lede">1~3단계 화면의 측정값, 적용한 것, 막힌 것, 그리고 막힌 이유를 한곳에 모았다. 이후 판단은 이 문서만 보면 된다.</p>
+  </header>
+
+  <section>
+    <h2>지금까지의 결과</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>화면</th><th class="num">처음</th><th class="num">지금</th><th class="num">감소</th></tr></thead>
+        <tbody>
+          <tr><td>1단계 글자 수</td><td class="num">888</td><td class="num">326</td><td class="num">63%</td></tr>
+          <tr><td>2단계 글자 수</td><td class="num">907</td><td class="num">158</td><td class="num">83%</td></tr>
+          <tr><td>3단계 글자 수</td><td class="num">833</td><td class="num">376</td><td class="num">55%</td></tr>
+          <tr><td>1단계 버튼 수</td><td class="num">5</td><td class="num">1</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>디자인 관련 커밋 9개, 브랜치 전체 14개. 단위 테스트 1,026건 통과. 브랜치 <code>fp023-off-route-choice</code>, 로컬 전용.</p>
+  </section>
+
+  <section>
+    <h2>적용한 것</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th><th>커밋</th></tr></thead>
+        <tbody>
+          <tr><td class="done">하단 여백</td><td>하드코딩 32px → 밀도 기반 24dp</td><td class="mono">811d482</td></tr>
+          <tr><td class="done">설정 섹션</td><td>온보딩 중 <code>GONE</code>. 계정 삭제 복구 로그인은 예외</td><td class="mono">ad83831</td></tr>
+          <tr><td class="done">시각 토큰</td><td>측정 팔레트 상수화, 둥근 버튼·테두리·간격 12/24dp</td><td class="mono">99a99b1</td></tr>
+          <tr><td class="done">진행 표시줄</td><td>3칸, 단계 따라 채움. 접근성 트리 제외(중복 낭독 방지)</td><td class="mono">acd3ab1</td></tr>
+          <tr><td class="done">고지 접기</td><td>1단계 전문 유지 → 확인 후 한 줄 + 토글</td><td class="mono">68a688e</td></tr>
+          <tr><td class="done">제목 계층</td><td>Spannable eyebrow + 굵은 제목. 낭독 원문 불변</td><td class="mono">a185676</td></tr>
+          <tr><td class="done">주·보조 분리</td><td>주 행동 56dp + 강조 테두리, 보조 49dp</td><td class="mono">5f00612</td></tr>
+          <tr><td class="done">여백 리듬·라벨</td><td>그룹 8dp / 제목 16dp / 섹션 24dp, 화면·낭독 라벨 분리</td><td class="mono">a8a62ce</td></tr>
+          <tr><td class="done">동의 카드</td><td>항목별 카드 + 조항 + 머리글 + 허용 카운터 + 전문 토글</td><td class="mono">d0aa447 · d83bb7d</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>측정된 디자인 토큰</h2>
+    <p>색은 실측값이며 변경하지 않는다. 간격·크기는 이 노트에서 정한 값이다.</p>
+    <pre>color/bg            #000000
+color/text          #FFFFFF    21.00:1  AAA
+color/emphasis      #FFE8BD    17.53:1  AAA
+color/notice-text   #C9C6C0    10.81:1  AAA  (고지 카드 위)
+color/notice-fill   #141414
+color/button-fill   #5A595B     3.01:1  비텍스트 AA
+color/button-text   #FFFFFF     6.97:1  AA
+color/line          #6E6D70     4.08:1  비텍스트 AA
+
+touch/min           48dp       touch/primary  56dp
+space/control       12dp       space/section  24dp
+radius              10dp       space/bottom   24dp</pre>
+  </section>
+
+  <section>
+    <h2>막힌 것과 그 이유</h2>
+    <div class="callout bad">
+      <strong>1단계에서 고지를 접으면 Figma와 같아진다. 그러나 그것이 유일한 차이다.</strong>
+      Figma가 깔끔한 이유는 디자인 기법이 아니라 1단계에서 274자 전문을 접었기 때문이다. 접으면 <em>읽지 않고 확인을 누를 수 있게 된다.</em> 1단계의 과제 자체가 "목적과 안전 한계를 읽고 확인"이므로 이는 기능 후퇴다. 2·3단계는 이미 접힌다.
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>막는 것</th><th>판단 주체</th></tr></thead>
+        <tbody>
+          <tr><td class="block">1단계 고지 접기</td><td>확인 전 접으면 미독 확인이 가능해짐</td><td>안전 정책</td></tr>
+          <tr><td class="done">동의 전문 접기</td><td>해결. 항목마다 승인 전문의 해당 조항을 그대로 담고, 문서 전체는 토글 뒤에 둔다. 감춘 것이 없으므로 법률 판단 대상에서 벗어났다</td><td>—</td></tr>
+          <tr><td class="done">항목별 문구</td><td>해결. 요약을 새로 쓰지 않고 <code>INTEGRATED_CONSENT_DISCLOSURE_KO</code>에서 조항을 잘라 쓴다</td><td>—</td></tr>
+          <tr><td class="block">열람·철회권 접근 시점</td><td>온보딩 중 숨김이 적절한지</td><td>법률</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>전수 조사 결과: 화면 순서 자체가 코드로 고정돼 있다</strong>
+      테스트 262개 중 첫 실행 화면을 제약하는 것이 24개이며, 그중 기존 계약이 15개다. 시작 화면은 단계별 독립 화면이 아니라 <em>하나의 스크롤 면</em>이고, 11개 블록의 세로 순서를 5개 테스트 파일이 나눠서 검사한다. Figma가 단계별 화면을 그리면 옮길 수 없는 이유가 이것이다. 이 사실은 <code>figma-brief.html</code>에 반영했다.
+    </div>
+    <p>참고로 <code>MainActivityFirstRunRegistrationStaticTest</code>의 <code>firstRunStatusIsTalkBackAccessibleAndFirstOnTheStartupSurface</code>가 <code>addView(productPurposeText)</code>를 컨트롤보다 앞에 두도록 고정한다. 고지를 아래로 내리는 안은 이 계약을 바꿔야 한다.</p>
+  </section>
+
+  <section>
+    <h2>아직 남은 디자인 여지</h2>
+    <p>정책과 무관하게 더 할 수 있는 것들이다. 현재 화면이 심심한 실제 원인에 가깝다.</p>
+    <ul>
+
+      <li><strong>고지 카드가 여전히 화면을 지배한다.</strong> 1단계에서는 불가피하지만, 카드 안쪽 글자 크기를 본문보다 한 단계 낮추는 선택지는 남아 있다. 다만 저시력 사용자를 고려하면 신중해야 한다.</li>
+
+    </ul>
+  </section>
+
+  <section>
+    <h2>Figma 재생성에 대해</h2>
+    <p>브리프에 구조 제약과 코드 계약을 모두 담은 뒤 재생성한 결과는 <strong>성공했다.</strong> 정책 원문 8개 일치, 지어낸 표현 0건, 계약 3개 준수, 대비 전 항목 통과였고 그대로 Kotlin에 옮겼다. 제약을 알려주지 않은 첫 시도가 실패했을 뿐이다.</p>
+    <p>첫 시도가 실패한 이유는 여전히 유효한 경고다.</p>
+    <ul>
+      <li>같은 벽에 부딪힌다. 더 나은 목업이 나와도 1단계 고지 문제는 정책 결정이라 코드로 넘을 수 없다.</li>
+      <li>지난 생성물은 동의 문구를 전부 지어냈다. 낙상 감지, 보호자 알림, 익명화 — 존재하지 않는 기능이었다. 명세를 정확히 줘도 생성 모델은 빈칸을 그럴듯하게 채운다. 동의 화면에서는 위험하다.</li>
+    </ul>
+    <p>Figma는 구조(진행바·카드·접기·계층)를 제안하는 역할을 이미 했고, 그것을 실제 정책 문구와 측정된 대비값으로 옮긴 것이 지금 상태다.</p>
+  </section>
+
+  <footer>WalkSafe · Hanium DreamUp · EPIC-02 · Pixel 6 에뮬레이터 1080×2400 density 420 기준</footer>
+</div>

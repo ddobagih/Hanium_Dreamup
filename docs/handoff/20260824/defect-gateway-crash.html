@@ -1,0 +1,165 @@
+<title>Gateway 연결 실패 크래시</title>
+<style>
+  :root{
+    --bg:#F8F7F6; --surface:#FFFFFF; --raise:#FCFBFA;
+    --ink:#1F1B18; --muted:#6B615B; --faint:#988D86;
+    --line:#E3DEDA; --line-strong:#CCC4BE;
+    --accent:#9C4E24; --accent-soft:#F6E9E0;
+    --ok:#2F6B3A; --ok-soft:#E6F0E7;
+    --code:#146B63;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#141110; --surface:#1C1817; --raise:#221D1B;
+      --ink:#EDE7E3; --muted:#A3968F; --faint:#7C716B;
+      --line:#2F2825; --line-strong:#3E3531;
+      --accent:#E0925F; --accent-soft:#2C211A;
+      --ok:#7FC78D; --ok-soft:#1A2A1D;
+      --code:#5FCFC0;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141110; --surface:#1C1817; --raise:#221D1B;
+    --ink:#EDE7E3; --muted:#A3968F; --faint:#7C716B;
+    --line:#2F2825; --line-strong:#3E3531;
+    --accent:#E0925F; --accent-soft:#2C211A;
+    --ok:#7FC78D; --ok-soft:#1A2A1D;
+    --code:#5FCFC0;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,"Noto Sans KR",sans-serif;
+    line-height:1.7;margin:0;padding:clamp(1.5rem,4vw,4rem) clamp(1rem,4vw,2rem);-webkit-font-smoothing:antialiased}
+  .page{max-width:52rem;margin:0 auto;display:flex;flex-direction:column;gap:2.75rem}
+  code,pre,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+  code{color:var(--code);font-size:.92em}
+
+  header{display:flex;flex-direction:column;gap:.6rem;border-bottom:2px solid var(--line-strong);padding-bottom:1.4rem}
+  .tags{display:flex;gap:.4rem;flex-wrap:wrap}
+  .tag{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;
+    padding:.2rem .55rem;border-radius:3px;background:var(--accent-soft);color:var(--accent)}
+  .tag.fixed{background:var(--ok-soft);color:var(--ok)}
+  h1{font-size:clamp(1.6rem,4vw,2.15rem);line-height:1.2;margin:0;letter-spacing:-.02em;text-wrap:balance}
+  .lede{color:var(--muted);margin:0;max-width:42rem}
+
+  section{display:flex;flex-direction:column;gap:.9rem}
+  h2{font-size:1.1rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:.55rem}
+  h2::before{content:"";width:.45rem;height:.45rem;flex:none;background:var(--accent);border-radius:1px;transform:translateY(-.15rem)}
+  p{margin:0}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;
+    overflow-x:auto;margin:0;font-size:.82rem;line-height:1.55}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+  table{border-collapse:collapse;width:100%;font-size:.88rem}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--accent-soft);color:var(--accent);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  .chain{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;font-size:.85rem;
+    background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem}
+  .chain span{padding:.15rem .5rem;border:1px solid var(--line-strong);border-radius:3px}
+  .chain .caught{border-color:var(--ok);color:var(--ok)}
+  .chain .miss{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .chain em{color:var(--faint);font-style:normal}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.4rem}
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:0 5px 5px 0;padding:.8rem 1rem;font-size:.9rem}
+  .callout.ok{border-left-color:var(--ok)}
+  .callout strong{display:block;margin-bottom:.2rem}
+  footer{border-top:1px solid var(--line);padding-top:1.1rem;font-size:.8rem;color:var(--faint)}
+</style>
+
+<div class="page">
+  <header>
+    <div class="tags"><span class="tag">P0 · 크래시</span><span class="tag">EPIC-02 / GAP-022</span><span class="tag fixed">수정 완료</span></div>
+    <h1>Gateway 연결 실패 크래시</h1>
+    <p class="lede">서버에 닿지 않으면 첫 실행에서 앱 프로세스가 종료된다. 단위 테스트 1,012건이 모두 통과하는 상태에서 에뮬레이터 실행으로만 드러난 결함. 같은 패턴이 로그인 경로에도 있어 함께 고쳤다. 2026-08-19 발견·수정, 커밋 <code>606abe2</code>.</p>
+  </header>
+
+  <section>
+    <h2>증상</h2>
+    <p>debug APK를 설치하고 실행하면 화면이 뜨지 않고 프로세스가 사라진다. Gateway 서버를 띄우지 않은 상태에서 100% 재현된다.</p>
+    <pre>FATAL EXCEPTION: walksafe-gateway-session
+Process: kr.co.hanium.dreamup.walksafe, PID: 5067
+java.net.ConnectException: Failed to connect to /127.0.0.1:8081
+    at ...CancellableNetworkCall.readBoundedResponse(CancellableNetworkCall.kt:198)
+    at ...AndroidIntegratedConsentClient.requestCall$lambda$4(AndroidIntegratedConsentClient.kt:147)
+    at ...MainActivity.startIntegratedConsentRequest$lambda$268(MainActivity.kt:6330)</pre>
+  </section>
+
+  <section>
+    <h2>원인</h2>
+    <p>첫 실행 통합 동의 요청이 백그라운드 실행자에서 Gateway를 호출하는데, 예외를 두 가지만 잡았다.</p>
+    <pre>gatewaySessionExecutor.execute {
+    try {
+        val confirmation = call.execute()
+        ...
+    } catch (_: CancellationException) {
+    } catch (_: RuntimeException) {     // ← 여기까지만
+    }
+}</pre>
+    <p>실제로 던져지는 예외의 계층은 이렇다.</p>
+    <div class="chain">
+      <span class="miss">ConnectException</span><em>→</em>
+      <span class="miss">SocketException</span><em>→</em>
+      <span class="miss">IOException</span><em>→</em>
+      <span>Exception</span>
+    </div>
+    <p><code>IOException</code>은 checked exception이라 <code>RuntimeException</code>이 아니다. 두 catch 어디에도 걸리지 않고 실행자 스레드의 uncaught handler로 올라가 프로세스를 죽인다.</p>
+    <div class="callout">
+      <strong>HTTP 오류는 왜 괜찮았나</strong>
+      <code>IntegratedConsentHttpException</code>과 <code>GatewaySessionHttpException</code>은 둘 다 <code>IllegalStateException</code>을 상속한다. 즉 <em>RuntimeException 계열</em>이라 잡혔다. 서버가 4xx·5xx를 주는 경우는 처리됐고, 서버에 닿지 못하는 경우만 빠져나갔다. 그래서 서버를 띄운 환경에서는 드러나지 않는다.
+    </div>
+  </section>
+
+  <section>
+    <h2>수정</h2>
+    <p><code>MainActivity.startIntegratedConsentRequest</code>의 catch 한 곳을 넓혔다. 처리 로직은 건드리지 않았다.</p>
+    <pre>- } catch (_: RuntimeException) {
++ } catch (_: Exception) {</pre>
+    <p>기존 <code>RuntimeException</code> 블록이 이미 올바른 fail-closed 처리를 하고 있었기 때문에 본문을 새로 쓸 필요가 없었다. 재시도 표시, UI 갱신, <code>integratedConsent=blocked:server_confirmation_failed</code> 상태, 그리고 "동의 선택 저장에 실패해 새 허용 항목을 열지 않습니다" 음성 안내가 그대로 <code>IOException</code>에도 적용된다.</p>
+    <p><code>CancellationException</code> catch가 앞에 있으므로 취소 경로의 동작은 바뀌지 않는다.</p>
+  </section>
+
+  <section>
+    <h2>검증</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>단계</th><th>결과</th></tr></thead>
+        <tbody>
+          <tr><td>실패 테스트 작성 (RED)</td><td><code>gatewayConnectionFailureIsHandledInsteadOfKillingTheProcess</code> 실패</td></tr>
+          <tr><td>수정 후 (GREEN)</td><td>통과</td></tr>
+          <tr><td><strong>수정을 되돌려 재확인</strong></td><td>해당 테스트만 다시 실패 — 테스트가 실제로 이 결함을 잡는다는 증거</td></tr>
+          <tr><td>전체 단위 테스트</td><td>1,014건 통과 / 실패 0 (신규 회귀 2건)</td></tr>
+          <tr><td>에뮬레이터 재설치·실행</td><td>프로세스 생존, FATAL 0건, 첫 실행 화면 도달</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout ok">
+      <strong>fail-closed 동작 확인</strong>
+      실행 화면에 "원본 수집 서버 미확인 · 자동신고 서버 미확인 · 이동통신망 전송 서버 미확인 · 학습 재사용 서버 미확인"이 표시된다. 서버 확인 없이는 새 허용 항목을 열지 않는다는 정책이 의도대로 동작한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>같은 계열의 두 번째 결함 — 함께 수정</h2>
+    <p><code>onGatewaySessionButtonClicked</code>(MainActivity.kt:6962)가 동일한 패턴을 갖고 있었다.</p>
+    <ul>
+      <li>실행자 블록 안에서 <code>gatewaySessionClient.login(</code>과 <code>logout(</code>을 호출한다</li>
+      <li>catch는 <code>RuntimeException</code>과 <code>RejectedExecutionException</code> 둘뿐이었다</li>
+      <li><code>GatewayFieldSession.login()</code> 안에는 catch가 <strong>0개</strong>이고, HTTP 오류만 <code>GatewaySessionHttpException</code>으로 감싼다</li>
+    </ul>
+    <p>같은 방식으로 catch를 <code>Exception</code>까지 넓혔고, 되돌려 확인하는 절차도 동일하게 거쳤다.</p>
+    <div class="callout">
+      <strong>런타임 재현은 하지 못했다</strong>
+      에뮬레이터에서 GATEWAY 로그인 버튼을 눌러 재현을 시도했으나 크래시가 나지 않았다. <code>login()</code>이 소켓 작업 전에 <code>actorId</code>를 먼저 검증해 <code>invalid_named_actor</code>를 던지는데, 이는 <code>RuntimeException</code> 계열이라 기존 catch에 걸린다. 서버 없는 첫 실행 상태에서는 유효한 actor id를 갖출 수 없어 실제 연결 시도까지 도달하지 못했다. <strong>이 수정의 근거는 정적 경로 분석이며 런타임 증거가 아니다.</strong> 첫 번째 결함과 달리 "고쳤더니 안 죽더라"를 확인하지 못했다.
+    </div>
+    <p>MainActivity에 <code>catch (_: RuntimeException)</code>이 8곳 남아 있다. 네트워크를 감싸는 것은 없고 JPEG 인코딩·저널·큐 정리 등 파일·메모리 작업이라 별도 판단이 필요하다.</p>
+  </section>
+
+  <section>
+    <h2>왜 단위 테스트로 못 잡았나</h2>
+    <p>이 결함이 있는 상태에서도 단위 테스트 1,012건이 전부 통과했다. MainActivity는 JVM에서 인스턴스화되지 않아 소스 텍스트 검사로만 검증되는데, 기존 검사 중 어느 것도 catch 절이 다루는 예외 <em>계층</em>을 확인하지 않았다.</p>
+    <p>실기기·에뮬레이터에서 실제로 실행해야만 드러나는 종류다. 이번 회귀 테스트는 소스 텍스트 방식이라 같은 함수의 재발만 막는다. 다른 실행자 블록에 같은 실수가 생기는 것은 여전히 막지 못한다.</p>
+  </section>
+
+  <footer>WalkSafe · Hanium DreamUp · 2026-08-19 · 브랜치 <code>fp023-off-route-choice</code></footer>
+</div>

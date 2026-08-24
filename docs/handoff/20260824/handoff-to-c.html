@@ -1,0 +1,286 @@
+<title>C 전달 문서 — 확인·수정 요청</title>
+<style>
+  :root{
+    --bg:#FAFAF8; --surface:#FFFFFF; --raise:#F3F3F0;
+    --ink:#1A1A17; --muted:#5F5D57; --faint:#918E86;
+    --line:#E4E3DE; --line-strong:#C9C7C0;
+    --accent:#7A5B12; --accent-soft:#F5EEDC;
+    --bad:#8F3A1E; --bad-soft:#F7E8E2;
+    --good:#2F6B3A; --good-soft:#E7F0E8;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+      --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+      --line:#2B2B25; --line-strong:#3B3A33;
+      --accent:#E0BC6A; --accent-soft:#2A2313;
+      --bad:#E09070; --bad-soft:#2B1D17;
+      --good:#7FC78D; --good-soft:#18271B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+    --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+    --line:#2B2B25; --line-strong:#3B3A33;
+    --accent:#E0BC6A; --accent-soft:#2A2313;
+    --bad:#E09070; --bad-soft:#2B1D17;
+    --good:#7FC78D; --good-soft:#18271B;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,"Noto Sans KR",sans-serif;
+    line-height:1.7;margin:0;padding:clamp(1.5rem,4vw,4rem) clamp(1rem,4vw,2rem);-webkit-font-smoothing:antialiased}
+  .page{max-width:54rem;margin:0 auto;display:flex;flex-direction:column;gap:2.75rem}
+  code,pre,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+  code{color:var(--accent);font-size:.92em}
+  header{display:flex;flex-direction:column;gap:.55rem;border-bottom:2px solid var(--line-strong);padding-bottom:1.4rem}
+  .eyebrow{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(1.7rem,4vw,2.25rem);line-height:1.15;margin:0;letter-spacing:-.025em;text-wrap:balance}
+  .lede{color:var(--muted);margin:0;max-width:44rem}
+  section{display:flex;flex-direction:column;gap:.9rem}
+  h2{font-size:1.12rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:.55rem}
+  h2::before{content:"";width:.45rem;height:.45rem;flex:none;background:var(--accent);border-radius:1px;transform:translateY(-.15rem)}
+  p{margin:0}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;min-width:0}
+  section>*{min-width:0;max-width:100%}
+  td code,li code{overflow-wrap:anywhere}
+  pre{white-space:pre-wrap;word-break:break-word}
+  h3{font-size:.95rem;margin:.7rem 0 0;color:var(--muted);font-weight:700}
+  table{border-collapse:collapse;width:100%;font-size:.87rem}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--accent-soft);color:var(--accent);font-size:.71rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .done{color:var(--good);font-weight:700}
+  .block{color:var(--bad);font-weight:700}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;overflow-x:auto;margin:0;font-size:.8rem;line-height:1.55}
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 5px 5px 0;padding:.8rem 1rem;font-size:.9rem}
+  .callout.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+  .callout strong{display:block;margin-bottom:.2rem}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.4rem}
+  footer{border-top:1px solid var(--line);padding-top:1.1rem;font-size:.8rem;color:var(--faint)}
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">WalkSafe · Hanium DreamUp · 2026-08-24</div>
+    <h1>C 전달 문서 — 확인·수정 요청</h1>
+    <p class="lede">혼자 고칠 수 없거나 담당이 다른 항목을 모았다. 각 항목은 <strong>증상 · 확인한 것 · 고치는 방법 · 확인 방법</strong> 순으로 적었다. 재현 명령은 문서 끝에 모아 두었다.</p>
+  </header>
+
+  <section>
+    <h2>한 줄 요약</h2>
+    <div class="callout bad">
+      <strong>파일 하나가 없어서 Goal graph 초과 실패 34건 중 21건이 발생한다</strong>
+      <code>WS-GOAL-EPIC-04-FP-022-R001/logs/backend-navigation-internal.log</code>가 커밋되지 않아 FP-022 완료 전이 사슬이 끊기고, 그 아래 phase1 successor 18건과 FP046·NPC 각 1건이 연쇄로 실패한다. 이것이 <code>AGENTS.md:28</code>의 제품 코드 변경 게이트를 막고 있다.
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>#</th><th>항목</th><th>담당</th><th>성격</th></tr></thead>
+        <tbody>
+          <tr><td class="num">①</td><td>FP-022 증거 로그 3개 미커밋 — <strong>게이트를 막는 단일 원인</strong></td><td>통제</td><td class="block">수정 필요</td></tr>
+          <tr><td class="num">②</td><td>내 브랜치가 FP-022 봉인 파일 7개를 변경 — ①을 고치면 드러남</td><td>통제 · 나</td><td class="block">결정 필요</td></tr>
+          <tr><td class="num">③</td><td>남은 초과 실패 12건 — 별도 원인, 미진단</td><td>통제</td><td>진단 필요</td></tr>
+          <tr><td class="num">④</td><td>첫 실행 4~8단계(FP-010) 착수 전 결정 6건</td><td>C · 백엔드 · 팀</td><td>결정 필요</td></tr>
+          <tr><td class="num">⑤</td><td>FP-023 A / EPIC-07 범위 겹침 3건</td><td>C</td><td>결정 필요</td></tr>
+          <tr><td class="num">⑥</td><td>백엔드 기동 실패 · 낡은 감사 보고서 · 동의 버튼 계약</td><td>C · 통제 · 팀</td><td>확인 필요</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>① FP-022 증거 로그 3개 미커밋 <span class="block">최우선</span></h2>
+
+    <h3>증상</h3>
+    <p><code>check_walksafe_goal_graph_v2_4.py</code>가 <code>current</code>에서 100건 실패한다. 기준선 문서(<code>baseline.md</code>)의 63건 + 권한 3건 = 66건 대비 <strong>34건 초과</strong>다. 병합 직전 커밋 <code>ca0898d</code>에서는 66건이라 초과분 전부가 PR #3에서 발생한다.</p>
+
+    <h3>확인한 것 — 연쇄 경로를 실측으로 확정했다</h3>
+    <pre>logs/backend-navigation-internal.log 없음
+ └─ build_walksafe_fp022_completion_seq70_71_review_20260814._validate_product_chain(root)
+      BuildError: review input is missing
+    └─ _fp022_completion_start_to_final_transitions(...)  →  None
+       └─ _npc_single_admin_recovery_live_compatibility_artifacts(...)  →  None
+          ├─ "NPC/FP022 successor authority differs"                        1건
+          ├─ "NPC single-admin recovery completion package … differs"       1건
+          └─ completion_transitions = {}  (빈 맵)
+             ├─ phase1 Android report successor live binding/bridge/…      18건
+             └─ FP046 final source binding differs                          1건
+
+같은 실행에서 "FP022 completion transition review cannot be replayed"      1건
+                                                                    합계   22건</pre>
+    <p>실측 출력:</p>
+    <pre>npc_artifacts:                      55건
+fp022_artifacts:                    None      ← 여기서 끊긴다
+security_artifacts:                 7건
+composed(completion_transitions):   None</pre>
+
+    <div class="callout bad">
+      <strong>이전 기록 정정</strong>
+      <code>git-notes.html</code>에 「FP-022 로그는 초과 34건 중 1건일 뿐」이라고 적었는데 <strong>틀렸다</strong>. 실패 <em>줄 수</em>로는 1건이지만 21~22건의 방아쇠다. 이 항목의 우선순위를 잘못 매긴 것이므로 정정한다.
+    </div>
+
+    <h3>왜 없는가</h3>
+    <p><code>.gitignore</code>의 <code>logs/</code> 규칙에 걸려 다음 3개 파일이 커밋되지 않았다. 다른 14개 <code>goal-results</code> 디렉터리는 <code>git add -f</code>로 강제 추가돼 있어, 이 하나만 누락된 것으로 보인다.</p>
+    <pre>docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/
+  backend-navigation-internal.log   ← 검사가 직접 요구하는 파일
+  (같은 디렉터리의 나머지 2개)</pre>
+
+    <h3>고치는 방법</h3>
+    <pre>git add -f docs/control/execution/goal-results/WS-GOAL-EPIC-04-FP-022-R001/logs/
+git commit -m "Track the FP022 completion review log inputs"</pre>
+    <div class="callout bad">
+      <strong>파일을 새로 만들 수 없다</strong>
+      내용이 해시로 봉인돼 있어 재생성이나 빈 파일로는 통과하지 않는다. <strong>FP-022 작업을 수행한 머신의 원본</strong>이어야 한다. 그래서 내가 대신 처리할 수 없고 이 문서로 넘긴다.
+    </div>
+
+    <h3>확인 방법</h3>
+    <p>추가 후 아래가 <code>OK</code>로 바뀌고 전체 실패 수가 66 근처로 떨어져야 한다.</p>
+    <pre>PYTHONPATH=. python3 -B scripts/check_walksafe_goal_graph_v2_4.py 2>&amp;1 | grep -c '^- '</pre>
+  </section>
+
+  <section>
+    <h2>② 내 브랜치가 FP-022 봉인 파일 7개를 변경 <span class="block">결정 필요</span></h2>
+
+    <h3>증상</h3>
+    <p>①을 고치면 다음 검사가 새로 드러난다 — <code>validate_final_content_manifest</code>: <code>FP-022 current file binding differs</code>. 지금은 ①에 가려 실행되지 않는다.</p>
+
+    <h3>확인한 것</h3>
+    <p>FP-022 완료 기록(<code>implementation-record.json</code>의 <code>final_content_manifest</code>)이 22개 파일을 바이트 단위로 봉인한다. 그중 <strong>7개를 내 브랜치 커밋이 바꿨다.</strong> <code>current</code>에서는 불일치 <span class="done">0건</span>, 내 브랜치에서 <span class="block">7건</span>이다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>봉인된 파일</th><th>바꾼 내 커밋</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">MainActivity.kt</td><td>디자인 9개 · <code>606abe2</code> · <code>456ab8d</code></td></tr>
+          <tr><td class="mono">navigation/RouteNavigator.kt</td><td><code>456ab8d</code> (FP-023)</td></tr>
+          <tr><td class="mono">navigation/AndroidVoiceCommand.kt</td><td><code>456ab8d</code> (FP-023)</td></tr>
+          <tr><td class="mono">navigation/RouteNavigatorTest.kt</td><td><code>456ab8d</code> · <code>aa0d491</code> (GAP-007)</td></tr>
+          <tr><td class="mono">navigation/AndroidVoiceCommandTest.kt</td><td><code>456ab8d</code></td></tr>
+          <tr><td class="mono">navigation/TactileRoutePolicyTest.kt</td><td><code>aa0d491</code></td></tr>
+          <tr><td class="mono">MainActivityNavigationCompositionTest.kt</td><td><code>456ab8d</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>필요한 결정 — 내가 판단할 수 없다</h3>
+    <ul>
+      <li>FP-022 완료 패키지가 바이트로 봉인한 파일을 <strong>이후 작업이 바꿀 때</strong> 어떻게 처리하는가? 봉인을 후속 revision으로 넘기는 절차가 있는가?</li>
+      <li>있다면 내 FP-023·GAP-007 커밋은 그 절차를 거쳐야 한다. 없다면 봉인 파일을 건드리지 않도록 작업 범위를 다시 잡아야 한다.</li>
+      <li>FP-023(GAP-032)이 <code>RouteNavigator.kt</code>를 바꾸지 않고 구현될 수는 없다. 즉 이 충돌은 내 실수가 아니라 <strong>절차의 빈칸</strong>으로 보인다.</li>
+    </ul>
+    <div class="callout">
+      <strong>참고 — 아직 푸시하지 않았다</strong>
+      내 작업은 로컬 브랜치 <code>fp023-off-route-choice</code>에만 있고 원격에 아무것도 보내지 않았다. <code>current</code>는 <code>origin/current</code>와 0/0으로 동일하다. 절차가 정해지면 그에 맞춰 다시 만들 수 있다.
+    </div>
+  </section>
+
+  <section>
+    <h2>③ 남은 초과 실패 12건 — 별도 원인</h2>
+    <p>①의 연쇄로 설명되지 않는 항목이다. 원인을 확인하지 못했다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>건수</th><th>실패</th><th>메모</th></tr></thead>
+        <tbody>
+          <tr><td class="num">8</td><td><code>frozen v2.3</code> / <code>archived v2.2</code> Goal graph event 1·4·6·9·11·14·17: canonical binding SHA-256 differs: <code>REQUIREMENTS_TRACEABILITY</code></td><td>같은 PR의 <code>d9289d3</code>가 <code>docs/deliverables/03-requirements/</code>를 수정했다. 정본이 바뀐 뒤 event의 canonical binding이 갱신되지 않은 것으로 보인다</td></tr>
+          <tr><td class="num">2</td><td><code>WS-GOAL-EPIC-02-FP-005-R001</code>: implementation changed artifact 5·16 differs</td><td>미확인</td></tr>
+          <tr><td class="num">2</td><td>gate event 디렉터리 mode가 <code>0700</code>이 아님 (FP022 · NPC-SINGLE-ADMIN-RECOVERY)</td><td>Git이 디렉터리 mode를 추적하지 않아 생기는 환경 문제. 기준선에도 3건 있다. <code>chmod 700</code>으로 사라지지만 control·evidence 경로라 손대지 않았다</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>①을 고친 뒤 다시 돌리면 이 12건만 남아야 한다. 그때 숫자가 맞는지가 ①의 연쇄 분석이 옳았는지에 대한 검증이 된다.</p>
+  </section>
+
+  <section>
+    <h2>④ 첫 실행 4~8단계 (FP-010) — 착수 전 결정 6건</h2>
+    <p>화면 설계는 끝냈다(<code>figma-brief-4to8.html</code> · <code>onboarding-spec-4to8.html</code>). 아래가 정해지지 않아 구현으로 넘어갈 수 없다. 앱 쪽에 남은 일은 화면 두 개(대기 컴포넌트 + 전화번호 입력)뿐이고 병목은 전부 서버 쪽이다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>질문</th><th>왜 필요한가</th><th>담당</th></tr></thead>
+        <tbody>
+          <tr><td>4~8단계 백엔드 경로를 EPIC-07 안에 넣는가, 별도로 두는가</td><td>현재 게이트웨이에 <code>/api/field-session</code>, <code>/api/field-walk</code>뿐. 전화번호 제출·SMS 검증·보호자 승인·계정 활성화·검증 로그인 5개가 없다</td><td>C</td></tr>
+          <tr><td>불투명 핸들 발급 주체가 백엔드인가 외부 공급자인가</td><td><code>^onb_[0-9a-f]{32}$</code> · <code>^actor_[0-9a-f]{32}$</code>. 정책이 전화번호·비밀번호·생년월일 파생을 금지하므로 발급 주체가 정해져야 앱이 검증할 대상이 생긴다</td><td>C</td></tr>
+          <tr><td>SMS 검증 공급자를 무엇으로 쓰는가</td><td>5단계 전체가 묶인다. 재전송·만료 UI도 여기 따라온다</td><td>팀 · 외부 계약</td></tr>
+          <tr><td>보호자 승인(6단계) 전달 경로</td><td>만 14~17세만 거친다. SMS 재사용인지 별도 채널인지에 따라 화면이 달라진다</td><td>팀</td></tr>
+          <tr><td>대기 상태 갱신 방식 — 폴링인가 푸시인가</td><td>대기 문구를 확정할 수 없다. 프로토타입에 「미정」 마커로 자리만 비워 두었다</td><td>C</td></tr>
+          <tr><td><code>productionEvidenceAvailable = true</code> 전환 시점과 승인 주체</td><td>운영 fail-closed를 여는 변경이라 임의로 바꿀 성격이 아니다</td><td>통제</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <strong>참고 — 도메인 쪽은 이미 완성돼 있다</strong>
+      13개 stage enum, 5개 evidence 타입, attempt 토큰 프로토콜, 4~8단계 안내 문구가 모두 코드에 있다. 비어 있는 것은 검증자와 백엔드 경로다. FP-010 Goal 자체가 외부 연동을 범위 밖(<code>INTERNAL_POLICY_CONFORMANCE_REASSESSED</code>)으로 선언했으므로, 현재 상태는 미완성이 아니라 그 Goal의 종착점이다.
+    </div>
+    <div class="callout bad">
+      <strong>추가 확인 — 취소·오류 복구 경로 (EPIC-02)</strong>
+      FP-010 완료 기준에 "실패·<strong>취소</strong> 때 보행 화면으로 넘어가지 않음"과 "TalkBack 조작과 <strong>오류 복구 경로</strong>가 내부 회귀로 검증됨"이 있다. 그런데 4~8단계 화면에는 둘 다 없다. 정책 코드에 <code>cancelAttempt()</code>가 있는데 화면에서 호출하는 곳이 없다. 외부 연동이 없어 당연한 것인지, 내부 slice에서 빠진 것인지 판단할 수 없다.
+    </div>
+  </section>
+
+  <section>
+    <h2>⑤ FP-023 A / EPIC-07 범위 겹침 3건</h2>
+    <p>2026-08-19에 FP-023 A(경로 암호화 저장)를 보류했다. EPIC-07 목표에 <em>경로</em> 원본의 암호화 수집·보존기한과 <em>자동 삭제 scheduler</em>가 명시돼 있어, 먼저 만들면 이중 구조가 된다. 보존 상수(단말 24시간 · 미전송 30일 · 검역 14일 · 활동원본 180일 · 학습 3년 · 백업 35일)는 이미 승인돼 있으므로 새로 정할 것은 없다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>질문</th><th>내 작업에 미치는 영향</th></tr></thead>
+        <tbody>
+          <tr><td>경로 저장소를 EPIC-07 통합 구조에 합치는가, 별개로 두는가</td><td>A를 navigation 안에 만들지, C 구조를 기다릴지 결정</td></tr>
+          <tr><td>만료 scheduler를 언제 만드는가</td><td>임시로 앱 실행 시점 삭제만 넣고 나중에 교체할지 판단</td></tr>
+          <tr><td>EPIC-07 착수 일정</td><td>내 EPIC-08 8건의 시작 시점 — 선행 EPIC-02·03이 모두 완료라 지금 착수 가능하다</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>EPIC-07 하나가 EPIC-08 → 09 → 11을 모두 막고 있다.</p>
+  </section>
+
+  <section>
+    <h2>⑥ 기타 확인 요청</h2>
+
+    <h3>백엔드가 새 clone에서 기동하지 않는다</h3>
+    <p><code>.env.example</code> 기본값이 <code>UPLOAD_DIR=backend/uploads</code>인데 이 디렉터리에는 <code>backend/uploads/.gitkeep</code>(권한 <code>0644</code>)만 있다. 문서대로 따라한 사람은 기동에 실패한다는 것이 이전 세션 기록이다. 우회는 빈 전용 디렉터리를 <code>UPLOAD_DIR</code>로 지정하는 것.</p>
+    <div class="callout">
+      <strong>오늘 기동을 재현하지 못했다</strong>
+      <code>config.py:767~778</code>의 <code>UPLOAD_DIR</code> 검증은 deployment 환경에서 <em>디렉터리</em>만 본다(symlink·소유자·group/other 접근). <code>.gitkeep</code>을 거부하는 파일 단위 검사는 찾지 못했다. <code>report_storage.py:307·501</code>이 파일에 <code>0600</code>을 요구하지만 특정 대상 파일에 대한 검사다.<br><strong>요청:</strong> 실제로 기동이 실패하는지, 실패한다면 어느 검사에서인지 확인해 달라. 실패한다면 <code>.env.example</code> 기본값을 빈 디렉터리로 바꾸거나 <code>.gitkeep</code>을 다른 방법으로 대체하는 쪽이 맞다.
+    </div>
+
+    <h3>r028 감사 보고서가 낡았다</h3>
+    <p><code>GAP-032</code>와 <code>GAP-007</code>의 "현재 구현" 설명이 글자 그대로 같고, 둘 다 FP-022 병합 <em>이전</em> 상태를 서술한다. 실제 코드는 이미 규칙대로 동작하며, GAP-007은 네 책임(실제 이동방향=위치 / 가야 할 방향=저장 경로 / 카메라 방향=회전센서 / 보폭=진행량 보조)이 분리돼 있음을 회귀 증거로 고정해 두었다(<code>aa0d491</code>, production 코드 변경 없음). 모르고 보면 없는 결함을 고치려 든다. <span class="mono">담당: 통제</span></p>
+
+    <h3>동의 버튼 텍스트 계약 변경 제안</h3>
+    <p><code>MainActivityIntegratedConsentStaticTest</code>가 <code>button.text = "$label: $syncState"</code>를 고정한다. 상태를 카드 배지로 분리하면 더 읽기 쉽고, 계약이 지키려는 "보이는 상태와 들리는 상태의 일치"는 <code>contentDescription</code>으로 유지된다. Figma 결과물에 설계 의도 메모가 남아 있어 근거로 쓸 수 있다. <span class="mono">담당: 팀 합의</span></p>
+  </section>
+
+  <section>
+    <h2>재현 명령</h2>
+    <p>모두 읽기 전용이다. 두 검사 모두 <code>PYTHONPATH=.</code>가 필요하다 — 저장소 루트가 <code>sys.path</code>에 없어 그냥 실행하면 <code>No module named 'scripts'</code>로 엉뚱하게 실패한다.</p>
+
+    <h3>현재 실패 수</h3>
+    <pre>cd ~/Desktop/WalkMate/Hanium_Dreamup
+PYTHONPATH=. python3 -B scripts/check_walksafe_goal_graph_v2_4.py 2>&amp;1 | grep -c '^- '</pre>
+
+    <h3>기준선과 비교 (읽기 전용 worktree)</h3>
+    <pre>git worktree add --detach /tmp/wt f0093863
+cd /tmp/wt &amp;&amp; PYTHONPATH=. python3 -B scripts/check_walksafe_goal_graph_v2_4.py 2>&amp;1 | grep '^- ' | sort &gt; /tmp/base.txt
+cd - &amp;&amp; PYTHONPATH=. python3 -B scripts/check_walksafe_goal_graph_v2_4.py 2>&amp;1 | grep '^- ' | sort &gt; /tmp/cur.txt
+comm -13 /tmp/base.txt /tmp/cur.txt          # 초과분
+git worktree remove --force /tmp/wt</pre>
+
+    <h3>①의 연쇄 지점 확인</h3>
+    <pre>PYTHONPATH=. python3 -B - &lt;&lt;'PY'
+import json, pathlib, sys, importlib
+sys.path.insert(0, ".")
+m = importlib.import_module("scripts.check_walksafe_goal_graph_v2_4")
+root = pathlib.Path(".")
+cp = json.load(open("docs/control/walksafe-project-continuation-checkpoint.json"))
+from scripts import build_walksafe_fp022_completion_seq70_71_review_20260814 as cr
+try:
+    cr._validate_product_chain(root); print("_validate_product_chain: OK")
+except Exception as e:
+    print("_validate_product_chain:", type(e).__name__, e)
+print("fp022_artifacts:", m._fp022_completion_start_to_final_transitions(root, cp, require_completion_review=False))
+PY</pre>
+  </section>
+
+  <footer>
+    WalkSafe · Hanium DreamUp · 작성 2026-08-24 · 측정 기준 <code>current</code> = <code>c0ba5a7</code> / 작업 브랜치 <code>fp023-off-route-choice</code> = <code>d83bb7d</code> · 원격 푸시 없음 · 함께 보는 문서 <code>git-notes.html</code> · <code>figma-brief-4to8.html</code> · <code>onboarding-spec-4to8.html</code>
+  </footer>
+</div>

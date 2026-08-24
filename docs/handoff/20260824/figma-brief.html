@@ -1,0 +1,265 @@
+<title>WalkSafe 첫 실행 디자인 브리프</title>
+<style>
+  :root{
+    --bg:#FBFAF7; --surface:#FFFFFF; --raise:#F2F1EC;
+    --ink:#1B1A16; --muted:#5E5B53; --faint:#918D83;
+    --line:#E5E3DC; --line-strong:#C8C5BB;
+    --accent:#8A5A1B; --accent-soft:#F6EDDF;
+    --stop:#8F2F1E; --stop-soft:#F8E7E3;
+    --free:#2F6B3A; --free-soft:#E7F0E8;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#131210; --surface:#1B1A17; --raise:#23211D;
+      --ink:#EFECE4; --muted:#A29D92; --faint:#7C776C;
+      --line:#2C2A24; --line-strong:#3D3A32;
+      --accent:#E5B36A; --accent-soft:#2B2214;
+      --stop:#E38A72; --stop-soft:#2C1A16;
+      --free:#7FC78D; --free-soft:#18271B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#131210; --surface:#1B1A17; --raise:#23211D;
+    --ink:#EFECE4; --muted:#A29D92; --faint:#7C776C;
+    --line:#2C2A24; --line-strong:#3D3A32;
+    --accent:#E5B36A; --accent-soft:#2B2214;
+    --stop:#E38A72; --stop-soft:#2C1A16;
+    --free:#7FC78D; --free-soft:#18271B;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,"Noto Sans KR",sans-serif;
+    line-height:1.7;margin:0;padding:clamp(1.5rem,4vw,4rem) clamp(1rem,4vw,2rem);-webkit-font-smoothing:antialiased}
+  .page{max-width:54rem;margin:0 auto;display:flex;flex-direction:column;gap:2.6rem}
+  code,pre{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+  code{color:var(--accent);font-size:.92em}
+  header{display:flex;flex-direction:column;gap:.55rem;border-bottom:2px solid var(--line-strong);padding-bottom:1.3rem}
+  .eyebrow{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(1.65rem,4vw,2.2rem);line-height:1.15;margin:0;letter-spacing:-.025em;text-wrap:balance}
+  .lede{color:var(--muted);margin:0;max-width:44rem}
+  section{display:flex;flex-direction:column;gap:.85rem}
+  h2{font-size:1.1rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:.5rem}
+  h2::before{content:"";width:.42rem;height:.42rem;flex:none;background:var(--accent);border-radius:1px;transform:translateY(-.15rem)}
+  h3{font-size:.92rem;margin:.6rem 0 0;color:var(--muted);font-weight:700}
+  p{margin:0}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:.85rem 1rem;
+    overflow-x:auto;margin:0;font-size:.79rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+  table{border-collapse:collapse;width:100%;font-size:.86rem}
+  th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--accent-soft);color:var(--accent);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  .rule{border-radius:0 5px 5px 0;padding:.75rem 1rem;font-size:.89rem;border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface)}
+  .rule.stop{border-left-color:var(--stop);background:var(--stop-soft)}
+  .rule.free{border-left-color:var(--free);background:var(--free-soft)}
+  .rule strong{display:block;margin-bottom:.15rem}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.35rem}
+  .copy{background:var(--surface);border:1px dashed var(--line-strong);border-radius:6px;padding:.75rem 1rem;font-size:.85rem;color:var(--muted)}
+  footer{border-top:1px solid var(--line);padding-top:1rem;font-size:.79rem;color:var(--faint)}
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">WalkSafe · 첫 실행 1~3단계 · Figma 입력</div>
+    <h1>WalkSafe 첫 실행 디자인 브리프</h1>
+    <p class="lede">Figma에 그대로 넘기는 문서다. 문구는 전부 실제 정책 원문이며 창작하면 안 된다. <strong>이 앱은 단계마다 독립된 화면이 아니라 하나의 긴 스크롤 면이고 블록 순서가 코드로 고정돼 있다.</strong> 그 구조 안에서 디자인해야 옮길 수 있다.</p>
+  </header>
+
+  <section>
+    <h2>제품 맥락</h2>
+    <p>시각장애인·저시력 사용자의 도심 보행을 돕는 Android 앱이다. 주 사용자는 화면을 보지 않고 <strong>TalkBack 음성</strong>으로 조작하며, 저시력 사용자는 <strong>고대비 큰 글씨</strong>로 본다. 예쁜 화면보다 이 두 조건이 우선한다.</p>
+    <p>이 브리프의 범위는 첫 실행 1~3단계다. 4단계 이후는 아직 구현되지 않았으므로 다루지 않는다.</p>
+  </section>
+
+  <section>
+    <h2>절대 바꾸면 안 되는 것</h2>
+    <div class="rule stop">
+      <strong>아래 문구는 승인된 정책 원문이다</strong>
+      한 글자도 바꾸거나 요약하거나 새로 쓰지 말 것. 표시 순서·크기·접기 여부는 자유지만 문구 자체는 그대로 써야 한다.
+    </div>
+
+    <h3>안전 고지 — 모든 화면에 필요 (274자)</h3>
+    <pre>워크세이프는 시각장애인의 도심 보행 중 가까운 위험과 이동 방향을 알려 주고 손상 점자블록 신고를 돕는 안드로이드 보행 보조 서비스입니다.
+WalkSafe(워크세이프)는 다음 세 가지를 돕습니다.
+1. 카메라로 가까운 위험을 안내합니다.
+2. TMAP으로 큰 이동 방향을 안내합니다.
+3. 손상된 점자블록 신고를 돕습니다.
+안전 제한: 워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다.
+고지 기준: FP-001/FP-009 1.0.1
+앱 버전: 0.1.0</pre>
+    <p>접을 때 쓸 수 있는 한 줄은 위 본문에서 그대로 발췌한다. 새로 쓰지 않는다.</p>
+    <pre>안전 제한: 워크세이프는 보행 안전을 보장하지 않으며 흰지팡이·안내견·보호자를 대신하지 않습니다.</pre>
+
+    <h3>단계 안내 문구</h3>
+    <pre>1단계  첫 실행 1단계. WalkSafe의 목적과 안전 한계를 읽고 확인하세요.
+2단계  첫 실행 2단계. 정확한 생년월일을 저장하지 않고 연령 구간만 확인합니다.
+3단계  첫 실행 3단계. 네 가지 동의 항목을 각각 허용하거나 거부한 뒤 서버 저장 확인을 완료하세요.</pre>
+
+    <h3>통합 동의 전문 — 3단계 (423자, 문서 ID FP-013-1.0.0)</h3>
+    <pre>통합 동의 문서 FP-013-1.0.0. 네 항목을 각각 허용하거나 거부할 수 있습니다.
+1. 원본 수집: 신고용 카메라 JPEG와 디버그 원본·센서 메타데이터를 신고 확인과 품질 점검 시 수집하며, WalkSafe 서버가 최대 180일 보관합니다.
+2. 자동신고: 손상 점자블록 후보의 JPEG·정확한 위치·방향·모델 메타데이터를 보행 중 자동 전송하며, WalkSafe 서버가 최대 180일 보관합니다.
+3. 이동통신 전송: Wi-Fi가 아닐 때 같은 서버 자료를 이동통신망으로 전송합니다. 거부하면 Wi-Fi만 사용합니다.
+4. 학습 재사용: 수집 자료를 모델 개선용 학습 후보로 재사용하며, 거부하면 신고 처리 외 학습에 쓰지 않습니다.
+각 항목은 언제든 이 화면에서 철회할 수 있고, 철회 즉시 해당 경로를 중단한 뒤 서버에 새 선택을 저장합니다.</pre>
+  </section>
+
+  <section>
+    <h2>지어내면 안 되는 것</h2>
+    <div class="rule stop">
+      <strong>이전 생성물이 실제로 만들어낸 오류다. 반복하지 말 것.</strong>
+      <ul>
+        <li>❌ "충격·낙상 감지" — 이런 기능은 없다</li>
+        <li>❌ "보호자에게 자동 신고 전송" — 보호자 알림 기능은 없다</li>
+        <li>❌ "익명화된 데이터" — 정책은 익명화를 주장하지 않는다</li>
+        <li>❌ "처리 완료 후 자동 삭제" — 실제는 최대 180일 보관이다</li>
+      </ul>
+      <p style="margin-top:.4rem">자동신고는 <strong>손상된 점자블록을 신고</strong>하는 기능이다. 낙상·응급 신고 앱이 아니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>지켜야 할 수치</h2>
+    <p>실제 기기(Pixel 6, 1080×2400, density 420)에서 측정한 값이다. 대비는 이 이상이어야 한다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>토큰</th><th>값</th><th>대비</th><th>기준</th></tr></thead>
+        <tbody>
+          <tr><td>배경</td><td><code>#000000</code></td><td>—</td><td>기준면</td></tr>
+          <tr><td>본문</td><td><code>#FFFFFF</code></td><td>21.00:1</td><td>AAA</td></tr>
+          <tr><td>강조</td><td><code>#FFE8BD</code></td><td>17.53:1</td><td>AAA</td></tr>
+          <tr><td>보조 본문</td><td><code>#C9C6C0</code></td><td>10.81:1</td><td>AAA</td></tr>
+          <tr><td>버튼 면</td><td><code>#5A595B</code></td><td>3.01:1</td><td>비텍스트 AA</td></tr>
+          <tr><td>버튼 글자</td><td><code>#FFFFFF</code></td><td>6.97:1</td><td>AA</td></tr>
+          <tr><td>테두리·구분선</td><td><code>#6E6D70</code></td><td>4.08:1</td><td>비텍스트 AA</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <pre>본문 글자     18sp 이상   (저시력 사용자 기준. 줄이지 말 것)
+터치 최소     48dp
+주 행동       56dp
+화면 폭       360dp 기준 (1080px / density 420)</pre>
+    <div class="rule stop">
+      <strong>색은 바꿔도 되지만 대비는 낮추면 안 된다</strong>
+      다른 색을 쓰려면 위 대비비 이상을 유지해야 한다. 회색 위 회색, 어두운 테두리처럼 대비가 낮은 조합은 저시력 사용자가 인지하지 못한다.
+    </div>
+  </section>
+
+  <section>
+    <h2>먼저 알아야 할 구조 — 독립 화면이 아니다</h2>
+    <div class="rule stop">
+      <strong>단계별 화면을 그리면 옮길 수 없다</strong>
+      이 앱의 시작 화면은 <em>하나의 세로 스크롤 면</em>이다. 1~3단계는 그 안의 한 블록이고, 단계가 바뀌면 화면이 전환되는 게 아니라 같은 면에서 일부 블록의 표시 여부와 내용만 바뀐다.
+    </div>
+    <p>블록의 세로 순서는 코드에 고정돼 있고 5개 테스트 파일이 각각 나눠서 검사한다. 순서를 바꾸는 디자인은 구현 단계에서 막힌다.</p>
+    <pre>1  안전 고지            productPurposeText
+2  권한 거부 안내        permissionDenialPanel
+3  첫 실행 1~3단계       firstRunOnboardingControls   ← 이 브리프의 범위
+4  우선 사용자           priorityUserOnboardingControls
+5  환경 상태            officialEnvironmentStatusText
+6  휴대전화 장착 방식     phoneMountingStatusText
+7  시작 기능 점검        startupCapabilityText
+8  사전 측정 실행        startupMetricPreflightButton
+9  시작 확인            startupCapabilityConfirmButton
+10 설정·동의·계정        privacyControls
+11 보행 런타임          runtimeControls</pre>
+    <div class="rule">
+      <strong>디자인 대상은 3번 블록과 그 위의 1번 블록이다</strong>
+      1번(안전 고지)과 3번(1~3단계) 사이에 다른 블록을 끼울 수 없고, 1번을 3번 아래로 내릴 수도 없다. 온보딩 중에는 4번 이후가 숨겨지므로, 실제로 사용자가 보는 것은 1번과 3번이다.
+    </div>
+  </section>
+
+  <section>
+    <h2>구조 규칙</h2>
+    <div class="rule stop">
+      <strong>1단계에서 안전 고지 전문은 확인 버튼보다 앞에 있어야 한다</strong>
+      1단계의 과제 자체가 "목적과 안전 한계를 읽고 확인"이다. 전문을 접어두고 확인 버튼만 보이면 읽지 않고 누를 수 있게 되어 기능이 후퇴한다. 2·3단계에서는 접어도 된다.
+    </div>
+    <div class="rule stop">
+      <strong>스크롤 위치를 조건으로 걸지 말 것</strong>
+      "끝까지 내려야 버튼이 활성화" 같은 패턴은 금지다. 스크롤은 시각·터치 개념이라 TalkBack 사용자에게는 인지 불가능한 조건이 된다. 버튼을 본문 뒤에 배치하는 것으로 충분하다.
+    </div>
+    <div class="rule">
+      <strong>낭독 순서에서 3번 안에 그 단계의 행동 버튼이 나와야 한다</strong>
+      TalkBack이 위에서부터 읽는다. 지금 할 일이 뒤에 묻히면 안 된다.
+    </div>
+    <div class="rule">
+      <strong>현재 단계와 무관한 컨트롤은 화면에 두지 않는다</strong>
+      설정·계정·다른 단계의 동의 버튼이 함께 보이면 낭독 순서를 채우고 잘못 누를 수 있다.
+    </div>
+    <div class="rule stop">
+      <strong>동의 버튼에 보이는 글자는 항목명과 상태를 함께 담아야 한다</strong>
+      현재 형식은 <code>"원본 수집: 거부 선택(서버 미확인)"</code>이다. 보이는 글자와 음성으로 읽히는 상태가 어긋나지 않게 하려는 장치이며 테스트가 이 형식을 고정한다. 상태만 따로 배지로 빼내는 디자인은 지금 구조에서 옮길 수 없다. <em>상태를 배지로 보여주고 싶다면 그 사실을 결과물에 표시해 달라. 팀에 계약 변경을 요청할 근거로 쓴다.</em>
+    </div>
+    <div class="rule stop">
+      <strong>단계 안내 문장은 쪼갤 수 없다</strong>
+      "첫 실행 2단계. 정확한 생년월일을…"은 한 덩어리로 음성에 읽혀야 한다. 앞머리를 작게 뒤를 크게 하는 시각적 위계는 가능하지만, 별도 요소 두 개로 나누는 것은 안 된다.
+    </div>
+    <div class="rule">
+      <strong>버튼은 글자가 길어지면 줄바꿈된다</strong>
+      말줄임표로 자르지 않는다. 한 줄에 맞추려고 글자를 줄이는 디자인을 전제하지 말 것. 버튼 높이는 내용에 따라 늘어난다.
+    </div>
+    <div class="rule">
+      <strong>연령 3개는 대등한 선택지다</strong>
+      하나를 주 버튼처럼 강조하면 제품이 하지 않는 권장으로 읽힌다. 셋을 같은 위계로 둘 것.
+    </div>
+  </section>
+
+  <section>
+    <h2>자유롭게 정해도 되는 것</h2>
+    <div class="rule free">
+      <strong>시각 표현은 전적으로 Figma의 판단이다</strong>
+      <ul>
+        <li>레이아웃, 여백 리듬, 정렬</li>
+        <li>카드·구분선·그림자 등 면 처리</li>
+        <li>진행 표시 방식 (막대, 점, 숫자 등)</li>
+        <li>버튼 모양, 모서리, 테두리 유무</li>
+        <li>타이포 위계 — 단, 본문 18sp 하한은 지킬 것</li>
+        <li>동의 항목의 배치 방식 (카드, 목록, 아코디언 등) — 단 버튼에 보이는 글자 형식은 위 계약을 따를 것</li>
+        <li>전환 애니메이션</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>화면별 필요 요소</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>화면</th><th>반드시 있어야 하는 것</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>1단계</strong><br>목적과 안전 한계</td>
+            <td>진행 위치 표시 · 단계 안내 문구 · <strong>안전 고지 전문 274자</strong> · 확인 버튼 「목적과 안전 한계 확인」(주 행동, 고지 뒤에 배치)</td>
+          </tr>
+          <tr>
+            <td><strong>2단계</strong><br>연령 구간</td>
+            <td>진행 위치 표시 · 단계 안내 문구 · 선택 버튼 3개 「만 18세 이상」 「만 14세 이상 18세 미만」 「만 14세 미만」(대등) · 접힌 안전 고지 + 펼치기</td>
+          </tr>
+          <tr>
+            <td><strong>3단계</strong><br>통합 동의</td>
+            <td>진행 위치 표시 · 단계 안내 문구 · 동의 항목 4개(각각 허용/거부 토글, 현재 상태와 서버 확인 여부 표시) · 전문 423자 접근 경로 · 저장 버튼 「네 가지 선택을 서버에 저장하고 확인」(주 행동) · 접힌 안전 고지 + 펼치기</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>동의 항목 4개의 화면 이름</h3>
+    <pre>원본 수집 · 자동신고 · 이동통신 전송 · 학습 재사용</pre>
+    <p>각 항목은 허용/거부 상태와 함께 <strong>서버 확인 여부</strong>를 표시해야 한다. 서버 확인 전에는 선택해도 아직 활성이 아니다.</p>
+  </section>
+
+  <section>
+    <h2>결과물로 받고 싶은 것</h2>
+    <ul>
+      <li>1~3단계 화면 각각의 기본 상태</li>
+      <li>안전 고지 펼침/접힘 두 상태</li>
+      <li>동의 항목 허용/거부 두 상태</li>
+      <li>사용한 색과 크기 값 목록</li>
+      <li>구조 제약 때문에 포기한 아이디어가 있다면 따로 적어 달라 — 팀에 계약 변경을 요청할 근거가 된다</li>
+    </ul>
+    <div class="copy">
+      이 문서를 그대로 Figma에 붙여넣고 "이 브리프대로 첫 실행 1~3단계를 디자인해 줘. 문구는 브리프에 있는 원문만 쓰고 새로 만들지 마"라고 요청하면 된다. 결과물을 받은 뒤에는 지어낸 문구가 없는지 위 「지어내면 안 되는 것」과 대조해 확인할 것.
+    </div>
+  </section>
+
+  <footer>WalkSafe · Hanium DreamUp · EPIC-02 · 문구는 FP-001/FP-009 1.0.1 및 FP-013-1.0.0 원문 · 측정 기준 Pixel 6 1080×2400 density 420</footer>
+</div>

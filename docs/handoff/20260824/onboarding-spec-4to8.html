@@ -1,0 +1,253 @@
+<title>가입 검증 단계 설계 노트</title>
+<style>
+  :root{
+    --bg:#FAFAF8; --surface:#FFFFFF; --raise:#F3F3F0;
+    --ink:#1A1A17; --muted:#5F5D57; --faint:#918E86;
+    --line:#E4E3DE; --line-strong:#C9C7C0;
+    --accent:#7A5B12; --accent-soft:#F5EEDC;
+    --bad:#8F3A1E; --bad-soft:#F7E8E2;
+    --good:#2F6B3A; --good-soft:#E7F0E8;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+      --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+      --line:#2B2B25; --line-strong:#3B3A33;
+      --accent:#E0BC6A; --accent-soft:#2A2313;
+      --bad:#E09070; --bad-soft:#2B1D17;
+      --good:#7FC78D; --good-soft:#18271B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12120F; --surface:#1A1A16; --raise:#22221D;
+    --ink:#EDEBE4; --muted:#A19D93; --faint:#7B776E;
+    --line:#2B2B25; --line-strong:#3B3A33;
+    --accent:#E0BC6A; --accent-soft:#2A2313;
+    --bad:#E09070; --bad-soft:#2B1D17;
+    --good:#7FC78D; --good-soft:#18271B;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",system-ui,"Noto Sans KR",sans-serif;
+    line-height:1.7;margin:0;padding:clamp(1.5rem,4vw,4rem) clamp(1rem,4vw,2rem);-webkit-font-smoothing:antialiased}
+  .page{max-width:54rem;margin:0 auto;display:flex;flex-direction:column;gap:2.75rem}
+  code,pre,.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+  code{color:var(--accent);font-size:.92em}
+  header{display:flex;flex-direction:column;gap:.55rem;border-bottom:2px solid var(--line-strong);padding-bottom:1.4rem}
+  .eyebrow{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(1.7rem,4vw,2.25rem);line-height:1.15;margin:0;letter-spacing:-.025em;text-wrap:balance}
+  .lede{color:var(--muted);margin:0;max-width:44rem}
+  section{display:flex;flex-direction:column;gap:.9rem}
+  h2{font-size:1.12rem;margin:0;letter-spacing:-.01em;display:flex;align-items:baseline;gap:.55rem}
+  h2::before{content:"";width:.45rem;height:.45rem;flex:none;background:var(--accent);border-radius:1px;transform:translateY(-.15rem)}
+  p{margin:0}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;min-width:0}
+  section>*{min-width:0;max-width:100%}
+  td code,li code{overflow-wrap:anywhere}
+  table{border-collapse:collapse;width:100%;font-size:.87rem}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--accent-soft);color:var(--accent);font-size:.71rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .done{color:var(--good);font-weight:700}
+  .block{color:var(--bad);font-weight:700}
+  pre{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;overflow-x:auto;margin:0;font-size:.8rem;line-height:1.55}
+  .callout{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 5px 5px 0;padding:.8rem 1rem;font-size:.9rem}
+  .callout.bad{border-left-color:var(--bad);background:var(--bad-soft)}
+  .callout strong{display:block;margin-bottom:.2rem}
+  ul{margin:0;padding-left:1.15rem;display:flex;flex-direction:column;gap:.4rem}
+  footer{border-top:1px solid var(--line);padding-top:1.1rem;font-size:.8rem;color:var(--faint)}
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">WalkSafe · EPIC-02 / FP-010 · 단일 설계 노트</div>
+    <h1>가입 검증 단계 설계 노트</h1>
+    <p class="lede">첫 실행 4~8단계 화면의 측정값, 적용한 것, 막힌 것, 그리고 막힌 이유를 한곳에 모았다. 1~3단계 노트의 후속이며, 이후 판단은 이 문서만 보면 된다.</p>
+  </header>
+
+  <section>
+    <h2>지금까지의 결과</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>Figma 결과물</th><th>정리 후</th></tr></thead>
+        <tbody>
+          <tr><td>정책 원문 일치 (단계 문구 5개)</td><td class="num done">5 / 5</td><td class="num done">5 / 5</td></tr>
+          <tr><td>지어낸 기능·화면</td><td class="num done">0</td><td class="num done">0</td></tr>
+          <tr><td>OTP·비밀번호 입력칸</td><td class="num done">0</td><td class="num done">0</td></tr>
+          <tr><td>지어낸 서버 동작 문구</td><td class="num block">1</td><td class="num done">0</td></tr>
+          <tr><td>본문 18sp 하한 위반</td><td class="num block">9</td><td class="num done">0</td></tr>
+          <tr><td>비텍스트 토큰을 글자색으로</td><td class="num block">5</td><td class="num done">0</td></tr>
+          <tr><td>터치 48dp 미달</td><td class="num block">1</td><td class="num done">0</td></tr>
+          <tr><td>토큰 밖 색</td><td class="num block">1</td><td class="num done">0</td></tr>
+          <tr><td>disabled 대비</td><td class="num block">2.24:1</td><td class="num done">5.04:1</td></tr>
+          <tr><td>가로 오버플로</td><td class="num done">없음</td><td class="num done">없음</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>프로토타입은 <code>~/Desktop/WalkMate/App Design/src/App.tsx</code>. 1~8단계 전체 흐름을 담고 있고 <code>npm --prefix "App Design" run dev</code>로 띄운다. <strong>제품 코드 변경은 0줄이다.</strong></p>
+    <div class="callout">
+      <strong>4단계 하나만 입력 화면이다</strong>
+      5~8단계는 안내 문구 한 줄만 다른 동일 구조라 재사용 대기 컴포넌트 하나로 처리된다. 화면 작업량이 작다는 뜻이고, 병목은 전부 백엔드 쪽이다.
+    </div>
+  </section>
+
+  <section>
+    <h2>적용한 것</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>지어낸 서버 동작 제거</td>
+            <td>「완료되면 자동으로 다음 단계로 넘어갑니다」 삭제 → 「미정 — 갱신 방식(폴링/푸시) 결정 후 문구 확정」 마커로 교체</td>
+            <td>갱신 방식 미정</td>
+          </tr>
+          <tr>
+            <td>본문 18sp 하한</td>
+            <td>고지 헤더 11→18 · 고지 토글 13→18 · 동의 전문 16→18 · 전문 버튼 15→18 · 허용 개수 15→18 · 전화번호 라벨 13→18 · 취소 대화 16→18 · 취소 버튼 16→18 · 완료 안내 14→18</td>
+            <td>저시력 하한</td>
+          </tr>
+          <tr>
+            <td>비텍스트 토큰 오용 제거</td>
+            <td><code>C.border</code>(#6E6D70, 4.08:1)를 글자색으로 쓴 5곳 → <code>C.sub</code>(#C9C6C0, 12.32:1)</td>
+            <td>일반 텍스트 AA 4.5:1</td>
+          </tr>
+          <tr>
+            <td>터치 최소</td>
+            <td>동의 전문 버튼 44→48dp · 고지 토글에 48dp 부여</td>
+            <td>touch/min 48dp</td>
+          </tr>
+          <tr>
+            <td>토큰 밖 색</td>
+            <td>통합 동의 전문 423자 <code>#888</code>(5.92:1) → <code>C.sub</code>(12.32:1)</td>
+            <td>대비 하향 금지</td>
+          </tr>
+          <tr>
+            <td>disabled 대비</td>
+            <td><code>#555</code> on <code>#1e1e1e</code> 2.24:1 → <code>#999999</code> on <code>#2A2A2A</code> 5.04:1</td>
+            <td>주 행동 가시성</td>
+          </tr>
+          <tr>
+            <td>진행 표시 대비·크기</td>
+            <td>구간 라벨 10→13px, 단계 번호 11→14px, 색 <code>C.border</code>→<code>C.sub</code></td>
+            <td><code>aria-hidden</code>이라 이 채널을 쓰는 건 저시력 사용자뿐</td>
+          </tr>
+          <tr>
+            <td>고지 헤더 줄바꿈</td>
+            <td>헤더가 폭 전체를 쓰게 분리하고 버전 식별자를 <code>nowrap</code>으로 묶어 <code>FP-</code> 중간 줄바꿈 제거</td>
+            <td>식별자 가독성</td>
+          </tr>
+          <tr>
+            <td>토글 위치·문구</td>
+            <td>토글을 고지 본문 <strong>뒤</strong>로 이동, 문구를 실제 앱 문자열 「안전 고지 다시 보기 / 안전 고지 접기」로 교체</td>
+            <td>probe로 확인한 실제 낭독 순서</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>검증은 브라우저에서 1·2·3·4·4(입력됨)·5·6단계를 순회하며 모든 텍스트 노드의 computed fontSize와 대비를 계산했다. 결과는 전 단계 <code>textIssues: []</code>, <code>touchUnder48: []</code>, <code>hOverflow: false</code>. <code>tsc --noEmit</code> 통과.</p>
+  </section>
+
+  <section>
+    <h2>측정된 디자인 토큰</h2>
+    <p>1~3단계 노트와 같은 값이다. 색은 실측값이며 변경하지 않는다. disabled만 이번에 새로 정했다.</p>
+    <pre>color/bg            #000000
+color/text          #FFFFFF    21.00:1  AAA
+color/emphasis      #FFE8BD    17.53:1  AAA
+color/sub           #C9C6C0    12.32:1  AAA  (검정 배경)
+color/surface       #121212
+color/button-fill   #5A595B     3.01:1  비텍스트 AA
+color/button-text   #FFFFFF     6.97:1  AA
+color/line          #6E6D70     4.08:1  비텍스트 AA — 글자색으로 쓰지 말 것
+color/warning       #E38A72                    (신규 제안·취소 마커)
+color/disabled-fill #2A2A2A                    ← 신규
+color/disabled-text #999999     5.04:1  AA     ← 신규
+
+text/body           18sp 하한   text/input     20sp
+touch/min           48dp        touch/primary  56dp
+radius              10dp        width          360dp 기준</pre>
+    <div class="callout">
+      <strong><code>color/line</code>은 테두리·구분선 전용이다</strong>
+      4.08:1은 비텍스트 AA만 통과한다. 글자에 쓰면 일반 텍스트 AA(4.5:1)에 미달하고, 카드(<code>#121212</code>) 위에서는 3.64:1까지 떨어진다. Figma 결과물이 5곳에서 이걸 글자색으로 썼다.
+    </div>
+  </section>
+
+  <section>
+    <h2>막힌 것과 그 이유</h2>
+    <div class="callout bad">
+      <strong>FP-010 Goal 자체가 외부 연동을 범위 밖으로 선언했다</strong>
+      <code>target_completion_level = "INTERNAL_POLICY_CONFORMANCE_REASSESSED"</code>. Goal 문서가 "내부 slice 완료 뒤에도 외부 signup·SMS·보호자 API와 운영 승인, 실제 사용자 TalkBack, <code>TC-FP-010-01~04</code>가 없으므로 <code>GAP-019</code>는 최대 <code>PARTIAL</code>"이라고 적는다. <strong>지금 앱의 4~8단계 대기 화면은 미완성이 아니라 이 Goal이 의도한 종착점이다.</strong>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>항목</th><th>막는 것</th><th>판단 주체</th></tr></thead>
+        <tbody>
+          <tr><td>백엔드 경로 5개 부재</td><td>현재 게이트웨이에 <code>/api/field-session</code>, <code>/api/field-walk</code>뿐. 전화번호 제출·SMS 검증·보호자 승인·계정 활성화·검증 로그인이 없다</td><td>C · 백엔드</td></tr>
+          <tr><td>SMS 검증 공급자 미정</td><td>5단계 전체. 재전송·만료 UI도 여기에 묶여 그릴 수 없다</td><td>팀 합의 · 외부 계약</td></tr>
+          <tr><td>불투명 핸들 발급 주체 미정</td><td><code>^onb_[0-9a-f]{32}$</code> · <code>^actor_[0-9a-f]{32}$</code>. 정책이 전화번호·비밀번호·생년월일 파생을 금지하므로 발급 주체가 정해져야 앱이 검증할 대상이 생긴다</td><td>C · 백엔드</td></tr>
+          <tr><td>보호자 승인 전달 경로 미정</td><td>6단계에서 보호자에게 무엇이 갔는지 쓸 수 없다</td><td>팀 합의</td></tr>
+          <tr><td>대기 갱신 방식 미정</td><td>폴링/푸시가 정해지지 않아 대기 문구를 확정할 수 없다 (위 「미정」 마커 자리)</td><td>C · 백엔드</td></tr>
+          <tr><td><code>productionEvidenceAvailable = false</code> 해제</td><td>운영 fail-closed를 여는 변경. 임의로 바꿀 성격이 아니다</td><td>통제</td></tr>
+          <tr><td><code>AGENTS.md:28</code> 제품 코드 게이트</td><td>"과거 base 부재나 Goal graph 실패를 무시하고 제품 기능 구현을 시작하지 않는다". 초과 34건이 PR #3의 통제 산출물 불일치에서 나온다</td><td>통제</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>앞의 다섯은 <code>figma-brief-4to8.html</code>과 <code>git-notes.html</code>의 C 조율 질문으로 정리해 두었다. 뒤의 둘은 통제 항목이다.</p>
+  </section>
+
+  <section>
+    <h2>probe로 확인한 현재 앱 상태</h2>
+    <p>2026-08-24. 제품 코드를 건드리지 않고 <code>androidTest</code> 소스셋에만 임시 probe를 두어, 스텁 검증자로 만든 4~8단계 스냅샷을 리플렉션으로 주입하고 접근성 트리를 뽑았다. probe는 실행 후 삭제했다.</p>
+    <pre>ScrollView
+  TextView  안전 고지(접힌 1문장)          focusable=false  a11y=yes
+  Button    안전 고지 다시 보기             focusable=true   a11y=yes
+  TextView  첫 실행 N단계. …기다립니다      focusable=false  a11y=yes</pre>
+    <ul>
+      <li>다섯 단계가 <strong>구조적으로 완전히 동일</strong>하고, 누를 수 있는 것은 「안전 고지 다시 보기」 하나뿐이다.</li>
+      <li>진행바가 <strong>3/3 가득 찬 채로 멈춘다</strong>. <code>FIRST_RUN_VISIBLE_STAGE_COUNT = 3</code>이고 4단계 이후는 <code>else</code>로 떨어진다. 막대는 완료를 보이고 문구는 4단계를 말한다.</li>
+      <li>접근성 라벨 자체는 정확하다. 진행바는 <code>IMPORTANT_FOR_ACCESSIBILITY_NO</code>로 의도적으로 제외돼 있고 근거 주석까지 있다. 단계 번호는 heading이 낭독하므로 스크린리더 사용자는 올바른 단계를 듣는다. <strong>진행바 문제는 시각적 결함이지 접근성 결함이 아니다.</strong></li>
+    </ul>
+    <div class="callout bad">
+      <strong>EPIC-02 담당자에게 확인할 것 — 취소·오류 복구 경로</strong>
+      FP-010 완료 기준에 "필수 단계 누락·오래된 증거·실패·<strong>취소</strong> 때 보행 화면으로 넘어가지 않음"과 "TalkBack 조작과 <strong>오류 복구 경로</strong>가 내부 회귀로 검증됨"이 있다. 그런데 4~8단계 화면에는 취소도 복구 경로도 없다. 정책 코드에 <code>cancelAttempt()</code>가 있는데 UI에서 호출하는 곳이 없다. 외부 연동이 없어 당연한 것인지, 내부 slice에서 빠진 것인지는 판단할 수 없다.
+    </div>
+  </section>
+
+  <section>
+    <h2>아직 남은 디자인 여지</h2>
+    <ul>
+      <li>대기 화면이 여전히 비어 있다. 문구 한 줄 + 펄스 3점이 전부다. 갱신 방식이 정해지면 경과 표시나 상태 변화 낭독을 넣을 자리가 생긴다.</li>
+      <li>진행 표시를 3구간(등록·검증·준비)으로 묶었는데, 구간 안에서 몇 번째인지는 숫자로만 보인다. 12칸으로 펼치는 안도 여전히 유효하다. 다만 360dp에서 12칸은 칸당 24dp 미만이 된다.</li>
+      <li>6단계는 만 14~17세만 본다. 지금은 구간 표시로 자연스럽게 넘어가지만, 성인에게 "6단계가 없다"는 사실을 알릴 필요가 있는지는 미결이다.</li>
+      <li>취소 확인 대화의 위계. 「계속 진행」을 주 행동으로 둔 것은 실수 방지 목적이지만, 정말 취소하려는 사용자에게는 한 단계 더 멀다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Figma 재생성에 대해</h2>
+    <p>1~3단계에서 얻은 교훈 — 구조 제약과 코드 계약을 브리프에 모두 담으면 옮길 수 있는 결과가 나온다 — 는 이번에도 유효했다. 가장 위험했던 OTP 입력칸이 <strong>0건</strong>이고, 소스에 <code>{/* 입력칸 하나만 — OTP·비밀번호 추가 금지 */}</code> 주석까지 달려 있었다.</p>
+    <div class="callout bad">
+      <strong>그래도 빈칸은 채웠다</strong>
+      「완료되면 자동으로 다음 단계로 넘어갑니다」 한 문장이 나왔다. 브리프가 갱신 방식을 미정으로 명시했고 바로 위 주석도 규칙을 정확히 알고 있었는데, 문장이 어겼다. <strong>금지 목록에 없는 미정 항목은 생성 모델이 그럴듯하게 메운다.</strong> 다음 브리프에서는 미정 항목도 「지어내면 안 되는 것」과 같은 강도로 적어야 한다.
+    </div>
+    <p>나머지 위반(크기·대비·터치)은 전부 수치였고 기계적으로 고쳤다. 내용 계약은 그대로 쓸 수 있다.</p>
+  </section>
+
+  <section>
+    <h2>이식할 때 확인할 것</h2>
+    <ul>
+      <li>블록 순서는 바꾸지 않는다. 대상은 <code>firstRunOnboardingControls</code>(3번) 안쪽뿐이다.</li>
+      <li>단계 안내 문장은 하나의 <code>TextView</code> + Spannable로 옮긴다. 요소 두 개로 나누지 않는다. 프로토타입도 단일 <code>&lt;p&gt;</code> + inline <code>&lt;span&gt;</code>이다.</li>
+      <li>고지 토글은 본문 <strong>뒤</strong>에 둔다. 문구는 <code>refreshFirstRunNoticeUi()</code>의 「안전 고지 다시 보기 / 안전 고지 접기」를 그대로 쓴다.</li>
+      <li>진행 표시는 <code>IMPORTANT_FOR_ACCESSIBILITY_NO</code>를 유지한다.</li>
+      <li>취소 경로와 「미정」 자리는 <strong>팀 확인 전에 구현하지 않는다.</strong> 프로토타입에 마커로 표시해 두었다.</li>
+      <li>5~8단계는 공통 컴포넌트 하나로 만들고 문구만 교체한다.</li>
+      <li><code>productionEvidenceVerifier</code>는 건드리지 않는다. 화면은 fail-closed 상태에서도 렌더돼야 한다.</li>
+    </ul>
+  </section>
+
+  <footer>
+    WalkSafe · Hanium DreamUp · EPIC-02 / FP-010 · Pixel 6 에뮬레이터 1080×2400 density 420 기준 · 프로토타입 검증 2026-08-24 · 함께 보는 문서 <code>figma-brief-4to8.html</code> · <code>git-notes.html</code>
+  </footer>
+</div>
